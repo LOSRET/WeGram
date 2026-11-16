@@ -1,0 +1,15 @@
+# Normalise every text file to LF in the repository and the working tree.
+# (core.autocrlf=true is set globally on the dev machine; without this the whole
+# tree would be rewritten to CRLF on the next checkout.)
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.zip binary
+*.dll binary
+*.node binary

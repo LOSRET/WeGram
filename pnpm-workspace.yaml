@@ -1,0 +1,11 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Packages allowed to run lifecycle/build scripts (pnpm 12: a name -> boolean map).
+# electron: downloads the binary; esbuild: installs its native binary;
+# tdl: node-gyp-build (no-op when a prebuild is present).
+allowBuilds:
+  electron: true
+  esbuild: true
+  tdl: true

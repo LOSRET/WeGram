@@ -1,0 +1,14 @@
+{
+  "name": "wechatgram",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@12.18.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @wechatgram/desktop dev",
+    "build": "pnpm --filter @wechatgram/desktop build",
+    "typecheck": "pnpm -r typecheck"
+  }
+}

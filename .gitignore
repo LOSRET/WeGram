@@ -1,0 +1,25 @@
+# 依赖与产物
+node_modules/
+.npm-cache/
+.pnpm-store/
+.cache/
+dist/
+out/
+release/
+
+# 本机凭据 —— 永远不要提交
+.env
+.env.*
+*.local
+
+# TDLib 运行时数据(session、消息库、下载缓存)
+spikes/*/data/
+spikes/*/_probe_db/
+spikes/*/_probe_files/
+**/tdlib-data/
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

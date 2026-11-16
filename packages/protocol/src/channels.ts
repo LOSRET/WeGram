@@ -1,0 +1,216 @@
+import { z } from 'zod'
+
+import {
+  appInfoSchema,
+  appSettingsSchema,
+  authStateSchema,
+  chatOpSchema,
+  chatSummarySchema,
+  connectionStateSchema,
+  messageEntitySchema,
+  messageOpSchema,
+  messageSchema,
+  proxyConfigSchema,
+  proxyTestResultSchema,
+  selfSchema,
+} from './dto'
+import { appErrorSchema } from './errors'
+
+/**
+ * Single source of truth for the IPC contract (design doc §7).
+ *
+ * The renderer may only name channels that appear in these tables; the preload
+ * script refuses anything else and the main process re-validates every payload
+ * with the zod schemas below.
+ */
+
+export const invokeChannels = [
+  'auth:state',
+  'auth:start',
+  'auth:code',
+  'auth:password',
+  'auth:logout',
+  'auth:me',
+  'chats:list',
+  'chats:get',
+  'chats:open',
+  'messages:history',
+  'messages:send',
+  'messages:edit',
+  'messages:delete',
+  'messages:forward',
+  'messages:read',
+  'search:global',
+  'search:inChat',
+  'media:download',
+  'media:upload',
+  'ui:saveDraft',
+  'ui:getDraft',
+  'settings:get',
+  'settings:set',
+  'proxy:get',
+  'proxy:set',
+  'proxy:test',
+  'app:info',
+] as const
+
+export type InvokeChannel = (typeof invokeChannels)[number]
+
+type ChannelSchema = { request: z.ZodType; response: z.ZodType }
+
+const noPayload = z.void()
+
+export const invokeSchemas = {
+  'auth:state': { request: noPayload, response: authStateSchema },
+  'auth:start': { request: z.object({ phone: z.string().min(5) }), response: authStateSchema },
+  'auth:code': { request: z.object({ code: z.string().min(1) }), response: authStateSchema },
+  'auth:password': { request: z.object({ password: z.string().min(1) }), response: authStateSchema },
+  'auth:logout': { request: noPayload, response: noPayload },
+  'auth:me': { request: noPayload, response: selfSchema },
+  'chats:list': {
+    request: z.object({
+      limit: z.number().int().positive().max(200),
+      offset: z.number().int().nonnegative(),
+    }),
+    response: z.array(chatSummarySchema),
+  },
+  'chats:get': { request: z.object({ chatId: z.number().int() }), response: chatSummarySchema },
+  'chats:open': { request: z.object({ chatId: z.number().int() }), response: noPayload },
+  'messages:history': {
+    request: z.object({
+      chatId: z.number().int(),
+      fromMessageId: z.number().int().optional(),
+      limit: z.number().int().positive().max(100),
+    }),
+    response: z.object({ messages: z.array(messageSchema), hasMore: z.boolean() }),
+  },
+  'messages:send': {
+    request: z.object({
+      chatId: z.number().int(),
+      text: z.string().min(1),
+      replyTo: z.number().int().optional(),
+    }),
+    response: z.object({ localId: z.string(), message: messageSchema }),
+  },
+  'messages:edit': {
+    request: z.object({
+      chatId: z.number().int(),
+      messageId: z.number().int(),
+      text: z.string(),
+    }),
+    response: messageSchema,
+  },
+  'messages:delete': {
+    request: z.object({
+      chatId: z.number().int(),
+      messageIds: z.array(z.number().int()).min(1),
+      forBoth: z.boolean(),
+    }),
+    response: noPayload,
+  },
+  'messages:forward': {
+    request: z.object({
+      fromChatId: z.number().int(),
+      messageIds: z.array(z.number().int()).min(1),
+      toChatId: z.number().int(),
+    }),
+    response: noPayload,
+  },
+  'messages:read': {
+    request: z.object({ chatId: z.number().int(), upToMessageId: z.number().int() }),
+    response: noPayload,
+  },
+  'search:global': {
+    request: z.object({ q: z.string().min(1), limit: z.number().int().positive().max(50) }),
+    response: z.array(chatSummarySchema),
+  },
+  'search:inChat': {
+    request: z.object({
+      chatId: z.number().int(),
+      q: z.string().min(1),
+      fromMessageId: z.number().int().optional(),
+    }),
+    response: z.array(messageSchema),
+  },
+  'media:download': {
+    request: z.object({ fileId: z.number().int(), priority: z.number().int().min(1).max(32) }),
+    response: z.object({ path: z.string() }),
+  },
+  'media:upload': {
+    request: z.object({ chatId: z.number().int(), filePath: z.string() }),
+    response: z.object({ fileId: z.number().int() }),
+  },
+  'ui:saveDraft': {
+    request: z.object({
+      chatId: z.number().int(),
+      text: z.string(),
+      entities: z.array(messageEntitySchema).optional(),
+      replyTo: z.number().int().optional(),
+    }),
+    response: noPayload,
+  },
+  'ui:getDraft': {
+    request: z.object({ chatId: z.number().int() }),
+    response: z
+      .object({ text: z.string(), replyTo: z.number().int().optional() })
+      .nullable(),
+  },
+  'settings:get': { request: noPayload, response: appSettingsSchema },
+  'settings:set': { request: z.object({ patch: appSettingsSchema.partial() }), response: noPayload },
+  'proxy:get': { request: noPayload, response: proxyConfigSchema.nullable() },
+  'proxy:set': { request: z.object({ config: proxyConfigSchema.nullable() }), response: noPayload },
+  'proxy:test': { request: z.object({ config: proxyConfigSchema }), response: proxyTestResultSchema },
+  'app:info': { request: noPayload, response: appInfoSchema },
+} satisfies Record<InvokeChannel, ChannelSchema>
+
+export type InvokeRequest<C extends InvokeChannel> = z.input<(typeof invokeSchemas)[C]['request']>
+export type InvokeResponse<C extends InvokeChannel> = z.output<(typeof invokeSchemas)[C]['response']>
+
+/** Every event main pushes to the renderer is sequenced, so gaps are detectable (§7.2). */
+const envelope = <S extends z.ZodType>(payload: S) =>
+  z.object({ seq: z.number().int(), payload })
+
+export const eventChannels = [
+  'evt:auth',
+  'evt:connection',
+  'evt:chats',
+  'evt:messages',
+  'evt:typing',
+  'evt:file',
+  'evt:error',
+] as const
+
+export type EventChannel = (typeof eventChannels)[number]
+
+export const eventSchemas = {
+  'evt:auth': envelope(authStateSchema),
+  'evt:connection': envelope(connectionStateSchema),
+  'evt:chats': envelope(z.object({ ops: z.array(chatOpSchema) })),
+  'evt:messages': envelope(z.object({ chatId: z.number().int(), ops: z.array(messageOpSchema) })),
+  'evt:typing': envelope(
+    z.object({
+      chatId: z.number().int(),
+      userId: z.number().int(),
+      action: z.string(),
+      until: z.number(),
+    }),
+  ),
+  'evt:file': envelope(
+    z.object({
+      fileId: z.number().int(),
+      downloaded: z.number(),
+      total: z.number(),
+      path: z.string().optional(),
+    }),
+  ),
+  'evt:error': envelope(appErrorSchema),
+} satisfies Record<EventChannel, z.ZodType>
+
+export type EventEnvelope<C extends EventChannel> = z.output<(typeof eventSchemas)[C]>
+export type EventPayload<C extends EventChannel> = EventEnvelope<C>['payload']
+
+/** The only API the preload script exposes on `window.tg`. */
+export interface TgBridge {
+  invoke<C extends InvokeChannel>(channel: C, payload?: InvokeRequest<C>): Promise<InvokeResponse<C>>
+  on<C extends EventChannel>(channel: C, callback: (event: EventEnvelope<C>) => void): () => void
+}

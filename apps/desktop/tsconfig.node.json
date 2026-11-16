@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "paths": {
+      "@wechatgram/protocol": ["../../packages/protocol/src/index.ts"]
+    }
+  },
+  "include": [
+    "electron.vite.config.ts",
+    "vite.web.config.ts",
+    "src/main/**/*.ts",
+    "src/preload/**/*.ts",
+    "scripts/**/*.ts",
+    "../../packages/protocol/src/**/*.ts"
+  ]
+}

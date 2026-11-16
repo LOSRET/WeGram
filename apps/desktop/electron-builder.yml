@@ -1,0 +1,19 @@
+appId: dev.wechatgram.desktop
+productName: WechatGram
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**
+  - package.json
+asarUnpack:
+  # tdjson.dll cannot be LoadLibrary'd from inside app.asar (RESULTS.md, conclusion 1)
+  - '**/node_modules/@prebuilt-tdlib/**'
+  - '**/node_modules/prebuilt-tdlib/**'
+win:
+  target:
+    - nsis
+  artifactName: ${productName}-${version}-${arch}.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

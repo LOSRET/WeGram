@@ -1,0 +1,39 @@
+{
+  "name": "@wechatgram/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WechatGram desktop shell (Electron + TDLib)",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "web": "vite --config vite.web.config.ts",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "tdlib:smoke": "tsx scripts/tdlib-smoke.ts",
+    "ui:db-check": "tsx scripts/ui-db-check.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.90.2",
+    "@tanstack/react-virtual": "^3.14.26",
+    "@wechatgram/protocol": "workspace:*",
+    "prebuilt-tdlib": "0.1008070.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tdl": "8.1.0",
+    "zustand": "^5.0.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.14",
+    "@types/node": "^22.18.8",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.1",
+    "@vitejs/plugin-react": "^5.0.4",
+    "electron": "^38.2.0",
+    "electron-vite": "^4.0.1",
+    "tailwindcss": "^4.1.14",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.9"
+  }
+}

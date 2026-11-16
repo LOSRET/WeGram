@@ -1,0 +1,971 @@
+@import 'tailwindcss';
+
+/* WeChat design tokens — every colour in the app must come from here (design doc §9.1). */
+:root {
+  /* Brand */
+  --wx-brand: #07c160;
+  --wx-brand-active: #06ad56;
+  --wx-brand-weak: #e6f8ee;
+
+  /* Backgrounds */
+  --wx-bg: #ededed;
+  --wx-bg-list: #f7f7f7;
+  --wx-bg-elevated: #ffffff;
+
+  /* Bubbles */
+  --wx-bubble-self: #95ec69;
+  --wx-bubble-other: #ffffff;
+  --wx-bubble-radius: 4px;
+
+  /* Text */
+  --wx-text: #191919;
+  --wx-text-secondary: #888888;
+  --wx-text-on-brand: #ffffff;
+
+  /* Lines and status */
+  --wx-divider: rgba(0, 0, 0, 0.08);
+  --wx-danger: #fa5151;
+  --wx-warning: #ffc300;
+  --wx-muted-dot: #b2b2b2;
+
+  /* Typography */
+  --wx-font: -apple-system, 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  --wx-fs-body: 17px;
+  --wx-lh-body: 1.42;
+  --wx-fs-caption: 13px;
+
+  /* Sizes */
+  --wx-titlebar-h: 60px;
+  --wx-sidebar-w: 300px;
+  --wx-list-item-h: 64px;
+  --wx-avatar: 40px;
+}
+
+[data-theme='dark'] {
+  --wx-bg: #111111;
+  --wx-bg-list: #191919;
+  --wx-bg-elevated: #1e1e1e;
+  --wx-bubble-self: #3eb575;
+  --wx-bubble-other: #2c2c2c;
+  --wx-text: #d6d6d6;
+  --wx-text-secondary: #8a8a8a;
+  --wx-text-on-brand: #ffffff;
+  --wx-divider: rgba(255, 255, 255, 0.08);
+  --wx-brand-weak: rgba(7, 193, 96, 0.16);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--wx-font);
+  font-size: var(--wx-fs-body);
+  color: var(--wx-text);
+  background: var(--wx-bg);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input,
+textarea {
+  font-family: inherit;
+  color: inherit;
+}
+
+/* ---------- App shell ---------- */
+
+.wx-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--wx-bg);
+}
+
+.wx-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ---------- Title bar (window controls are native: titleBarOverlay) ---------- */
+
+.wx-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: var(--wx-titlebar-h);
+  padding: 0 16px 0 20px;
+  /* The native window controls are drawn on top of the web content by
+     titleBarOverlay, so the right side must be reserved explicitly. The env()
+     vars come from Window Controls Overlay; in a plain browser they fall back
+     to zero reserved space. */
+  padding-right: calc(16px + (100% - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100%)));
+  background: var(--wx-bg-list);
+  border-bottom: 1px solid var(--wx-divider);
+  -webkit-app-region: drag;
+  user-select: none;
+  overflow: hidden;
+}
+
+.wx-titlebar__brand {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  flex: 0 0 auto;
+}
+
+.wx-titlebar__badge {
+  -webkit-app-region: no-drag;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--wx-brand-weak);
+  color: var(--wx-brand);
+}
+
+.wx-titlebar__spacer {
+  flex: 1;
+  min-width: 0;
+}
+
+.wx-search {
+  -webkit-app-region: no-drag;
+  flex: 0 1 220px;
+  min-width: 110px;
+  width: 220px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--wx-divider);
+  border-radius: 6px;
+  background: var(--wx-bg-elevated);
+  font-size: 14px;
+  outline: none;
+}
+
+.wx-search:focus {
+  border-color: var(--wx-brand);
+}
+
+.wx-icon-button {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wx-text-secondary);
+  font-size: 16px;
+}
+
+.wx-icon-button:hover {
+  background: var(--wx-divider);
+  color: var(--wx-text);
+}
+
+.wx-connection {
+  -webkit-app-region: no-drag;
+  font-size: var(--wx-fs-caption);
+  color: var(--wx-text-secondary);
+}
+
+.wx-connection--online {
+  color: var(--wx-brand);
+}
+
+.wx-connection--offline {
+  color: var(--wx-danger);
+}
+
+/* ---------- Sidebar / chat list ---------- */
+
+.wx-sidebar {
+  width: var(--wx-sidebar-w);
+  flex: 0 0 var(--wx-sidebar-w);
+  background: var(--wx-bg-list);
+  border-right: 1px solid var(--wx-divider);
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.wx-chat-item {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  height: var(--wx-list-item-h);
+  padding: 0 16px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.wx-chat-item:hover {
+  background: var(--wx-divider);
+}
+
+.wx-chat-item--active {
+  background: var(--wx-brand-weak);
+}
+
+.wx-chat-item--active:hover {
+  background: var(--wx-brand-weak);
+}
+
+.wx-avatar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--wx-avatar);
+  height: var(--wx-avatar);
+  flex: 0 0 var(--wx-avatar);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+  overflow: hidden;
+}
+
+.wx-chat-item__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.wx-chat-item__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wx-chat-item__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wx-chat-item__time {
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+  flex: 0 0 auto;
+}
+
+.wx-chat-item__preview {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--wx-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wx-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--wx-danger);
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+  flex: 0 0 auto;
+}
+
+.wx-badge--muted {
+  background: transparent;
+  color: var(--wx-muted-dot);
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+  min-width: 0;
+  height: auto;
+}
+
+/* ---------- Chat pane ---------- */
+
+.wx-chat {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  background: var(--wx-bg);
+}
+
+.wx-chat__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--wx-divider);
+  background: var(--wx-bg-list);
+}
+
+.wx-chat__title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.wx-chat__subtitle {
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+}
+
+.wx-messages-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.wx-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-anchor: none;
+  padding: 20px 24px 12px;
+  position: relative;
+  /* The virtualizer positions rows absolutely; keep block flow, not flex. */
+}
+
+.wx-messages--pending {
+  visibility: hidden;
+}
+
+.wx-messages__sizer {
+  position: relative;
+  width: 100%;
+}
+
+.wx-message-slot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+}
+
+.wx-messages__loading {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--wx-bg-elevated);
+  border: 1px solid var(--wx-divider);
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  pointer-events: none;
+}
+
+.wx-buoy {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--wx-brand);
+  color: var(--wx-text-on-brand);
+  font-size: 13px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+
+.wx-day-separator {
+  align-self: center;
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+  background: var(--wx-divider);
+  border-radius: 4px;
+  padding: 2px 8px;
+}
+
+.wx-message-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding-bottom: 10px;
+  position: relative;
+}
+
+.wx-message-more {
+  align-self: center;
+  border: none;
+  background: transparent;
+  color: var(--wx-text-secondary);
+  font-size: 16px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.wx-message-row:hover .wx-message-more {
+  opacity: 1;
+}
+
+.wx-message-more:hover {
+  background: var(--wx-divider);
+  color: var(--wx-text);
+}
+
+.wx-avatar--small {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  font-size: 11px;
+}
+
+/* ---------- Context menu ---------- */
+
+.wx-context-menu {
+  position: fixed;
+  z-index: 80;
+  min-width: 148px;
+  padding: 6px;
+  border-radius: 8px;
+  background: var(--wx-bg-elevated);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--wx-divider);
+  display: flex;
+  flex-direction: column;
+}
+
+.wx-context-menu__item {
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--wx-text);
+}
+
+.wx-context-menu__item:hover {
+  background: var(--wx-divider);
+}
+
+.wx-context-menu__item--danger {
+  color: var(--wx-danger);
+}
+
+/* ---------- Composer bars / toast / forward list ---------- */
+
+.wx-composer-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--wx-brand-weak);
+  font-size: 12px;
+  color: var(--wx-text);
+}
+
+.wx-composer-bar__quote {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wx-composer-bar__close {
+  border: none;
+  background: transparent;
+  color: var(--wx-text-secondary);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.wx-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 72px;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.78);
+  color: #fff;
+  font-size: 13px;
+  z-index: 90;
+}
+
+.wx-forward-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 320px;
+  overflow-y: auto;
+  gap: 2px;
+}
+
+.wx-forward-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  text-align: left;
+  color: var(--wx-text);
+}
+
+.wx-forward-item:hover:not(:disabled) {
+  background: var(--wx-divider);
+}
+
+.wx-forward-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wx-forward-item__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.wx-modal--small {
+  width: 340px;
+}
+
+.wx-chat__header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ---------- Dev-only acceptance panel ---------- */
+
+.wx-perf {
+  position: fixed;
+  right: 16px;
+  bottom: 56px;
+  z-index: 100;
+  font-size: 12px;
+}
+
+.wx-perf__toggle {
+  border: 1px solid var(--wx-divider);
+  background: var(--wx-bg-elevated);
+  color: var(--wx-text);
+  border-radius: 999px;
+  padding: 6px 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.wx-perf__panel {
+  margin-top: 8px;
+  width: 240px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--wx-bg-elevated);
+  border: 1px solid var(--wx-divider);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wx-perf__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--wx-text-secondary);
+}
+
+.wx-perf__row strong {
+  color: var(--wx-text);
+  font-weight: 600;
+}
+
+.wx-perf__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.wx-perf__actions .wx-button {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.wx-perf__results {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wx-perf__pass {
+  color: var(--wx-brand) !important;
+}
+
+.wx-perf__fail {
+  color: var(--wx-danger) !important;
+}
+
+.wx-message-row--self {
+  flex-direction: row-reverse;
+}
+
+.wx-bubble {
+  max-width: 100%;
+  width: fit-content;
+  padding: 9px 12px;
+  border-radius: var(--wx-bubble-radius);
+  background: var(--wx-bubble-other);
+  font-size: 15px;
+  line-height: var(--wx-lh-body);
+  word-break: break-word;
+  white-space: pre-wrap;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.wx-bubble--self {
+  background: var(--wx-bubble-self);
+  color: #121212;
+}
+
+.wx-quote {
+  margin-bottom: 6px;
+  padding: 4px 8px;
+  border-left: 3px solid var(--wx-muted-dot);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.06);
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 420px;
+}
+
+.wx-message__meta {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--wx-text-secondary);
+  text-align: right;
+}
+
+.wx-message-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  /* max-width must live here: a percentage max-width on the bubble would
+     resolve against this stack's content size and collapse to min-content. */
+  max-width: min(560px, 68%);
+}
+
+.wx-message-stack--self {
+  align-items: flex-end;
+}
+
+.wx-sender {
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+  padding-left: 2px;
+}
+
+.wx-empty-chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--wx-text-secondary);
+}
+
+/* ---------- Composer ---------- */
+
+.wx-composer {
+  border-top: 1px solid var(--wx-divider);
+  background: var(--wx-bg-list);
+  padding: 10px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wx-composer__input {
+  min-height: 68px;
+  max-height: 180px;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.wx-composer__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.wx-composer__hint {
+  margin-right: auto;
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+}
+
+.wx-button {
+  border: none;
+  border-radius: 4px;
+  padding: 7px 18px;
+  background: var(--wx-brand);
+  color: var(--wx-text-on-brand);
+  font-size: 14px;
+}
+
+.wx-button:hover {
+  background: var(--wx-brand-active);
+}
+
+.wx-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wx-button--ghost {
+  background: transparent;
+  color: var(--wx-text-secondary);
+  border: 1px solid var(--wx-divider);
+}
+
+.wx-button--ghost:hover {
+  background: var(--wx-divider);
+  color: var(--wx-text);
+}
+
+/* ---------- Login ---------- */
+
+.wx-login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background: var(--wx-bg);
+}
+
+.wx-login__card {
+  width: 380px;
+  padding: 32px;
+  border-radius: 10px;
+  background: var(--wx-bg-elevated);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.wx-login__title {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.wx-login__subtitle {
+  font-size: 13px;
+  color: var(--wx-text-secondary);
+  line-height: 1.5;
+}
+
+.wx-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wx-field label {
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+}
+
+.wx-input {
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--wx-divider);
+  border-radius: 6px;
+  background: var(--wx-bg);
+  font-size: 15px;
+  outline: none;
+}
+
+.wx-input:focus {
+  border-color: var(--wx-brand);
+}
+
+.wx-error {
+  font-size: 13px;
+  color: var(--wx-danger);
+  line-height: 1.4;
+}
+
+.wx-hint {
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+}
+
+/* ---------- Modal / settings ---------- */
+
+.wx-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.32);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.wx-modal {
+  width: 460px;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 22px;
+  border-radius: 10px;
+  background: var(--wx-bg-elevated);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.wx-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.wx-row {
+  display: flex;
+  gap: 10px;
+}
+
+.wx-row > * {
+  flex: 1;
+}
+
+.wx-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+}
+
+.wx-status {
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+}
+
+.wx-status--ok {
+  color: var(--wx-brand);
+}
+
+.wx-status--fail {
+  color: var(--wx-danger);
+}
+
+.wx-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--wx-divider);
+  border-top-color: var(--wx-brand);
+  border-radius: 50%;
+  animation: wx-spin 0.8s linear infinite;
+}
+
+@keyframes wx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- Error strip / status footer ---------- */
+
+.wx-error-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  font-size: 13px;
+  color: #fff;
+  background: var(--wx-danger);
+}
+
+.wx-error-bar > span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wx-error-bar .wx-icon-button {
+  color: #fff;
+  width: 22px;
+  height: 22px;
+}
+
+.wx-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 16px;
+  border-top: 1px solid var(--wx-divider);
+  background: var(--wx-bg-list);
+  font-size: 11px;
+  color: var(--wx-text-secondary);
+  user-select: none;
+}
+
+.wx-sidebar__empty {
+  padding: 24px 16px;
+  font-size: 13px;
+  color: var(--wx-text-secondary);
+  text-align: center;
+}
+
+/* Prevent the name/status area from being dragged when clicking the title bar buttons. */
+.wx-titlebar input,
+.wx-titlebar button {
+  -webkit-app-region: no-drag;
+}
+
