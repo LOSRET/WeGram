@@ -13,6 +13,8 @@ export interface AnchoredScrollApi {
   atBottom: boolean
   markReady: () => void
   scrollToBottom: (smooth?: boolean) => void
+  /** Drop the stick-to-bottom pin without moving — used when restoring a saved anchor. */
+  unpin: () => void
 }
 
 /**
@@ -101,5 +103,13 @@ export function useAnchoredScroll({
 
   const markReady = useCallback(() => setReady(true), [])
 
-  return { ready, atBottom, markReady, scrollToBottom }
+  // Restoring a saved anchor is an intentional "not at the bottom": without this
+  // the ResizeObserver would glue the viewport to the bottom on the next
+  // measurement and undo the restore.
+  const unpin = useCallback(() => {
+    pinnedRef.current = false
+    setAtBottom(false)
+  }, [])
+
+  return { ready, atBottom, markReady, scrollToBottom, unpin }
 }

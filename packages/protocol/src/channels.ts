@@ -12,6 +12,7 @@ import {
   messageSchema,
   proxyConfigSchema,
   proxyTestResultSchema,
+  scrollAnchorSchema,
   selfSchema,
 } from './dto'
 import { appErrorSchema } from './errors'
@@ -46,6 +47,8 @@ export const invokeChannels = [
   'media:upload',
   'ui:saveDraft',
   'ui:getDraft',
+  'ui:saveAnchor',
+  'ui:getAnchor',
   'settings:get',
   'settings:set',
   'proxy:get',
@@ -154,6 +157,22 @@ export const invokeSchemas = {
     response: z
       .object({ text: z.string(), replyTo: z.number().int().optional() })
       .nullable(),
+  },
+  /**
+   * `messageId: null` means "the reader was at the bottom" and clears the anchor,
+   * so reopening the chat lands on the newest message.
+   */
+  'ui:saveAnchor': {
+    request: z.object({
+      chatId: z.number().int(),
+      messageId: z.number().int().nullable(),
+      offset: z.number().int(),
+    }),
+    response: noPayload,
+  },
+  'ui:getAnchor': {
+    request: z.object({ chatId: z.number().int() }),
+    response: scrollAnchorSchema.nullable(),
   },
   'settings:get': { request: noPayload, response: appSettingsSchema },
   'settings:set': { request: z.object({ patch: appSettingsSchema.partial() }), response: noPayload },

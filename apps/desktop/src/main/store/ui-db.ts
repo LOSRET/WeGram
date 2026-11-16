@@ -130,8 +130,11 @@ export class UiDatabase {
   }
 
   /**
-   * Reserved for W3: remembering where the reader stopped in a chat.
-   * Written by the UI, read back when the chat is opened again.
+   * Reading position of a chat (§8.2 rule 5). Written by MessageList after the
+   * reader scrolls, read back by ChatPane when the chat is opened.
+   *
+   * `messageId: null` is meaningful: it means "the reader was at the bottom" and
+   * is what makes reopening the chat land on the newest message.
    */
   saveScrollAnchor(chatId: number, messageId: number | null, offset = 0): void {
     this.require()

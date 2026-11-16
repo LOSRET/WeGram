@@ -3,6 +3,7 @@ import type { ChatSummary, Message } from '@wechatgram/protocol'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import { avatarColor, formatMessageTime, initials } from '../lib/format'
+import { invoke } from '../lib/ipc'
 import { useAnchoredScroll } from '../lib/useAnchoredScroll'
 import { ContextMenu, type MenuItem } from './ContextMenu'
 
@@ -11,6 +12,8 @@ interface MessageListProps {
   messages: Message[]
   hasMore: boolean
   loadingOlder: boolean
+  /** Saved reading position to open the chat at; null means "land at the bottom". */
+  initialAnchor: { messageId: number; offset: number } | null
   onLoadOlder: () => Promise<void>
   onReply: (message: Message) => void
   onEdit: (message: Message) => void
@@ -30,6 +33,7 @@ export function MessageList({
   messages,
   hasMore,
   loadingOlder,
+  initialAnchor,
   onLoadOlder,
   onReply,
   onEdit,
@@ -44,7 +48,7 @@ export function MessageList({
   const [menu, setMenu] = useState<MenuState | null>(null)
   const [buoy, setBuoy] = useState(0)
 
-  const { ready, atBottom, markReady, scrollToBottom } = useAnchoredScroll({
+  const { ready, atBottom, markReady, scrollToBottom, unpin } = useAnchoredScroll({
     scrollRef,
     contentRef,
     resetKey: chat.id,
@@ -58,16 +62,132 @@ export function MessageList({
     getItemKey: (index) => messages[index]?.id ?? index,
   })
 
-  // Rule 1: land at the bottom, and only reveal once that is true.
+  /**
+   * Rule 1, extended for #2: the first paint either restores the saved reading
+   * position or lands at the bottom. Both happen while the list is still hidden
+   * (`wx-messages--pending`), so the reader never sees it jump.
+   *
+   * The virtualizer measures rows lazily, so a single `scrollToIndex` is only an
+   * estimate; the position is corrected against the anchor row's DOM node until
+   * it stops moving — the same two-stage idea as the prepend compensation.
+   */
+  const restoringRef = useRef(false)
+  const initialisedRef = useRef(false)
+
+  const restoreToAnchor = async (messageId: number, offset: number): Promise<void> => {
+    const el = scrollRef.current
+    if (!el) return
+    restoringRef.current = true
+    unpin()
+    try {
+      let index = messages.findIndex((message) => message.id === messageId)
+      if (index < 0) return
+      virtualizer.scrollToIndex(index, { align: 'start' })
+
+      let stable = 0
+      for (let frame = 0; frame < 40 && stable < 2; frame += 1) {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+        if (!scrollRef.current) return
+        index = messages.findIndex((message) => message.id === messageId)
+        if (index < 0) return
+        const node = el.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`)
+        if (!node) {
+          // Row is outside the rendered window (estimate was off): nudge again.
+          virtualizer.scrollToIndex(index, { align: 'start' })
+          stable = 0
+          continue
+        }
+        const delta = node.getBoundingClientRect().top - el.getBoundingClientRect().top - offset
+        if (Math.abs(delta) > 0.5) {
+          el.scrollTop += delta
+          stable = 0
+        } else {
+          stable += 1
+        }
+      }
+    } finally {
+      restoringRef.current = false
+    }
+  }
+
   useLayoutEffect(() => {
-    if (ready || messages.length === 0) return
+    if (initialisedRef.current || messages.length === 0) return
+    initialisedRef.current = true
+
+    const anchor = initialAnchor
+    if (anchor && messages.some((message) => message.id === anchor.messageId)) {
+      void restoreToAnchor(anchor.messageId, anchor.offset).finally(markReady)
+      return
+    }
+
     scrollToBottom()
     const frame = requestAnimationFrame(() => {
       scrollToBottom()
       markReady()
     })
     return () => cancelAnimationFrame(frame)
-  }, [messages.length, ready, scrollToBottom, markReady])
+    // Runs once per mounted chat (MessageList is keyed by chat id).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages.length])
+
+  /* ---------- reading position saved to ui.db (#2) ---------- */
+
+  const lastSavedRef = useRef('')
+  const saveTimerRef = useRef<number | null>(null)
+
+  const measureAnchor = (): { messageId: number | null; offset: number } | null => {
+    const el = scrollRef.current
+    if (!el) return null
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight
+    // At (or within a hair of) the bottom: no anchor at all is the two-in-one
+    // "read to the end" flag — reopening lands on the newest message.
+    if (distance <= 40) return { messageId: null, offset: 0 }
+    const containerTop = el.getBoundingClientRect().top
+    const slot = [...el.querySelectorAll<HTMLElement>('.wx-message-slot')].find(
+      (node) => node.getBoundingClientRect().bottom > containerTop + 4,
+    )
+    const id = slot?.dataset['messageId']
+    if (!slot || !id) return null
+    return {
+      messageId: Number(id),
+      offset: Math.round(slot.getBoundingClientRect().top - containerTop),
+    }
+  }
+
+  const flushAnchor = (): void => {
+    if (!initialisedRef.current || restoringRef.current || prependingRef.current) return
+    const anchor = measureAnchor()
+    if (!anchor) return
+    const key = `${anchor.messageId ?? 'bottom'}:${anchor.offset}`
+    if (key === lastSavedRef.current) return
+    lastSavedRef.current = key
+    void invoke('ui:saveAnchor', {
+      chatId: chat.id,
+      messageId: anchor.messageId,
+      offset: anchor.offset,
+    }).catch(() => undefined)
+  }
+
+  const scheduleAnchorSave = (): void => {
+    if (!initialisedRef.current || restoringRef.current || prependingRef.current) return
+    if (saveTimerRef.current !== null) return
+    saveTimerRef.current = window.setTimeout(() => {
+      saveTimerRef.current = null
+      flushAnchor()
+    }, 250)
+  }
+
+  // Leaving the chat (or the window): write the last position immediately.
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current !== null) {
+        window.clearTimeout(saveTimerRef.current)
+        saveTimerRef.current = null
+      }
+      flushAnchor()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Buoy for messages that arrived while the reader is scrolled up (rule 3).
   const previousCount = useRef(messages.length)
@@ -191,6 +311,7 @@ export function MessageList({
         ref={scrollRef}
         onScroll={(event) => {
           if (event.currentTarget.scrollTop < 160) void loadOlder()
+          scheduleAnchorSave()
         }}
         data-testid="message-scroller"
       >

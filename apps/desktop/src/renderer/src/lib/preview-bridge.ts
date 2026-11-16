@@ -154,6 +154,7 @@ const messagesByChat: Record<number, Message[]> = {
 }
 
 const drafts: Record<number, string> = {}
+const anchors: Record<number, { messageId: number; offset: number }> = {}
 
 function msg(chatId: number, id: number, text: string, outgoing: boolean, secondsAgo: number): Message {
   return {
@@ -274,6 +275,14 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       const text = String(store.text ?? '')
       if (text.trim().length) drafts[store.chatId] = text
       else delete drafts[store.chatId]
+      return undefined
+    }
+    case 'ui:getAnchor':
+      return anchors[store.chatId] ?? null
+    case 'ui:saveAnchor': {
+      const messageId = store.messageId as number | null
+      if (messageId === null) delete anchors[store.chatId]
+      else anchors[store.chatId] = { messageId, offset: Number(store.offset ?? 0) }
       return undefined
     }
     case 'settings:get':

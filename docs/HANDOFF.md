@@ -21,9 +21,9 @@ Verified at the end of the session: `pnpm typecheck`, `pnpm build`, `pnpm tdlib:
 60 fps, 0 px viewport drift when prepending a page.
 
 Follow-up session (same day), after the import below: repo created, `senderChatId` fix
-for channel posts, and the dark title-bar overlay verified end-to-end plus a login-screen
-drag strip (details in "Known gaps"). Commits: `262996a` (import), `af72110`
-(`senderChatId`), then the login-strip fix — `git log --oneline` is the source of truth.
+for channel posts, the dark title-bar overlay verified end-to-end plus a login-screen
+drag strip, and the `ui.db` reading-position wiring (details in "Known gaps"). The
+`git log --oneline` of `main` is the source of truth for those commits.
 
 **Git exists now**: `main`, root commit `262996a` ("chore: initial import of the W1/W2
 skeleton"), 69 files, clean tree. `.gitignore` covers `.env*`, `node_modules`, `out`,
@@ -157,6 +157,13 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
   caches titles (`chatTitles`, filled from `mapChat` and `updateChatTitle`) next to
   `userNames`. Measured on the real account: 20/20 messages in a channel use
   `messageSenderChat` (`senderChat` line in `tdlib:smoke`).
+- **Restoring a reading position needs all three pieces.** (a) the list must not mount
+  before the stored anchor is known — a cached chat otherwise captures the bottom as its
+  position; (b) `scrollToIndex` is only an estimate with dynamic row heights, so the
+  position is corrected against the anchor row's DOM node, the same way prepends are;
+  (c) `unpin()` must be called before restoring or the stick-to-bottom `ResizeObserver`
+  undoes it. The anchor is "first visible slot + its offset", and *no row at all* (a
+  null anchor) means "was at the bottom".
 - **Real unread counts are large** (hundreds of thousands on unfollowed groups); that
   is data, not a mapping bug.
 - `userData` is pinned to `%APPDATA%\WechatGram` via `app.setName`/`setPath`, because
@@ -181,9 +188,26 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
    rectangle in the corner. `.wx-login::before` now paints a 60 px `--wx-bg-list` strip
    with a divider (same as the shell), which also gives the login window its **only drag
    region** (it could not be moved before logging in).
-2. **`ui.db` scroll-anchor wiring** — columns and `saveScrollAnchor`/`getScrollAnchor`
-   exist, nothing calls them yet. Decide the UX first: restore position only when the
-   user was not at the bottom.
+2. ~~**`ui.db` scroll-anchor wiring**~~ — **done** with the decided UX ("restore only when
+   the reader was not at the bottom"):
+   - `MessageList` measures the first visible `.wx-message-slot` (id + offset relative to
+     the viewport top, which may be negative) after a 250 ms scroll debounce and on
+     unmount, and sends `ui:saveAnchor`. At the bottom (≤ 40 px) it sends
+     `messageId: null`, which is what makes a reopen land on the newest message.
+   - `ChatPane` resolves `ui:getAnchor` **before** mounting the list (a cached chat would
+     otherwise capture its position at the bottom and miss the restore), pages back up to
+     6 pages / 10 s until the anchor message is loaded, and passes it down as
+     `initialAnchor`.
+   - `MessageList` restores with `scrollToIndex` + correction against the anchor row's DOM
+     node (the virtualizer only estimates row heights), then reveals itself.
+   Verified with the mock adapter (Electron, `-NoSandbox -Mock`): chat switch restores the
+   exact row, a full app restart restores it from `ui.db`, a seeded deep anchor (#4771,
+   4 pages behind) paged back automatically, and scrolling to the bottom cleared the row
+   (`scroll_anchor_id = NULL`).
+   Limitation worth knowing: an anchor further back than that budget is unreachable
+   (history is fetched by paging, not from an anchor), so the chat opens at the bottom and
+   the anchor is dropped. Fixing that properly needs a "load around message" fetch, which
+   is a W3 jump-to-message feature.
 3. **W3 scope**: media send/receive (files, images, progress events), sticker renderer
    (WebP `<img>`, TGS → `DecompressionStream` + lottie-web, WebM `<video>`), search
    (global + in-chat), day separators, unread divider, sticker panel.

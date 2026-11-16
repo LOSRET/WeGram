@@ -143,6 +143,20 @@ export const messageOpSchema = z.discriminatedUnion('op', [
 export type MessageOp = z.infer<typeof messageOpSchema>
 
 /**
+ * Where the reader stopped in a chat (design doc §8.2 rule 5).
+ *
+ * `offset` is the anchor row's top relative to the viewport top in pixels and can
+ * be negative when that row starts above the viewport. No stored anchor at all
+ * means "the reader was at the bottom", which is the normal case and needs no
+ * resume: the list lands at the newest message.
+ */
+export const scrollAnchorSchema = z.object({
+  messageId: z.number().int(),
+  offset: z.number().int(),
+})
+export type ScrollAnchor = z.infer<typeof scrollAnchorSchema>
+
+/**
  * Proxy configuration.
  *
  * Secrets crossing IPC are always `MASK` when already stored; sending `MASK`

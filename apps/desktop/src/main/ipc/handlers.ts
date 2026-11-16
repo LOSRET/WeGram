@@ -76,6 +76,15 @@ export function createHandlers({
       )
     },
     'ui:getDraft': (payload) => uiDb.getDraft((payload as { chatId: number }).chatId),
+    'ui:saveAnchor': (payload) => {
+      const anchor = payload as { chatId: number; messageId: number | null; offset: number }
+      uiDb.saveScrollAnchor(
+        anchor.chatId,
+        anchor.messageId,
+        anchor.messageId === null ? 0 : anchor.offset,
+      )
+    },
+    'ui:getAnchor': (payload) => uiDb.getScrollAnchor((payload as { chatId: number }).chatId),
 
     'settings:get': () => ({
       theme: uiDb.getSetting('theme') === 'dark' ? ('dark' as const) : ('light' as const),

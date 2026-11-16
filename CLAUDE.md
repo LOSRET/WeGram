@@ -17,7 +17,9 @@ W2 scope is in: virtualised message list (`@tanstack/react-virtual`), anchored p
 
 `ui.db` uses the built-in `node:sqlite` (Electron 38 ships Node 22.22) instead of better-sqlite3, so there is no native module to rebuild for the Electron ABI. All SQL is confined to `apps/desktop/src/main/store/ui-db.ts`; `settings.json` keeps only the proxy config because it carries a sealed secret.
 
-Still deferred: `ui.db` scroll-anchor wiring (columns and API exist), media send/receive, stickers, search.
+Still deferred: media send/receive, stickers, search. `ui.db` reading positions
+(`scroll_anchor_id`/`scroll_offset`) are wired: MessageList writes them, ChatPane restores
+them when the reader was not at the bottom.
 
 W1 is verified by `pnpm typecheck`, `pnpm build` and the browser preview (`pnpm web`). The Electron window has also been exercised end-to-end on this machine, but only when launched detached and with `--no-sandbox` (both are environment workarounds — see Environment quirks).
 
