@@ -114,15 +114,25 @@ one element per line. Re-run it if the client updates and the artwork changes.
 "chats" tab (red bubble with dots over a green bubble — the payloads are monochrome,
 and only an empty bubble exists) and the empty-pane watermark logo.
 
-**Icons matched off reference crops in this round** (client crop → binarised ink mask →
-blurred soft-IoU over all 2500 masks, best hit confirmed by eye; scripts
-`.cache/wxsvg/refine.py`, `refine2.py`):
+**Icons matched off reference crops** (client crop → binarised ink mask → blurred
+soft-IoU over all 2500 masks, best hit confirmed by eye; scripts
+`.cache/wxsvg/refine.py`, `refine2.py`, `siblings.py`):
 
 | Component | payload | Component | payload |
 |---|---|---|---|
-| `MoreIcon` (…) | `#0846` | `ScissorsIcon` | `#0632` |
+| `MoreIcon` (…) | `#0846` | `ScissorsIcon` | `#0859` |
 | `CallIcon` (话机) | `#0300` | `ChevronDownIcon` | `#0555` (12×12) |
-| `StickerCubeIcon` (贴纸 cube) | `#1359` | `CallBubbleIcon` (was `#1755`, empty bubble) | `#0068` |
+| `StickerCubeIcon` (贴纸 cube) | `#1268` | `CallBubbleIcon` (was `#1755`, empty bubble) | `#1206` |
+
+**Weight is per family, not per library.** Many glyphs ship as regular / medium /
+heavy siblings that differ only in stroke (measured at 24-unit scale by
+`.cache/wxsvg/erode_weight.py`: 1.12 / 1.38 / 1.88, with 0.88 and 1.62 in the
+tails). Match the lightest sibling, otherwise one icon in a row reads visibly
+bolder than its neighbours — the cube, scissors and call bubble had to be moved
+down a weight for exactly that reason. Most other glyphs have a single weight
+(smiley and folder sit at 1.38), so a row can only be as even as the library
+allows. A plain `2A/P` estimate is not usable here: vertices and junctions inflate
+it (it called the thin cube "heavier" than the smiley).
 
 `MomentsTabIcon` uses the compass from WeChat's design-system SVG set
 (`.cache/wxres/tabBar_icons_outlined_discover.svg`, ring + rhombus needle) because the
