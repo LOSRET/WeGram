@@ -8,12 +8,17 @@ import type {
   ProxyConfig,
   ProxyTestResult,
   Self,
+  Sticker,
+  StickerSet,
+  StickerSetSummary,
 } from '@wechatgram/protocol'
 import { getTdjson } from 'prebuilt-tdlib'
 import { configure, createClient } from 'tdl'
 
+import { probeImageSize } from '../media/image-size'
+import { registerMediaFile } from '../media/registry'
 import { createLogger, toAdapterError } from '../util'
-import { AdapterEmitter, type TelegramAdapter } from './adapter'
+import { AdapterEmitter, type MediaKind, type TelegramAdapter } from './adapter'
 
 /* TDLib responses are a 2MB generated type space; the adapter boundary is the
  * only place allowed to touch raw JSON, so it stays `unknown`-ish here and is
@@ -80,6 +85,8 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   private readonly userNames = new Map<number, string>()
   /** Chat titles, used for `messageSenderChat` (channel posts, anonymous admins). */
   private readonly chatTitles = new Map<number, string>()
+  /** Sticker file id → pixel size, so the picker can send without a lookup. */
+  private readonly stickerSizes = new Map<number, { width: number; height: number }>()
 
   constructor(private readonly options: TdlibAdapterOptions) {
     super()
@@ -331,7 +338,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     return Promise.all(rawMessages.map((raw) => this.mapMessage(input.chatId, raw)))
   }
 
-  async downloadFile(input: { fileId: number; priority: number }): Promise<{ path: string }> {
+  async downloadFile(input: { fileId: number; priority: number }): Promise<{ path: string; url: string }> {
     const file = await this.invoke({
       _: 'downloadFile',
       file_id: input.fileId,
@@ -342,11 +349,138 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     })
     const path: string | undefined = file?.local?.path
     if (!path) throw new AppError('internal', `File ${input.fileId} downloaded but path is empty`)
-    return { path }
+    const url = registerMediaFile(path)
+    this.emit({
+      type: 'file',
+      fileId: input.fileId,
+      downloaded: file?.local?.downloaded_size ?? 0,
+      total: file?.expected_size ?? file?.size ?? 0,
+      url,
+      completed: true,
+    })
+    return { path, url }
   }
 
-  async uploadFile(): Promise<{ fileId: number }> {
-    throw new AppError('not_implemented', 'File upload lands in W3')
+  /**
+   * Sends a local file. Photos go through `inputMessagePhoto` so the server builds
+   * the usual size ladder; everything else is a document. The pixel size must be
+   * known before a photo can be sent (TDLib wants it), so an unparsable image falls
+   * back to a document instead of producing a broken bubble.
+   */
+  async sendMedia(input: {
+    chatId: number
+    filePath: string
+    kind: MediaKind
+    caption?: string
+    replyTo?: number
+  }): Promise<{ localId: string; message: Message }> {
+    const size = input.kind === 'photo' ? await probeImageSize(input.filePath) : null
+    const content =
+      input.kind === 'photo' && size
+        ? {
+            _: 'inputMessagePhoto',
+            photo: {
+              _: 'inputPhoto',
+              photo: { _: 'inputFileLocal', path: input.filePath },
+              thumbnail: null,
+              video: null,
+              added_sticker_file_ids: [],
+              width: size.width,
+              height: size.height,
+            },
+            caption: formattedText(input.caption),
+            show_caption_above_media: false,
+            self_destruct_type: null,
+            has_spoiler: false,
+          }
+        : {
+            _: 'inputMessageDocument',
+            document: {
+              _: 'inputDocument',
+              document: { _: 'inputFileLocal', path: input.filePath },
+              thumbnail: null,
+              disable_content_type_detection: false,
+            },
+            caption: formattedText(input.caption),
+          }
+
+    const response = await this.invoke({
+      _: 'sendMessage',
+      chat_id: input.chatId,
+      reply_to: replyTo(input.replyTo),
+      options: null,
+      input_message_content: content,
+    })
+    const message = await this.mapMessage(input.chatId, response)
+    return { localId: `td-${message.id}`, message }
+  }
+
+  /** Sends an existing sticker by file id, as the picker does (design doc §9.4). */
+  async sendSticker(input: {
+    chatId: number
+    fileId: number
+    replyTo?: number
+  }): Promise<{ localId: string; message: Message }> {
+    // Dimensions were cached when the set was mapped; 512 is the sticker default.
+    const size = this.stickerSizes.get(input.fileId) ?? { width: 512, height: 512 }
+    const response = await this.invoke({
+      _: 'sendMessage',
+      chat_id: input.chatId,
+      reply_to: replyTo(input.replyTo),
+      options: null,
+      input_message_content: {
+        _: 'inputMessageSticker',
+        sticker: {
+          _: 'inputSticker',
+          sticker: { _: 'inputFileId', id: input.fileId },
+          thumbnail: null,
+          width: size.width,
+          height: size.height,
+        },
+        emoji: '',
+      },
+    })
+    const message = await this.mapMessage(input.chatId, response)
+    return { localId: `td-${message.id}`, message }
+  }
+
+  async listStickerSets(): Promise<StickerSetSummary[]> {
+    const response = await this.invoke({
+      _: 'getInstalledStickerSets',
+      sticker_type: { _: 'stickerTypeRegular' },
+    })
+    const sets: TdObject[] = Array.isArray(response?.sets) ? response.sets : []
+    return sets.map((set) => ({
+      id: String(set.id),
+      title: set.title ?? '',
+      ...(set.thumbnail ? { thumbnail: mapStickerThumbnail(set.thumbnail) } : {}),
+    }))
+  }
+
+  async getStickerSet(setId: string): Promise<StickerSet> {
+    const response = await this.invoke({ _: 'getStickerSet', set_id: setId })
+    const stickers: TdObject[] = Array.isArray(response?.stickers) ? response.stickers : []
+    return {
+      id: String(response.id),
+      title: response.title ?? '',
+      ...(response.thumbnail ? { thumbnail: mapStickerThumbnail(response.thumbnail) } : {}),
+      stickers: stickers.map((sticker) => this.toSticker(sticker)).filter((item) => item.fileId > 0),
+    }
+  }
+
+  private toSticker(raw: TdObject): Sticker {
+    const fileId: number = raw?.sticker?.id ?? 0
+    if (fileId && raw?.width && raw?.height) {
+      this.stickerSizes.set(fileId, { width: raw.width, height: raw.height })
+    }
+    return {
+      fileId,
+      format: mapStickerFormat(raw?.format?._) ?? 'webp',
+      ...(raw?.emoji ? { emoji: raw.emoji } : {}),
+      ...(raw?.width ? { width: raw.width } : {}),
+      ...(raw?.height ? { height: raw.height } : {}),
+      ...(raw?.thumbnail?.file?.id ? { thumbFileId: raw.thumbnail.file.id } : {}),
+    }
   }
 
   async setProxy(config: ProxyConfig | null): Promise<void> {
@@ -444,15 +578,24 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
         await this.emitChatUpsert(raw.chat_id)
         return
       }
-      case 'updateMessageContent': {
-        const text = extractText(update.new_content)
-        this.emit({
-          type: 'messages',
-          chatId: update.chat_id,
-          ops: [
-            { op: 'edit', chatId: update.chat_id, messageId: update.message_id, text: text ?? '' },
-          ],
-        })
+      case 'updateMessageContent':
+      case 'updateMessageEdited': {
+        // Remap the whole message instead of patching the text: an edit can change
+        // media and a media upload completion can change a caption (§6.1).
+        const chatId: number = update.chat_id
+        const messageId: number = update.message_id
+        try {
+          const raw = await this.invoke({
+            _: 'getMessage',
+            chat_id: chatId,
+            message_id: messageId,
+          })
+          if (!raw || raw._ === 'error') return
+          const message = await this.mapMessage(chatId, raw)
+          this.emit({ type: 'messages', chatId, ops: [{ op: 'replace', message }] })
+        } catch {
+          // The message may have been deleted in the same batch.
+        }
         return
       }
       case 'updateDeleteMessages':
@@ -476,6 +619,10 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
         })
         await this.emitChatUpsert(update.chat_id)
         return
+      case 'updateChatReadOutbox':
+        // Read receipts for our own messages: last_read_outbox_message_id moves.
+        await this.emitChatUpsert(update.chat_id)
+        return
       case 'updateChatPosition':
       case 'updateNewChat':
         await this.emitChatUpsert(update.chat?.id ?? update.chat_id)
@@ -490,18 +637,28 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
           chatId: update.chat_id,
           userId: update.sender_id?.user_id ?? 0,
           action: update.action?._ ?? 'typing',
-          until: Date.now() + 5_000,
+          until:
+            update.action?._ === 'chatActionCancel' || update.action?._ === 'chatActionTypingCancel'
+              ? Date.now()
+              : Date.now() + 5_000,
         })
         return
       case 'updateFile': {
         const file = update.file
         if (!file) return
+        const local = file.local ?? {}
+        const completed = Boolean(local.is_downloading_completed)
+        const uploading = Boolean(file.remote?.is_uploading_active)
         this.emit({
           type: 'file',
           fileId: file.id,
-          downloaded: file.local?.downloaded_size ?? 0,
+          downloaded: uploading
+            ? (file.remote?.uploaded_size ?? 0)
+            : (local.downloaded_size ?? 0),
           total: file.expected_size ?? file.size ?? 0,
-          ...(file.local?.is_downloading_completed ? { path: file.local.path } : {}),
+          ...(completed && local.path ? { url: registerMediaFile(local.path) } : {}),
+          ...(uploading ? { uploading: true } : {}),
+          ...(completed || file.remote?.is_uploading_completed ? { completed: true } : {}),
         })
         return
       }
@@ -578,6 +735,8 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
       unread: chat.unread_count ?? 0,
       pinned: Boolean(mainPosition?.is_pinned),
       muted: Boolean(chat.notification_settings?.is_muted),
+      lastReadInboxMessageId: Number(chat.last_read_inbox_message_id ?? 0),
+      lastReadOutboxMessageId: Number(chat.last_read_outbox_message_id ?? 0),
       ...(lastMessage ? { lastMessageText: previewContent(lastMessage.content) } : {}),
       ...(lastMessage ? { lastMessageAt: Number(lastMessage.date) } : {}),
     }
@@ -610,6 +769,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
       ...(entities.length ? { entities } : {}),
       ...(media ? { media } : {}),
       ...(raw.reply_to?.message_id ? { replyToId: raw.reply_to.message_id } : {}),
+      ...(raw.edit_date ? { edited: true } : {}),
     }
   }
 
@@ -705,6 +865,16 @@ function normalizeMtprotoSecret(secret: string): string {
   return cleaned
 }
 
+function replyTo(messageId?: number): TdObject | null {
+  return messageId === undefined
+    ? null
+    : { _: 'inputMessageReplyToMessage', message_id: messageId }
+}
+
+function formattedText(text: string | undefined): TdObject {
+  return { _: 'formattedText', text: text ?? '', entities: [] }
+}
+
 function previewContent(content: TdObject | undefined): string {
   return extractText(content) ?? mapContentLabel(content)
 }
@@ -750,16 +920,22 @@ function mapContent(content: TdObject): {
       }
     }
     case 'messagePhoto': {
-      const sizes: TdObject[] = content.photo?.sizes ?? []
-      const biggest = sizes.at(-1)
+      const photo = content.photo ?? {}
+      const sizes: TdObject[] = Array.isArray(photo.sizes) ? photo.sizes : []
+      const display = pickLargest(sizes)
+      // A small variant doubles as the bubble placeholder until the full file lands.
+      const thumb = pickSmallestAtLeast(sizes, 160) ?? pickLargest(sizes)
       return {
         kind: 'photo',
         text: content.caption?.text ?? '',
         entities: mapEntities(content.caption?.entities),
         media: {
-          fileId: biggest?.photo?.id ?? 0,
-          ...(biggest?.width ? { width: biggest.width } : {}),
-          ...(biggest?.height ? { height: biggest.height } : {}),
+          fileId: display?.photo?.id ?? 0,
+          ...(thumb && thumb !== display ? { thumbFileId: thumb.photo?.id } : {}),
+          ...(display?.width ? { width: display.width } : {}),
+          ...(display?.height ? { height: display.height } : {}),
+          ...(photo.minithumbnail?.data ? { minithumbnail: photo.minithumbnail.data } : {}),
+          ...mediaUrls(display?.photo, thumb?.photo),
         },
       }
     }
@@ -771,8 +947,33 @@ function mapContent(content: TdObject): {
         entities: mapEntities(content.caption?.entities),
         media: {
           fileId: video.video?.id ?? 0,
+          ...(video.thumbnail?.file?.id ? { thumbFileId: video.thumbnail.file.id } : {}),
           ...(video.duration ? { duration: video.duration } : {}),
+          ...(video.width ? { width: video.width } : {}),
+          ...(video.height ? { height: video.height } : {}),
           ...(video.file_name ? { fileName: video.file_name } : {}),
+          ...(video.mime_type ? { mimeType: video.mime_type } : {}),
+          ...(video.minithumbnail?.data ? { minithumbnail: video.minithumbnail.data } : {}),
+          ...mediaUrls(video.video, video.thumbnail?.file),
+        },
+      }
+    }
+    case 'messageAnimation': {
+      // GIF-style messages are videos to us: Chromium plays the MP4 natively.
+      const animation = content.animation ?? {}
+      return {
+        kind: 'video',
+        text: content.caption?.text ?? '',
+        entities: mapEntities(content.caption?.entities),
+        media: {
+          fileId: animation.animation?.id ?? 0,
+          ...(animation.thumbnail?.file?.id ? { thumbFileId: animation.thumbnail.file.id } : {}),
+          ...(animation.duration ? { duration: animation.duration } : {}),
+          ...(animation.width ? { width: animation.width } : {}),
+          ...(animation.height ? { height: animation.height } : {}),
+          ...(animation.file_name ? { fileName: animation.file_name } : {}),
+          ...(animation.mime_type ? { mimeType: animation.mime_type } : {}),
+          ...mediaUrls(animation.animation, animation.thumbnail?.file),
         },
       }
     }
@@ -784,9 +985,12 @@ function mapContent(content: TdObject): {
         entities: mapEntities(content.caption?.entities),
         media: {
           fileId: document.document?.id ?? 0,
+          ...(document.thumbnail?.file?.id ? { thumbFileId: document.thumbnail.file.id } : {}),
           ...(document.file_name ? { fileName: document.file_name } : {}),
           ...(document.document?.size ? { size: document.document.size } : {}),
           ...(document.mime_type ? { mimeType: document.mime_type } : {}),
+          ...(document.minithumbnail?.data ? { minithumbnail: document.minithumbnail.data } : {}),
+          ...mediaUrls(document.document, document.thumbnail?.file),
         },
       }
     }
@@ -798,9 +1002,12 @@ function mapContent(content: TdObject): {
         entities: [],
         media: {
           fileId: sticker.sticker?.id ?? 0,
+          ...(sticker.thumbnail?.file?.id ? { thumbFileId: sticker.thumbnail.file.id } : {}),
           stickerFormat: mapStickerFormat(sticker.format?._),
+          ...(sticker.emoji ? { stickerEmoji: sticker.emoji } : {}),
           ...(sticker.width ? { width: sticker.width } : {}),
           ...(sticker.height ? { height: sticker.height } : {}),
+          ...mediaUrls(sticker.sticker, sticker.thumbnail?.file),
         },
       }
     }
@@ -812,7 +1019,9 @@ function mapContent(content: TdObject): {
         entities: [],
         media: {
           fileId: voice.voice?.id ?? 0,
+          mimeType: voice.mime_type ?? 'audio/ogg',
           ...(voice.duration ? { duration: voice.duration } : {}),
+          ...mediaUrls(voice.voice),
         },
       }
     }
@@ -820,6 +1029,52 @@ function mapContent(content: TdObject): {
       return { kind: 'poll', text: content.poll?.question?.text ?? '', entities: [] }
     default:
       return { kind: 'service', text: '', entities: [] }
+  }
+}
+
+/** Local URLs for an already-downloaded file (and optional thumbnail). */
+function mediaUrls(
+  file: TdObject | undefined,
+  thumb?: TdObject | undefined,
+): { localUrl?: string; thumbUrl?: string } {
+  const localUrl = localUrlOf(file)
+  const thumbUrl = localUrlOf(thumb)
+  return {
+    ...(localUrl ? { localUrl } : {}),
+    ...(thumbUrl ? { thumbUrl } : {}),
+  }
+}
+
+function localUrlOf(file: TdObject | undefined): string | undefined {
+  const local = file?.local
+  if (!local?.is_downloading_completed) return undefined
+  if (typeof local.path !== 'string' || local.path.length === 0) return undefined
+  return registerMediaFile(local.path)
+}
+
+function pickLargest(sizes: TdObject[]): TdObject | undefined {
+  return sizes.reduce<TdObject | undefined>((best, size) => {
+    if (!best) return size
+    const area = (size.width ?? 0) * (size.height ?? 0)
+    const bestArea = (best.width ?? 0) * (best.height ?? 0)
+    return area > bestArea ? size : best
+  }, undefined)
+}
+
+function pickSmallestAtLeast(sizes: TdObject[], minWidth: number): TdObject | undefined {
+  return [...sizes]
+    .filter((size) => (size.width ?? 0) >= minWidth)
+    .sort((a, b) => (a.width ?? 0) - (b.width ?? 0))[0]
+}
+
+/** Set covers are thumbnails, not stickers, but they render through the same path. */
+function mapStickerThumbnail(thumbnail: TdObject): Sticker {
+  const format: string | undefined = thumbnail?.format?._
+  return {
+    fileId: thumbnail?.file?.id ?? 0,
+    format: format === 'thumbnailFormatTgs' ? 'tgs' : format === 'thumbnailFormatWebm' ? 'webm' : 'webp',
+    ...(thumbnail?.width ? { width: thumbnail.width } : {}),
+    ...(thumbnail?.height ? { height: thumbnail.height } : {}),
   }
 }
 

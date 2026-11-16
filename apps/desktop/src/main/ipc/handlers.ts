@@ -1,4 +1,6 @@
+import { AppError } from '@wechatgram/protocol'
 import type { AppInfo, ProxyConfig } from '@wechatgram/protocol'
+import { BrowserWindow, dialog, shell } from 'electron'
 
 import { resolveProxySecrets, toProxyView, toStoredProxy } from '../proxy'
 import type { SettingsStore } from '../store/settings'
@@ -59,9 +61,44 @@ export function createHandlers({
     'search:inChat': (payload) =>
       adapter.searchInChat(payload as { chatId: number; q: string; fromMessageId?: number }),
 
+    'media:pick': async (payload) => {
+      const { kind } = payload as { kind: 'photo' | 'file' }
+      const owner = BrowserWindow.getFocusedWindow()
+      const options: Electron.OpenDialogOptions = {
+        properties: ['openFile', 'multiSelections'],
+        ...(kind === 'photo'
+          ? { filters: [{ name: '图片', extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif'] }] }
+          : {}),
+      }
+      const result = owner
+        ? await dialog.showOpenDialog(owner, options)
+        : await dialog.showOpenDialog(options)
+      return { paths: result.canceled ? [] : result.filePaths }
+    },
     'media:download': (payload) =>
       adapter.downloadFile(payload as { fileId: number; priority: number }),
-    'media:upload': (payload) => adapter.uploadFile(payload as { chatId: number; filePath: string }),
+    'media:open': async (payload) => {
+      const { fileId } = payload as { fileId: number }
+      const { path } = await adapter.downloadFile({ fileId, priority: 32 })
+      // Only files the protocol layer just produced are ever opened.
+      const failure = await shell.openPath(path)
+      if (failure) throw new AppError('internal', `Failed to open file: ${failure}`)
+    },
+    'media:send': (payload) => {
+      const input = payload as {
+        chatId: number
+        filePath: string
+        kind: 'photo' | 'file'
+        caption?: string
+        replyTo?: number
+      }
+      if (!input.filePath.trim()) throw new AppError('invalid_payload', 'Empty file path')
+      return adapter.sendMedia(input)
+    },
+    'messages:sendSticker': (payload) =>
+      adapter.sendSticker(payload as { chatId: number; fileId: number; replyTo?: number }),
+    'stickers:sets': () => adapter.listStickerSets(),
+    'stickers:set': (payload) => adapter.getStickerSet((payload as { setId: string }).setId),
 
     'ui:saveDraft': (payload) => {
       const draft = payload as { chatId: number; text: string; replyTo?: number }

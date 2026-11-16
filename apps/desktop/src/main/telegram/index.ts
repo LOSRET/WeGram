@@ -22,10 +22,13 @@ export interface CreateAdapterOptions {
  * already has the shape multi-account will need (design doc §15).
  */
 export function createAdapter(options: CreateAdapterOptions): TelegramAdapter {
+  const mock = (): TelegramAdapter =>
+    new MockAdapter({ mediaDir: join(options.userDataDir, 'mock-media') })
+
   // WECHATGRAM_ADAPTER=mock forces the fake adapter even when credentials exist:
   // needed for UI work and demos that must not touch the real account.
   const forced = process.env['WECHATGRAM_ADAPTER']?.trim().toLowerCase()
-  if (forced === 'mock') return new MockAdapter()
+  if (forced === 'mock') return mock()
 
   if (options.apiId && options.apiHash) {
     // Dev escape hatch: point the app at an already-authorized session (for
@@ -41,5 +44,5 @@ export function createAdapter(options: CreateAdapterOptions): TelegramAdapter {
       initialProxy: options.initialProxy,
     })
   }
-  return new MockAdapter()
+  return mock()
 }

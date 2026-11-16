@@ -6,6 +6,7 @@ import { app, BrowserWindow, shell } from 'electron'
 
 import { createHandlers } from './ipc/handlers'
 import { registerIpc, unregisterIpc } from './ipc/router'
+import { installMediaProtocol, registerMediaScheme } from './media/protocol'
 import { storedProxyToConfig } from './proxy'
 import { parseProxyUrl } from './proxy-url'
 import { SettingsStore } from './store/settings'
@@ -23,6 +24,10 @@ const isDev = !app.isPackaged
 // would turn userData into a nested @wechatgram/desktop directory. Pin it.
 app.setName('WechatGram')
 app.setPath('userData', join(app.getPath('appData'), 'WechatGram'))
+
+// A custom scheme must be declared privileged before the app is ready, otherwise
+// <img>/<video>/fetch() in the renderer cannot load downloaded media.
+registerMediaScheme()
 
 let mainWindow: BrowserWindow | null = null
 let adapter: TelegramAdapter | null = null
@@ -45,6 +50,8 @@ if (!app.requestSingleInstanceLock()) {
 
 async function bootstrap(): Promise<void> {
   const userDataDir = app.getPath('userData')
+
+  installMediaProtocol()
 
   const store = new SettingsStore(join(userDataDir, 'settings.json'))
   store.load()
@@ -118,14 +125,18 @@ async function bootstrap(): Promise<void> {
 
 function createWindow(theme: 'light' | 'dark'): BrowserWindow {
   const win = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 940,
-    minHeight: 620,
+    width: 1000,
+    height: 680,
+    minWidth: 880,
+    minHeight: 600,
     show: false,
-    backgroundColor: theme === 'dark' ? '#111111' : '#ededed',
+    backgroundColor: theme === 'dark' ? '#111111' : '#fbfbfb',
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: '#f7f7f7', symbolColor: '#191919', height: 60 },
+    titleBarOverlay: {
+      color: theme === 'dark' ? '#191919' : '#e0e0e0',
+      symbolColor: theme === 'dark' ? '#d6d6d6' : '#191919',
+      height: 32,
+    },
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
@@ -186,9 +197,9 @@ function applyTitleBarTheme(win: BrowserWindow | null, theme: 'light' | 'dark'):
   if (!win || win.isDestroyed()) return
   try {
     win.setTitleBarOverlay({
-      color: theme === 'dark' ? '#191919' : '#f7f7f7',
+      color: theme === 'dark' ? '#191919' : '#e0e0e0',
       symbolColor: theme === 'dark' ? '#d6d6d6' : '#191919',
-      height: 60,
+      height: 32,
     })
   } catch (error) {
     logger.warn('setTitleBarOverlay failed:', error instanceof Error ? error.message : String(error))

@@ -29,7 +29,9 @@ export function publishAdapterEvent(bus: EventBus, event: AdapterEvent): void {
         fileId: event.fileId,
         downloaded: event.downloaded,
         total: event.total,
-        ...(event.path === undefined ? {} : { path: event.path }),
+        ...(event.url === undefined ? {} : { url: event.url }),
+        ...(event.uploading === undefined ? {} : { uploading: event.uploading }),
+        ...(event.completed === undefined ? {} : { completed: event.completed }),
       })
       return
     default:

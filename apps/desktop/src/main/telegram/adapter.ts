@@ -8,9 +8,13 @@ import type {
   ProxyConfig,
   ProxyTestResult,
   Self,
+  StickerSet,
+  StickerSetSummary,
 } from '@wechatgram/protocol'
 
 export type AdapterKind = 'mock' | 'tdlib'
+
+export type MediaKind = 'photo' | 'file'
 
 /**
  * Domain events the adapter may emit. The IPC layer maps these onto `evt:*`
@@ -22,7 +26,15 @@ export type AdapterEvent =
   | { type: 'chats'; ops: ChatOp[] }
   | { type: 'messages'; chatId: number; ops: MessageOp[] }
   | { type: 'typing'; chatId: number; userId: number; action: string; until: number }
-  | { type: 'file'; fileId: number; downloaded: number; total: number; path?: string }
+  | {
+      type: 'file'
+      fileId: number
+      downloaded: number
+      total: number
+      url?: string
+      uploading?: boolean
+      completed?: boolean
+    }
 
 export type AdapterListener = (event: AdapterEvent) => void
 
@@ -69,11 +81,27 @@ export interface TelegramAdapter {
   }): Promise<void>
   markRead(input: { chatId: number; upToMessageId: number }): Promise<void>
 
+  /** Sends a local file as a photo or a document (design doc §1: media upload). */
+  sendMedia(input: {
+    chatId: number
+    filePath: string
+    kind: MediaKind
+    caption?: string
+    replyTo?: number
+  }): Promise<{ localId: string; message: Message }>
+  sendSticker(input: {
+    chatId: number
+    fileId: number
+    replyTo?: number
+  }): Promise<{ localId: string; message: Message }>
+
+  listStickerSets(): Promise<StickerSetSummary[]>
+  getStickerSet(setId: string): Promise<StickerSet>
+
   searchGlobal(input: { q: string; limit: number }): Promise<ChatSummary[]>
   searchInChat(input: { chatId: number; q: string; fromMessageId?: number }): Promise<Message[]>
 
-  downloadFile(input: { fileId: number; priority: number }): Promise<{ path: string }>
-  uploadFile(input: { chatId: number; filePath: string }): Promise<{ fileId: number }>
+  downloadFile(input: { fileId: number; priority: number }): Promise<{ path: string; url: string }>
 
   setProxy(config: ProxyConfig | null): Promise<void>
   testProxy(config: ProxyConfig): Promise<ProxyTestResult>
