@@ -4,22 +4,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-> **New session? Read `docs/HANDOFF.md` first** — current state, hard rules, measured surprises and next steps.
+> **New session? Read `docs/HANDOFF.md` first** — current state, hard rules, measured surprises and next steps. For anything under `src/renderer`, read **`docs/UI-HANDOFF.md`** as well: the WeChat 4.x tokens/metrics that were measured off the real client, the icon provenance, the known deltas and the pitfalls.
 
-pnpm workspace with W1 + W2 implemented:
+pnpm workspace with W1 + W2 + the W3 main body implemented:
 
 - `docs/技术方案.md` — authoritative design (Chinese). Change the design here first, then the code.
 - `packages/protocol` — IPC contract: DTO zod schemas, channel tables, `AppError`. Single source of truth shared by main, preload and renderer. Exported straight from source (`src/index.ts`), no build step.
-- `apps/desktop` — Electron app: `src/main` (adapter + IPC + store), `src/preload` (whitelisted `window.tg`), `src/renderer` (React 19 + Tailwind v4 UI).
+- `apps/desktop` — Electron app: `src/main` (adapter + IPC + store + media protocol), `src/preload` (whitelisted `window.tg`), `src/renderer` (React 19 + Tailwind v4 UI).
 - `spikes/tdlib` — measured TDLib behaviour on this machine; `RESULTS.md` holds packaging constraints that only fail at build time.
 
 W2 scope is in: virtualised message list (`@tanstack/react-virtual`), anchored prepend, message send / reply / edit / delete / forward, per-chat drafts persisted in `ui.db`, and a dev acceptance panel (`?perf=1` on the preview server) that measures FPS and the pixel drift of the anchored row.
 
+W3 main body is in: media send/receive (photo + document, upload/download progress over `evt:file`), media files served to the renderer through the `wx-media://` protocol (never raw paths), the three sticker formats (WebP `<img>`, TGS → `DecompressionStream('gzip')` + lottie-web, WebM `<video>`), a sticker picker backed by `getInstalledStickerSets`, TL entity rendering (bold/italic/code/pre/link/spoiler), day separators, the unread divider, read receipts, and a typing indicator that expires. The mock adapter generates real PNG/WebP/TGS fixture media under `userData/mock-media`.
+
 `ui.db` uses the built-in `node:sqlite` (Electron 38 ships Node 22.22) instead of better-sqlite3, so there is no native module to rebuild for the Electron ABI. All SQL is confined to `apps/desktop/src/main/store/ui-db.ts`; `settings.json` keeps only the proxy config because it carries a sealed secret.
 
-Still deferred: media send/receive, stickers, search. `ui.db` reading positions
-(`scroll_anchor_id`/`scroll_offset`) are wired: MessageList writes them, ChatPane restores
-them when the reader was not at the bottom.
+Still deferred: search (global + in-chat), pinning/mute controls, settings page, packaging.
+`ui.db` reading positions (`scroll_anchor_id`/`scroll_offset`) are wired: MessageList writes them,
+ChatPane restores them when the reader was not at the bottom.
 
 W1 is verified by `pnpm typecheck`, `pnpm build` and the browser preview (`pnpm web`). The Electron window has also been exercised end-to-end on this machine, but only when launched detached and with `--no-sandbox` (both are environment workarounds — see Environment quirks).
 
@@ -35,7 +37,7 @@ cd apps\desktop; pnpm dev       # Electron dev (needs ELECTRON_RUN_AS_NODE unset
 cd apps\desktop; pnpm web       # renderer-only preview at http://localhost:5174 (?perf=1 → W2 acceptance panel)
 cd apps\desktop; pnpm tdlib:smoke   # headless real-TDLib check (see below)
 cd apps\desktop; pnpm ui:db-check   # headless ui.db check (node:sqlite)
-cd apps\desktop; pwsh scripts\launch-detached.ps1 -NoSandbox   # only way Electron starts here (-Mock for the fake adapter)
+cd apps\desktop; pwsh scripts\launch-detached.ps1 -NoSandbox   # only way Electron starts here (-Mock for the fake adapter, -RemoteDebugPort 9224 for CDP checks)
 ```
 
 `WECHATGRAM_ADAPTER=mock` forces the mock adapter even when credentials exist — use it for any UI work that must not touch the real account (the launch script exposes it as `-Mock`).
@@ -74,6 +76,9 @@ node login.mjs    # interactive; requires TELEGRAM_API_ID / TELEGRAM_API_HASH in
 - UI state that is protocol-independent lives in `ui.db` through `main/store/ui-db.ts` (drafts, theme, scroll anchor, media cache). `main/store/settings.ts` keeps only the proxy config, because it carries a DPAPI-sealed secret. All `node:sqlite` calls stay inside `ui-db.ts`.
 - Without `TELEGRAM_API_ID`/`TELEGRAM_API_HASH` the app runs the mock adapter; with them it runs TDLib. `WECHATGRAM_ADAPTER=mock` forces the mock anyway. The mock is what keeps UI work unblocked without touching the real account.
 - `src/renderer/src/lib/preview-bridge.ts` is browser-preview-only tooling. Do not let app logic depend on it.
+- Local media reaches the renderer only as a `wx-media://f/<token>` URL registered by `main/media/registry.ts`; only the adapters (and the mock) may register a path. The `wx-media` handler in `main/media/protocol.ts` resolves tokens, never request paths, and streams with Range support.
+- The custom scheme is declared with `protocol.registerSchemesAsPrivileged` before `app.whenReady()`; the CSP in `renderer/index.html` must keep `wx-media:` in `img-src`, `media-src` and `connect-src` (TGS is fetched, then gunzipped in the renderer).
+- Sticker rendering depends on `lottie-web` (renderer only, TGS path). Keep the decompression guards in `lib/tgs.ts`: TGS is user-controlled input (§10).
 
 ## Conventions
 

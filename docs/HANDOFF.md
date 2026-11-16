@@ -1,24 +1,41 @@
 # Handoff — WechatGram
 
-Written 2026-11-17 at the end of the W1/W2 session. Read this first, then
-`docs/技术方案.md` (authoritative design, Chinese) and `spikes/tdlib/RESULTS.md`
-(measured TDLib behaviour). `CLAUDE.md` holds the rules that must not drift.
+Written 2026-11-17 at the end of the W1/W2 session, extended the same day with the
+W3 main body. Read this first, then `docs/技术方案.md` (authoritative design, Chinese)
+and `spikes/tdlib/RESULTS.md` (measured TDLib behaviour). `CLAUDE.md` holds the rules
+that must not drift.
+
+The renderer was later rebuilt against the real WeChat 4.x client; that work has its
+own handoff — **`docs/UI-HANDOFF.md`** (measured tokens and metrics, icon provenance,
+known deltas, pitfalls). Read it before touching anything under `src/renderer`.
 
 ## Where things stand
 
-Greenfield → working skeleton in two milestones:
+Greenfield → working skeleton in three milestones:
 
 - **W1** Electron shell, `packages/protocol` IPC contract, mock adapter, real TDLib
   adapter with manual auth state machine, SOCKS5/MTProxy proxy support, WeChat-style
   login screen + three-column shell.
 - **W2** virtualised message list, anchored history paging, send / reply / edit /
   delete / forward, per-chat drafts, `ui.db` (drafts, theme, scroll-anchor columns).
+- **W3 main body** media send/receive (photo + document with upload/download progress),
+  `wx-media://` serving for downloaded files, the three sticker formats
+  (WebP/TGS/WebM), a sticker picker, TL entity rendering, day separators, the unread
+  divider, read receipts, and a typing indicator that expires. Mock fixtures now carry
+  real generated PNG/WebP/TGS media, so every renderer path is exercised offline.
 - Spike 2 (real login + session reuse) is **done and verified**; the session lives in
   `spikes/tdlib/data`.
 
-Verified at the end of the session: `pnpm typecheck`, `pnpm build`, `pnpm tdlib:smoke`,
+Verified at the end of the W2 session: `pnpm typecheck`, `pnpm build`, `pnpm tdlib:smoke`,
 `pnpm ui:db-check`, and the browser acceptance panel (`?perf=1`) — 5000 messages at
 60 fps, 0 px viewport drift when prepending a page.
+
+Verified at the end of the W3 session (same commands, plus CDP): `pnpm typecheck`,
+`pnpm build`, `pnpm tdlib:smoke` (real session, read-only), `pnpm ui:db-check`; Electron
+mock login → media + sticker flows end-to-end; measured in Electron via CDP
+(`-RemoteDebugPort`): prepend 50 → 100 messages, anchor row visible, **0.0 px** drift,
+**60.6 fps**, worst frame 17 ms, P95 17 ms, 27 rendered rows. Browser preview verified
+the same UI with `data:` URLs instead of `wx-media://`.
 
 Follow-up session (same day), after the import below: repo created, `senderChatId` fix
 for channel posts, the dark title-bar overlay verified end-to-end plus a login-screen
@@ -41,6 +58,27 @@ Two gotchas from that commit:
   is in effect — a `git checkout`/`git restore` of that path would replace the link with
   a one-line text file containing `CLAUDE.md`. Don't restore it casually; recreate the
   link with `New-Item -ItemType SymbolicLink` from an elevated shell.
+
+**Same day, WeChat 4.x UI pass** — details in `docs/UI-HANDOFF.md`. Summary: the
+renderer now mirrors the client on this machine (measured with PIL off a 125%-scaled
+screenshot, not guessed).
+
+- Tokens in `styles/index.css` (rail `#e0e0e0`, list `#e7e7e9`, pane `#fbfbfb`, selected
+  row `#15ad70`, incoming bubble `#eeeef0`, outgoing `#95ec69`) and §9.1 of the design
+  doc. Metrics: 32 px title strip, 42 px rail, 238 px list, 65 px rows, 40/38 px
+  avatars, 46 px chat header, 128 px composer card.
+- Structure: `SideRail` + list + pane, search pill and "+" inside the list column,
+  composer as a bordered card. `TitleBar.tsx` deleted — the strip is the native
+  `titleBarOverlay` (32 px, rail colour) and settings/theme/sign-out live in the rail's
+  "≡" menu (`AppMenu.tsx`). The footer with the adapter hint is gone; that hint is a
+  caption in the same menu.
+- Icons: ten chrome glyphs are WeChat's own vectors, extracted from `Weixin.dll`
+  (2346 embedded SVGs) into the generated `components/WechatIcons.tsx`; the rest
+  (two-tone chat tab, compass tab, "…", scissors) are hand-drawn. The name manifest in
+  the DLL has no recoverable name→payload mapping — see `UI-HANDOFF.md` §3 before
+  trying again.
+- Also fixed while testing: the login field regains focus after each step (it is
+  disabled while a request is in flight, which used to drop the caret and force a click).
 
 ## Hard rules
 
@@ -79,7 +117,16 @@ pnpm web                        # renderer-only preview; ?perf=1 shows the W2 pa
 pnpm tdlib:smoke                # real adapter headlessly (needs .env + proxy env)
 pnpm ui:db-check                # ui.db via node:sqlite, headless
 pwsh scripts\launch-detached.ps1 -NoSandbox -Mock   # the only way Electron starts here
+pwsh scripts\launch-detached.ps1 -NoSandbox -Mock -RemoteDebugPort 9224  # + CDP
 ```
+
+- The mock adapter writes its generated media to `userData/mock-media` on startup
+  (`%APPDATA%\WechatGram\mock-media`): `design-v3.png`, `sunset.png`, `需求说明.md`,
+  `sticker-face.webp`, `sticker-heart.webp`, `sticker-wave.tgs`. Delete that folder to
+  force regeneration.
+- `-RemoteDebugPort` exposes the renderer over CDP (`http://127.0.0.1:9224/json`); that
+  is how the prepend/FPS numbers above were measured without opening DevTools. rAF and
+  `PerfPanel` only run while the window is actually visible, so focus it first.
 
 - `tdlib:smoke` env: `TDLIB_PROXY=socks5://host:port`, `WECHATGRAM_TDLIB_DIR`,
   `SMOKE_DEBUG=1`. It defaults to the spike session, so no second login is needed.
@@ -95,12 +142,17 @@ pwsh scripts\launch-detached.ps1 -NoSandbox -Mock   # the only way Electron star
 packages/protocol/src/       dto.ts (zod schemas + types), channels.ts (channel tables,
                              schemas, TgBridge), errors.ts (AppError), index.ts
 apps/desktop/src/main/
-  index.ts                   app lifecycle, window, theme overlay, adapter wiring
+  index.ts                   app lifecycle, window, theme overlay, adapter wiring,
+                             media scheme/protocol registration
   ipc/router.ts              per-channel zod validation, Result envelope
-  ipc/handlers.ts            one handler per invoke channel
+  ipc/handlers.ts            one handler per invoke channel (incl. native file picker)
+  media/registry.ts          path → wx-media:// token registry (renderer never sees paths)
+  media/protocol.ts          protocol.handle('wx-media') with Range streaming + MIME
+  media/image-size.ts        PNG/JPEG/WebP/GIF header probe (inputPhoto needs real sizes)
   telegram/adapter.ts        TelegramAdapter interface + event types (the seam)
   telegram/tdlib.ts          ONLY file allowed to import `tdl`
-  telegram/mock.ts           fake adapter incl. a 5000-message chat (id 99)
+  telegram/mock.ts           fake adapter incl. a 5000-message chat (id 99) + media fixtures
+  telegram/mock-assets.ts    embedded WebP/TGS + runtime PNG encoder for mock media
   telegram/updates.ts        EventBus: 60 ms batching, monotonic seq
   telegram/events.ts         AdapterEvent → evt:* channels
   telegram/index.ts          adapter selection (mock / tdlib, WECHATGRAM_ADAPTER)
@@ -110,14 +162,23 @@ apps/desktop/src/main/
   security/secrets.ts        safeStorage seal/unseal
   preload/index.ts           window.tg.invoke / window.tg.on, channel whitelist
 apps/desktop/src/renderer/src/
-  App.tsx                    bootstrap + event subscription (one place)
-  store/useAppStore.ts       zustand state (chats, messages, drafts of UI state)
-  components/MessageList.tsx virtualiser + anchored prepend + context menu
+  App.tsx                    bootstrap + event subscription (one place), typing expiry
+  store/useAppStore.ts       zustand state (chats, messages, drafts, media URLs/progress)
+  components/MessageList.tsx virtualiser + anchored prepend + context menu + day separators
+                             + unread divider + read receipts
+  components/MediaBubble.tsx photo lightbox / video / file card / voice bar + progress
+  components/StickerRenderer.tsx WebP <img>, TGS lottie, WebM <video>, offscreen pause
+  components/StickerPanel.tsx installed sets → grid → send sticker
+  components/RichText.tsx    TL entity renderer (bold/italic/code/pre/link/spoiler)
+  components/Composer.tsx    IME guard, reply bar, edit mode, draft debounce, attachments
   lib/useAnchoredScroll.ts   ready gate, 40px stick-to-bottom, resize compensation
-  components/Composer.tsx    IME guard, reply bar, edit mode, draft debounce
+  lib/media.ts               one-download-per-file dedupe + media URL/progress hooks
+  lib/tgs.ts                 gzip guards + Lottie decode cache (LRU)
+  lib/entities.ts            UTF-16 offset segmentation for TL entities
   components/PerfPanel.tsx   dev-only acceptance panel (?perf=1)
   lib/preview-bridge.ts      browser-preview-only fake IPC
-scripts/                     launch-detached.ps1, tdlib-smoke.ts, ui-db-check.ts
+scripts/                     launch-detached.ps1 (-RemoteDebugPort for CDP),
+                             tdlib-smoke.ts, ui-db-check.ts
 ```
 
 Rules that keep it maintainable: only `telegram/tdlib.ts` knows TDLib JSON; new fields
@@ -142,11 +203,11 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
   reserve space with `padding-right: calc(16px + (100% - env(titlebar-area-x, 0px) -
   env(titlebar-area-width, 100%)))`. A fixed spacer only pushes content into the buttons.
   The overlay colour also has to be repainted from the main process on theme change.
-  **Whatever sits under the controls must use `--wx-bg-list`** (the colour
-  `applyTitleBarTheme` sends) or the bitmap shows a seam — that is why the login screen
-  (`wx-login::before`) got a 60 px strip of its own. The overlay covers only the
-  right-hand control area, not the whole 60 px strip, so the strip keeps the rest of the
-  window looking consistent.
+  **Whatever sits under the controls must match the overlay colour** (what
+  `applyTitleBarTheme` sends — currently the rail colour `#e0e0e0` / `#191919`, height
+  32 px) or the bitmap shows a seam — that is why the login screen (`wx-login::before`)
+  paints its own 32 px strip. The overlay covers only the right-hand control area, not
+  the whole strip, so the strip keeps the rest of the window looking consistent.
 - **`node:sqlite` exists in Electron 38** (bundled Node 22.22) — no better-sqlite3, no
   Electron-ABI rebuild. It is flagged experimental upstream, hence the single-file
   confinement. Expect an `ExperimentalWarning` in the log.
@@ -164,6 +225,41 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
   (c) `unpin()` must be called before restoring or the stick-to-bottom `ResizeObserver`
   undoes it. The anchor is "first visible slot + its offset", and *no row at all* (a
   null anchor) means "was at the bottom".
+- **`wx-media://` must be declared before `app.whenReady()`** with
+  `protocol.registerSchemesAsPrivileged` (standard/secure/supportFetchAPI/stream), or
+  `<img>`/`<video>`/`fetch` cannot load it. The CSP also needs it in **`connect-src`**,
+  not just `img-src`: TGS is fetched as bytes and gunzipped in the renderer. The handler
+  resolves opaque tokens and streams with `Range` support; request paths are never used
+  for filesystem access.
+- **`position: fixed` inside a virtualised row is broken.** Rows are positioned with
+  `transform: translateY(...)`, which makes them the containing block for fixed
+  descendants — a lightbox rendered inside the bubble was confined to the row. Media
+  overlays must go through `createPortal(..., document.body)`.
+- **The ready gate could never open under React StrictMode.** The mount layout effect
+  is run twice (effect → cleanup → effect); the first pass set `initialisedRef` and
+  scheduled `requestAnimationFrame`, the cleanup cancelled it, and the second pass
+  returned early — the list stayed `visibility: hidden` forever. Fix: do not cancel the
+  frame, and add a 150 ms `setTimeout` fallback because rAF is throttled while the window
+  is occluded (this also explains flaky `?perf=1` runs in background windows).
+- **This TDLib's `inputMessagePhoto` has no width/height.** Dimensions live on
+  `inputPhoto`, so a photo cannot be sent without knowing its pixel size. The main
+  process parses PNG/JPEG/WebP/GIF headers first; when it cannot, the file is sent as a
+  document instead of producing a broken photo bubble. `inputMessageSticker` also needs
+  `inputSticker.width/height` and an emoji.
+- **Sticker set ids are int64 strings in TDLib.** They cross IPC as strings; the sticker
+  itself is identified by the numeric file id. `getInstalledStickerSets` only returns
+  set summaries — the grid needs a second `getStickerSet` call.
+- **`updateChatAction` is a one-shot event.** It has no "stopped typing" notification you
+  can rely on, so the renderer schedules an expiry timer from `until`; without it the
+  header claims "对方正在输入…" forever.
+- **Editing content is a full remap, not a text patch.** `updateMessageContent` can change
+  media/captions, so the adapter fetches the message and emits a `replace` op instead of
+  an `edit` op with just the text.
+- **Mock media is generated, not referenced.** `telegram/mock-assets.ts` embeds two real
+  WebP stickers and one gzipped TGS animation, and encodes gradient PNGs at runtime with
+  `node:zlib`; the files land in `userData/mock-media` and are served through the same
+  `wx-media://` registry as TDLib downloads. This is what makes media/sticker work
+  testable without the real account.
 - **Real unread counts are large** (hundreds of thousands on unfollowed groups); that
   is data, not a mapping bug.
 - `userData` is pinned to `%APPDATA%\WechatGram` via `app.setName`/`setPath`, because
@@ -188,6 +284,9 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
    rectangle in the corner. `.wx-login::before` now paints a 60 px `--wx-bg-list` strip
    with a divider (same as the shell), which also gives the login window its **only drag
    region** (it could not be moved before logging in).
+   *Superseded by the WeChat UI pass*: the overlay is now 32 px and rail-coloured
+   (`#e0e0e0` / `#191919`), and the same strip is 32 px — see `docs/UI-HANDOFF.md` §2.
+   The dark/light verification itself still holds.
 2. ~~**`ui.db` scroll-anchor wiring**~~ — **done** with the decided UX ("restore only when
    the reader was not at the bottom"):
    - `MessageList` measures the first visible `.wx-message-slot` (id + offset relative to
@@ -207,10 +306,27 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
    Limitation worth knowing: an anchor further back than that budget is unreachable
    (history is fetched by paging, not from an anchor), so the chat opens at the bottom and
    the anchor is dropped. Fixing that properly needs a "load around message" fetch, which
-   is a W3 jump-to-message feature.
-3. **W3 scope**: media send/receive (files, images, progress events), sticker renderer
-   (WebP `<img>`, TGS → `DecompressionStream` + lottie-web, WebM `<video>`), search
-   (global + in-chat), day separators, unread divider, sticker panel.
+   is a W4 jump-to-message feature.
+3. ~~**W3 scope**: media send/receive, sticker renderer, day separators, unread
+   divider, sticker panel.~~ **Main body done**; what is left from W3 and what W3
+   deliberately did not include:
+   - **WebM stickers** are implemented (`<video>` + offscreen pause) but no fixture
+     exercises them: this machine has no VP8 encoder (ffmpeg absent) and the mock only
+     generates WebP/TGS. Verify with a real account or a recorded `.webm` sticker.
+   - **Custom emoji** entities render as their base glyph, not the sticker image. Needs
+     `getCustomEmojiStickers` plus an inline sticker cache; the rendering seam
+     (`RichText`'s `customEmoji` case) is already there.
+   - Media is sent immediately after the picker; no caption dialog, no album grouping,
+     no drag & drop / paste. Captions are supported end-to-end in the adapter
+     (`media:send` takes `caption`), just not surfaced in the UI yet.
+   - Voice notes play, but there is no recording and the waveform is decorative.
+   - Download cache is TDLib's own file cache; the `media_cache` LRU table from §5.2 is
+     still unused, so nothing bounds the disk usage yet.
+   - Sticker panel only lists regular installed sets; no search/trending, no "recent".
+     A set cover whose thumbnail is MPEG4 would render as a broken `<img>` (rare).
+   - `updateMessageContent`/`updateNewMessage` are mapped, but `updateMessageSendSucceeded`
+     is not handled separately; message ids are server ids already, so it is cosmetic.
+   - Search (global + in-chat) is W4 even though the adapter methods exist.
 4. ~~**Channel posts show senderName `未知`**~~ — **done**: `senderChatId` in the DTO,
    `mapMessage` resolves `messageSenderChat` through the chat-title cache, verified on
    the real account by the `senderChat` line of `tdlib:smoke`. Mock + preview fixtures
@@ -222,19 +338,30 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
    matters, split a channels-only entry point.
 7. Minor: `tdlib:smoke` only checks the *first* channel of the chat list for
    `messageSenderChat`; groups with anonymous admins are not covered by a fixture.
-8. Minor: the login strip is a fixed 60 px (`--wx-titlebar-h`), so the browser preview
+8. Minor: the login strip is a fixed `--wx-titlebar-h` (32 px), so the browser preview
    (`pnpm web`) shows an empty strip above the login card too. Detecting the real overlay
    would need `env(titlebar-area-height)`; not worth it while the strip stays harmless.
+9. **UI deltas vs the real client** are catalogued in `docs/UI-HANDOFF.md` §5 (composer
+   toolbar loses the sticker cube and the scissors chevron, avatars are placeholders, no
+   pin button, fixed 238 px list, rail sections other than 聊天 only raise a toast, dark
+   rail icon grey untuned). §6 has the ordered follow-ups.
 
 ## Open questions for the product owner
 
-- W3 order: media first or search first?
-- Scroll-position restore: WeChat restores where you left; do we follow that or always
-  land at the bottom?
-- Multi-account stays v2 — confirm nothing in W3 needs it.
+- ~~W3 order: media first or search first?~~ Media + stickers were done first (W3 main
+  body); search is the natural start of W4.
+- Scroll-position restore: WeChat restores where you left; we already do that when the
+  reader was not at the bottom. Confirm it should stay.
+- Multi-account stays v2 — confirm nothing in W3/W4 needs it.
 
 ## Session leftovers
 
-All processes started during the session (Electron windows, wrapper consoles, the Vite
-preview server) were closed, and the test `%APPDATA%\WechatGram` profile was removed. The
-`.cache/` folder keeps logs and is gitignored.
+All processes started during the session (Electron windows, the remote-debugged Edge
+profile, wrapper consoles, the Vite preview server) were closed, and the test
+`%APPDATA%\WechatGram` profile was removed. The `.cache/` folder keeps logs and is
+gitignored.
+
+The W3 changes are **not committed** yet: the working tree holds the protocol, main,
+renderer and doc changes listed by `git status`, plus `pnpm-lock.yaml` (lottie-web).
+Re-run `pnpm typecheck && pnpm build` before committing; both were green at the end of
+the session.
