@@ -27,6 +27,8 @@ W1 is verified by `pnpm typecheck`, `pnpm build` and the browser preview (`pnpm 
 
 The real TDLib adapter is verified headlessly instead: `pnpm tdlib:smoke` runs the same `TdlibAdapter` under Node against an authorized session and checks `getMe` / `getChats` / history paging. See `spikes/tdlib/RESULTS.md` (Spike 2) for the measured findings, including why a proxy is mandatory and how `getChatHistory` anchoring works.
 
+**Real-account pass (same day):** the adapter was then driven end-to-end in the Electron window behind the mandatory SOCKS proxy, which surfaced three defects that the mock cannot reproduce — history paging stopped on short TDLib answers, read receipts poisoned every chat's cache, and an occluded window could freeze the transcript's visibility gate. All three are fixed; the rail and the chat rows now load real profile photos, and both long panes use WeChat's floating overlay scrollbar. Details: `docs/HANDOFF.md` → "Real-account session" and "Non-obvious facts".
+
 ## Commands
 
 ```powershell
@@ -74,6 +76,9 @@ node login.mjs    # interactive; requires TELEGRAM_API_ID / TELEGRAM_API_HASH in
 - Every event carries `seq`; the renderer is expected to detect gaps and re-sync.
 - Password/MTProxy-secret values cross IPC only as `MASK` (`'***'`) and are stored through `main/security/secrets.ts` (Windows DPAPI via `safeStorage`).
 - UI state that is protocol-independent lives in `ui.db` through `main/store/ui-db.ts` (drafts, theme, scroll anchor, media cache). `main/store/settings.ts` keeps only the proxy config, because it carries a DPAPI-sealed secret. All `node:sqlite` calls stay inside `ui-db.ts`.
+- `messagesByChat` entries are created **only** by `setHistory`/`prependHistory`. `applyMessageOps` must not create one for a chat whose history was never loaded: `ChatPane` reads "an entry exists" as "already cached" and would then skip the first-page fetch for good. (Read receipts fire for every chat, so this poisons the whole list — it is exactly the bug that made groups open empty.)
+- Long scroll panes (chat list, transcript) use `components/OverlayScrollbar.tsx`; never reintroduce a native scrollbar there — Chromium gives those a layout gutter, so the rows re-flow whenever the bar appears. Popovers keep native thin bars on purpose.
+- Never gate content visibility on `requestAnimationFrame` alone (the list's `--pending` class): Electron throttles rAF while the window is occluded, and the pane then stays invisible with its data loaded. Always pair a frame-based reveal with a `setTimeout` fallback.
 - Without `TELEGRAM_API_ID`/`TELEGRAM_API_HASH` the app runs the mock adapter; with them it runs TDLib. `WECHATGRAM_ADAPTER=mock` forces the mock anyway. The mock is what keeps UI work unblocked without touching the real account.
 - `src/renderer/src/lib/preview-bridge.ts` is browser-preview-only tooling. Do not let app logic depend on it.
 - Local media reaches the renderer only as a `wx-media://f/<token>` URL registered by `main/media/registry.ts`; only the adapters (and the mock) may register a path. The `wx-media` handler in `main/media/protocol.ts` resolves tokens, never request paths, and streams with Range support.

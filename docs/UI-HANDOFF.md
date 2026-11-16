@@ -16,14 +16,16 @@ listed in "Known deltas" is a deliberate, documented difference.
 |---|---|
 | `renderer/src/styles/index.css` | Rewritten. All design tokens + every component style. Single source of truth for colour/size. |
 | `renderer/src/components/MainShell.tsx` | Three-column shell, owns the toast + app menu + settings dialog state. |
-| `renderer/src/components/SideRail.tsx` | 42 px icon rail: avatar (connection dot), 聊天/通讯录/收藏/朋友圈, 手机/设置. |
-| `renderer/src/components/ChatList.tsx` | Search pill + circular "+" (both inside the list column) + 65 px rows. |
+| `renderer/src/components/SideRail.tsx` | 42 px icon rail: avatar (connection dot), 聊天/通讯录/收藏/朋友圈, 手机/设置. The avatar is the account's real profile photo (`Self.avatarUrl`), initials until it arrives. The 聊天 tab is the Telegram mark in brand green. |
+| `renderer/src/components/ChatList.tsx` | Search pill + circular "+" (both inside the list column) + 65 px rows. Selecting the row that is already open toggles the conversation shut. Rows show the real chat photo when `ChatSummary.avatarUrl` is present, initials otherwise. |
+| `renderer/src/components/OverlayScrollbar.tsx` | WeChat's floating scrollbar: a 6 px translucent pill drawn over the rows (hover/scroll/drag), so long lists get no layout gutter and nothing re-flows when it appears. Used by the chat list and the transcript. |
 | `renderer/src/components/ChatPane.tsx` | 46 px header (title, typing, call/… buttons), watermark empty state, chat-info popover. |
 | `renderer/src/components/MessageList.tsx` | Bubbles, own avatar on the right, hover-only timestamp/read receipt, day + unread separators. |
 | `renderer/src/components/Composer.tsx` | Bordered input card, toolbar under the text, attach menu, send button inside the card. |
 | `renderer/src/components/ContextMenu.tsx` | Exports `Popup` (positioned, closes on Escape/outside click) plus the message menu. |
 | `renderer/src/components/AppMenu.tsx` | The rail "≡" menu: settings, theme, sign out, adapter caption. |
-| `renderer/src/components/Icon.tsx` | Hand-drawn remainder (two-tone chat tab, voice-input circle, watermark) **and** re-exports of the generated set. |
+| `renderer/src/components/PlusMenu.tsx` | The list header's "+" card: 发起群聊 / 添加朋友 / 写笔记 with their payload glyphs (all three toast — none is in the protocol). |
+| `renderer/src/components/Icon.tsx` | Payload re-exports, the design-system compass, and `TelegramLogo` — the Simple Icons roundel that serves as the rail's 聊天 tab, the login mark and the empty-pane watermark (tinted through `currentColor`). |
 | `renderer/src/components/WechatIcons.tsx` | **Generated** from `Weixin.dll` payloads — see §3. Never hand-edit; regenerate. |
 | `renderer/src/screens/LoginScreen.tsx` | WeChat-style centred card, brand watermark, `autocomplete=off`, caret restored after each step. |
 | `renderer/src/lib/format.ts` | List timestamps: `HH:MM` today, `昨天 HH:MM`, `星期X` within a week, then `MM/DD`. |
@@ -67,6 +69,9 @@ sat at (276,105)–(1145,656) in that screenshot space.
 | composer card | radius 8, 1 px `#ececec` border, margins 6/9 px; input min-height 84; toolbar 42 |
 | send button | 72×30, radius 4; disabled `#ececec` on tertiary text, enabled brand green |
 | day separator | 12 px centred, no pill; message meta 11 px, hover-only |
+| popup card | fill `#fafafa`, 6 px radius, 5 px padding; the ＋ card is 143×144 with 45 px rows |
+| popup hover | **brand green `#07c160` fill with white label *and* white glyph** — measured on the ＋ card and confirmed on the rail menu; never a grey wash |
+| overlay scrollbar | 6 px wide, `right: 2px`, radius 3, thumb `rgba(0,0,0,.22)` → `.38` when hovered/dragged (dark theme: white at the same alphas). Fades in on hover / for 900 ms after a wheel scroll. **No gutter**: rows keep their full width and the pill floats over them. |
 
 `wx-list__plus` no longer draws its own circle — the button *is* WeChat's circle-plus
 SVG, colour `#8a8a8a`.
@@ -93,7 +98,7 @@ a byte scan for `<svg` finds all of them.
 - The `:/gui/svg/...` strings (238 of them) are a runtime path table surrounded by
   pointer fields, not a static map.
 
-**How the ten icons were actually picked.** Crop each icon out of the live client,
+**How the icons were actually picked.** Crop each icon out of the live client,
 binarise to a 24×24 ink mask, render each candidate SVG at 24 px in a headless page,
 compare with IoU, then confirm the top hit by eye. Scripts: `.cache/wxsvg/*.py`
 (gitignored, regenerate as needed).
@@ -105,14 +110,17 @@ compare with IoU, then confirm the top hit by eye. Scripts: `.cache/wxsvg/*.py`
 | `DeviceIcon` | `#0498` | `FolderIcon` | `#0436` |
 | `MenuIcon` | `#0158` | `MicIcon` | `#0768` |
 | `SearchIcon` | `#0760` | `CallBubbleIcon` | `#1755` |
+| `NewGroupIcon` (＋ menu) | `#0698` | `AddFriendIcon` (＋ menu) | `#1463` |
+| `NoteIcon` (＋ menu) | `#0391` | | |
 
 `WechatIcons.tsx` is produced by `.cache/wxsvg/gen_icons.py`: drop `width`/`height`,
 strip `style="…"`, `fill="black"` → `currentColor`, hyphenated attrs → JSX camelCase,
 one element per line. Re-run it if the client updates and the artwork changes.
 
-**Not in that payload set, therefore hand-drawn in `Icon.tsx`:** the two-tone rail
-"chats" tab (red bubble with dots over a green bubble — the payloads are monochrome,
-and only an empty bubble exists) and the empty-pane watermark logo.
+**Not in that payload set, therefore replaced:** the rail "chats" tab and the
+empty-pane watermark are now the Telegram roundel (`TelegramLogo`, Simple Icons,
+CC0) instead of WeChat artwork — the tab carries it in brand green, the watermark
+keeps the light grey.
 
 **Icons matched off reference crops** (client crop → binarised ink mask → blurred
 soft-IoU over all 2500 masks, best hit confirmed by eye; scripts
@@ -184,9 +192,11 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
    photo/file menu, scissors and mic show a "not wired" toast. The client's separate
    right-hand "语音输入" circle is **deliberately left out** — the send button sits
    right after the toolbar.
-2. **Avatars are colour placeholders with initials.** The protocol has no avatar URL
-   (`ChatSummary`/`Self` carry no photo field); adding one means extending
-   `packages/protocol/src/dto.ts` and both adapters.
+2. **Avatars are real where the protocol carries them, initials elsewhere.** The rail
+   avatar and every chat row now load the account's/profile photo through
+   `wx-media://` (`Self.avatarUrl`, `ChatSummary.avatarUrl`); the rows without a photo
+   keep the coloured initial square. **Message rows still draw initials** — `Message` has
+   no sender-photo field (see `docs/HANDOFF.md` "Known gaps" 11).
 3. **Rail sections other than 聊天** only raise a toast. 通讯录 is cheap to build from
    `chat.kind === 'private'`; 收藏 and 朋友圈 have no data at all.
 4. **No pin (always-on-top) button** in the title strip; WeChat has one left of the
@@ -197,8 +207,24 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
 7. **Search field filters the loaded chat list locally** — global search is still W4.
 8. **Dark mode** tokens exist and were exercised, but the rail icon grey (`#8a8a8a`) was
    only tuned for light mode.
-9. The empty-pane watermark is drawn, not extracted (WeChat's is a logo, not in the
-   icon payload set).
+9. **The brand mark is Telegram's, not WeChat's.** `TelegramLogo` in `Icon.tsx` is
+   the Simple Icons roundel (`https://simpleicons.org/?q=telegram`, CC0 1.0) copied
+   verbatim; the plane is a hole in the disc, so no white fill is painted. It is used
+   three times: the rail's 聊天 tab in `--wx-brand` (`#07c160`), the login card in the
+   same green, and the empty-pane watermark in the light `#efefef` / `#222` it had
+   before — the watermark stays low-contrast rather than becoming a green logo.
+10. **Re-selecting the open conversation closes it.** In the client, clicking the
+    highlighted row does nothing; here it is a toggle: the right pane returns to the
+    watermark state and the list keeps its search filter (requested 2026-11-17). The
+    rail's 聊天 tab stays inert, as in the client. Closing the pane still flushes the
+    reading anchor, so reopening the chat restores the same position.
+11. **The header "+" opens WeChat's three-entry card, but none of the entries is
+    wired.** 发起群聊 / 添加朋友 / 写笔记 match the client's menu down to the payload
+    glyphs, and the card hangs centred under the round button 12 px below it
+    (`Popup centerX`); the client's card measures 143×144 with 45 px rows. The
+    protocol has no create-chat, contact-search or notes channel, so each entry only
+    raises the same "还没有接入" toast as the rail's other sections. Settings, theme and
+    sign-out stay behind the rail's "≡" button.
 
 ---
 
@@ -206,14 +232,17 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
 
 1. ~~Finish the icon set while the DLL is still at 4.2.0.13~~ — done for the chrome:
    dots, handset, scissors + chevron, sticker cube and the dotted call bubble all come
-   from payloads now. Left over: identify the client's sixth composer glyph (◎), and
-   the two-tone chats tab / voice-input circle, which have no payload.
+   from payloads now. Left over: identify the client's sixth composer glyph (◎) and the
+   voice-input circle, which has no payload. (The chats tab no longer needs one — it is
+   the Telegram mark now.)
 2. 通讯录 panel: reuse `ChatList` with private chats only, grouped by initial.
 3. Chat-info popover → real side panel (members, mute/pin controls) — the protocol
    already has `muted`/`pinned`.
 4. Global search overlay (W4) and in-chat search.
 5. Pin button + draggable list width, if the client fidelity matters more than scope.
-6. Avatar photos once the DTO carries them.
+6. ~~Avatar photos once the DTO carries them~~ — done for the rail and the chat list.
+   Next: sender avatars in the transcript (needs a photo id on `Message`), and a
+   virtualised chat list (526 rows render at once on this account).
 
 ---
 
@@ -229,6 +258,15 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
 - The agent shell's `pnpm web` background job is fine, but killing it stops HMR.
 - The **mock adapter floods new messages** every few seconds (`(mock) 新消息 #n`) and
   the unread counters grow. That is the fixture, not a regression.
+- **A hidden transcript is usually the visibility gate, not missing data.** Check
+  `document.querySelector('[data-testid="message-scroller"]').className` — if it still
+  has `wx-messages--pending` while `.wx-message-slot` rows exist, the messages are there
+  and only the gate is stuck (Chromium throttles rAF while the window is occluded). The
+  list now force-readies itself after 1 s; if it ever regresses, look at
+  `restoreToAnchor` first.
+- **A slow avatar is a slow tunnel, not slow code.** One 160 px photo measured 16 s on a
+  flapping SOCKS connection and 65–230 ms on a healthy one. Check the proxy before
+  touching `prefetchChatAvatars`.
 - Login needs three submits; the field is re-focused after each step only because of
   the fix in `LoginScreen.tsx` — if it regresses, typing stops going anywhere.
 - The reference screenshots and comparison PNGs are in `.cache` and therefore

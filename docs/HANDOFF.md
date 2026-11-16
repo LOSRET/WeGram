@@ -72,13 +72,43 @@ screenshot, not guessed).
   `titleBarOverlay` (32 px, rail colour) and settings/theme/sign-out live in the rail's
   "≡" menu (`AppMenu.tsx`). The footer with the adapter hint is gone; that hint is a
   caption in the same menu.
-- Icons: ten chrome glyphs are WeChat's own vectors, extracted from `Weixin.dll`
-  (2346 embedded SVGs) into the generated `components/WechatIcons.tsx`; the rest
-  (two-tone chat tab, compass tab, "…", scissors) are hand-drawn. The name manifest in
-  the DLL has no recoverable name→payload mapping — see `UI-HANDOFF.md` §3 before
-  trying again.
+- Icons: the chrome glyphs are WeChat's own vectors, extracted from `Weixin.dll`
+  (2346 embedded SVGs) into the generated `components/WechatIcons.tsx` — including the
+  ＋ menu's 发起群聊 / 添加朋友 / 写笔记 glyphs; the rest (compass tab, "…", scissors)
+  are hand-drawn, and the brand mark — rail 聊天 tab, login card, empty-pane watermark —
+  is the Telegram roundel from Simple Icons. The name manifest in the DLL has no
+  recoverable name→payload mapping — see `UI-HANDOFF.md` §3 before trying again.
 - Also fixed while testing: the login field regains focus after each step (it is
   disabled while a request is in flight, which used to drop the caret and force a click).
+
+### Real-account session (the one that produced this revision)
+
+First time the real TDLib adapter was driven end-to-end in the Electron window (a proxy
+is mandatory here). Three real defects surfaced and were fixed — all of them only
+reproduce against a real account, none with the mock:
+
+1. **Groups opened empty and never paged.** `updateChatReadInbox` fires for every chat,
+   and `applyMessageOps` was creating an empty `messagesByChat[chatId]` for each one, so
+   `ChatPane`'s "history is cached" check skipped the first-page fetch forever.
+2. **`hasMore` lied.** TDLib often answers `getChatHistory` from its local window (1–5
+   messages in ~2 ms); the old `hasMore = raw.length >= limit` read that as "no older
+   messages", so paging stopped dead.
+3. **A loaded transcript stayed invisible.** When the window is occluded, Chromium
+   throttles `requestAnimationFrame`, and the anchor-restore path only released the
+   `--pending` gate from a rAF loop — messages were in the DOM but `visibility: hidden`.
+   Together with defect 1 this is what the owner saw as "群组加载旧消息无法加载".
+
+UI work in the same session: WeChat-style **overlay scrollbars** (no layout gutter) and
+**real profile photos** for the rail avatar and every chat row (`avatarUrl` added to
+`Self` and `ChatSummary`; downloaded in the background with a 4-wide worker pool and
+pushed back as batched `chats` upserts). Details in `docs/UI-HANDOFF.md`; the measured
+quirks are in "Non-obvious facts" below.
+
+Verified in that session: `pnpm typecheck`, `pnpm build`, and CDP measurements against
+the real account — first page 50 messages / `hasMore: true` on cold groups, 60 pages
+(3000 messages) with no duplicates and strictly ascending ids, rail + list photos at
+160×160 in 40×40 boxes, and a chat opened while the window was occluded rendering
+correctly after the visibility fix. The Electron window is left running.
 
 ## Hard rules
 
@@ -104,6 +134,9 @@ screenshot, not guessed).
 | `pnpm install` fails / ignored builds | pnpm 12 reads `allowBuilds:` (name → bool map) from `pnpm-workspace.yaml`, store lives outside the workspace | already configured; needs full filesystem access |
 | Vite watcher dies with `EBUSY` | editors save through `*.tmpdir` folders | both Vite configs ignore `**/*.tmpdir/**` and `**/*.tmp` |
 | `getChats` hangs, `getMe` works | no proxy → TDLib reads users/chats from the local DB but cannot reach the network | set a proxy; `socks5://127.0.0.1:7890` worked here (Clash mixed port) |
+| `launch-detached.ps1` dies with `Invoke-CimMethod … 拒绝访问` | the DSH shell is sandboxed (`workspace-write`): WMI process creation is denied, and so are the obvious detours (starting through `explorer.exe`, `schtasks /create`) | only works when the session runs with full access (this session was `danger-full-access`). Do not "fix" the script — ask for full access instead |
+| avatars/photos trickle in, one 30 KB thumbnail takes 16 s | the SOCKS tunnel is saturated or flapping, not the code | measured: the same file later took 65–230 ms. Check FlClash/Clash before debugging |
+| `-RemoteDebugPort` connects but `Runtime.evaluate` sees a stale UI | a second Electron instance was requested while one was running; the single-instance lock kept the old window | close `electron.exe` first (`windows close electron.exe`), then launch |
 
 ## How to run and verify
 
@@ -118,7 +151,28 @@ pnpm tdlib:smoke                # real adapter headlessly (needs .env + proxy en
 pnpm ui:db-check                # ui.db via node:sqlite, headless
 pwsh scripts\launch-detached.ps1 -NoSandbox -Mock   # the only way Electron starts here
 pwsh scripts\launch-detached.ps1 -NoSandbox -Mock -RemoteDebugPort 9224  # + CDP
+# real account (read-only; the proxy is mandatory, see the environment table)
+pwsh scripts\launch-detached.ps1 -NoSandbox -Proxy socks5://127.0.0.1:7890 -SessionDir ..\..\spikes\tdlib\data
 ```
+
+Reading and driving the real renderer over CDP is what produced the numbers above. The
+helper is `.cache/cdp-eval.mjs` (gitignored; ~30 lines: read
+`http://127.0.0.1:9224/json`, open the page's `webSocketDebuggerUrl`, send one
+`Runtime.evaluate`):
+
+```powershell
+node .cache\cdp-eval.mjs "document.querySelectorAll('.wx-message-slot').length"
+node .cache\cdp-eval.mjs "@script.js"   # same, expression read from a file (quoting!)
+```
+
+It can call the app's own IPC, which is the cheapest way to isolate a bug:
+
+```javascript
+await window.tg.invoke('messages:history', { chatId: -1001125107539, limit: 50 })
+await window.tg.invoke('chats:list', { offset: 0, limit: 5 })
+```
+
+Anything that opens a chat also marks it read on the server — use it deliberately.
 
 - The mock adapter writes its generated media to `userData/mock-media` on startup
   (`%APPDATA%\WechatGram\mock-media`): `design-v3.png`, `sunset.png`, `需求说明.md`,
@@ -241,6 +295,43 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
   returned early — the list stayed `visibility: hidden` forever. Fix: do not cancel the
   frame, and add a 150 ms `setTimeout` fallback because rAF is throttled while the window
   is occluded (this also explains flaky `?perf=1` runs in background windows).
+- **…and occlusion was still able to freeze the list after that fix** (measured on the
+  real account: 12 rows in the DOM, `scrollHeight 9968`, `messages:history` answering 50
+  in 8 ms, and `wx-messages--pending` stuck on). The anchor-restore path waits on rAF and
+  only released the gate in its `.finally`. Three layers now prevent a permanently
+  hidden transcript: a 700 ms `setTimeout(markReady)` next to the restore, a 900 ms
+  deadline inside `restoreToAnchor` (frames alone are not a bound), and a watchdog that
+  force-readies any list that has messages but is not ready after 1 s. **Never gate
+  visibility on layout timing.**
+- **A short `getChatHistory` answer is normal, not the end of the chat.** For a cold
+  chat TDLib answers from its local window — measured 1 to 5 messages in 1–7 ms — even
+  when the chat has thousands. Re-anchoring *below* the oldest returned id is what makes
+  it go to the server (that request came back with 50 in 65–230 ms; the first cold fetch
+  after a long time took ~3.4 s). `history()` therefore tops a page up over up to
+  `MAX_HISTORY_ROUNDS = 3` rounds and only an **empty** round means "the chat begins
+  here". `hasMore` is `!exhausted && messages.length > 0`; the old
+  `raw.length >= limit` turned every cold chat into "no more history". Cost of the new
+  rule: one extra request when a chat is genuinely at its beginning.
+- **Never create a `messagesByChat` entry for a chat whose history is not loaded.**
+  `updateChatReadInbox` fires for *every* chat, and `applyMessageOps` used to write
+  `messagesByChat[chatId] = []` from it. `ChatPane` treats "an entry exists" as "cached",
+  so every chat the read marker touched opened empty and could not page (this is the bug
+  the product owner reported). `applyMessageOps` now returns without touching the store
+  when the chat has no entry; entries come only from `setHistory`/`prependHistory`.
+- **`downloadFile(synchronous: true)` occupies a TDLib request slot until the file is
+  complete.** That is fine for user-triggered media, but avatars must not be fetched
+  naively: the adapter runs a 4-wide worker pool at priority 1, dedupes per chat id
+  (queue / in-flight / done / no-photo), and never emits `evt:file` for them
+  (`fetchFilePath()` is the silent variant; `downloadFile()` is the progress one). On a
+  saturated tunnel a single thumbnail took 16 s, so the pool is 4 — if opening a chat
+  feels starved right after start-up, this queue is the first suspect. Finished photos
+  are pushed as `chats` upserts coalesced over 120 ms, not one event per chat.
+- **Profile photos need `getChat`/`getMe` → `profile_photo.small` (or `chat.photo.small`),
+  not the media pipeline.** The file is registered through `registerMediaFile` exactly
+  like attachments, so the renderer only ever sees `wx-media://f/<token>`. The rail's
+  own photo is fetched in the background and announced with a second `auth` event, so
+  authorisation never waits on the network; `updateUser` (self) and `updateChatPhoto`
+  (a chat) invalidate and refetch.
 - **This TDLib's `inputMessagePhoto` has no width/height.** Dimensions live on
   `inputPhoto`, so a photo cannot be sent without knowing its pixel size. The main
   process parses PNG/JPEG/WebP/GIF headers first; when it cannot, the file is sent as a
@@ -342,9 +433,20 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
    (`pnpm web`) shows an empty strip above the login card too. Detecting the real overlay
    would need `env(titlebar-area-height)`; not worth it while the strip stays harmless.
 9. **UI deltas vs the real client** are catalogued in `docs/UI-HANDOFF.md` §5 (composer
-   toolbar loses the sticker cube and the scissors chevron, avatars are placeholders, no
-   pin button, fixed 238 px list, rail sections other than 聊天 only raise a toast, dark
-   rail icon grey untuned). §6 has the ordered follow-ups.
+   toolbar loses the scissors chevron, message-row avatars still draw initials, no pin
+   button, fixed 238 px list, rail sections other than 聊天 only raise a toast, dark rail
+   icon grey untuned). §6 has the ordered follow-ups.
+10. **The chat list is not virtualised.** This account renders **526 rows** at once
+    (measured in the DOM). It is still smooth, but it is the next scaling risk, and the
+    avatar pool only prefetches what it is handed: the 100-chat first page plus whatever
+    arrives through `emitChatUpsert`. A row scrolled into view without an update event
+    keeps its initials until the chat is touched.
+11. **Message-row (sender) avatars are still initials.** `Message` carries no photo
+    field; doing it properly means `senderPhotoFileId` in the DTO plus a cache keyed by
+    user id, or a `getUserProfilePhotos` call per sender.
+12. **Popovers keep native scrollbars** (modals, forward list, sticker grid). Only the
+    two long panes use `<OverlayScrollbar>`; converting the rest is mechanical but was
+    not worth the churn while the complaint was the list and the transcript.
 
 ## Open questions for the product owner
 
@@ -356,12 +458,16 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
 
 ## Session leftovers
 
-All processes started during the session (Electron windows, the remote-debugged Edge
-profile, wrapper consoles, the Vite preview server) were closed, and the test
-`%APPDATA%\WechatGram` profile was removed. The `.cache/` folder keeps logs and is
-gitignored.
+The Electron window is **left running** (real adapter, launched detached, maximised) so
+the next session can pick it up; close it with `windows close electron.exe` before the
+next launch, or the single-instance lock silently keeps the old bundle.
 
-The W3 changes are **not committed** yet: the working tree holds the protocol, main,
-renderer and doc changes listed by `git status`, plus `pnpm-lock.yaml` (lottie-web).
-Re-run `pnpm typecheck && pnpm build` before committing; both were green at the end of
-the session.
+The Vite preview server and the remote-debugged browser windows started during the
+session were closed. `.cache/` keeps logs and is gitignored; it also holds the throwaway
+CDP helpers (`cdp-eval.mjs`, `*-check.js`, `uitest.js`) used to measure the real
+renderer — recreate them from the snippets above if they are gone.
+
+The UI/real-account changes are **not committed yet**: the working tree holds the
+protocol, main, renderer and documentation changes listed by `git status`, plus
+`OverlayScrollbar.tsx`. `pnpm typecheck && pnpm build` were green at the end of the
+session.
