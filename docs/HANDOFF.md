@@ -20,6 +20,11 @@ Verified at the end of the session: `pnpm typecheck`, `pnpm build`, `pnpm tdlib:
 `pnpm ui:db-check`, and the browser acceptance panel (`?perf=1`) — 5000 messages at
 60 fps, 0 px viewport drift when prepending a page.
 
+Follow-up session (same day), after the import below: repo created, `senderChatId` fix
+for channel posts, and the dark title-bar overlay verified end-to-end plus a login-screen
+drag strip (details in "Known gaps"). Commits: `262996a` (import), `af72110`
+(`senderChatId`), then the login-strip fix — `git log --oneline` is the source of truth.
+
 **Git exists now**: `main`, root commit `262996a` ("chore: initial import of the W1/W2
 skeleton"), 69 files, clean tree. `.gitignore` covers `.env*`, `node_modules`, `out`,
 `.cache`, `spikes/*/data`; `.gitattributes` pins `eol=lf` so the machine's global
@@ -137,6 +142,11 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
   reserve space with `padding-right: calc(16px + (100% - env(titlebar-area-x, 0px) -
   env(titlebar-area-width, 100%)))`. A fixed spacer only pushes content into the buttons.
   The overlay colour also has to be repainted from the main process on theme change.
+  **Whatever sits under the controls must use `--wx-bg-list`** (the colour
+  `applyTitleBarTheme` sends) or the bitmap shows a seam — that is why the login screen
+  (`wx-login::before`) got a 60 px strip of its own. The overlay covers only the
+  right-hand control area, not the whole 60 px strip, so the strip keeps the rest of the
+  window looking consistent.
 - **`node:sqlite` exists in Electron 38** (bundled Node 22.22) — no better-sqlite3, no
   Electron-ABI rebuild. It is flagged experimental upstream, hence the single-file
   confinement. Expect an `ExperimentalWarning` in the log.
@@ -161,8 +171,16 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
 
 ## Known gaps / suggested next steps
 
-1. **Unverified:** the dark-mode window-controls overlay (code landed: `applyTitleBarTheme`
-   + `onThemeChange`; needs a login + theme toggle to confirm visually).
+1. ~~**Unverified:** the dark-mode window-controls overlay~~ — **verified** (Electron 38,
+   `-NoSandbox -Mock`, mock login `+8613800000000` / `12345` / `wechatgram`). Measured
+   pixels: light title bar `#F7F7F7` with `#171717` glyphs, dark title bar `#1A1A1A`
+   (JPEG of `#191919`) with `#E4E4E4` glyphs, overlay strip identical to the title bar in
+   both themes, and a dark profile restarts dark from `ready-to-show`. Fixing the
+   comparison exposed a real gap: the login screen has no title bar, so the controls sat
+   on `#111111`/`#EDEDED` — about 8/255 off the overlay colour, a faint but visible
+   rectangle in the corner. `.wx-login::before` now paints a 60 px `--wx-bg-list` strip
+   with a divider (same as the shell), which also gives the login window its **only drag
+   region** (it could not be moved before logging in).
 2. **`ui.db` scroll-anchor wiring** — columns and `saveScrollAnchor`/`getScrollAnchor`
    exist, nothing calls them yet. Decide the UX first: restore position only when the
    user was not at the bottom.
@@ -180,6 +198,9 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
    matters, split a channels-only entry point.
 7. Minor: `tdlib:smoke` only checks the *first* channel of the chat list for
    `messageSenderChat`; groups with anonymous admins are not covered by a fixture.
+8. Minor: the login strip is a fixed 60 px (`--wx-titlebar-h`), so the browser preview
+   (`pnpm web`) shows an empty strip above the login card too. Detecting the real overlay
+   would need `env(titlebar-area-height)`; not worth it while the strip stays harmless.
 
 ## Open questions for the product owner
 

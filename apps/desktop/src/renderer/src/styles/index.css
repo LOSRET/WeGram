@@ -777,6 +777,7 @@ textarea {
 /* ---------- Login ---------- */
 
 .wx-login {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -784,7 +785,23 @@ textarea {
   background: var(--wx-bg);
 }
 
+/* The login screen has no title bar, but the native window controls are still
+   painted over the top-right corner by titleBarOverlay. This strip gives them
+   the same colour the shell's title bar uses (the overlay colour comes from
+   applyTitleBarTheme), so the controls never sit on a slightly different
+   surface — and it is the only drag region available before login. */
+.wx-login::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: var(--wx-titlebar-h);
+  background: var(--wx-bg-list);
+  border-bottom: 1px solid var(--wx-divider);
+  -webkit-app-region: drag;
+}
+
 .wx-login__card {
+  position: relative;
   width: 380px;
   padding: 32px;
   border-radius: 10px;
