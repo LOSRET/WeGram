@@ -2,7 +2,7 @@ import type { AuthState } from '@wechatgram/protocol'
 
 import { errorMessage, invoke } from '@renderer/lib/ipc'
 import { useAppStore } from '@renderer/store/useAppStore'
-import { WechatWatermark } from '@renderer/components/Icon'
+import { TelegramLogo } from '@renderer/components/Icon'
 import { useEffect, useRef, useState } from 'react'
 
 type Step = 'phone' | 'code' | 'password'
@@ -96,7 +96,7 @@ export function LoginScreen() {
           void submit()
         }}
       >
-        <WechatWatermark size={56} className="wx-login__logo" />
+        <TelegramLogo size={56} className="wx-login__logo" />
         <div className="wx-login__title">{copy.title}</div>
         <div className="wx-login__subtitle">{copy.subtitle}</div>
 

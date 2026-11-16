@@ -11,6 +11,11 @@ interface PopupProps {
   y: number
   onClose: () => void
   children: ReactNode
+  /**
+   * Treat `x` as the anchor's centre instead of its left edge. WeChat's "+" card
+   * hangs centred under the round button rather than left-aligned to it.
+   */
+  centerX?: boolean
 }
 
 /**
@@ -18,7 +23,7 @@ interface PopupProps {
  * border, 6 px radius. It closes on Escape, on a pointer-down anywhere outside,
  * and when the window loses focus.
  */
-export function Popup({ x, y, onClose, children }: PopupProps) {
+export function Popup({ x, y, onClose, children, centerX = false }: PopupProps) {
   const ref = useRef<HTMLDivElement | null>(null)
   const [pos, setPos] = useState({ left: x, top: y })
 
@@ -26,13 +31,14 @@ export function Popup({ x, y, onClose, children }: PopupProps) {
     const el = ref.current
     if (!el) return
     const rect = el.getBoundingClientRect()
-    const left = Math.max(8, Math.min(x, window.innerWidth - rect.width - 8))
+    const wanted = centerX ? x - rect.width / 2 : x
+    const left = Math.max(8, Math.min(wanted, window.innerWidth - rect.width - 8))
     const top =
       y + rect.height > window.innerHeight - 8
         ? Math.max(8, y - rect.height)
         : Math.min(y, window.innerHeight - rect.height - 8)
     setPos({ left, top })
-  }, [x, y])
+  }, [x, y, centerX])
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {

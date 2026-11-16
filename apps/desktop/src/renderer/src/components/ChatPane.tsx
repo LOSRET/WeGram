@@ -7,7 +7,7 @@ import { Composer } from './Composer'
 import { ConfirmDialog } from './ConfirmDialog'
 import { Popup } from './ContextMenu'
 import { ForwardDialog } from './ForwardDialog'
-import { CallIcon, CallMenuIcon, MoreIcon, WechatWatermark } from './Icon'
+import { CallIcon, CallMenuIcon, MoreIcon, TelegramLogo } from './Icon'
 import { MessageList } from './MessageList'
 
 /** How many extra pages may be fetched to reach a saved reading position. */
@@ -150,7 +150,7 @@ export function ChatPane() {
     return (
       <main className="wx-chat">
         <div className="wx-empty-chat">
-          <WechatWatermark size={132} className="wx-empty-chat__logo" />
+          <TelegramLogo size={132} className="wx-empty-chat__logo" />
         </div>
       </main>
     )

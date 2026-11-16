@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect } from 'react'
 import { AppMenu } from './AppMenu'
 import { ChatList } from './ChatList'
 import { ChatPane } from './ChatPane'
+import { PlusMenu } from './PlusMenu'
 import { ProxyPanel } from './ProxyPanel'
 import { SideRail } from './SideRail'
 import { errorMessage, invoke } from '../lib/ipc'
@@ -24,7 +25,10 @@ export function MainShell() {
 
   const [query, setQuery] = useState('')
   const [proxyOpen, setProxyOpen] = useState(false)
+  /** The rail's "≡" menu (settings / theme / sign out). */
   const [menu, setMenu] = useState<Anchor | null>(null)
+  /** The list header's "+" menu (发起群聊 / 添加朋友 / 写笔记). */
+  const [plusMenu, setPlusMenu] = useState<Anchor | null>(null)
 
   // Toasts are fire-and-forget and owned here: the rail can raise one before a
   // conversation is even open.
@@ -40,7 +44,17 @@ export function MainShell() {
     return chats.filter((chat) => chat.title.toLowerCase().includes(needle))
   }, [chats, query])
 
+  /**
+   * Selecting the row that is already open toggles the conversation shut: the
+   * right pane goes back to its initial watermark state and the list keeps its
+   * filter, so the reader can pick the same or another chat again.
+   */
   const openChat = async (chat: ChatSummary) => {
+    if (chat.id === activeChatId) {
+      useAppStore.getState().setActiveChat(null)
+      return
+    }
+
     const store = useAppStore.getState()
     // Snapshot before `chats:open` reports the chat as read, or the unread
     // divider would disappear before the list ever mounts.
@@ -87,10 +101,19 @@ export function MainShell() {
           query={query}
           onQueryChange={setQuery}
           onSelect={(chat) => void openChat(chat)}
-          onOpenMenu={(anchor) => setMenu(anchor)}
+          onOpenPlus={(anchor) => setPlusMenu(anchor)}
         />
         <ChatPane />
       </div>
+
+      {plusMenu ? (
+        <PlusMenu
+          x={plusMenu.x}
+          y={plusMenu.y}
+          onClose={() => setPlusMenu(null)}
+          onUnavailable={(label) => setToast(`${label}还没有接入，先看聊天吧`)}
+        />
+      ) : null}
 
       {menu ? (
         <AppMenu
