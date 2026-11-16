@@ -13,7 +13,9 @@ param(
   [string]$SessionDir = $env:WECHATGRAM_TDLIB_DIR,
   [string]$LogFile = '',
   [switch]$NoSandbox,
-  [switch]$Mock
+  [switch]$Mock,
+  # Optional Chrome DevTools Protocol port, for automated checks of the renderer.
+  [int]$RemoteDebugPort = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -35,6 +37,7 @@ if ($SessionDir) { $lines += "set WECHATGRAM_TDLIB_DIR=$SessionDir" }
 if ($Mock) { $lines += 'set WECHATGRAM_ADAPTER=mock' }
 $lines += "cd /d `"$appDir`""
 $sandboxFlag = if ($NoSandbox) { ' --no-sandbox' } else { '' }
+if ($RemoteDebugPort -gt 0) { $sandboxFlag += " --remote-debugging-port=$RemoteDebugPort" }
 if (-not $LogFile) {
   $LogFile = Join-Path $appDir '..\..\.cache\app.log'
 }

@@ -17,6 +17,7 @@
     "@tanstack/react-query": "^5.90.2",
     "@tanstack/react-virtual": "^3.14.26",
     "@wechatgram/protocol": "workspace:*",
+    "lottie-web": "^5.13.0",
     "prebuilt-tdlib": "0.1008070.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
