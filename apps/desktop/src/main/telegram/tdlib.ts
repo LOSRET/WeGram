@@ -345,12 +345,26 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     if (latest) await this.markRead({ chatId, upToMessageId: latest.id })
   }
 
+  /**
+   * One page of history, ascending, plus whether older messages may exist.
+   *
+   * Measured quirk that made groups look unloadable: `getChatHistory` happily
+   * answers from the local database and then returns only the handful of
+   * messages it has cached — 1 to 5 for a cold group, in ~2 ms — even when the
+   * chat has thousands of messages. Anchoring *below* that short answer is the
+   * request TDLib does take to the server, and it comes back full. So a short
+   * answer is topped up here, and only an empty round counts as "the chat
+   * begins here".
+   *
+   * The old `hasMore: rawMessages.length >= limit` read every short answer as
+   * "no more history", which stopped MessageList from paging at all.
+   */
   async history(input: {
     chatId: number
     fromMessageId?: number
     limit: number
   }): Promise<{ messages: Message[]; hasMore: boolean }> {
-    const limit = Math.min(input.limit, 100)
+    const limit = Math.min(Math.max(input.limit, 1), 100)
 
     // Measured behaviour (probe in RESULTS.md): from_message_id = 0 does not
     // trigger a server fetch — it only returns the locally cached last message.
@@ -364,23 +378,50 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
       anchor = lastId
     }
 
-    const response = await this.invoke({
-      _: 'getChatHistory',
-      chat_id: input.chatId,
-      from_message_id: anchor,
-      offset: 0,
-      limit,
-      only_local: false,
-    })
-    const rawMessages: TdObject[] = Array.isArray(response.messages) ? response.messages : []
-    // TDLib includes the anchor message itself; paging must be strictly older.
-    const page =
-      input.fromMessageId === undefined
-        ? rawMessages
-        : rawMessages.filter((raw) => Number(raw.id) < input.fromMessageId!)
+    const collected: TdObject[] = []
+    const seen = new Set<number>()
+    let cursor: number = anchor
+    // The first page may include its anchor; every later round is strictly older.
+    let below = input.fromMessageId
+    let exhausted = false
+    // A short answer is topped up over a few rounds; bounded so a slow link
+    // cannot stall the first paint.
+    const MAX_ROUNDS = 3
+
+    for (let round = 0; round < MAX_ROUNDS && collected.length < limit; round += 1) {
+      const response = await this.invoke({
+        _: 'getChatHistory',
+        chat_id: input.chatId,
+        from_message_id: cursor,
+        offset: 0,
+        limit: limit - collected.length,
+        only_local: false,
+      })
+      const rawMessages: TdObject[] = Array.isArray(response.messages) ? response.messages : []
+      const fresh = rawMessages.filter((raw) => {
+        const id = Number(raw.id)
+        if (!Number.isFinite(id) || seen.has(id)) return false
+        return below === undefined || id < below
+      })
+      if (fresh.length === 0) {
+        exhausted = true
+        break
+      }
+      for (const raw of fresh) {
+        seen.add(Number(raw.id))
+        collected.push(raw)
+      }
+      const oldest = Math.min(...fresh.map((raw) => Number(raw.id)))
+      cursor = oldest
+      below = oldest
+    }
+
+    // getChatHistory returns newest first; the UI wants ascending order, and a
+    // top-up round can overshoot, so keep the newest `limit` of what we have.
+    const ordered = [...collected].sort((a, b) => Number(a.id) - Number(b.id))
+    const page = ordered.length > limit ? ordered.slice(ordered.length - limit) : ordered
     const mapped = await Promise.all(page.map((raw) => this.mapMessage(input.chatId, raw)))
-    // getChatHistory returns newest first; the UI wants ascending order.
-    return { messages: mapped.reverse(), hasMore: rawMessages.length >= limit }
+    return { messages: mapped, hasMore: !exhausted && mapped.length > 0 }
   }
 
   async sendText(input: {

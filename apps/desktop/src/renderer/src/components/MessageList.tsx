@@ -13,6 +13,7 @@ import {
 import { invoke } from '../lib/ipc'
 import { useAnchoredScroll } from '../lib/useAnchoredScroll'
 import { ContextMenu, type MenuItem } from './ContextMenu'
+import { OverlayScrollbar } from './OverlayScrollbar'
 import { MediaBubble } from './MediaBubble'
 import { RichText } from './RichText'
 import { StickerRenderer } from './StickerRenderer'
@@ -57,6 +58,7 @@ export function MessageList({
   onCopy,
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  const hostRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const loadingRef = useRef(false)
   const prependingRef = useRef(false)
@@ -116,8 +118,11 @@ export function MessageList({
       if (index < 0) return
       virtualizer.scrollToIndex(index, { align: 'start' })
 
+      // Frame-bounded *and* time-bounded: an occluded window throttles rAF, and
+      // a 40-frame loop can then take a minute.
+      const deadline = Date.now() + 900
       let stable = 0
-      for (let frame = 0; frame < 40 && stable < 2; frame += 1) {
+      for (let frame = 0; frame < 40 && stable < 2 && Date.now() < deadline; frame += 1) {
         await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
         if (!scrollRef.current) return
         index = messages.findIndex((message) => message.id === messageId)
@@ -149,6 +154,10 @@ export function MessageList({
     const anchor = initialAnchor
     if (anchor && messages.some((message) => message.id === anchor.messageId)) {
       void restoreToAnchor(anchor.messageId, anchor.offset).finally(markReady)
+      // Same safety net as below: `restoreToAnchor` walks frames with rAF, and
+      // Chromium throttles rAF for an occluded window — without this the list
+      // would stay invisible (the `--pending` gate) for as long as that lasts.
+      window.setTimeout(markReady, 700)
       return
     }
 
@@ -170,6 +179,18 @@ export function MessageList({
     // Runs once per mounted chat (MessageList is keyed by chat id).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length])
+
+  /**
+   * Visibility must never hinge on layout timing. Whatever the scroll code does
+   * below (restoring a deep anchor, waiting for frames), the transcript becomes
+   * visible within a second of having messages — a `--pending` list that stays
+   * hidden is indistinguishable from "messages did not load".
+   */
+  useEffect(() => {
+    if (ready || messages.length === 0) return
+    const timer = window.setTimeout(markReady, 1000)
+    return () => window.clearTimeout(timer)
+  }, [ready, messages.length, markReady])
 
   /* ---------- reading position saved to ui.db (#2) ---------- */
 
@@ -332,6 +353,21 @@ export function MessageList({
     }
   }
 
+  /**
+   * A page can come back shorter than the viewport (TDLib likes to answer a
+   * history request from its local window first). With nothing to scroll, the
+   * `onScroll` handler below never runs, so the reader would be stuck on a
+   * handful of messages with no way to ask for more. Fill the view instead.
+   */
+  useEffect(() => {
+    if (!ready || !hasMore) return
+    const el = scrollRef.current
+    if (!el) return
+    if (el.scrollHeight <= el.clientHeight + 8) void loadOlder()
+    // Runs on every page; loadOlder itself is guarded against re-entry.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, hasMore, messages.length])
+
   const menuItems = (message: Message): MenuItem[] => {
     const items: MenuItem[] = [{ label: '回复', onSelect: () => onReply(message) }]
     if (message.text) items.push({ label: '复制', onSelect: () => onCopy(message) })
@@ -344,7 +380,7 @@ export function MessageList({
   }
 
   return (
-    <div className="wx-messages-wrap">
+    <div className="wx-messages-wrap" ref={hostRef}>
       <div
         className={`wx-messages${ready ? '' : ' wx-messages--pending'}`}
         ref={scrollRef}
@@ -395,6 +431,8 @@ export function MessageList({
           })}
         </div>
       </div>
+
+      <OverlayScrollbar scrollerRef={scrollRef} hostRef={hostRef} hidden={!ready} />
 
       {loadingOlder ? <div className="wx-messages__loading">正在加载更早的消息…</div> : null}
 

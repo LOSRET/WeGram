@@ -159,7 +159,15 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   applyMessageOps: (chatId, ops) =>
     set((state) => {
-      let list = state.messagesByChat[chatId] ?? EMPTY
+      // Only a chat whose first page is already in memory may be patched here.
+      // Creating an entry for a chat we never opened would make ChatPane's
+      // "already cached" check believe the history is loaded and skip the fetch
+      // entirely — read markers alone (`updateChatReadInbox` fires for every
+      // chat) used to poison every conversation that way, which is what made
+      // groups open empty and never page back.
+      const existing = state.messagesByChat[chatId]
+      if (existing === undefined) return {}
+      let list = existing
       const deleted = new Set<number>()
       for (const op of ops) {
         switch (op.op) {
