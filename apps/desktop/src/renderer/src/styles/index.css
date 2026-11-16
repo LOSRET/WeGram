@@ -50,6 +50,10 @@
   --wx-muted-dot: #b2b2b2;
   --wx-badge: #fa5151;
 
+  /* Overlay scrollbar: WeChat floats a translucent pill over the rows. */
+  --wx-scrollbar-thumb: rgba(0, 0, 0, 0.22);
+  --wx-scrollbar-thumb-active: rgba(0, 0, 0, 0.38);
+
   /* Typography — WeChat on Windows renders with YaHei UI. */
   --wx-font: 'Microsoft YaHei UI', 'Microsoft YaHei', 'Segoe UI', 'PingFang SC', sans-serif;
   --wx-fs-body: 14px;
@@ -86,6 +90,8 @@
   --wx-pane-line: #1f1f1f;
   --wx-divider: rgba(255, 255, 255, 0.07);
   --wx-brand-weak: rgba(7, 193, 96, 0.16);
+  --wx-scrollbar-thumb: rgba(255, 255, 255, 0.22);
+  --wx-scrollbar-thumb-active: rgba(255, 255, 255, 0.38);
 }
 
 * {
@@ -122,6 +128,8 @@ select {
   outline: none;
 }
 
+/* Native bars stay on the small popovers (modals, forward list, sticker grid);
+   the two long panes draw <OverlayScrollbar> instead — see below. */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -129,11 +137,6 @@ select {
 
 ::-webkit-scrollbar-track {
   background: transparent;
-}
-
-/* The transcript uses a hairline overlay-style bar, like WeChat. */
-.wx-messages::-webkit-scrollbar {
-  width: 6px;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -146,6 +149,54 @@ select {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.3);
   background-clip: padding-box;
+}
+
+/* ---------- Overlay scrollbar ---------- */
+
+/* WeChat reserves no gutter: its bar floats over the rows and fades in on
+   hover, so the list never re-flows when the bar appears and the unread
+   badges keep their width. */
+.wx-scrollbar {
+  position: absolute;
+  right: 2px;
+  width: 6px;
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.wx-scrollbar__thumb {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  border-radius: 3px;
+  background: var(--wx-scrollbar-thumb);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 140ms ease,
+    background-color 140ms ease;
+}
+
+.wx-scrollbar[data-visible='true'] .wx-scrollbar__thumb {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.wx-scrollbar__thumb:hover,
+.wx-scrollbar__thumb[data-dragging='true'] {
+  background: var(--wx-scrollbar-thumb-active);
+}
+
+/* The panes that carry the overlay bar hide their native one. */
+.wx-list__view,
+.wx-messages {
+  scrollbar-width: none;
+}
+
+.wx-list__view::-webkit-scrollbar,
+.wx-messages::-webkit-scrollbar {
+  display: none;
 }
 
 /* ---------- App shell ---------- */
@@ -227,6 +278,14 @@ select {
   justify-content: center;
 }
 
+/* Real profile photo from `getMe`, cropped into the 32 px rail slot. */
+.wx-rail__me-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .wx-rail__me-dot {
   position: absolute;
   right: -1px;
@@ -288,6 +347,12 @@ select {
 .wx-rail__btn--active:hover {
   background: transparent;
   color: #6a6a6a;
+}
+
+/* The 聊天 tab's Telegram mark is the one coloured glyph in the rail: it is the
+   active section, so it carries the brand green instead of the icon grey. */
+.wx-rail__brand {
+  color: var(--wx-brand);
 }
 
 .wx-rail__badge {
@@ -377,8 +442,16 @@ select {
 }
 
 .wx-list__body {
+  position: relative;
   flex: 1;
   min-height: 0;
+}
+
+/* The scroller is its own layer so the overlay bar can float above it without
+   being part of the scrolling content. */
+.wx-list__view {
+  position: absolute;
+  inset: 0;
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -427,6 +500,15 @@ select {
   font-weight: 500;
   overflow: hidden;
   letter-spacing: 0.5px;
+}
+
+/* Chat photo, cropped into the 40 px rounded square. */
+.wx-avatar__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .wx-avatar--small {
@@ -1093,8 +1175,11 @@ select {
   white-space: nowrap;
 }
 
+/* WeChat marks the hovered row of a popup card with the brand green and white
+   ink, not a grey wash — see the "+" card and every right-click menu. */
 .wx-context-menu__item:hover {
-  background: var(--wx-row-hover);
+  background: var(--wx-brand);
+  color: #fff;
 }
 
 .wx-context-menu__item--danger {
@@ -1111,6 +1196,34 @@ select {
   padding: 6px 12px;
   font-size: 11px;
   color: var(--wx-text-tertiary);
+}
+
+/* The list header's "+" card: WeChat's 发起群聊 / 添加朋友 / 写笔记 rows. Measured
+   off the client: 143 px wide, 45 px rows, a 20 px glyph 22 px in from the card
+   edge and a 14 px label 56 px in. */
+.wx-plus-menu__item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 130px;
+  padding: 12px 20px 12px 16px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--wx-text);
+  font-size: 14px;
+  text-align: left;
+}
+
+.wx-plus-menu__item:hover {
+  background: var(--wx-brand);
+  color: #fff;
+}
+
+.wx-plus-menu__item svg {
+  flex: none;
+  /* Follows the label ink, so the glyph turns white with the row on hover. */
+  color: inherit;
 }
 
 /* ---------- Toast ---------- */

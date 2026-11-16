@@ -1,4 +1,4 @@
-import { statSync } from 'node:fs'
+import { statSync, writeFileSync } from 'node:fs'
 import { mkdir, stat, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 
@@ -38,6 +38,36 @@ const ME: Self = {
 const MOCK_CODE = '12345'
 const MOCK_PASSWORD = 'wechatgram'
 const MOCK_STICKER_SET_ID = 'mock-stickers'
+
+/** Gradient pairs for the generated chat photos, picked by chat id. */
+const MOCK_AVATAR_COLORS: readonly (
+  | readonly [[number, number, number], [number, number, number]]
+)[] = [
+  [
+    [7, 193, 96],
+    [12, 122, 78],
+  ],
+  [
+    [96, 140, 250],
+    [38, 62, 168],
+  ],
+  [
+    [250, 128, 81],
+    [188, 52, 92],
+  ],
+  [
+    [168, 106, 232],
+    [82, 48, 148],
+  ],
+  [
+    [64, 178, 196],
+    [24, 96, 128],
+  ],
+  [
+    [236, 178, 74],
+    [176, 96, 30],
+  ],
+]
 
 interface Fixture {
   chat: ChatSummary
@@ -97,6 +127,8 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   private nextMessageId = 5000
   private nextFileId = 9000
   private timer: NodeJS.Timeout | null = null
+  /** Generated avatar for the rail, so the mock exercises the real image path. */
+  private selfAvatarUrl: string | null = null
 
   constructor(private readonly options: MockAdapterOptions) {
     super()
@@ -105,6 +137,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   async start(): Promise<void> {
     await this.materializeMedia()
     this.buildFixtures()
+    this.attachAvatarFixtures()
     this.setAuth({ kind: 'waitPhoneNumber' })
     this.setConnection('offline')
     this.timer = setInterval(() => this.simulateTraffic(), 12_000)
@@ -154,7 +187,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
 
   async me(): Promise<Self> {
     if (this.auth.kind !== 'ready') throw new AppError('auth_required', 'Not signed in')
-    return this.auth.me
+    return this.selfAvatarUrl ? { ...this.auth.me, avatarUrl: this.selfAvatarUrl } : this.auth.me
   }
 
   async listChats(input: { limit: number; offset: number }): Promise<ChatSummary[]> {
@@ -394,6 +427,17 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
 
   /* ---------- fixture plumbing ---------- */
 
+  /** Every fixture chat gets a generated photo, so the list exercises <img>. */
+  private attachAvatarFixtures(): void {
+    for (const [chatId, fixture] of this.fixtures) {
+      const pair = MOCK_AVATAR_COLORS[chatId % MOCK_AVATAR_COLORS.length] ?? MOCK_AVATAR_COLORS[0]!
+      const [from, to] = pair
+      const path = join(this.options.mediaDir, `chat-avatar-${chatId}.png`)
+      writeFileSync(path, createGradientPng(128, 128, from, to))
+      fixture.chat.avatarUrl = registerMediaFile(path)
+    }
+  }
+
   private async materializeMedia(): Promise<void> {
     await mkdir(this.options.mediaDir, { recursive: true })
 
@@ -413,6 +457,10 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     await writeFile(heartPath, Buffer.from(STICKER_HEART_WEBP, 'base64'))
     const wavePath = join(this.options.mediaDir, 'sticker-wave.tgs')
     await writeFile(wavePath, Buffer.from(STICKER_WAVE_TGS, 'base64'))
+
+    const avatarPath = join(this.options.mediaDir, 'self-avatar.png')
+    await writeFile(avatarPath, createGradientPng(256, 256, [7, 193, 96], [24, 96, 180]))
+    this.selfAvatarUrl = registerMediaFile(avatarPath)
 
     this.addFile(7001, facePath, '笑脸贴纸', 'image/webp', 128, 128)
     this.addFile(7002, heartPath, '爱心贴纸', 'image/webp', 128, 128)
@@ -706,7 +754,10 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   }
 
   private completeLogin(): void {
-    this.setAuth({ kind: 'ready', me: ME })
+    this.setAuth({
+      kind: 'ready',
+      me: this.selfAvatarUrl ? { ...ME, avatarUrl: this.selfAvatarUrl } : ME,
+    })
     this.setConnection('online')
     this.emit({
       type: 'chats',

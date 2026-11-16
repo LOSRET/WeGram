@@ -59,6 +59,11 @@ const ENTITY_TYPES: Record<string, MessageEntity['type']> = {
   textEntityTypeCustomEmoji: 'customEmoji',
 }
 
+/** Parallel chat-photo downloads; TDLib serialises internals anyway. */
+const AVATAR_WORKERS = 4
+/** Coalescing window for pushing finished avatars back to the renderer. */
+const AVATAR_FLUSH_MS = 120
+
 export interface TdlibAdapterOptions {
   apiId: number
   apiHash: string
@@ -87,6 +92,22 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   private readonly chatTitles = new Map<number, string>()
   /** Sticker file id → pixel size, so the picker can send without a lookup. */
   private readonly stickerSizes = new Map<number, { width: number; height: number }>()
+  /** Our own user id, learnt from `getMe`; drives the rail avatar. */
+  private selfUserId: number | null = null
+  /** Profile photo file id → `wx-media://` URL, so it is downloaded once. */
+  private selfAvatarFileId: number | null = null
+  private selfAvatarUrl: string | null = null
+  /** Chat photos: chat id → known photo file id / `wx-media://` URL. */
+  private readonly chatAvatarFiles = new Map<number, number>()
+  private readonly chatAvatarUrls = new Map<number, string>()
+  /** Chats whose photo is known to be absent — never asked again. */
+  private readonly chatAvatarMisses = new Set<number>()
+  private readonly avatarQueue: number[] = []
+  /** Chats whose photo download is running — keeps list and updates from duplicating. */
+  private readonly avatarInFlight = new Set<number>()
+  private avatarWorkers = 0
+  private avatarFlushTimer: NodeJS.Timeout | null = null
+  private readonly pendingAvatarUpserts = new Set<number>()
 
   constructor(private readonly options: TdlibAdapterOptions) {
     super()
@@ -180,7 +201,39 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
 
   async me(): Promise<Self> {
     const raw = await this.invoke({ _: 'getMe' })
+    this.selfUserId = raw.id
+    const fileId: number | undefined = raw.profile_photo?.small?.id ?? raw.profile_photo?.big?.id
+    // Already fetched: hand the renderer the picture with the profile in one go.
+    if (fileId && this.selfAvatarFileId === fileId && this.selfAvatarUrl) {
+      return { ...this.mapUser(raw), avatarUrl: this.selfAvatarUrl }
+    }
+    // Otherwise fetch it in the background and announce it with a fresh auth
+    // event — authorisation must not wait for a network round trip.
+    if (fileId) void this.loadSelfAvatar(fileId)
     return this.mapUser(raw)
+  }
+
+  /**
+   * Downloads our own profile photo (the small size the rail uses) and re-emits
+   * the ready auth state so the avatar can replace the initials. Best effort:
+   * the account still works without a picture.
+   */
+  private async loadSelfAvatar(fileId: number): Promise<void> {
+    if (this.selfAvatarFileId === fileId && this.selfAvatarUrl) return
+    try {
+      const { url } = await this.downloadFile({ fileId, priority: 32 })
+      this.selfAvatarFileId = fileId
+      this.selfAvatarUrl = url
+      if (this.auth.kind === 'ready') {
+        this.setAuth({ kind: 'ready', me: { ...this.auth.me, avatarUrl: url } })
+      }
+    } catch (error) {
+      this.logger.warn(
+        `profile photo ${fileId} could not be downloaded: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      )
+    }
   }
 
   async listChats(input: { limit: number; offset: number }): Promise<ChatSummary[]> {
@@ -192,7 +245,94 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     })
     const ids: number[] = Array.isArray(response.chat_ids) ? response.chat_ids : []
     const page = ids.slice(input.offset, input.offset + input.limit)
-    return Promise.all(page.map((id) => this.fetchChatSummary(id)))
+    const summaries = await Promise.all(page.map((id) => this.fetchChatSummary(id)))
+    // Photos come second: the rows must not wait for one network round trip per
+    // chat, so they are downloaded in the background and pushed as `chats` ops.
+    void this.prefetchChatAvatars(page)
+    return summaries
+  }
+
+  /**
+   * Downloads chat photos with a small worker pool and pushes the finished ones
+   * back as batched `chats` upserts. Only the small (thumbnail) size is fetched;
+   * failures are remembered so a chat without a usable photo is not retried.
+   */
+  private async prefetchChatAvatars(chatIds: number[]): Promise<void> {
+    for (const chatId of chatIds) {
+      if (this.chatAvatarUrls.has(chatId)) continue
+      if (this.chatAvatarMisses.has(chatId)) continue
+      if (this.avatarInFlight.has(chatId)) continue
+      if (this.avatarQueue.includes(chatId)) continue
+      this.avatarQueue.push(chatId)
+    }
+    while (this.avatarWorkers < AVATAR_WORKERS && this.avatarQueue.length > 0) {
+      this.avatarWorkers += 1
+      void this.runAvatarWorker()
+    }
+  }
+
+  private async runAvatarWorker(): Promise<void> {
+    try {
+      for (;;) {
+        const chatId = this.avatarQueue.shift()
+        if (chatId === undefined) return
+        this.avatarInFlight.add(chatId)
+        try {
+          await this.resolveChatAvatar(chatId)
+        } finally {
+          this.avatarInFlight.delete(chatId)
+        }
+      }
+    } finally {
+      this.avatarWorkers -= 1
+    }
+  }
+
+  private async resolveChatAvatar(chatId: number): Promise<void> {
+    try {
+      const chat = await this.invoke({ _: 'getChat', chat_id: chatId })
+      const fileId: number | undefined = chat.photo?.small?.id ?? chat.photo?.big?.id
+      if (!fileId) {
+        this.chatAvatarMisses.add(chatId)
+        return
+      }
+      if (this.chatAvatarFiles.get(chatId) === fileId && this.chatAvatarUrls.has(chatId)) return
+      const { path } = await this.fetchFilePath(fileId, 1)
+      this.chatAvatarFiles.set(chatId, fileId)
+      this.chatAvatarUrls.set(chatId, registerMediaFile(path))
+      this.queueAvatarUpsert(chatId)
+    } catch (error) {
+      this.chatAvatarMisses.add(chatId)
+      this.logger.warn(
+        `chat ${chatId} photo could not be downloaded: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      )
+    }
+  }
+
+  /** Batches finished avatars into one `chats` event instead of one per chat. */
+  private queueAvatarUpsert(chatId: number): void {
+    this.pendingAvatarUpserts.add(chatId)
+    if (this.avatarFlushTimer) return
+    this.avatarFlushTimer = setTimeout(() => {
+      this.avatarFlushTimer = null
+      void this.flushAvatarUpserts()
+    }, AVATAR_FLUSH_MS)
+  }
+
+  private async flushAvatarUpserts(): Promise<void> {
+    const chatIds = [...this.pendingAvatarUpserts]
+    this.pendingAvatarUpserts.clear()
+    const ops: { op: 'upsert'; chat: ChatSummary }[] = []
+    for (const chatId of chatIds) {
+      try {
+        ops.push({ op: 'upsert', chat: await this.fetchChatSummary(chatId) })
+      } catch {
+        // Removed between download and flush.
+      }
+    }
+    if (ops.length > 0) this.emit({ type: 'chats', ops })
   }
 
   async getChat(chatId: number): Promise<ChatSummary> {
@@ -338,17 +478,30 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     return Promise.all(rawMessages.map((raw) => this.mapMessage(input.chatId, raw)))
   }
 
-  async downloadFile(input: { fileId: number; priority: number }): Promise<{ path: string; url: string }> {
+  /**
+   * Downloads a file raw, without announcing it. Attachments go through
+   * `downloadFile()` below (which emits `evt:file` for the progress UI); avatars
+   * use this one so a hundred preview pictures do not flood the store.
+   */
+  private async fetchFilePath(
+    fileId: number,
+    priority: number,
+  ): Promise<{ path: string; file: TdObject }> {
     const file = await this.invoke({
       _: 'downloadFile',
-      file_id: input.fileId,
-      priority: input.priority,
+      file_id: fileId,
+      priority,
       offset: 0,
       limit: 0,
       synchronous: true,
     })
     const path: string | undefined = file?.local?.path
-    if (!path) throw new AppError('internal', `File ${input.fileId} downloaded but path is empty`)
+    if (!path) throw new AppError('internal', `File ${fileId} downloaded but path is empty`)
+    return { path, file }
+  }
+
+  async downloadFile(input: { fileId: number; priority: number }): Promise<{ path: string; url: string }> {
+    const { path, file } = await this.fetchFilePath(input.fileId, input.priority)
     const url = registerMediaFile(path)
     this.emit({
       type: 'file',
@@ -631,6 +784,23 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
         if (typeof update.title === 'string') this.chatTitles.set(update.chat_id, update.title)
         await this.emitChatUpsert(update.chat_id)
         return
+      case 'updateChatPhoto': {
+        // A new photo replaces the old one; drop the cache and refetch.
+        const chatId: number = update.chat_id
+        this.chatAvatarFiles.delete(chatId)
+        this.chatAvatarUrls.delete(chatId)
+        this.chatAvatarMisses.delete(chatId)
+        void this.prefetchChatAvatars([chatId])
+        return
+      }
+      case 'updateUser': {
+        // Our own profile changed (new photo): refresh the rail avatar.
+        const user = update.user
+        if (!user || user.id !== this.selfUserId) return
+        const fileId: number | undefined = user.profile_photo?.small?.id ?? user.profile_photo?.big?.id
+        if (fileId) void this.loadSelfAvatar(fileId)
+        return
+      }
       case 'updateChatAction':
         this.emit({
           type: 'typing',
@@ -713,6 +883,8 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     try {
       const chat = await this.fetchChatSummary(chatId)
       this.emit({ type: 'chats', ops: [{ op: 'upsert', chat }] })
+      // New or updated chat: its photo may not be downloaded yet.
+      void this.prefetchChatAvatars([chatId])
     } catch {
       // Chat may have been deleted between update and fetch.
     }
@@ -728,6 +900,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     const mainPosition = positions.find((position) => position.list?._ === 'chatListMain')
     const lastMessage = chat.last_message
     if (typeof chat.title === 'string') this.chatTitles.set(chat.id, chat.title)
+    const avatarUrl = this.chatAvatarUrls.get(chat.id)
     return {
       id: chat.id,
       title: chat.title ?? '',
@@ -739,6 +912,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
       lastReadOutboxMessageId: Number(chat.last_read_outbox_message_id ?? 0),
       ...(lastMessage ? { lastMessageText: previewContent(lastMessage.content) } : {}),
       ...(lastMessage ? { lastMessageAt: Number(lastMessage.date) } : {}),
+      ...(avatarUrl ? { avatarUrl } : {}),
     }
   }
 

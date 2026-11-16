@@ -2,12 +2,12 @@ import { useAppStore } from '@renderer/store/useAppStore'
 import type { MouseEvent } from 'react'
 
 import {
-  ChatsTabIcon,
   ContactsTabIcon,
   CubeTabIcon,
   DeviceIcon,
   MenuIcon,
   MomentsTabIcon,
+  TelegramLogo,
 } from './Icon'
 import { avatarColor, initials } from '../lib/format'
 
@@ -32,6 +32,9 @@ export function SideRail({ onOpenMenu, onUnavailable }: SideRailProps) {
 
   const me = auth.kind === 'ready' ? auth.me : null
   const name = me ? [me.firstName, me.lastName].filter(Boolean).join('') : '我'
+  // The profile photo arrives from `getMe` → `downloadFile` once TDLib has it;
+  // until then the rail keeps the initial like a freshly added contact.
+  const avatarUrl = me?.avatarUrl ?? null
   const unread = chats.reduce((total, chat) => total + chat.unread, 0)
 
   const openMenu = (event: MouseEvent<HTMLButtonElement>): void => {
@@ -43,16 +46,20 @@ export function SideRail({ onOpenMenu, onUnavailable }: SideRailProps) {
     <nav className="wx-rail" aria-label="主导航">
       <button
         className="wx-rail__me"
-        style={{ background: avatarColor(me?.id ?? 1000) }}
+        style={avatarUrl ? undefined : { background: avatarColor(me?.id ?? 1000) }}
         title={me ? `${name}（${connectionLabel(connection)}）` : '我'}
       >
-        {initials(name)}
+        {avatarUrl ? (
+          <img className="wx-rail__me-img" src={avatarUrl} alt="" draggable={false} />
+        ) : (
+          initials(name)
+        )}
         <span className={`wx-rail__me-dot wx-rail__me-dot--${connection}`} />
       </button>
 
       <div className="wx-rail__nav">
         <button className="wx-rail__btn wx-rail__btn--active" title="聊天" aria-current="page">
-          <ChatsTabIcon size={26} />
+          <TelegramLogo size={26} className="wx-rail__brand" />
           {unread > 0 ? (
             <span className="wx-rail__badge">{unread > 99 ? '99+' : unread}</span>
           ) : null}

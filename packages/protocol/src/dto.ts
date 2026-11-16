@@ -14,6 +14,8 @@ export const selfSchema = z.object({
   lastName: z.string().optional(),
   username: z.string().optional(),
   phone: z.string().optional(),
+  /** `wx-media://` URL of the profile photo; absent while it is not downloaded. */
+  avatarUrl: z.string().optional(),
 })
 export type Self = z.infer<typeof selfSchema>
 
@@ -56,6 +58,8 @@ export const chatSummarySchema = z.object({
   lastReadInboxMessageId: z.number().int().optional(),
   /** Highest outgoing message id the peer has read (read receipt). */
   lastReadOutboxMessageId: z.number().int().optional(),
+  /** `wx-media://` URL of the chat photo; filled in after it is downloaded. */
+  avatarUrl: z.string().optional(),
 })
 export type ChatSummary = z.infer<typeof chatSummarySchema>
 
