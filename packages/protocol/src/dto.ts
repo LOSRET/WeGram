@@ -52,6 +52,10 @@ export const chatSummarySchema = z.object({
   muted: z.boolean(),
   lastMessageText: z.string().optional(),
   lastMessageAt: z.number().optional(),
+  /** Highest incoming message id the server considers read (unread divider). */
+  lastReadInboxMessageId: z.number().int().optional(),
+  /** Highest outgoing message id the peer has read (read receipt). */
+  lastReadOutboxMessageId: z.number().int().optional(),
 })
 export type ChatSummary = z.infer<typeof chatSummarySchema>
 
@@ -88,17 +92,60 @@ export const messageEntitySchema = z.object({
 })
 export type MessageEntity = z.infer<typeof messageEntitySchema>
 
+/**
+ * A media attachment. Download progress travels separately on `evt:file`, so the
+ * message DTO stays immutable: only URLs that are already on disk are embedded.
+ *
+ * `localUrl` is a `wx-media://` URL served by the main process (or a `data:` URL
+ * from the mock adapter). The renderer never receives a filesystem path and never
+ * loads `file://`, which also keeps the browser preview working.
+ */
 export const messageMediaSchema = z.object({
   fileId: z.number().int(),
+  thumbFileId: z.number().int().optional(),
   mimeType: z.string().optional(),
   width: z.number().int().optional(),
   height: z.number().int().optional(),
   duration: z.number().int().optional(),
   stickerFormat: z.enum(['webp', 'tgs', 'webm']).optional(),
+  /** Emoji the sticker matches, used as its alt text and in the picker. */
+  stickerEmoji: z.string().optional(),
   fileName: z.string().optional(),
   size: z.number().int().optional(),
+  localUrl: z.string().optional(),
+  thumbUrl: z.string().optional(),
+  /** base64 JPEG, ~40px: instant blur-up placeholder (§8.2 rule 4). */
+  minithumbnail: z.string().optional(),
 })
 export type MessageMedia = z.infer<typeof messageMediaSchema>
+
+export const stickerFormatSchema = z.enum(['webp', 'tgs', 'webm'])
+export type StickerFormat = z.infer<typeof stickerFormatSchema>
+
+/** One sticker from a set (design doc §9.4: WebP / TGS / WebM). */
+export const stickerSchema = z.object({
+  fileId: z.number().int(),
+  format: stickerFormatSchema,
+  emoji: z.string().optional(),
+  width: z.number().int().optional(),
+  height: z.number().int().optional(),
+  /** Static WebP/JPEG preview, used for grids so animations stay cheap. */
+  thumbFileId: z.number().int().optional(),
+})
+export type Sticker = z.infer<typeof stickerSchema>
+
+export const stickerSetSummarySchema = z.object({
+  /** TDLib ids are int64, so they cross IPC as strings. */
+  id: z.string(),
+  title: z.string(),
+  thumbnail: stickerSchema.optional(),
+})
+export type StickerSetSummary = z.infer<typeof stickerSetSummarySchema>
+
+export const stickerSetSchema = stickerSetSummarySchema.extend({
+  stickers: z.array(stickerSchema),
+})
+export type StickerSet = z.infer<typeof stickerSetSchema>
 
 export const messageKindSchema = z.enum([
   'text',
@@ -137,6 +184,8 @@ export type Message = z.infer<typeof messageSchema>
 export const messageOpSchema = z.discriminatedUnion('op', [
   z.object({ op: z.literal('new'), message: messageSchema }),
   z.object({ op: z.literal('edit'), chatId: z.number().int(), messageId: z.number().int(), text: z.string() }),
+  /** Full replacement, used when the server changes the content (media, caption). */
+  z.object({ op: z.literal('replace'), message: messageSchema }),
   z.object({ op: z.literal('delete'), chatId: z.number().int(), messageIds: z.array(z.number().int()) }),
   z.object({ op: z.literal('read'), chatId: z.number().int(), upToMessageId: z.number().int() }),
 ])

@@ -14,6 +14,8 @@ import {
   proxyTestResultSchema,
   scrollAnchorSchema,
   selfSchema,
+  stickerSetSchema,
+  stickerSetSummarySchema,
 } from './dto'
 import { appErrorSchema } from './errors'
 
@@ -41,10 +43,15 @@ export const invokeChannels = [
   'messages:delete',
   'messages:forward',
   'messages:read',
+  'messages:sendSticker',
   'search:global',
   'search:inChat',
+  'media:pick',
   'media:download',
-  'media:upload',
+  'media:open',
+  'media:send',
+  'stickers:sets',
+  'stickers:set',
   'ui:saveDraft',
   'ui:getDraft',
   'ui:saveAnchor',
@@ -123,6 +130,14 @@ export const invokeSchemas = {
     request: z.object({ chatId: z.number().int(), upToMessageId: z.number().int() }),
     response: noPayload,
   },
+  'messages:sendSticker': {
+    request: z.object({
+      chatId: z.number().int(),
+      fileId: z.number().int(),
+      replyTo: z.number().int().optional(),
+    }),
+    response: z.object({ localId: z.string(), message: messageSchema }),
+  },
   'search:global': {
     request: z.object({ q: z.string().min(1), limit: z.number().int().positive().max(50) }),
     response: z.array(chatSummarySchema),
@@ -135,14 +150,32 @@ export const invokeSchemas = {
     }),
     response: z.array(messageSchema),
   },
+  /** Opens the native file dialog; an empty list means the user cancelled. */
+  'media:pick': {
+    request: z.object({ kind: z.enum(['photo', 'file']) }),
+    response: z.object({ paths: z.array(z.string()) }),
+  },
   'media:download': {
     request: z.object({ fileId: z.number().int(), priority: z.number().int().min(1).max(32) }),
-    response: z.object({ path: z.string() }),
+    response: z.object({ path: z.string(), url: z.string() }),
   },
-  'media:upload': {
-    request: z.object({ chatId: z.number().int(), filePath: z.string() }),
-    response: z.object({ fileId: z.number().int() }),
+  /** Hands a downloaded file to the OS (default app / media player). */
+  'media:open': {
+    request: z.object({ fileId: z.number().int() }),
+    response: noPayload,
   },
+  'media:send': {
+    request: z.object({
+      chatId: z.number().int(),
+      filePath: z.string().min(1),
+      kind: z.enum(['photo', 'file']),
+      caption: z.string().optional(),
+      replyTo: z.number().int().optional(),
+    }),
+    response: z.object({ localId: z.string(), message: messageSchema }),
+  },
+  'stickers:sets': { request: noPayload, response: z.array(stickerSetSummarySchema) },
+  'stickers:set': { request: z.object({ setId: z.string().min(1) }), response: stickerSetSchema },
   'ui:saveDraft': {
     request: z.object({
       chatId: z.number().int(),
@@ -219,7 +252,11 @@ export const eventSchemas = {
       fileId: z.number().int(),
       downloaded: z.number(),
       total: z.number(),
-      path: z.string().optional(),
+      /** Set once the file is fully local; a `wx-media://` URL for the renderer. */
+      url: z.string().optional(),
+      /** Bytes are going up rather than down (media being sent). */
+      uploading: z.boolean().optional(),
+      completed: z.boolean().optional(),
     }),
   ),
   'evt:error': envelope(appErrorSchema),
