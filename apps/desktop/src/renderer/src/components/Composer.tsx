@@ -10,7 +10,6 @@ import {
   EmojiIcon,
   FolderIcon,
   MicIcon,
-  MicWaveIcon,
   ScissorsIcon,
   StickerCubeIcon,
 } from './Icon'
@@ -254,15 +253,6 @@ export function Composer({
               <MicIcon size={20} />
             </button>
           </div>
-
-          <button
-            className="wx-tool-button"
-            onClick={() => notWired('语音输入')}
-            title="语音输入"
-            aria-label="语音输入"
-          >
-            <MicWaveIcon size={21} />
-          </button>
 
           <button
             className={`wx-send-button${ready ? ' wx-send-button--ready' : ''}`}

@@ -112,8 +112,7 @@ one element per line. Re-run it if the client updates and the artwork changes.
 
 **Not in that payload set, therefore hand-drawn in `Icon.tsx`:** the two-tone rail
 "chats" tab (red bubble with dots over a green bubble — the payloads are monochrome,
-and only an empty bubble exists), the composer's "voice input" circle (a ring around a
-mic with a sound arc; no payload matches it), and the empty-pane watermark logo.
+and only an empty bubble exists) and the empty-pane watermark logo.
 
 **Icons matched off reference crops in this round** (client crop → binarised ink mask →
 blurred soft-IoU over all 2500 masks, best hit confirmed by eye; scripts
@@ -173,7 +172,8 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
    (cube), 文件夹, 剪刀 + chevron, 麦克风 — all from payloads. The smiley and the cube
    both open the sticker panel because there is no emoji picker yet; folder opens a
    photo/file menu, scissors and mic show a "not wired" toast. The client's separate
-   right-hand "语音输入" circle is hand-drawn.
+   right-hand "语音输入" circle is **deliberately left out** — the send button sits
+   right after the toolbar.
 2. **Avatars are colour placeholders with initials.** The protocol has no avatar URL
    (`ChatSummary`/`Self` carry no photo field); adding one means extending
    `packages/protocol/src/dto.ts` and both adapters.
