@@ -1,11 +1,13 @@
-import type { Message, ScrollAnchor } from '@wechatgram/protocol'
+import type { ChatSummary, Message, ScrollAnchor } from '@wechatgram/protocol'
 import { useEffect, useState } from 'react'
 
 import { errorMessage, invoke } from '../lib/ipc'
 import { useAppStore } from '../store/useAppStore'
 import { Composer } from './Composer'
 import { ConfirmDialog } from './ConfirmDialog'
+import { Popup } from './ContextMenu'
 import { ForwardDialog } from './ForwardDialog'
+import { CallIcon, CallMenuIcon, MoreIcon, WechatWatermark } from './Icon'
 import { MessageList } from './MessageList'
 
 /** How many extra pages may be fetched to reach a saved reading position. */
@@ -23,10 +25,12 @@ export function ChatPane() {
   const replyToByChat = useAppStore((state) => state.replyToByChat)
   const editing = useAppStore((state) => state.editing)
   const typingByChat = useAppStore((state) => state.typingByChat)
-  const toast = useAppStore((state) => state.toast)
+  const unreadMarkers = useAppStore((state) => state.unreadMarkers)
 
   const [forwarding, setForwarding] = useState<Message | null>(null)
   const [deleting, setDeleting] = useState<Message | null>(null)
+  /** Chat-info popover (the "…" button in the header). */
+  const [infoAt, setInfoAt] = useState<{ x: number; y: number } | null>(null)
   /** Reading position to open this chat at (#2); null → land at the bottom. */
   const [pendingAnchor, setPendingAnchor] = useState<
     { chatId: number; messageId: number; offset: number } | null
@@ -140,19 +144,13 @@ export function ChatPane() {
     }
   }, [activeChatId])
 
-  // Toasts are fire-and-forget.
-  useEffect(() => {
-    if (!toast) return
-    const timer = window.setTimeout(() => useAppStore.getState().setToast(null), 2200)
-    return () => window.clearTimeout(timer)
-  }, [toast])
+  // Toasts are fire-and-forget; MainShell owns the dismissal timer.
 
   if (!chat || !activeChatId) {
     return (
       <main className="wx-chat">
         <div className="wx-empty-chat">
-          <div style={{ fontSize: 40 }}>💬</div>
-          <div>选择一个会话开始聊天</div>
+          <WechatWatermark size={132} className="wx-empty-chat__logo" />
         </div>
       </main>
     )
@@ -235,15 +233,36 @@ export function ChatPane() {
 
   return (
     <main className="wx-chat">
-      <div className="wx-chat__header">
-        <div>
-          <div className="wx-chat__title">{chat.title}</div>
-          <div className="wx-chat__subtitle">{chatSubtitle(chat.kind, chat.muted, typing)}</div>
-        </div>
+      <header className="wx-chat__header">
+        <h1 className="wx-chat__title">
+          {chat.title}
+          {typing ? <span className="wx-chat__typing">对方正在输入…</span> : null}
+        </h1>
         <div className="wx-chat__header-actions">
-          <span className="wx-hint">{messages.length} 条已加载</span>
+          <button
+            className="wx-ghost-btn"
+            title="语音通话"
+            disabled
+            aria-label="语音通话"
+          >
+            <CallMenuIcon size={19} />
+          </button>
+          <button className="wx-ghost-btn" title="视频通话" disabled aria-label="视频通话">
+            <CallIcon size={18} />
+          </button>
+          <button
+            className="wx-ghost-btn"
+            title="聊天信息"
+            aria-label="聊天信息"
+            onClick={(event) => {
+              const rect = event.currentTarget.getBoundingClientRect()
+              setInfoAt({ x: rect.right - 232, y: rect.bottom + 6 })
+            }}
+          >
+            <MoreIcon size={18} />
+          </button>
         </div>
-      </div>
+      </header>
 
       {loadingHistoryByChat[activeChatId] && messages.length === 0 ? (
         <div className="wx-empty-chat">
@@ -264,6 +283,11 @@ export function ChatPane() {
           hasMore={Boolean(hasMoreByChat[activeChatId])}
           loadingOlder={Boolean(loadingOlderByChat[activeChatId])}
           initialAnchor={pendingAnchor?.chatId === activeChatId ? pendingAnchor : null}
+          unreadMarker={
+            unreadMarkers[activeChatId]?.unread
+              ? (unreadMarkers[activeChatId] ?? null)
+              : null
+          }
           onLoadOlder={loadOlder}
           onReply={(message) => useAppStore.getState().setReplyTo(activeChatId, message.id)}
           onEdit={(message) =>
@@ -307,13 +331,38 @@ export function ChatPane() {
         />
       ) : null}
 
-      {toast ? <div className="wx-toast">{toast}</div> : null}
+      {infoAt ? (
+        <Popup x={infoAt.x} y={infoAt.y} onClose={() => setInfoAt(null)}>
+          <div className="wx-info-pop__row">
+            <span>名称</span>
+            <strong>{chat.title}</strong>
+          </div>
+          <div className="wx-info-pop__row">
+            <span>类型</span>
+            <strong>{kindLabel(chat.kind)}</strong>
+          </div>
+          <div className="wx-info-pop__row">
+            <span>未读</span>
+            <strong>{chat.unread}</strong>
+          </div>
+          <div className="wx-info-pop__row">
+            <span>已加载</span>
+            <strong>{messages.length} 条</strong>
+          </div>
+          <div className="wx-info-pop__row">
+            <span>已读回执</span>
+            <strong>
+              {chat.lastReadOutboxMessageId ? `#${chat.lastReadOutboxMessageId}` : '无'}
+            </strong>
+          </div>
+        </Popup>
+      ) : null}
     </main>
   )
 }
 
-function chatSubtitle(kind: string, muted: boolean, typing: boolean): string {
-  if (typing) return '对方正在输入…'
-  const label = kind === 'group' ? '群聊' : kind === 'channel' ? '频道' : '私聊'
-  return muted ? `${label} · 消息免打扰` : label
+function kindLabel(kind: ChatSummary['kind']): string {
+  if (kind === 'group') return '群聊'
+  if (kind === 'channel') return '频道'
+  return '私聊'
 }

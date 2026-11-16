@@ -9,9 +9,13 @@ import type {
   InvokeRequest,
   InvokeResponse,
   Message,
+  MessageMedia,
   ProxyConfig,
   ProxyTestResult,
   Self,
+  Sticker,
+  StickerSet,
+  StickerSetSummary,
   TgBridge,
 } from '@wechatgram/protocol'
 
@@ -26,6 +30,10 @@ import type {
 const ME: Self = { id: 1000, firstName: '预览', lastName: '账号', username: 'preview' }
 
 const now = () => Math.floor(Date.now() / 1000)
+
+/** A real gzip'd Lottie file, so the TGS path is exercised in the browser. */
+const PREVIEW_TGS =
+  'data:application/gzip;base64,H4sIAGBJ+2oC/6VT226DMAz9Fz9HyIxLKb8y8ZBxKxoUlrB2COXfZyfRGB172SSIybF9jh2HFW6QQxKcghgENAryCAV0E+RkRjJnsnfIw6dMwMXb60A5d3mrWyUHSquqysZLretZQ/5cCOjlUiv+Xr/c3ZVsKGBeII89i36jfK0s/krhK4y8SAfY9NkmM1WISMwdB3zQFoOYtgs7CiNcosNTj2NhjLAMceIoouSvDOdvRRiOVr8Xiv8ViVIvMnkRdCJpLOhB9si9BwU6XO9xKlf4l1VAX+RUu7nwHKBVNIBu3gBV8kRtW/pA/KAoL6x2aJgZP2JVlzPY/pi+6Ym+fCAIMBIYnFJaokxsx7SxITqF0JM2Xd9vpDM3cVyVPESPD+lnF3hYiSl8Fa0a3yfg7cMfo91deBmYojCfs22fcmYDAAA='
 
 let seq = 0
 const listeners = new Map<string, Set<(event: EventEnvelope<EventChannel>) => void>>()
@@ -54,6 +62,8 @@ const chats: ChatSummary[] = [
     muted: false,
     lastMessageText: '[图片] 设计稿 v3.png',
     lastMessageAt: now() - 180,
+    lastReadInboxMessageId: 104,
+    lastReadOutboxMessageId: 103,
   },
   {
     id: 2,
@@ -62,8 +72,10 @@ const chats: ChatSummary[] = [
     unread: 12,
     pinned: true,
     muted: false,
-    lastMessageText: '虚拟列表的滚动锚定我这边先接',
-    lastMessageAt: now() - 540,
+    lastMessageText: '[贴纸] ✨',
+    lastMessageAt: now() - 60,
+    lastReadInboxMessageId: 204,
+    lastReadOutboxMessageId: 202,
   },
   {
     id: 3,
@@ -122,13 +134,78 @@ const messagesByChat: Record<number, Message[]> = {
   1: [
     msg(1, 101, '本周的设计稿放这里', false, 14_400),
     msg(1, 102, '收到，我晚点看', true, 14_340),
-    msg(1, 103, '设计稿 v3.png', false, 240),
+    {
+      id: 103,
+      chatId: 1,
+      senderId: ME.id,
+      senderName: '我',
+      outgoing: true,
+      date: now() - 360,
+      kind: 'photo',
+      text: '设计稿 v3，先看这个方向',
+      media: media(8101, { width: 1200, height: 800, fileName: 'design-v3.png' }),
+    },
+    {
+      id: 104,
+      chatId: 1,
+      senderId: ME.id,
+      senderName: '我',
+      outgoing: true,
+      date: now() - 300,
+      kind: 'file',
+      text: '',
+      media: media(8201, { fileName: '需求说明.md', size: 2048, mimeType: 'text/markdown' }),
+    },
+    {
+      id: 105,
+      chatId: 1,
+      senderId: ME.id,
+      senderName: '我',
+      outgoing: true,
+      date: now() - 180,
+      kind: 'sticker',
+      text: '',
+      media: media(8001, { stickerFormat: 'webp', stickerEmoji: '😀', width: 128, height: 128 }),
+    },
   ],
   2: [
     msg(2, 201, 'TDLib 的登录链路已经通了', false, 7_200),
     msg(2, 202, '那 UI 可以对着 mock 并行做', true, 7_080),
     msg(2, 203, '贴纸三种格式记得一起做，别留到二期', false, 1_800),
     msg(2, 204, '虚拟列表的滚动锚定我这边先接', false, 540),
+    {
+      id: 205,
+      chatId: 2,
+      senderId: 27,
+      senderName: '成员2',
+      outgoing: false,
+      date: now() - 240,
+      kind: 'photo',
+      text: '截个图给你',
+      media: media(8102, { width: 900, height: 1200, fileName: 'sunset.png' }),
+    },
+    {
+      id: 206,
+      chatId: 2,
+      senderId: 27,
+      senderName: '成员2',
+      outgoing: false,
+      date: now() - 150,
+      kind: 'sticker',
+      text: '',
+      media: media(8001, { stickerFormat: 'webp', stickerEmoji: '😀', width: 128, height: 128 }),
+    },
+    {
+      id: 207,
+      chatId: 2,
+      senderId: ME.id,
+      senderName: '我',
+      outgoing: true,
+      date: now() - 60,
+      kind: 'sticker',
+      text: '',
+      media: media(8002, { stickerFormat: 'tgs', stickerEmoji: '✨', width: 128, height: 128 }),
+    },
   ],
   3: [
     msg(3, 301, '降温了，多穿点', false, 1_560),
@@ -166,6 +243,66 @@ function msg(chatId: number, id: number, text: string, outgoing: boolean, second
     date: now() - secondsAgo,
     kind: 'text',
     text,
+  }
+}
+
+/* ---------- preview-only media ---------- */
+
+function svgUrl(width: number, height: number, from: string, to: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+    <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/>
+    </linearGradient></defs>
+    <rect width="${width}" height="${height}" fill="url(#g)"/>
+    <circle cx="${width * 0.7}" cy="${height * 0.34}" r="${Math.min(width, height) * 0.16}" fill="rgba(255,255,255,0.55)"/>
+  </svg>`
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
+}
+
+function stickerSvg(emoji: string, background: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128">
+    <rect x="4" y="4" width="120" height="120" rx="26" fill="${background}"/>
+    <text x="64" y="86" font-size="64" text-anchor="middle">${emoji}</text>
+  </svg>`
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
+}
+
+/**
+ * Built lazily and memoised on `globalThis`: the fixture message table below is
+ * initialised at module load, before these declarations would have run, so it
+ * must not touch them eagerly (a module-level `let` would be in its TDZ).
+ */
+function previewFiles(): Record<number, string> {
+  const store = globalThis as typeof globalThis & { __wxPreviewFiles?: Record<number, string> }
+  store.__wxPreviewFiles ??= {
+    8001: stickerSvg('😀', '#FFD75E'),
+    8002: PREVIEW_TGS,
+    8101: svgUrl(1200, 800, '#22427c', '#eca860'),
+    8102: svgUrl(900, 1200, '#faaa46', '#5a1e6e'),
+    8201: 'data:text/markdown;utf8,%23%20%E9%9C%80%E6%B1%82%E8%AF%B4%E6%98%8E%0A%0A-%20%E5%AA%92%E4%BD%93%E6%94%B6%E5%8F%91',
+  }
+  return store.__wxPreviewFiles
+}
+
+const PREVIEW_STICKERS: Sticker[] = [
+  { fileId: 8001, format: 'webp', emoji: '😀', width: 128, height: 128, thumbFileId: 8001 },
+  { fileId: 8002, format: 'tgs', emoji: '✨', width: 128, height: 128 },
+]
+
+function previewStickerSet(): StickerSet {
+  return {
+    id: 'preview-stickers',
+    title: 'WechatGram 贴纸',
+    ...(PREVIEW_STICKERS[0] ? { thumbnail: PREVIEW_STICKERS[0] } : {}),
+    stickers: PREVIEW_STICKERS,
+  }
+}
+
+function media(fileId: number, extra: Partial<MessageMedia> = {}): MessageMedia {
+  return {
+    fileId,
+    localUrl: previewFiles()[fileId],
+    ...extra,
   }
 }
 
@@ -267,6 +404,53 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       messagesByChat[store.toChatId] = target
       return undefined
     }
+    case 'messages:sendSticker': {
+      const sticker = PREVIEW_STICKERS.find((item) => item.fileId === store.fileId)
+      if (!sticker) throw { code: 'internal', message: 'unknown sticker' }
+      const list = messagesByChat[store.chatId] ?? []
+      const message: Message = {
+        id: nextId++,
+        chatId: store.chatId,
+        senderId: ME.id,
+        senderName: '我',
+        outgoing: true,
+        date: now(),
+        kind: 'sticker',
+        text: '',
+        media: media(sticker.fileId, {
+          stickerFormat: sticker.format,
+          ...(sticker.emoji ? { stickerEmoji: sticker.emoji } : {}),
+          ...(sticker.width ? { width: sticker.width } : {}),
+          ...(sticker.height ? { height: sticker.height } : {}),
+        }),
+      }
+      list.push(message)
+      messagesByChat[store.chatId] = list
+      return { localId: `web-${message.id}`, message }
+    }
+    case 'media:pick':
+      // The browser cannot hand us a local path; sending files needs Electron.
+      return { paths: [] }
+    case 'media:download': {
+      const url = previewFiles()[Number(store.fileId)]
+      if (!url) throw { code: 'internal', message: 'unknown preview file' }
+      return { path: url, url }
+    }
+    case 'media:open': {
+      const url = previewFiles()[Number(store.fileId)]
+      if (url) window.open(url, '_blank', 'noopener')
+      return undefined
+    }
+    case 'media:send':
+      throw { code: 'not_implemented', message: '浏览器预览不能发送本地文件' }
+    case 'stickers:sets': {
+      const set = previewStickerSet()
+      return [
+        { id: set.id, title: set.title, ...(set.thumbnail ? { thumbnail: set.thumbnail } : {}) },
+      ] satisfies StickerSetSummary[]
+    }
+    case 'stickers:set':
+      return previewStickerSet()
     case 'ui:getDraft': {
       const text = drafts[store.chatId]
       return text ? { text } : null

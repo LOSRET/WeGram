@@ -7,6 +7,7 @@ interface ConfirmDialogProps {
   onCancel: () => void
 }
 
+/** WeChat's confirm sheet: centred title, grey body, hairline-separated buttons. */
 export function ConfirmDialog({
   title,
   description,
@@ -18,17 +19,12 @@ export function ConfirmDialog({
   return (
     <div className="wx-modal-backdrop" onClick={onCancel}>
       <div className="wx-modal wx-modal--small" onClick={(event) => event.stopPropagation()}>
-        <div className="wx-modal__header">
-          <span>{title}</span>
-        </div>
-        {description ? <div className="wx-hint">{description}</div> : null}
-        <div className="wx-row">
-          <button className="wx-button wx-button--ghost" onClick={onCancel}>
-            取消
-          </button>
+        <div className="wx-dialog__title">{title}</div>
+        {description ? <div className="wx-dialog__body">{description}</div> : null}
+        <div className="wx-dialog__actions">
+          <button onClick={onCancel}>取消</button>
           <button
-            className="wx-button"
-            style={danger ? { background: 'var(--wx-danger)' } : undefined}
+            className={`wx-dialog__confirm${danger ? ' wx-dialog__confirm--danger' : ''}`}
             onClick={onConfirm}
           >
             {confirmLabel}

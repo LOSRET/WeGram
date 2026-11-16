@@ -15,6 +15,24 @@ export interface EditingState {
   text: string
 }
 
+/** Progress of one file: own uploads and incoming downloads share the shape. */
+export interface FileProgress {
+  downloaded: number
+  total: number
+  completed: boolean
+  uploading: boolean
+}
+
+/**
+ * Snapshot of what was unread when the chat was opened, captured *before*
+ * `chats:open` marks it read — otherwise the unread divider would vanish on the
+ * first paint.
+ */
+export interface UnreadMarker {
+  lastReadInboxMessageId: number | null
+  unread: number
+}
+
 export interface AppState {
   auth: AuthState
   connection: ConnectionState
@@ -32,6 +50,10 @@ export interface AppState {
   editing: EditingState | null
   toast: string | null
   error: string | null
+  /** fileId → wx-media:// URL, filled by downloads and by `evt:file`. */
+  mediaUrls: Record<number, string>
+  mediaProgress: Record<number, FileProgress>
+  unreadMarkers: Record<number, UnreadMarker | null>
 
   setAuth: (state: AuthState) => void
   setConnection: (state: ConnectionState) => void
@@ -50,6 +72,9 @@ export interface AppState {
   setEditing: (editing: EditingState | null) => void
   setToast: (message: string | null) => void
   setError: (message: string | null) => void
+  setMediaUrl: (fileId: number, url: string) => void
+  setMediaProgress: (fileId: number, progress: FileProgress, url?: string) => void
+  setUnreadMarker: (chatId: number, marker: UnreadMarker | null) => void
   reset: () => void
 }
 
@@ -86,6 +111,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   editing: null,
   toast: null,
   error: null,
+  mediaUrls: {},
+  mediaProgress: {},
+  unreadMarkers: {},
 
   setAuth: (auth) => set({ auth }),
   setConnection: (connection) => set({ connection }),
@@ -143,6 +171,9 @@ export const useAppStore = create<AppState>((set, get) => ({
               item.id === op.messageId ? { ...item, text: op.text, edited: true } : item,
             )
             break
+          case 'replace':
+            list = upsertMessage(list, op.message)
+            break
           case 'delete':
             for (const id of op.messageIds) deleted.add(id)
             list = list.filter((item) => !op.messageIds.includes(item.id))
@@ -180,6 +211,24 @@ export const useAppStore = create<AppState>((set, get) => ({
   setToast: (toast) => set({ toast }),
   setError: (error) => set({ error }),
 
+  setMediaUrl: (fileId, url) =>
+    set((state) =>
+      state.mediaUrls[fileId] === url
+        ? state
+        : { mediaUrls: { ...state.mediaUrls, [fileId]: url } },
+    ),
+
+  setMediaProgress: (fileId, progress, url) =>
+    set((state) => ({
+      mediaProgress: { ...state.mediaProgress, [fileId]: progress },
+      ...(url ? { mediaUrls: { ...state.mediaUrls, [fileId]: url } } : {}),
+    })),
+
+  setUnreadMarker: (chatId, marker) =>
+    set((state) => ({
+      unreadMarkers: { ...state.unreadMarkers, [chatId]: marker },
+    })),
+
   reset: () =>
     set({
       chats: [],
@@ -192,5 +241,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       editing: null,
       toast: null,
       error: null,
+      mediaUrls: {},
+      mediaProgress: {},
+      unreadMarkers: {},
     }),
 }))

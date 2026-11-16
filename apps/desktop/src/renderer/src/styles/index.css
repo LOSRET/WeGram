@@ -1,56 +1,90 @@
 @import 'tailwindcss';
 
-/* WeChat design tokens — every colour in the app must come from here (design doc §9.1). */
+/* ==========================================================================
+   WeChat design tokens.
+
+   Every value below was read off the real WeChat 4.x desktop client running at
+   125% scaling: colours by sampling the window, sizes by measuring control
+   boxes. The app therefore looks the same next to WeChat on this machine, and
+   every colour in the UI must come from this block (design doc §9.1).
+   ========================================================================== */
+
 :root {
   /* Brand */
   --wx-brand: #07c160;
   --wx-brand-active: #06ad56;
-  --wx-brand-weak: #e6f8ee;
+  --wx-brand-weak: #e8f7ee;
+  --wx-brand-text: #07c160;
 
-  /* Backgrounds */
-  --wx-bg: #ededed;
-  --wx-bg-list: #f7f7f7;
-  --wx-bg-elevated: #ffffff;
+  /* Chrome */
+  --wx-rail: #e0e0e0;
+  --wx-list: #e7e7e9;
+  --wx-pane: #fbfbfb;
+  --wx-card: #fcfcfc;
+  --wx-elevated: #ffffff;
+
+  /* The selected conversation row is a softer green than the brand colour. */
+  --wx-row-active: #15ad70;
+  --wx-row-hover: rgba(0, 0, 0, 0.045);
+  --wx-row-pinned: rgba(0, 0, 0, 0.028);
 
   /* Bubbles */
   --wx-bubble-self: #95ec69;
-  --wx-bubble-other: #ffffff;
-  --wx-bubble-radius: 4px;
+  --wx-bubble-other: #eeeef0;
+  --wx-bubble-radius: 6px;
 
   /* Text */
   --wx-text: #191919;
-  --wx-text-secondary: #888888;
+  --wx-text-secondary: #9a9a9a;
+  --wx-text-tertiary: #b7b7b7;
+  --wx-text-on-active: #ffffff;
   --wx-text-on-brand: #ffffff;
 
   /* Lines and status */
-  --wx-divider: rgba(0, 0, 0, 0.08);
+  --wx-divider: rgba(0, 0, 0, 0.06);
+  --wx-line: #ececec;
+  --wx-line-strong: #dedede;
+  --wx-pane-line: #f2f2f2;
   --wx-danger: #fa5151;
   --wx-warning: #ffc300;
   --wx-muted-dot: #b2b2b2;
+  --wx-badge: #fa5151;
 
-  /* Typography */
-  --wx-font: -apple-system, 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
-  --wx-fs-body: 17px;
-  --wx-lh-body: 1.42;
-  --wx-fs-caption: 13px;
+  /* Typography — WeChat on Windows renders with YaHei UI. */
+  --wx-font: 'Microsoft YaHei UI', 'Microsoft YaHei', 'Segoe UI', 'PingFang SC', sans-serif;
+  --wx-fs-body: 14px;
+  --wx-lh-body: 1.45;
+  --wx-fs-caption: 12px;
 
-  /* Sizes */
-  --wx-titlebar-h: 60px;
-  --wx-sidebar-w: 300px;
-  --wx-list-item-h: 64px;
+  /* Sizes (WeChat 4.x metrics) */
+  --wx-titlebar-h: 32px;
+  --wx-rail-w: 42px;
+  --wx-sidebar-w: 238px;
+  --wx-list-head-h: 43px;
+  --wx-list-item-h: 65px;
   --wx-avatar: 40px;
+  --wx-avatar-msg: 38px;
+  --wx-pane-head-h: 46px;
 }
 
 [data-theme='dark'] {
-  --wx-bg: #111111;
-  --wx-bg-list: #191919;
-  --wx-bg-elevated: #1e1e1e;
+  --wx-rail: #191919;
+  --wx-list: #1f1f1f;
+  --wx-pane: #111111;
+  --wx-card: #1a1a1a;
+  --wx-elevated: #252525;
+  --wx-row-active: #1f5c44;
+  --wx-row-hover: rgba(255, 255, 255, 0.06);
+  --wx-row-pinned: rgba(255, 255, 255, 0.035);
   --wx-bubble-self: #3eb575;
   --wx-bubble-other: #2c2c2c;
   --wx-text: #d6d6d6;
   --wx-text-secondary: #8a8a8a;
-  --wx-text-on-brand: #ffffff;
-  --wx-divider: rgba(255, 255, 255, 0.08);
+  --wx-text-tertiary: #6f6f6f;
+  --wx-line: #262626;
+  --wx-line-strong: #333333;
+  --wx-pane-line: #1f1f1f;
+  --wx-divider: rgba(255, 255, 255, 0.07);
   --wx-brand-weak: rgba(7, 193, 96, 0.16);
 }
 
@@ -69,9 +103,10 @@ body {
   font-family: var(--wx-font);
   font-size: var(--wx-fs-body);
   color: var(--wx-text);
-  background: var(--wx-bg);
+  background: var(--wx-pane);
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 button {
@@ -80,9 +115,37 @@ button {
 }
 
 input,
-textarea {
+textarea,
+select {
   font-family: inherit;
   color: inherit;
+  outline: none;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* The transcript uses a hairline overlay-style bar, like WeChat. */
+.wx-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.18);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+  background-clip: padding-box;
 }
 
 /* ---------- App shell ---------- */
@@ -91,7 +154,7 @@ textarea {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--wx-bg);
+  background: var(--wx-pane);
 }
 
 .wx-body {
@@ -100,43 +163,28 @@ textarea {
   min-height: 0;
 }
 
-/* ---------- Title bar (window controls are native: titleBarOverlay) ---------- */
+/* ---------- Title bar ----------
+   WeChat paints a single flat strip above all three columns; the window
+   controls are drawn over the right end by Windows (titleBarOverlay). */
 
 .wx-titlebar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  justify-content: flex-end;
+  gap: 2px;
   height: var(--wx-titlebar-h);
-  padding: 0 16px 0 20px;
-  /* The native window controls are drawn on top of the web content by
-     titleBarOverlay, so the right side must be reserved explicitly. The env()
-     vars come from Window Controls Overlay; in a plain browser they fall back
-     to zero reserved space. */
-  padding-right: calc(16px + (100% - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100%)));
-  background: var(--wx-bg-list);
-  border-bottom: 1px solid var(--wx-divider);
+  flex: 0 0 var(--wx-titlebar-h);
+  padding: 0 6px;
+  /* Reserve the strip the native window controls occupy (WCO env vars). */
+  padding-right: calc(6px + (100% - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100%)));
+  background: var(--wx-rail);
   -webkit-app-region: drag;
   user-select: none;
   overflow: hidden;
 }
 
 .wx-titlebar__brand {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  font-weight: 600;
-  letter-spacing: 0.2px;
-  flex: 0 0 auto;
-}
-
-.wx-titlebar__badge {
-  -webkit-app-region: no-drag;
-  font-size: 11px;
-  font-weight: 500;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--wx-brand-weak);
-  color: var(--wx-brand);
+  display: none;
 }
 
 .wx-titlebar__spacer {
@@ -144,89 +192,225 @@ textarea {
   min-width: 0;
 }
 
-.wx-search {
+.wx-titlebar input,
+.wx-titlebar button {
   -webkit-app-region: no-drag;
-  flex: 0 1 220px;
-  min-width: 110px;
-  width: 220px;
-  height: 30px;
-  padding: 0 12px;
-  border: 1px solid var(--wx-divider);
-  border-radius: 6px;
-  background: var(--wx-bg-elevated);
-  font-size: 14px;
-  outline: none;
 }
 
-.wx-search:focus {
+/* ---------- Side rail ---------- */
+
+.wx-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: var(--wx-rail-w);
+  flex: 0 0 var(--wx-rail-w);
+  padding: 8px 0 9px;
+  background: var(--wx-rail);
+  user-select: none;
+}
+
+.wx-rail__me {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  overflow: hidden;
+  flex: 0 0 32px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wx-rail__me-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--wx-rail);
+  border-radius: 50%;
+  background: var(--wx-muted-dot);
+}
+
+.wx-rail__me-dot--online {
+  background: var(--wx-brand);
+}
+
+.wx-rail__me-dot--connecting {
+  background: var(--wx-warning);
+}
+
+.wx-rail__me-dot--offline {
+  background: var(--wx-text-tertiary);
+}
+
+.wx-rail__nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.wx-rail__bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  margin-top: auto;
+}
+
+.wx-rail__btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: #8a8a8a;
+}
+
+.wx-rail__btn:hover {
+  background: rgba(0, 0, 0, 0.055);
+}
+
+.wx-rail__btn--active,
+.wx-rail__btn--active:hover {
+  background: transparent;
+  color: #6a6a6a;
+}
+
+.wx-rail__badge {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--wx-badge);
+  color: #fff;
+  font-size: 10px;
+  line-height: 15px;
+  text-align: center;
+  font-weight: 500;
+}
+
+/* ---------- Conversation list ---------- */
+
+.wx-list {
+  display: flex;
+  flex-direction: column;
+  width: var(--wx-sidebar-w);
+  flex: 0 0 var(--wx-sidebar-w);
+  min-height: 0;
+  background: var(--wx-list);
+}
+
+.wx-list__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--wx-list-head-h);
+  flex: 0 0 var(--wx-list-head-h);
+  padding: 0 10px 0 9px;
+}
+
+.wx-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  height: 29px;
+  padding: 0 8px;
+  border: 1px solid var(--wx-line-strong);
+  border-radius: 5px;
+  background: var(--wx-pane);
+  color: var(--wx-text-tertiary);
+}
+
+.wx-search:focus-within {
   border-color: var(--wx-brand);
 }
 
-.wx-icon-button {
-  -webkit-app-region: no-drag;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 32px;
-  height: 32px;
+.wx-search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
   border: none;
-  border-radius: 6px;
   background: transparent;
-  color: var(--wx-text-secondary);
-  font-size: 16px;
-}
-
-.wx-icon-button:hover {
-  background: var(--wx-divider);
+  font-size: 13px;
   color: var(--wx-text);
 }
 
-.wx-connection {
-  -webkit-app-region: no-drag;
-  font-size: var(--wx-fs-caption);
-  color: var(--wx-text-secondary);
+.wx-search input::placeholder {
+  color: var(--wx-text-tertiary);
 }
 
-.wx-connection--online {
-  color: var(--wx-brand);
+.wx-list__plus {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #8a8a8a;
 }
 
-.wx-connection--offline {
-  color: var(--wx-danger);
+.wx-list__plus:hover {
+  color: var(--wx-text);
 }
 
-/* ---------- Sidebar / chat list ---------- */
-
-.wx-sidebar {
-  width: var(--wx-sidebar-w);
-  flex: 0 0 var(--wx-sidebar-w);
-  background: var(--wx-bg-list);
-  border-right: 1px solid var(--wx-divider);
+.wx-list__body {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 8px 0;
+  overflow-x: hidden;
+}
+
+.wx-list__empty {
+  padding: 28px 16px;
+  font-size: 13px;
+  color: var(--wx-text-secondary);
+  text-align: center;
 }
 
 .wx-chat-item {
   display: flex;
-  gap: 12px;
   align-items: center;
+  gap: 13px;
   height: var(--wx-list-item-h);
-  padding: 0 16px;
+  padding: 0 10px 0 9px;
   cursor: pointer;
   user-select: none;
 }
 
+.wx-chat-item--pinned {
+  background: var(--wx-row-pinned);
+}
+
 .wx-chat-item:hover {
-  background: var(--wx-divider);
+  background: var(--wx-row-hover);
 }
 
-.wx-chat-item--active {
-  background: var(--wx-brand-weak);
-}
-
+.wx-chat-item--active,
 .wx-chat-item--active:hover {
-  background: var(--wx-brand-weak);
+  background: var(--wx-row-active);
 }
 
 .wx-avatar {
@@ -242,65 +426,101 @@ textarea {
   font-size: 15px;
   font-weight: 500;
   overflow: hidden;
+  letter-spacing: 0.5px;
+}
+
+.wx-avatar--small {
+  width: var(--wx-avatar-msg);
+  height: var(--wx-avatar-msg);
+  flex: 0 0 var(--wx-avatar-msg);
+  font-size: 13px;
 }
 
 .wx-chat-item__main {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
 .wx-chat-item__row {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
 }
 
 .wx-chat-item__title {
   flex: 1;
   min-width: 0;
-  font-size: 15px;
-  font-weight: 500;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--wx-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .wx-chat-item__time {
-  font-size: 12px;
-  color: var(--wx-text-secondary);
   flex: 0 0 auto;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--wx-text-tertiary);
 }
 
 .wx-chat-item__preview {
-  margin-top: 4px;
-  font-size: 13px;
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 18px;
   color: var(--wx-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.wx-chat-item--active .wx-chat-item__title {
+  color: var(--wx-text-on-active);
+}
+
+.wx-chat-item--active .wx-chat-item__time {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.wx-chat-item--active .wx-chat-item__preview {
+  color: rgba(255, 255, 255, 0.78);
+}
+
 .wx-badge {
-  min-width: 18px;
-  height: 18px;
+  min-width: 16px;
+  height: 16px;
   padding: 0 5px;
-  border-radius: 9px;
-  background: var(--wx-danger);
+  border-radius: 8px;
+  background: var(--wx-badge);
   color: #fff;
-  font-size: 11px;
-  line-height: 18px;
+  font-size: 10px;
+  line-height: 16px;
   text-align: center;
   flex: 0 0 auto;
 }
 
+.wx-chat-item--active .wx-badge {
+  background: rgba(0, 0, 0, 0.28);
+}
+
 .wx-badge--muted {
   background: transparent;
-  color: var(--wx-muted-dot);
-  font-size: 16px;
+  color: var(--wx-text-tertiary);
+  font-size: 14px;
   line-height: 1;
   padding: 0;
   min-width: 0;
   height: auto;
+}
+
+.wx-chat-item--active .wx-badge--muted {
+  color: rgba(255, 255, 255, 0.7);
 }
 
 /* ---------- Chat pane ---------- */
@@ -310,27 +530,75 @@ textarea {
   flex-direction: column;
   flex: 1;
   min-width: 0;
-  background: var(--wx-bg);
+  background: var(--wx-pane);
 }
 
 .wx-chat__header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  height: 52px;
-  padding: 0 20px;
-  border-bottom: 1px solid var(--wx-divider);
-  background: var(--wx-bg-list);
+  gap: 8px;
+  height: var(--wx-pane-head-h);
+  flex: 0 0 var(--wx-pane-head-h);
+  padding: 0 14px 0 18px;
+  border-bottom: 1px solid var(--wx-pane-line);
+  background: var(--wx-pane);
+  user-select: none;
 }
 
 .wx-chat__title {
-  font-size: 16px;
-  font-weight: 600;
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--wx-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wx-chat__typing {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--wx-brand-text);
 }
 
 .wx-chat__subtitle {
-  font-size: 12px;
-  color: var(--wx-text-secondary);
+  display: none;
+}
+
+.wx-chat__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.wx-ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 30px;
+  height: 28px;
+  padding: 0 4px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: #6f6f6f;
+}
+
+.wx-ghost-btn:hover:not(:disabled) {
+  background: var(--wx-row-hover);
+  color: var(--wx-text);
+}
+
+.wx-ghost-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .wx-messages-wrap {
@@ -346,7 +614,7 @@ textarea {
   min-height: 0;
   overflow-y: auto;
   overflow-anchor: none;
-  padding: 20px 24px 12px;
+  padding: 10px 8px 4px 16px;
   position: relative;
   /* The virtualizer positions rows absolutely; keep block flow, not flex. */
 }
@@ -374,8 +642,8 @@ textarea {
   transform: translateX(-50%);
   padding: 4px 12px;
   border-radius: 999px;
-  background: var(--wx-bg-elevated);
-  border: 1px solid var(--wx-divider);
+  background: var(--wx-elevated);
+  border: 1px solid var(--wx-line);
   font-size: 12px;
   color: var(--wx-text-secondary);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
@@ -388,29 +656,98 @@ textarea {
   bottom: 14px;
   transform: translateX(-50%);
   padding: 6px 14px;
-  border: none;
+  border: 1px solid var(--wx-line);
   border-radius: 999px;
-  background: var(--wx-brand);
-  color: var(--wx-text-on-brand);
-  font-size: 13px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  background: var(--wx-elevated);
+  color: var(--wx-brand-text);
+  font-size: 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
 }
 
-.wx-day-separator {
-  align-self: center;
-  font-size: 12px;
-  color: var(--wx-text-secondary);
-  background: var(--wx-divider);
-  border-radius: 4px;
-  padding: 2px 8px;
-}
+/* ---------- Message rows ---------- */
 
 .wx-message-row {
   display: flex;
-  gap: 8px;
+  gap: 9px;
   align-items: flex-start;
-  padding-bottom: 10px;
+  padding-bottom: 14px;
   position: relative;
+}
+
+.wx-message-row--self {
+  flex-direction: row-reverse;
+}
+
+.wx-message-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  /* max-width must live here: a percentage max-width on the bubble would
+     resolve against this stack's content size and collapse to min-content. */
+  max-width: min(560px, 66%);
+}
+
+.wx-message-stack--self {
+  align-items: flex-end;
+}
+
+.wx-sender {
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--wx-text-secondary);
+  padding: 0 2px 2px;
+}
+
+.wx-bubble {
+  max-width: 100%;
+  width: fit-content;
+  padding: 8px 12px;
+  border-radius: var(--wx-bubble-radius);
+  background: var(--wx-bubble-other);
+  color: var(--wx-text);
+  font-size: 14px;
+  line-height: var(--wx-lh-body);
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.wx-bubble--self {
+  background: var(--wx-bubble-self);
+  color: #191919;
+}
+
+/* Time / edited / read receipt: WeChat keeps the transcript clean, so the
+   metadata only appears while the row is hovered. It is absolutely positioned so
+   it never adds a gap between bubbles. */
+.wx-message__meta {
+  position: absolute;
+  bottom: 1px;
+  left: 47px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(251, 251, 251, 0.94);
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--wx-text-tertiary);
+  text-align: right;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.wx-message-row--self .wx-message__meta {
+  left: auto;
+  right: 47px;
+}
+
+[data-theme='dark'] .wx-message__meta {
+  background: rgba(17, 17, 17, 0.94);
+}
+
+.wx-message-row:hover .wx-message__meta {
+  opacity: 1;
 }
 
 .wx-message-more {
@@ -418,9 +755,9 @@ textarea {
   border: none;
   background: transparent;
   color: var(--wx-text-secondary);
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1;
-  padding: 2px 6px;
+  padding: 0 4px;
   border-radius: 4px;
   opacity: 0;
   transition: opacity 0.12s ease;
@@ -431,61 +768,199 @@ textarea {
 }
 
 .wx-message-more:hover {
-  background: var(--wx-divider);
+  background: var(--wx-row-hover);
   color: var(--wx-text);
 }
 
-.wx-avatar--small {
-  width: 30px;
-  height: 30px;
-  flex: 0 0 30px;
-  font-size: 11px;
+.wx-quote {
+  margin-bottom: 5px;
+  padding: 4px 8px;
+  border-left: 2px solid var(--wx-line-strong);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.045);
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 420px;
 }
 
-/* ---------- Context menu ---------- */
+.wx-bubble__empty {
+  color: var(--wx-text-secondary);
+  font-size: 12px;
+}
 
-.wx-context-menu {
-  position: fixed;
-  z-index: 80;
-  min-width: 148px;
-  padding: 6px;
-  border-radius: 8px;
-  background: var(--wx-bg-elevated);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
-  border: 1px solid var(--wx-divider);
+/* ---------- Day separator / unread divider / service ---------- */
+
+.wx-day-separator {
+  display: block;
+  width: fit-content;
+  margin: 6px auto 10px;
+  font-size: 12px;
+  color: var(--wx-text-tertiary);
+  text-align: center;
+}
+
+.wx-unread-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 12px;
+  font-size: 11px;
+  color: var(--wx-text-tertiary);
+}
+
+.wx-unread-divider::before,
+.wx-unread-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--wx-divider);
+}
+
+.wx-unread-divider > span {
+  padding: 0 4px;
+}
+
+.wx-service {
+  margin: 2px auto 12px;
+  width: fit-content;
+  max-width: 80%;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--wx-divider);
+  font-size: 11px;
+  color: var(--wx-text-secondary);
+  text-align: center;
+}
+
+/* ---------- Empty pane ---------- */
+
+.wx-empty-chat {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--wx-text-secondary);
+  font-size: 13px;
 }
 
-.wx-context-menu__item {
+.wx-empty-chat__logo {
+  color: #efefef;
+}
+
+[data-theme='dark'] .wx-empty-chat__logo {
+  color: #222222;
+}
+
+/* ---------- Composer ----------
+   WeChat 4.x puts the input in a bordered card that floats above the pane
+   background; the toolbar lives inside the card, under the text. */
+
+.wx-composer {
+  position: relative;
+  padding: 0 9px 8px 6px;
+  background: var(--wx-pane);
+}
+
+.wx-composer__card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--wx-line);
+  border-radius: 8px;
+  background: var(--wx-card);
+}
+
+.wx-composer__input {
+  min-height: 84px;
+  max-height: 180px;
+  padding: 10px 12px 0;
+  resize: none;
   border: none;
   background: transparent;
-  text-align: left;
-  padding: 8px 10px;
-  border-radius: 6px;
   font-size: 14px;
+  line-height: 1.5;
   color: var(--wx-text);
 }
 
-.wx-context-menu__item:hover {
-  background: var(--wx-divider);
+.wx-composer__input::placeholder {
+  color: var(--wx-text-tertiary);
 }
 
-.wx-context-menu__item--danger {
-  color: var(--wx-danger);
+.wx-composer__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 8px 0 6px;
 }
 
-/* ---------- Composer bars / toast / forward list ---------- */
+.wx-composer__tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: auto;
+}
 
+.wx-composer__hint {
+  font-size: 11px;
+  color: var(--wx-text-tertiary);
+}
+
+.wx-tool-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: #6f6f6f;
+}
+
+.wx-tool-button:hover:not(:disabled) {
+  background: var(--wx-row-hover);
+  color: var(--wx-text);
+}
+
+.wx-tool-button--active {
+  background: var(--wx-row-hover);
+  color: var(--wx-text);
+}
+
+.wx-tool-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* Screenshot entry: scissors plus the small "v" that opens the capture menu. */
+.wx-tool-button--split {
+  gap: 2px;
+  width: auto;
+  padding: 0 5px;
+}
+
+.wx-tool-button__chevron {
+  margin-top: 7px;
+  opacity: 0.85;
+}
+
+/* Reply / edit banner above the input card. */
 .wx-composer-bar {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin: 0 0 6px 2px;
   padding: 6px 10px;
-  border-radius: 6px;
-  background: var(--wx-brand-weak);
+  border-radius: 5px;
+  background: var(--wx-divider);
   font-size: 12px;
-  color: var(--wx-text);
+  color: var(--wx-text-secondary);
 }
 
 .wx-composer-bar__quote {
@@ -500,50 +975,394 @@ textarea {
   border: none;
   background: transparent;
   color: var(--wx-text-secondary);
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1;
-  cursor: pointer;
+  padding: 0 2px;
 }
+
+.wx-composer-bar__close:hover {
+  color: var(--wx-text);
+}
+
+/* ---------- Buttons ---------- */
+
+.wx-button {
+  border: none;
+  border-radius: 4px;
+  padding: 0 18px;
+  height: 30px;
+  background: var(--wx-brand);
+  color: var(--wx-text-on-brand);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.wx-button:hover:not(:disabled) {
+  background: var(--wx-brand-active);
+}
+
+.wx-button:disabled {
+  background: var(--wx-line);
+  color: var(--wx-text-tertiary);
+  cursor: default;
+}
+
+.wx-button--ghost {
+  background: var(--wx-pane);
+  color: var(--wx-text);
+  border: 1px solid var(--wx-line-strong);
+}
+
+.wx-button--ghost:hover:not(:disabled) {
+  background: var(--wx-row-hover);
+  color: var(--wx-text);
+}
+
+.wx-button--danger {
+  background: var(--wx-danger);
+}
+
+.wx-button--danger:hover:not(:disabled) {
+  background: #e04848;
+}
+
+.wx-send-button {
+  min-width: 72px;
+  height: 30px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 4px;
+  background: var(--wx-line);
+  color: var(--wx-text-tertiary);
+  font-size: 13px;
+}
+
+.wx-send-button--ready {
+  background: var(--wx-brand);
+  color: #fff;
+}
+
+.wx-send-button--ready:hover {
+  background: var(--wx-brand-active);
+}
+
+.wx-icon-button {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--wx-text-secondary);
+  font-size: 15px;
+}
+
+.wx-icon-button:hover {
+  background: var(--wx-row-hover);
+  color: var(--wx-text);
+}
+
+/* ---------- Popup menus ---------- */
+
+.wx-context-menu {
+  position: fixed;
+  z-index: 80;
+  min-width: 132px;
+  padding: 5px;
+  border-radius: 6px;
+  background: var(--wx-elevated);
+  border: 1px solid var(--wx-line-strong);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16);
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+}
+
+.wx-context-menu__item {
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 7px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--wx-text);
+  white-space: nowrap;
+}
+
+.wx-context-menu__item:hover {
+  background: var(--wx-row-hover);
+}
+
+.wx-context-menu__item--danger {
+  color: var(--wx-danger);
+}
+
+.wx-context-menu__separator {
+  height: 1px;
+  margin: 5px 6px;
+  background: var(--wx-line);
+}
+
+.wx-context-menu__caption {
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--wx-text-tertiary);
+}
+
+/* ---------- Toast ---------- */
 
 .wx-toast {
   position: fixed;
   left: 50%;
-  bottom: 72px;
-  transform: translateX(-50%);
+  top: 50%;
+  transform: translate(-50%, -50%);
   padding: 8px 16px;
   border-radius: 6px;
-  background: rgba(0, 0, 0, 0.78);
+  background: rgba(0, 0, 0, 0.72);
   color: #fff;
-  font-size: 13px;
+  font-size: 12px;
   z-index: 90;
+  pointer-events: none;
 }
+
+/* ---------- Error strip ---------- */
+
+.wx-error-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: #fff;
+  background: var(--wx-danger);
+}
+
+.wx-error-bar > span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wx-error-bar .wx-icon-button {
+  color: #fff;
+  width: 20px;
+  height: 20px;
+}
+
+.wx-footer {
+  display: none;
+}
+
+/* ---------- Modal / dialog ---------- */
+
+.wx-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.wx-modal {
+  width: 440px;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 20px;
+  border-radius: 8px;
+  background: var(--wx-elevated);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.wx-modal--small {
+  width: 320px;
+  padding: 22px 20px 0;
+  gap: 10px;
+}
+
+.wx-modal--forward {
+  width: 380px;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.wx-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+/* WeChat's confirm dialog: centred title, grey body, hairline-separated
+   buttons along the bottom. */
+.wx-dialog__title {
+  font-size: 15px;
+  font-weight: 500;
+  text-align: center;
+  color: var(--wx-text);
+}
+
+.wx-dialog__body {
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: center;
+  color: var(--wx-text-secondary);
+}
+
+.wx-dialog__actions {
+  display: flex;
+  margin: 18px -20px 0;
+  border-top: 1px solid var(--wx-line);
+}
+
+.wx-dialog__actions > button {
+  flex: 1;
+  height: 44px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  color: var(--wx-text);
+}
+
+.wx-dialog__actions > button + button {
+  border-left: 1px solid var(--wx-line);
+}
+
+.wx-dialog__actions > button:hover {
+  background: var(--wx-row-hover);
+}
+
+.wx-dialog__actions > .wx-dialog__confirm {
+  color: var(--wx-brand-text);
+}
+
+.wx-dialog__actions > .wx-dialog__confirm--danger {
+  color: var(--wx-danger);
+}
+
+.wx-dialog__actions--flat {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+/* ---------- Forward sheet ---------- */
+
+.wx-forward-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 auto;
+  padding: 12px 8px 12px 16px;
+  border-bottom: 1px solid var(--wx-line);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.wx-row {
+  display: flex;
+  gap: 10px;
+}
+
+.wx-row > * {
+  flex: 1;
+}
+
+.wx-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wx-field label {
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+}
+
+.wx-input {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--wx-line-strong);
+  border-radius: 5px;
+  background: var(--wx-pane);
+  font-size: 14px;
+}
+
+.wx-input:focus {
+  border-color: var(--wx-brand);
+}
+
+.wx-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+}
+
+.wx-status {
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+}
+
+.wx-status--ok {
+  color: var(--wx-brand-text);
+}
+
+.wx-status--fail {
+  color: var(--wx-danger);
+}
+
+.wx-hint {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--wx-text-secondary);
+}
+
+.wx-error {
+  font-size: 12px;
+  color: var(--wx-danger);
+  line-height: 1.4;
+}
+
+/* ---------- Forward list ---------- */
 
 .wx-forward-list {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
   max-height: 320px;
   overflow-y: auto;
-  gap: 2px;
+  padding: 4px 0;
 }
 
 .wx-forward-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px;
+  padding: 8px 14px;
   border: none;
   background: transparent;
-  border-radius: 6px;
   text-align: left;
   color: var(--wx-text);
 }
 
 .wx-forward-item:hover:not(:disabled) {
-  background: var(--wx-divider);
+  background: var(--wx-row-hover);
 }
 
 .wx-forward-item:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
@@ -553,18 +1372,542 @@ textarea {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 13px;
+}
+
+.wx-forward-item .wx-avatar {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  font-size: 12px;
+  border-radius: 5px;
+}
+
+/* ---------- Spinner ---------- */
+
+.wx-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--wx-line-strong);
+  border-top-color: var(--wx-brand);
+  border-radius: 50%;
+  animation: wx-spin 0.8s linear infinite;
+}
+
+@keyframes wx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- Login ---------- */
+
+.wx-login {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background: var(--wx-pane);
+}
+
+/* The login screen has no title bar of its own, but the native window controls
+   are still painted over the top-right corner by titleBarOverlay. This strip
+   gives them the same colour the shell's title bar uses. */
+.wx-login::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: var(--wx-titlebar-h);
+  background: var(--wx-rail);
+  -webkit-app-region: drag;
+}
+
+.wx-login__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 340px;
+  padding: 28px 32px 26px;
+  border-radius: 8px;
+  background: var(--wx-elevated);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  text-align: center;
+}
+
+.wx-login__logo {
+  color: var(--wx-brand);
+  margin-bottom: 2px;
+}
+
+.wx-login__title {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--wx-text);
+}
+
+.wx-login__subtitle {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--wx-text-secondary);
+}
+
+.wx-login__card .wx-field {
+  width: 100%;
+  text-align: left;
+}
+
+.wx-login__card .wx-button {
+  width: 100%;
+  height: 36px;
   font-size: 14px;
 }
 
-.wx-modal--small {
-  width: 340px;
+.wx-login__card .wx-hint,
+.wx-login__card .wx-error {
+  text-align: left;
+  width: 100%;
 }
 
-.wx-chat__header-actions {
-  margin-left: auto;
+/* ---------- Rich text (TL entities, design doc §8.3) ---------- */
+
+.wx-link {
+  color: #576b95;
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.wx-link:hover {
+  text-decoration: underline;
+}
+
+.wx-entity-mention {
+  color: #576b95;
+}
+
+.wx-code {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.07);
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 0.92em;
+}
+
+.wx-pre {
+  margin: 4px 0;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.07);
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 12.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+.wx-spoiler {
+  border-radius: 3px;
+  background: currentColor;
+  color: transparent;
+  cursor: pointer;
+}
+
+.wx-spoiler > * {
+  color: transparent;
+}
+
+.wx-spoiler--revealed {
+  background: transparent;
+  color: inherit;
+}
+
+.wx-inline-emoji {
+  font-size: 1.15em;
+  line-height: 1;
+}
+
+/* ---------- Media bubbles ---------- */
+
+.wx-bubble--media {
+  padding: 4px;
+}
+
+.wx-bubble--media .wx-caption {
+  padding: 5px 7px 2px;
+}
+
+/* A photo with a caption is image plus a separate bubble, exactly like WeChat. */
+.wx-bubble--photo .wx-caption,
+.wx-bubble--video .wx-caption {
+  margin-top: 4px;
+  padding: 8px 12px;
+  border-radius: var(--wx-bubble-radius);
+  background: var(--wx-bubble-other);
+  font-size: 14px;
+}
+
+.wx-bubble--photo.wx-bubble--self .wx-caption,
+.wx-bubble--video.wx-bubble--self .wx-caption {
+  background: var(--wx-bubble-self);
+}
+
+/* Photos and videos sit on the wallpaper, not inside a chat bubble (WeChat). */
+.wx-bubble--photo,
+.wx-bubble--video {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.wx-bubble--photo.wx-bubble--self,
+.wx-bubble--video.wx-bubble--self {
+  background: transparent;
+}
+
+.wx-photo {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.05);
+  cursor: zoom-in;
+}
+
+.wx-photo__thumb,
+.wx-photo__image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wx-photo__thumb {
+  filter: blur(10px);
+  transform: scale(1.06);
+}
+
+.wx-photo__pending {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+  background: var(--wx-list);
+}
+
+.wx-photo__upload {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 1px 7px;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.wx-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 140;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(0, 0, 0, 0.86);
+}
+
+.wx-lightbox img {
+  max-width: 88vw;
+  max-height: 82vh;
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.5);
+}
+
+.wx-lightbox__actions {
+  display: flex;
   gap: 10px;
+}
+
+.wx-video {
+  position: relative;
+  display: block;
+  border: none;
+  padding: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #000;
+}
+
+.wx-video--poster {
+  cursor: pointer;
+}
+
+.wx-video__play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+  color: #fff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+}
+
+.wx-video__duration {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  font-size: 11px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 9px;
+  padding: 1px 7px;
+}
+
+.wx-video__progress {
+  position: absolute;
+  left: 8px;
+  bottom: 6px;
+  font-size: 11px;
+  color: #fff;
+}
+
+/* WeChat's file card: white rounded card, icon tile on the left. */
+.wx-file {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 226px;
+  padding: 10px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  text-align: left;
+  color: inherit;
+}
+
+.wx-file:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.wx-file__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 44px;
+  flex: 0 0 40px;
+  border-radius: 4px;
+  background: #7c93c9;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+
+.wx-file__main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.wx-file__name {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wx-file__meta {
+  font-size: 11px;
+  color: var(--wx-text-secondary);
+}
+
+.wx-file__bar {
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.wx-file__bar > span {
+  display: block;
+  height: 100%;
+  background: var(--wx-brand);
+}
+
+.wx-voice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 172px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+}
+
+.wx-voice__icon {
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+}
+
+.wx-voice__wave {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  letter-spacing: 1px;
+  color: var(--wx-text-secondary);
+  opacity: 0.55;
+}
+
+.wx-voice--playing .wx-voice__wave {
+  color: var(--wx-brand-text);
+  opacity: 1;
+}
+
+.wx-voice__time {
+  font-size: 11px;
+  color: var(--wx-text-secondary);
+}
+
+/* ---------- Stickers ---------- */
+
+.wx-sticker-wrap {
+  padding: 2px;
+  line-height: 0;
+}
+
+.wx-sticker {
+  display: block;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.wx-sticker--loading,
+.wx-sticker--failed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.wx-sticker--failed {
+  font-size: 30px;
+}
+
+.wx-sticker__pct {
+  font-size: 11px;
+  color: var(--wx-text-secondary);
+}
+
+/* Sticker picker: WeChat slides a grey panel above the composer, full width. */
+.wx-sticker-panel {
+  position: absolute;
+  left: 6px;
+  right: 9px;
+  bottom: calc(100% - 2px);
+  z-index: 70;
+  height: 264px;
+  padding: 8px 10px 6px;
+  border: 1px solid var(--wx-line-strong);
+  border-radius: 8px 8px 0 0;
+  border-bottom: none;
+  background: var(--wx-list);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wx-sticker-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+}
+
+.wx-sticker-panel__sets {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  flex: 0 0 auto;
+}
+
+.wx-sticker-panel__set {
+  width: 34px;
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.wx-sticker-panel__set--active {
+  border-color: var(--wx-brand);
+  background: var(--wx-brand-weak);
+}
+
+.wx-sticker-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 6px;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1;
+}
+
+.wx-sticker-panel__item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 72px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  padding: 4px;
+}
+
+.wx-sticker-panel__item:hover {
+  background: var(--wx-row-hover);
+}
+
+.wx-sticker-panel__loading,
+.wx-sticker-panel__empty {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+}
+
+.wx-sticker-panel__error {
+  font-size: 12px;
+  color: var(--wx-danger);
+  line-height: 1.4;
 }
 
 /* ---------- Dev-only acceptance panel ---------- */
@@ -578,8 +1921,8 @@ textarea {
 }
 
 .wx-perf__toggle {
-  border: 1px solid var(--wx-divider);
-  background: var(--wx-bg-elevated);
+  border: 1px solid var(--wx-line-strong);
+  background: var(--wx-elevated);
   color: var(--wx-text);
   border-radius: 999px;
   padding: 6px 12px;
@@ -591,8 +1934,8 @@ textarea {
   width: 240px;
   padding: 10px;
   border-radius: 8px;
-  background: var(--wx-bg-elevated);
-  border: 1px solid var(--wx-divider);
+  background: var(--wx-elevated);
+  border: 1px solid var(--wx-line-strong);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
   display: flex;
   flex-direction: column;
@@ -620,6 +1963,7 @@ textarea {
   flex: 1;
   padding: 6px 8px;
   font-size: 12px;
+  height: auto;
 }
 
 .wx-perf__results {
@@ -629,360 +1973,29 @@ textarea {
 }
 
 .wx-perf__pass {
-  color: var(--wx-brand) !important;
+  color: var(--wx-brand-text) !important;
 }
 
 .wx-perf__fail {
   color: var(--wx-danger) !important;
 }
 
-.wx-message-row--self {
-  flex-direction: row-reverse;
-}
+/* ---------- Chat info popover rows ---------- */
 
-.wx-bubble {
-  max-width: 100%;
-  width: fit-content;
-  padding: 9px 12px;
-  border-radius: var(--wx-bubble-radius);
-  background: var(--wx-bubble-other);
-  font-size: 15px;
-  line-height: var(--wx-lh-body);
-  word-break: break-word;
-  white-space: pre-wrap;
-  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
-}
-
-.wx-bubble--self {
-  background: var(--wx-bubble-self);
-  color: #121212;
-}
-
-.wx-quote {
-  margin-bottom: 6px;
-  padding: 4px 8px;
-  border-left: 3px solid var(--wx-muted-dot);
-  border-radius: 3px;
-  background: rgba(0, 0, 0, 0.06);
+.wx-info-pop__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 4px 9px;
   font-size: 12px;
   color: var(--wx-text-secondary);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 420px;
 }
 
-.wx-message__meta {
-  margin-top: 4px;
-  font-size: 11px;
-  color: var(--wx-text-secondary);
-  text-align: right;
-}
-
-.wx-message-stack {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  min-width: 0;
-  /* max-width must live here: a percentage max-width on the bubble would
-     resolve against this stack's content size and collapse to min-content. */
-  max-width: min(560px, 68%);
-}
-
-.wx-message-stack--self {
-  align-items: flex-end;
-}
-
-.wx-sender {
-  font-size: 12px;
-  color: var(--wx-text-secondary);
-  padding-left: 2px;
-}
-
-.wx-empty-chat {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  color: var(--wx-text-secondary);
-}
-
-/* ---------- Composer ---------- */
-
-.wx-composer {
-  border-top: 1px solid var(--wx-divider);
-  background: var(--wx-bg-list);
-  padding: 10px 16px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.wx-composer__input {
-  min-height: 68px;
-  max-height: 180px;
-  resize: none;
-  border: none;
-  outline: none;
-  background: transparent;
-  font-size: 15px;
-  line-height: 1.5;
-}
-
-.wx-composer__actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-.wx-composer__hint {
-  margin-right: auto;
-  font-size: 12px;
-  color: var(--wx-text-secondary);
-}
-
-.wx-button {
-  border: none;
-  border-radius: 4px;
-  padding: 7px 18px;
-  background: var(--wx-brand);
-  color: var(--wx-text-on-brand);
-  font-size: 14px;
-}
-
-.wx-button:hover {
-  background: var(--wx-brand-active);
-}
-
-.wx-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.wx-button--ghost {
-  background: transparent;
-  color: var(--wx-text-secondary);
-  border: 1px solid var(--wx-divider);
-}
-
-.wx-button--ghost:hover {
-  background: var(--wx-divider);
+.wx-info-pop__row strong {
   color: var(--wx-text);
-}
-
-/* ---------- Login ---------- */
-
-.wx-login {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  background: var(--wx-bg);
-}
-
-/* The login screen has no title bar, but the native window controls are still
-   painted over the top-right corner by titleBarOverlay. This strip gives them
-   the same colour the shell's title bar uses (the overlay colour comes from
-   applyTitleBarTheme), so the controls never sit on a slightly different
-   surface — and it is the only drag region available before login. */
-.wx-login::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: var(--wx-titlebar-h);
-  background: var(--wx-bg-list);
-  border-bottom: 1px solid var(--wx-divider);
-  -webkit-app-region: drag;
-}
-
-.wx-login__card {
-  position: relative;
-  width: 380px;
-  padding: 32px;
-  border-radius: 10px;
-  background: var(--wx-bg-elevated);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.wx-login__title {
-  font-size: 20px;
-  font-weight: 600;
-}
-
-.wx-login__subtitle {
-  font-size: 13px;
-  color: var(--wx-text-secondary);
-  line-height: 1.5;
-}
-
-.wx-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.wx-field label {
-  font-size: 12px;
-  color: var(--wx-text-secondary);
-}
-
-.wx-input {
-  height: 38px;
-  padding: 0 12px;
-  border: 1px solid var(--wx-divider);
-  border-radius: 6px;
-  background: var(--wx-bg);
-  font-size: 15px;
-  outline: none;
-}
-
-.wx-input:focus {
-  border-color: var(--wx-brand);
-}
-
-.wx-error {
-  font-size: 13px;
-  color: var(--wx-danger);
-  line-height: 1.4;
-}
-
-.wx-hint {
-  font-size: 12px;
-  color: var(--wx-text-secondary);
-}
-
-/* ---------- Modal / settings ---------- */
-
-.wx-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.32);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-}
-
-.wx-modal {
-  width: 460px;
-  max-height: 80vh;
-  overflow-y: auto;
-  padding: 22px;
-  border-radius: 10px;
-  background: var(--wx-bg-elevated);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.2);
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.wx-modal__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 17px;
-  font-weight: 600;
-}
-
-.wx-row {
-  display: flex;
-  gap: 10px;
-}
-
-.wx-row > * {
-  flex: 1;
-}
-
-.wx-switch-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 14px;
-}
-
-.wx-status {
-  font-size: 12px;
-  color: var(--wx-text-secondary);
-}
-
-.wx-status--ok {
-  color: var(--wx-brand);
-}
-
-.wx-status--fail {
-  color: var(--wx-danger);
-}
-
-.wx-spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid var(--wx-divider);
-  border-top-color: var(--wx-brand);
-  border-radius: 50%;
-  animation: wx-spin 0.8s linear infinite;
-}
-
-@keyframes wx-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* ---------- Error strip / status footer ---------- */
-
-.wx-error-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 16px;
-  font-size: 13px;
-  color: #fff;
-  background: var(--wx-danger);
-}
-
-.wx-error-bar > span {
-  flex: 1;
+  font-weight: 500;
+  max-width: 150px;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
-
-.wx-error-bar .wx-icon-button {
-  color: #fff;
-  width: 22px;
-  height: 22px;
-}
-
-.wx-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 16px;
-  border-top: 1px solid var(--wx-divider);
-  background: var(--wx-bg-list);
-  font-size: 11px;
-  color: var(--wx-text-secondary);
-  user-select: none;
-}
-
-.wx-sidebar__empty {
-  padding: 24px 16px;
-  font-size: 13px;
-  color: var(--wx-text-secondary);
-  text-align: center;
-}
-
-/* Prevent the name/status area from being dragged when clicking the title bar buttons. */
-.wx-titlebar input,
-.wx-titlebar button {
-  -webkit-app-region: no-drag;
-}
-

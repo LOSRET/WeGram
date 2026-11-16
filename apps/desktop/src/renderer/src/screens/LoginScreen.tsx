@@ -2,7 +2,8 @@ import type { AuthState } from '@wechatgram/protocol'
 
 import { errorMessage, invoke } from '@renderer/lib/ipc'
 import { useAppStore } from '@renderer/store/useAppStore'
-import { useState } from 'react'
+import { WechatWatermark } from '@renderer/components/Icon'
+import { useEffect, useRef, useState } from 'react'
 
 type Step = 'phone' | 'code' | 'password'
 
@@ -26,9 +27,16 @@ export function LoginScreen() {
   const [value, setValue] = useState('')
   const [busy, setBusy] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement | null>(null)
 
   const step = stepOf(auth)
   const isMock = info?.adapter === 'mock'
+
+  // The field is disabled while a step is in flight, which drops focus; put the
+  // caret back when the next step arrives so the whole login stays typing-only.
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [auth.kind])
 
   const submit = async () => {
     if (busy || !value.trim()) return
@@ -82,11 +90,13 @@ export function LoginScreen() {
     <div className="wx-login">
       <form
         className="wx-login__card"
+        autoComplete="off"
         onSubmit={(event) => {
           event.preventDefault()
           void submit()
         }}
       >
+        <WechatWatermark size={56} className="wx-login__logo" />
         <div className="wx-login__title">{copy.title}</div>
         <div className="wx-login__subtitle">{copy.subtitle}</div>
 
@@ -94,9 +104,11 @@ export function LoginScreen() {
           <label htmlFor="login-input">{step === 'phone' ? '手机号' : step === 'code' ? '验证码' : '密码'}</label>
           <input
             id="login-input"
+            ref={inputRef}
             className="wx-input"
             autoFocus
             type={step === 'password' ? 'password' : 'text'}
+            autoComplete={step === 'password' ? 'new-password' : 'off'}
             inputMode={step === 'code' ? 'numeric' : undefined}
             placeholder={copy.placeholder}
             value={value}

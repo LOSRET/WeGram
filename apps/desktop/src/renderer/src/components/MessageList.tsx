@@ -1,11 +1,23 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { ChatSummary, Message } from '@wechatgram/protocol'
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react'
 
-import { avatarColor, formatMessageTime, initials } from '../lib/format'
+import {
+  avatarColor,
+  formatDaySeparator,
+  formatMessageTime,
+  initials,
+  isSameDay,
+  messagePreview,
+} from '../lib/format'
 import { invoke } from '../lib/ipc'
 import { useAnchoredScroll } from '../lib/useAnchoredScroll'
 import { ContextMenu, type MenuItem } from './ContextMenu'
+import { MediaBubble } from './MediaBubble'
+import { RichText } from './RichText'
+import { StickerRenderer } from './StickerRenderer'
+import { useAppStore } from '../store/useAppStore'
+import type { UnreadMarker } from '../store/useAppStore'
 
 interface MessageListProps {
   chat: ChatSummary
@@ -14,6 +26,8 @@ interface MessageListProps {
   loadingOlder: boolean
   /** Saved reading position to open the chat at; null means "land at the bottom". */
   initialAnchor: { messageId: number; offset: number } | null
+  /** What was unread when the chat was opened, for the "以下是新消息" divider. */
+  unreadMarker: UnreadMarker | null
   onLoadOlder: () => Promise<void>
   onReply: (message: Message) => void
   onEdit: (message: Message) => void
@@ -34,6 +48,7 @@ export function MessageList({
   hasMore,
   loadingOlder,
   initialAnchor,
+  unreadMarker,
   onLoadOlder,
   onReply,
   onEdit,
@@ -47,6 +62,23 @@ export function MessageList({
   const prependingRef = useRef(false)
   const [menu, setMenu] = useState<MenuState | null>(null)
   const [buoy, setBuoy] = useState(0)
+
+  const auth = useAppStore((state) => state.auth)
+  const self =
+    auth.kind === 'ready'
+      ? {
+          id: auth.me.id,
+          name: [auth.me.firstName, auth.me.lastName].filter(Boolean).join(''),
+        }
+      : { id: 1000, name: '我' }
+
+  // Captured once per mounted chat: the divider must not jump as the read marker
+  // moves after `chats:open`. Stored as an id, not an index, because prepending
+  // older messages shifts indexes.
+  const [unreadMessageId] = useState<number | null>(() => findUnreadMessage(messages, unreadMarker))
+  const unreadIndex = unreadMessageId
+    ? messages.findIndex((message) => message.id === unreadMessageId)
+    : -1
 
   const { ready, atBottom, markReady, scrollToBottom, unpin } = useAnchoredScroll({
     scrollRef,
@@ -121,11 +153,20 @@ export function MessageList({
     }
 
     scrollToBottom()
-    const frame = requestAnimationFrame(() => {
+    // Open the ready gate on the next frame, but never depend on it alone:
+    // requestAnimationFrame is throttled while the window is occluded, and the
+    // list must not stay invisible because of that. No cleanup cancels these:
+    // StrictMode runs mount effects twice and its cleanup would kill the frame
+    // scheduled by the pass that actually initialised the list.
+    let opened = false
+    const finish = (): void => {
+      if (opened) return
+      opened = true
       scrollToBottom()
       markReady()
-    })
-    return () => cancelAnimationFrame(frame)
+    }
+    requestAnimationFrame(finish)
+    window.setTimeout(finish, 150)
     // Runs once per mounted chat (MessageList is keyed by chat id).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length])
@@ -292,11 +333,9 @@ export function MessageList({
   }
 
   const menuItems = (message: Message): MenuItem[] => {
-    const items: MenuItem[] = [
-      { label: '回复', onSelect: () => onReply(message) },
-      { label: '复制', onSelect: () => onCopy(message) },
-      { label: '转发', onSelect: () => onForward(message) },
-    ]
+    const items: MenuItem[] = [{ label: '回复', onSelect: () => onReply(message) }]
+    if (message.text) items.push({ label: '复制', onSelect: () => onCopy(message) })
+    items.push({ label: '转发', onSelect: () => onForward(message) })
     if (message.outgoing && message.kind === 'text') {
       items.push({ label: '编辑', onSelect: () => onEdit(message) })
     }
@@ -323,6 +362,11 @@ export function MessageList({
           {virtualizer.getVirtualItems().map((virtualItem) => {
             const message = messages[virtualItem.index]
             if (!message) return null
+            const previous = messages[virtualItem.index - 1]
+            const newDay = !previous || !isSameDay(previous.date, message.date)
+            const repliedTo = message.replyToId
+              ? (messages.find((item) => item.id === message.replyToId) ?? null)
+              : null
             return (
               <div
                 key={virtualItem.key}
@@ -332,14 +376,18 @@ export function MessageList({
                 className="wx-message-slot"
                 style={{ transform: `translateY(${virtualItem.start}px)` }}
               >
+                {virtualItem.index === unreadIndex ? (
+                  <div className="wx-unread-divider">
+                    <span>以下是新消息</span>
+                  </div>
+                ) : null}
+                {newDay ? <div className="wx-day-separator">{formatDaySeparator(message.date)}</div> : null}
                 <MessageRow
                   chat={chat}
                   message={message}
-                  quoted={
-                    message.replyToId
-                      ? (messages.find((item) => item.id === message.replyToId)?.text ?? null)
-                      : null
-                  }
+                  repliedTo={repliedTo}
+                  self={self}
+                  readOutboxMaxId={chat.lastReadOutboxMessageId ?? 0}
                   onOpenMenu={(x, y) => setMenu({ message, x, y })}
                 />
               </div>
@@ -374,42 +422,108 @@ export function MessageList({
   )
 }
 
+/**
+ * Id of the first message the reader had not seen when opening the chat.
+ *
+ * The read marker is authoritative; the unread counter is only a fallback for
+ * chats whose marker is missing (e.g. a brand-new session). Returns null when
+ * the divider would not make sense.
+ */
+function findUnreadMessage(messages: Message[], marker: UnreadMarker | null): number | null {
+  if (!marker || marker.unread <= 0 || messages.length === 0) return null
+  if (marker.lastReadInboxMessageId !== null) {
+    const found = messages.find(
+      (message) => !message.outgoing && message.id > marker.lastReadInboxMessageId!,
+    )
+    return found?.id ?? null
+  }
+  const fallback = messages[Math.max(0, messages.length - marker.unread)]
+  return fallback?.id ?? null
+}
+
 interface MessageRowProps {
   chat: ChatSummary
   message: Message
-  quoted: string | null
+  repliedTo: Message | null
+  /** Identity of the signed-in account, for the avatar on our own messages. */
+  self: { id: number; name: string }
+  /** Highest outgoing id the peer has read; drives the 已读/未读 receipt. */
+  readOutboxMaxId: number
   onOpenMenu: (x: number, y: number) => void
 }
 
-function MessageRow({ chat, message, quoted, onOpenMenu }: MessageRowProps) {
+function MessageRow({ chat, message, repliedTo, self, readOutboxMaxId, onOpenMenu }: MessageRowProps) {
+  if (message.kind === 'service') {
+    return <div className="wx-service">{message.text || '系统消息'}</div>
+  }
+
   const showSender = !message.outgoing && chat.kind !== 'private'
+  const media = message.media
+  const mediaKind =
+    message.kind === 'photo' || message.kind === 'video' || message.kind === 'file' || message.kind === 'voice'
+      ? message.kind
+      : null
+  const isSticker = message.kind === 'sticker' && media
+
+  const openMenu = (event: MouseEvent): void => {
+    event.preventDefault()
+    onOpenMenu(event.clientX, event.clientY)
+  }
+
+  const readReceipt = message.outgoing
+    ? readOutboxMaxId >= message.id
+      ? ' · 已读'
+      : ' · 未读'
+    : ''
 
   return (
     <div className={`wx-message-row${message.outgoing ? ' wx-message-row--self' : ''}`}>
-      {!message.outgoing ? (
-        <div
-          className="wx-avatar wx-avatar--small"
-          style={{ background: avatarColor(message.senderChatId || message.senderId || chat.id) }}
-        >
-          {initials(message.senderName)}
-        </div>
-      ) : null}
+      <div
+        className="wx-avatar wx-avatar--small"
+        style={{
+          background: avatarColor(
+            message.outgoing
+              ? (self.id ?? 1000)
+              : message.senderChatId || message.senderId || chat.id,
+          ),
+        }}
+      >
+        {initials(message.outgoing ? self.name : message.senderName)}
+      </div>
 
       <div className={`wx-message-stack${message.outgoing ? ' wx-message-stack--self' : ''}`}>
-        {showSender ? <span className="wx-sender">{message.senderName}</span> : null}
-        <div
-          className={`wx-bubble${message.outgoing ? ' wx-bubble--self' : ''}`}
-          onContextMenu={(event) => {
-            event.preventDefault()
-            onOpenMenu(event.clientX, event.clientY)
-          }}
-        >
-          {quoted ? <div className="wx-quote">{quoted.slice(0, 120)}</div> : null}
-          {message.kind === 'text' ? message.text : `[${message.kind}] ${message.text}`.trim()}
-        </div>
+        {showSender && message.senderName && message.senderName !== self.name ? (
+          <span className="wx-sender">{message.senderName}</span>
+        ) : null}
+        {isSticker ? (
+          <div className="wx-sticker-wrap" onContextMenu={openMenu}>
+            <StickerRenderer media={media!} size={140} />
+          </div>
+        ) : (
+          <div
+            className={`wx-bubble${message.outgoing ? ' wx-bubble--self' : ''}${
+              mediaKind ? ` wx-bubble--media wx-bubble--${mediaKind}` : ''
+            }`}
+            onContextMenu={openMenu}
+          >
+            {repliedTo ? (
+              <div className="wx-quote">
+                {repliedTo.senderName}：{messagePreview(repliedTo)}
+              </div>
+            ) : null}
+            {mediaKind && media ? <MediaBubble media={media} kind={mediaKind} /> : null}
+            {message.text ? (
+              <div className={mediaKind ? 'wx-caption' : undefined}>
+                <RichText text={message.text} entities={message.entities} />
+              </div>
+            ) : null}
+            {!mediaKind && !message.text ? <span className="wx-bubble__empty">[不支持的消息]</span> : null}
+          </div>
+        )}
         <span className="wx-message__meta">
           {formatMessageTime(message.date)}
           {message.edited ? ' · 已编辑' : ''}
+          {readReceipt}
         </span>
       </div>
 

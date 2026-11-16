@@ -9,19 +9,18 @@ interface ForwardDialogProps {
   onClose: () => void
 }
 
+/** WeChat's "转发到" sheet: a chat picker with a hairline footer. */
 export function ForwardDialog({ chats, message, onForward, onClose }: ForwardDialogProps) {
   return (
     <div className="wx-modal-backdrop" onClick={onClose}>
-      <div className="wx-modal" onClick={(event) => event.stopPropagation()}>
-        <div className="wx-modal__header">
+      <div className="wx-modal wx-modal--forward" onClick={(event) => event.stopPropagation()}>
+        <div className="wx-forward-head">
           <span>转发到</span>
           <button className="wx-icon-button" onClick={onClose} title="关闭">
             ×
           </button>
         </div>
-        <div className="wx-hint">
-          消息：{message.text.slice(0, 40) || `[${message.kind}]`}
-        </div>
+
         <div className="wx-forward-list">
           {chats.map((chat) => (
             <button
@@ -30,13 +29,17 @@ export function ForwardDialog({ chats, message, onForward, onClose }: ForwardDia
               onClick={() => onForward(chat.id)}
               disabled={chat.id === message.chatId}
             >
-              <span className="wx-avatar wx-avatar--small" style={{ background: avatarColor(chat.id) }}>
+              <span className="wx-avatar" style={{ background: avatarColor(chat.id) }}>
                 {initials(chat.title)}
               </span>
               <span className="wx-forward-item__title">{chat.title}</span>
               {chat.id === message.chatId ? <span className="wx-hint">当前会话</span> : null}
             </button>
           ))}
+        </div>
+
+        <div className="wx-dialog__actions wx-dialog__actions--flat">
+          <button onClick={onClose}>取消</button>
         </div>
       </div>
     </div>
