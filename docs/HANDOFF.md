@@ -467,7 +467,7 @@ session were closed. `.cache/` keeps logs and is gitignored; it also holds the t
 CDP helpers (`cdp-eval.mjs`, `*-check.js`, `uitest.js`) used to measure the real
 renderer — recreate them from the snippets above if they are gone.
 
-The UI/real-account changes are **not committed yet**: the working tree holds the
-protocol, main, renderer and documentation changes listed by `git status`, plus
-`OverlayScrollbar.tsx`. `pnpm typecheck && pnpm build` were green at the end of the
-session.
+The UI/real-account changes are **committed** on `main` in four commits on top of
+`a3d9a5f` — the "+" card and brand mark, avatars + overlay scrollbars, the three
+real-account fixes, and this documentation. `pnpm typecheck && pnpm build` were green
+before each of them; the working tree is clean.
