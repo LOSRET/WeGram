@@ -268,7 +268,7 @@ function MessageRow({ chat, message, quoted, onOpenMenu }: MessageRowProps) {
       {!message.outgoing ? (
         <div
           className="wx-avatar wx-avatar--small"
-          style={{ background: avatarColor(message.senderId || chat.id) }}
+          style={{ background: avatarColor(message.senderChatId || message.senderId || chat.id) }}
         >
           {initials(message.senderName)}
         </div>

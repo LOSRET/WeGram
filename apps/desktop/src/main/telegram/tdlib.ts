@@ -78,6 +78,8 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   private connection: ConnectionState = 'offline'
   private proxy: ProxyConfig | null = null
   private readonly userNames = new Map<number, string>()
+  /** Chat titles, used for `messageSenderChat` (channel posts, anonymous admins). */
+  private readonly chatTitles = new Map<number, string>()
 
   constructor(private readonly options: TdlibAdapterOptions) {
     super()
@@ -478,6 +480,10 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
       case 'updateNewChat':
         await this.emitChatUpsert(update.chat?.id ?? update.chat_id)
         return
+      case 'updateChatTitle':
+        if (typeof update.title === 'string') this.chatTitles.set(update.chat_id, update.title)
+        await this.emitChatUpsert(update.chat_id)
+        return
       case 'updateChatAction':
         this.emit({
           type: 'typing',
@@ -564,6 +570,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     const positions: TdObject[] = Array.isArray(chat.positions) ? chat.positions : []
     const mainPosition = positions.find((position) => position.list?._ === 'chatListMain')
     const lastMessage = chat.last_message
+    if (typeof chat.title === 'string') this.chatTitles.set(chat.id, chat.title)
     return {
       id: chat.id,
       title: chat.title ?? '',
@@ -577,15 +584,24 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   }
 
   private async mapMessage(chatId: number, raw: TdObject): Promise<Message> {
-    const senderId: number = raw.sender_id?.user_id ?? 0
-    const senderName = senderId ? await this.resolveUserName(senderId) : '未知'
+    // `sender_id` is either `messageSenderUser { user_id }` or
+    // `messageSenderChat { chat_id }` — channel posts and anonymous admins use
+    // the latter. Reading only `user_id` used to leave those as `未知`.
+    const senderUserId: number = raw.sender_id?.user_id ?? 0
+    const senderChatId: number = raw.sender_id?.chat_id ?? 0
+    const senderName = senderUserId
+      ? await this.resolveUserName(senderUserId)
+      : senderChatId
+        ? await this.resolveChatTitle(senderChatId)
+        : '未知'
     const content = raw.content ?? {}
     const { kind, media, text, entities } = mapContent(content)
 
     return {
       id: raw.id,
       chatId,
-      senderId,
+      senderId: senderUserId,
+      ...(senderChatId ? { senderChatId } : {}),
       senderName,
       outgoing: Boolean(raw.is_outgoing),
       date: Number(raw.date),
@@ -606,6 +622,19 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
       const label = [name.firstName, name.lastName].filter(Boolean).join(' ') || name.username || '未知'
       this.userNames.set(userId, label)
       return label
+    } catch {
+      return '未知'
+    }
+  }
+
+  private async resolveChatTitle(chatId: number): Promise<string> {
+    const cached = this.chatTitles.get(chatId)
+    if (cached) return cached
+    try {
+      const chat = await this.invoke({ _: 'getChat', chat_id: chatId })
+      const title: string = chat?.title ?? ''
+      if (title) this.chatTitles.set(chatId, title)
+      return title || '未知'
     } catch {
       return '未知'
     }

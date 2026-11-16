@@ -116,6 +116,12 @@ export const messageSchema = z.object({
   id: z.number().int(),
   chatId: z.number().int(),
   senderId: z.number().int(),
+  /**
+   * Set instead of `senderId` when the message was sent by a chat rather than a
+   * user: channel posts, and anonymous admins inside groups/supergroups
+   * (`messageSenderChat` in TDLib). `senderName` then carries the chat title.
+   */
+  senderChatId: z.number().int().optional(),
   senderName: z.string(),
   outgoing: z.boolean(),
   date: z.number().int(),

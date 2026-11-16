@@ -20,9 +20,22 @@ Verified at the end of the session: `pnpm typecheck`, `pnpm build`, `pnpm tdlib:
 `pnpm ui:db-check`, and the browser acceptance panel (`?perf=1`) — 5000 messages at
 60 fps, 0 px viewport drift when prepending a page.
 
-**There is no git repository yet.** Nothing is committed or tagged. First action of
-the next session should probably be `git init` + an initial commit after reviewing
-what is there (`.gitignore` already covers `.env`, `node_modules`, `out`, `.cache`).
+**Git exists now**: `main`, root commit `262996a` ("chore: initial import of the W1/W2
+skeleton"), 69 files, clean tree. `.gitignore` covers `.env*`, `node_modules`, `out`,
+`.cache`, `spikes/*/data`; `.gitattributes` pins `eol=lf` so the machine's global
+`core.autocrlf=true` cannot rewrite the whole tree on the next checkout.
+
+Two gotchas from that commit:
+
+- `commit.gpgsign=true` is set globally, but gpg cannot reach `keyboxd` from the agent
+  shell ("can't create … sentinel.lock"). The root commit was made with
+  `git -c commit.gpgsign=false`; re-sign in a normal terminal with
+  `git commit --amend -S --no-edit` if signed history matters.
+- `AGENTS.md` is a symlink to `CLAUDE.md` and is stored as one (mode `120000`). This
+  machine cannot create symlinks without admin/Developer Mode, so `core.symlinks=false`
+  is in effect — a `git checkout`/`git restore` of that path would replace the link with
+  a one-line text file containing `CLAUDE.md`. Don't restore it casually; recreate the
+  link with `New-Item -ItemType SymbolicLink` from an elevated shell.
 
 ## Hard rules
 
@@ -127,6 +140,13 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
 - **`node:sqlite` exists in Electron 38** (bundled Node 22.22) — no better-sqlite3, no
   Electron-ABI rebuild. It is flagged experimental upstream, hence the single-file
   confinement. Expect an `ExperimentalWarning` in the log.
+- **`sender_id` has two shapes.** It is `messageSenderUser { user_id }` **or**
+  `messageSenderChat { chat_id }`; channel posts and anonymous admins only fill
+  `chat_id`. Reading `user_id` alone left those at `未知`. `Message` now carries an
+  optional `senderChatId`, `senderName` falls back to the chat title, and the adapter
+  caches titles (`chatTitles`, filled from `mapChat` and `updateChatTitle`) next to
+  `userNames`. Measured on the real account: 20/20 messages in a channel use
+  `messageSenderChat` (`senderChat` line in `tdlib:smoke`).
 - **Real unread counts are large** (hundreds of thousands on unfollowed groups); that
   is data, not a mapping bug.
 - `userData` is pinned to `%APPDATA%\WechatGram` via `app.setName`/`setPath`, because
@@ -149,13 +169,17 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
 3. **W3 scope**: media send/receive (files, images, progress events), sticker renderer
    (WebP `<img>`, TGS → `DecompressionStream` + lottie-web, WebM `<video>`), search
    (global + in-chat), day separators, unread divider, sticker panel.
-4. **Channel posts show senderName `未知`**: `mapMessage` only reads
-   `sender_id.user_id`; add `senderChatId` to the DTO for `messageSenderChat`.
+4. ~~**Channel posts show senderName `未知`**~~ — **done**: `senderChatId` in the DTO,
+   `mapMessage` resolves `messageSenderChat` through the chat-title cache, verified on
+   the real account by the `senderChat` line of `tdlib:smoke`. Mock + preview fixtures
+   grew a channel-post example (chat 5, message 502).
 5. **Packaging has never been produced**: `electron-builder` config exists
    (`asarUnpack` for `@prebuilt-tdlib`/`prebuilt-tdlib`), but NSIS build + auto-update +
    sandbox-on-clean-machine are all unverified.
 6. Minor: the preload bundle is 187 kB because it imports the protocol index (zod). If it
    matters, split a channels-only entry point.
+7. Minor: `tdlib:smoke` only checks the *first* channel of the chat list for
+   `messageSenderChat`; groups with anonymous admins are not covered by a fixture.
 
 ## Open questions for the product owner
 

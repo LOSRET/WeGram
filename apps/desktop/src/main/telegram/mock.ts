@@ -123,7 +123,22 @@ function buildFixtures(): Map<number, Fixture> {
       lastMessageText: 'Telegram 11.0 released',
       lastMessageAt: at(600),
     },
-    messages: [text(5, 501, 600, 'Telegram 11.0 released', false)],
+    messages: [
+      text(5, 501, 600, 'Telegram 11.0 released', false),
+      // Channel posts are sent by the chat itself (`messageSenderChat`), not by a
+      // user: senderId stays 0 and senderChatId + the chat title carry the name.
+      {
+        id: 502,
+        chatId: 5,
+        senderId: 0,
+        senderChatId: 5,
+        senderName: 'Telegram News',
+        outgoing: false,
+        date: at(600),
+        kind: 'text',
+        text: '频道消息：发送者是频道本身',
+      },
+    ],
   })
 
   // Stress fixture for the virtualised list (W2 acceptance: 5000 messages).

@@ -97,6 +97,22 @@ async function main(): Promise<void> {
         const kindsSeen = [...new Set(history.messages.map((message) => message.kind))]
         console.log(`  msg kinds  : ${kindsSeen.join(', ') || '(none)'}`)
 
+        // Channel posts are sent by the chat itself; this is the regression check
+        // for `senderChatId` + the channel title instead of `未知`.
+        const channel = chats.find((chat) => chat.kind === 'channel')
+        if (channel) {
+          const page = await withTimeout(
+            adapter.history({ chatId: channel.id, limit: 20 }),
+            20_000,
+            `channel history(${channel.id})`,
+          )
+          const byChat = page.messages.filter((message) => message.senderChatId)
+          const names = [...new Set(byChat.map((message) => message.senderName))].slice(0, 3)
+          console.log(
+            `  senderChat : ${byChat.length}/${page.messages.length} channel msgs carry senderChatId, names=${names.join(' | ') || '(none)'}`,
+          )
+        }
+
         if (process.env['SMOKE_DEBUG']) {
           for (const chat of chats.slice(0, 3)) {
             const page = await withTimeout(

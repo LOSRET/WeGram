@@ -135,7 +135,21 @@ const messagesByChat: Record<number, Message[]> = {
     msg(3, 302, '晚上回来吃饭吗', false, 1_500),
   ],
   4: [msg(4, 401, '会议纪要已经放到共享盘', false, 10_800)],
-  5: [msg(5, 501, 'Telegram 11.0 released', false, 36_000)],
+  5: [
+    msg(5, 501, 'Telegram 11.0 released', false, 36_000),
+    // Channel post: sent by the chat itself, so senderId is 0 and senderChatId is set.
+    {
+      id: 502,
+      chatId: 5,
+      senderId: 0,
+      senderChatId: 5,
+      senderName: 'Telegram News',
+      outgoing: false,
+      date: now() - 36_000,
+      kind: 'text',
+      text: '频道消息：发送者是频道本身',
+    },
+  ],
   99: perfMessages,
 }
 
