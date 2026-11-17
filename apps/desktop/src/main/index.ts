@@ -144,11 +144,12 @@ function createWindow(theme: 'light' | 'dark'): BrowserWindow {
     minWidth: 880,
     minHeight: 600,
     show: false,
-    backgroundColor: theme === 'dark' ? '#111111' : '#fbfbfb',
+    backgroundColor: theme === 'dark' ? '#1e1e1f' : '#fbfbfb',
     titleBarStyle: 'hidden',
     titleBarOverlay: {
-      color: theme === 'dark' ? '#191919' : '#e0e0e0',
-      symbolColor: theme === 'dark' ? '#d6d6d6' : '#191919',
+      // Must match --wx-rail / --wx-rail-icon, or the strip reads as a seam.
+      color: theme === 'dark' ? '#2d2d2e' : '#e0e0e0',
+      symbolColor: theme === 'dark' ? '#969697' : '#191919',
       height: 32,
     },
     webPreferences: {
@@ -211,8 +212,8 @@ function applyTitleBarTheme(win: BrowserWindow | null, theme: 'light' | 'dark'):
   if (!win || win.isDestroyed()) return
   try {
     win.setTitleBarOverlay({
-      color: theme === 'dark' ? '#191919' : '#e0e0e0',
-      symbolColor: theme === 'dark' ? '#d6d6d6' : '#191919',
+      color: theme === 'dark' ? '#2d2d2e' : '#e0e0e0',
+      symbolColor: theme === 'dark' ? '#969697' : '#191919',
       height: 32,
     })
   } catch (error) {

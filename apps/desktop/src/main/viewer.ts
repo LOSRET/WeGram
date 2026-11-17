@@ -115,7 +115,7 @@ function createViewerWindow(parent: BrowserWindow | null): BrowserWindow {
     titleBarStyle: 'hidden',
     titleBarOverlay: titleBarOverlay(theme),
     ...(parent ? { parent } : {}),
-    backgroundColor: theme === 'dark' ? '#141414' : '#f7f7f7',
+    backgroundColor: theme === 'dark' ? '#242424' : '#f7f7f7',
     title: VIEWER_TITLE,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -160,8 +160,8 @@ function titleBarOverlay(next: 'light' | 'dark'): {
 } {
   return {
     // Must match --wx-viewer-bar, or the strip reads as a seam.
-    color: next === 'dark' ? '#1f1f1f' : '#e6e6e6',
-    symbolColor: next === 'dark' ? '#d6d6d6' : '#191919',
+    color: next === 'dark' ? '#3b3b3d' : '#e6e6e6',
+    symbolColor: next === 'dark' ? '#b1b1b1' : '#191919',
     height: VIEWER_TOOLBAR_H,
   }
 }
