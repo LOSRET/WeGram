@@ -68,9 +68,9 @@ describe('applyMessageOps', () => {
     store.setReplyTo(CHAT_ID, 1)
     store.setEditing({ chatId: CHAT_ID, messageId: 2, text: 'editing' })
 
-    useAppStore.getState().applyMessageOps(CHAT_ID, [
-      { op: 'delete', chatId: CHAT_ID, messageIds: [1, 2] },
-    ])
+    useAppStore
+      .getState()
+      .applyMessageOps(CHAT_ID, [{ op: 'delete', chatId: CHAT_ID, messageIds: [1, 2] }])
 
     const state = useAppStore.getState()
     expect(state.replyToByChat[CHAT_ID]).toBeNull()

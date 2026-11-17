@@ -8,7 +8,7 @@ import { ConfirmDialog } from './ConfirmDialog'
 import { Popup } from './ContextMenu'
 import { ForwardDialog } from './ForwardDialog'
 import { CallIcon, CallMenuIcon, MoreIcon, TelegramLogo } from './Icon'
-import { MessageList } from './MessageList'
+import { MessageList } from './message-list'
 
 /** How many extra pages may be fetched to reach a saved reading position. */
 const MAX_RESTORE_PAGES = 6

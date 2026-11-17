@@ -100,7 +100,8 @@ export interface UiActions {
   setError: (message: string | null) => void
 }
 
-export interface AppState extends AppData, AuthActions, ChatActions, MessageActions, MediaActions, UiActions {}
+export interface AppState
+  extends AppData, AuthActions, ChatActions, MessageActions, MediaActions, UiActions {}
 
 /**
  * A zustand slice: it may only return actions, never data. Data is seeded by

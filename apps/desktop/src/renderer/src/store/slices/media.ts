@@ -5,7 +5,9 @@ export const createMediaSlice: SliceCreator<MediaActions> = (set) => ({
   // returning the unchanged state keeps every subscriber from re-rendering.
   setMediaUrl: (fileId, url) =>
     set((state) =>
-      state.mediaUrls[fileId] === url ? state : { mediaUrls: { ...state.mediaUrls, [fileId]: url } },
+      state.mediaUrls[fileId] === url
+        ? state
+        : { mediaUrls: { ...state.mediaUrls, [fileId]: url } },
     ),
 
   setMediaProgress: (fileId, progress, url) =>
