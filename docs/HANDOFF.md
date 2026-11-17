@@ -318,6 +318,15 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
   so every chat the read marker touched opened empty and could not page (this is the bug
   the product owner reported). `applyMessageOps` now returns without touching the store
   when the chat has no entry; entries come only from `setHistory`/`prependHistory`.
+- **…but the ops of an unloaded chat must not be dropped either.** While a chat's first
+  page was in flight (a cold chat can take seconds), `applyMessageOps` threw the ops
+  away, and the subsequent `setHistory` wrote the pre-event snapshot — anything that
+  arrived during the fetch (a `updateNewMessage`, a late-batched edit) was missing from
+  the transcript until the chat was reloaded. The store now queues meaningful ops in
+  `pendingOps[chatId]` (pure read-marker batches are skipped) and `setHistory` replays
+  the queue onto the fresh page (`reduceOps`, shared with `applyMessageOps`). A failed
+  first fetch also used to leave the pane empty forever — `ChatPane` retries once
+  quietly after 1.5 s before giving up.
 - **`downloadFile(synchronous: true)` occupies a TDLib request slot until the file is
   complete.** That is fine for user-triggered media, but avatars must not be fetched
   naively: the adapter runs a 4-wide worker pool at priority 1, dedupes per chat id
@@ -353,6 +362,25 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
   testable without the real account.
 - **Real unread counts are large** (hundreds of thousands on unfollowed groups); that
   is data, not a mapping bug.
+- **A programmatic `scrollTop` write can desync `@tanstack/react-virtual`.** Row
+  transforms come from the virtualizer's *own* `scrollOffset`, which it refreshes only on
+  real scroll events. Scrolling the transcript in the mount layout effect (landing at the
+  bottom, restoring an anchor, prepend compensation) can therefore leave it painting the
+  top of the history while the element sits elsewhere: the rows are all off-screen, so the
+  pane looks **blank** (or shows a slice of very old messages) with an empty tail under the
+  scrollbar, and `scrollTop` still reports "at the bottom". Symptom looked like a chat that
+  never loads. Fix: after every programmatic scroll, `MessageList.resyncScroller()` dispatches
+  one `scroll` event so the virtualizer re-reads the element (measured: 13 rows at y −4842…
+  −2708 before, the real 2025↔today window at y −1098…+394 after), plus `stickToNewest()`
+  uses `virtualizer.scrollToEnd()` and re-sticks at 150/400 ms once the first measurements
+  have landed.
+- **An empty first history page is not "an empty chat".** A cold local TDLib database can
+  answer `messages:history` with `[]`; the renderer used to cache that, after which the
+  transcript stayed blank for the rest of the session. `ChatPane` now retries three times
+  before believing it, does not treat an empty entry as cached, shows an explicit
+  "这个会话还没有可显示的消息" + 重新加载 state, and the adapter logs both halves of the
+  chain (`no last_message` / `getChatHistory returned nothing`) so the next occurrence is
+  explainable from `.cache/app.log`.
 - `userData` is pinned to `%APPDATA%\WechatGram` via `app.setName`/`setPath`, because
   the package name is `@wechatgram/desktop` and would otherwise create a nested folder.
 
@@ -381,9 +409,21 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
 2. ~~**`ui.db` scroll-anchor wiring**~~ — **done** with the decided UX ("restore only when
    the reader was not at the bottom"):
    - `MessageList` measures the first visible `.wx-message-slot` (id + offset relative to
-     the viewport top, which may be negative) after a 250 ms scroll debounce and on
-     unmount, and sends `ui:saveAnchor`. At the bottom (≤ 40 px) it sends
-     `messageId: null`, which is what makes a reopen land on the newest message.
+     the viewport top, which may be negative) on scroll and sends `ui:saveAnchor`. At the
+     bottom (≤ 40 px) it sends `messageId: null`, which is what makes a reopen land on the
+     newest message.
+   - **Save-path correction (real-account bug)**: the position a reader left a chat at was
+     often never written, so a reopened app restored an older anchor. Two causes, both in
+     `MessageList`: the save was a single 250 ms debounce that *re-measured* inside the
+     timer and bailed whenever a history page was in flight (the common case while reading
+     up), and the "write on unmount" net was dead code — React nulls `scrollRef.current`
+     before passive cleanups run, so it measured nothing. Now the first scroll of a burst is
+     written immediately, later ones collapse into one trailing write, the last measurement
+     is kept in `latestAnchorRef` and flushed on unmount without touching the DOM, prepend
+     compensation no longer suppresses saving (only `restoringRef`/`programmaticRef` do), and
+     a hung `messages:history` is capped at 15 s so it cannot wedge paging. Verified on the
+     real account: scroll → close the app within the same second → `ui.db` holds the new
+     position, and the next start restores exactly that row.
    - `ChatPane` resolves `ui:getAnchor` **before** mounting the list (a cached chat would
      otherwise capture its position at the bottom and miss the restore), pages back up to
      6 pages / 10 s until the anchor message is loaded, and passes it down as

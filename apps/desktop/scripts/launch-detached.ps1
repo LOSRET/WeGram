@@ -20,8 +20,15 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $appDir = (Resolve-Path "$PSScriptRoot\..").Path
-$electronExe = node -e "process.stdout.write(require('electron'))"
-if (-not (Test-Path $electronExe)) { throw "electron binary not found: $electronExe" }
+# `node -e "require('electron')"` resolves from the cwd, not the script dir —
+# pin it so the launcher also works when called from the repo root.
+Push-Location $appDir
+try {
+  $electronExe = node -e "process.stdout.write(require('electron'))"
+} finally {
+  Pop-Location
+}
+if (-not $electronExe -or -not (Test-Path $electronExe)) { throw "electron binary not found: $electronExe" }
 if (-not (Test-Path (Join-Path $appDir 'out\main\index.js'))) {
   throw "out\ is missing — run 'pnpm build' first"
 }

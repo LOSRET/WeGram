@@ -1641,6 +1641,14 @@ select {
   line-height: 1;
 }
 
+/* Telegram emoji-only messages render as a large glyph without a bubble,
+   the way WeChat shows big emoji. */
+.wx-big-emoji {
+  font-size: 48px;
+  line-height: 1.15;
+  cursor: default;
+}
+
 /* ---------- Media bubbles ---------- */
 
 .wx-bubble--media {

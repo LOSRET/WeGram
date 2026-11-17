@@ -43,6 +43,8 @@ export function ChatPane() {
   const [anchorKnown, setAnchorKnown] = useState(false)
   /** Paging back towards a saved anchor (can take a moment on the real account). */
   const [restoring, setRestoring] = useState(false)
+  /** Bumped by the empty-state "reload" button to re-run the first-page fetch. */
+  const [reloadNonce, setReloadNonce] = useState(0)
 
   const chat = chats.find((item) => item.id === activeChatId) ?? null
   const messages = activeChatId ? (messagesByChat[activeChatId] ?? []) : []
@@ -63,8 +65,11 @@ export function ChatPane() {
       invoke('ui:getAnchor', { chatId: activeChatId }).catch(() => null)
 
     // Already in memory: no fetch, the list only needs the anchor to restore.
+    // An *empty* entry is not treated as cached: it is what a cold TDLib cache
+    // answers with while it has not loaded the chat's last message yet, and
+    // trusting it left the transcript blank for the rest of the session.
     const cached = store.messagesByChat[activeChatId]
-    if (cached) {
+    if (cached && cached.length > 0) {
       setPendingAnchor(null)
       setAnchorKnown(false)
       void resolveAnchor().then((anchor) => {
@@ -81,54 +86,84 @@ export function ChatPane() {
 
     setAnchorKnown(false)
     store.setLoadingHistory(activeChatId, true)
+
+    const loadFirstPage = async (): Promise<void> => {
+      const anchor = await resolveAnchor()
+      let first = await invoke('messages:history', { chatId: activeChatId, limit: 50 })
+      // An empty first page means "TDLib has not got the chat's last message
+      // yet" far more often than "this chat is empty": it happens right after a
+      // start, while the local database is still syncing. Ask again before
+      // caching nothing — a cached empty page is a blank transcript forever.
+      for (let attempt = 0; attempt < 3 && first.messages.length === 0; attempt += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 800))
+        if (cancelled) return
+        first = await invoke('messages:history', { chatId: activeChatId, limit: 50 })
+      }
+      let messages = first.messages
+      let hasMore = first.hasMore
+
+      const deadline = Date.now() + RESTORE_BUDGET_MS
+      const needsPaging =
+        Boolean(anchor) && messages.length > 0 && messages[0]!.id > anchor!.messageId
+      if (needsPaging && !cancelled) setRestoring(true)
+      for (
+        let pages = 0;
+        anchor &&
+        hasMore &&
+        messages.length > 0 &&
+        messages[0]!.id > anchor.messageId &&
+        pages < MAX_RESTORE_PAGES &&
+        Date.now() < deadline;
+        pages += 1
+      ) {
+        const older = await invoke('messages:history', {
+          chatId: activeChatId,
+          fromMessageId: messages[0]!.id,
+          limit: 50,
+        })
+        messages = [...older.messages, ...messages]
+        hasMore = older.hasMore
+      }
+
+      if (cancelled) return
+      const found = anchor
+        ? messages.some((message) => message.id === anchor.messageId)
+        : false
+      setPendingAnchor(found && anchor ? { chatId: activeChatId, ...anchor } : null)
+      useAppStore.getState().setHistory(activeChatId, messages, hasMore)
+      // The position could not be reached within the budget (deep history):
+      // land at the bottom and drop the anchor, so the next open stays instant
+      // instead of paging back again for nothing.
+      if (anchor && !found) {
+        void invoke('ui:saveAnchor', {
+          chatId: activeChatId,
+          messageId: null,
+          offset: 0,
+        }).catch(() => undefined)
+      }
+    }
+
     void (async () => {
       try {
-        const anchor = await resolveAnchor()
-        const first = await invoke('messages:history', { chatId: activeChatId, limit: 50 })
-        let messages = first.messages
-        let hasMore = first.hasMore
-
-        const deadline = Date.now() + RESTORE_BUDGET_MS
-        const needsPaging =
-          Boolean(anchor) && messages.length > 0 && messages[0]!.id > anchor!.messageId
-        if (needsPaging && !cancelled) setRestoring(true)
-        for (
-          let pages = 0;
-          anchor &&
-          hasMore &&
-          messages.length > 0 &&
-          messages[0]!.id > anchor.messageId &&
-          pages < MAX_RESTORE_PAGES &&
-          Date.now() < deadline;
-          pages += 1
-        ) {
-          const older = await invoke('messages:history', {
-            chatId: activeChatId,
-            fromMessageId: messages[0]!.id,
-            limit: 50,
-          })
-          messages = [...older.messages, ...messages]
-          hasMore = older.hasMore
-        }
-
-        if (cancelled) return
-        const found = anchor
-          ? messages.some((message) => message.id === anchor.messageId)
-          : false
-        setPendingAnchor(found && anchor ? { chatId: activeChatId, ...anchor } : null)
-        useAppStore.getState().setHistory(activeChatId, messages, hasMore)
-        // The position could not be reached within the budget (deep history):
-        // land at the bottom and drop the anchor, so the next open stays instant
-        // instead of paging back again for nothing.
-        if (anchor && !found) {
-          void invoke('ui:saveAnchor', {
-            chatId: activeChatId,
-            messageId: null,
-            offset: 0,
-          }).catch(() => undefined)
-        }
+        await loadFirstPage()
       } catch (error) {
-        if (!cancelled) useAppStore.getState().setError(errorMessage(error))
+        const message = errorMessage(error)
+        if (!cancelled) {
+          useAppStore.getState().setError(message)
+          // One quiet retry: the proxy tunnel here flaps, and a failed first
+          // fetch used to leave the pane empty forever — the only way back was
+          // toggling the chat closed and open again.
+          await new Promise((resolve) => window.setTimeout(resolve, 1500))
+          if (cancelled) return
+          try {
+            await loadFirstPage()
+            if (useAppStore.getState().error === message) {
+              useAppStore.getState().setError(null)
+            }
+          } catch {
+            // The error bar stays; the user can close the chat and retry.
+          }
+        }
       } finally {
         if (!cancelled) {
           useAppStore.getState().setLoadingHistory(activeChatId, false)
@@ -142,7 +177,7 @@ export function ChatPane() {
     return () => {
       cancelled = true
     }
-  }, [activeChatId])
+  }, [activeChatId, reloadNonce])
 
   // Toasts are fire-and-forget; MainShell owns the dismissal timer.
 
@@ -275,6 +310,18 @@ export function ChatPane() {
         // The list captures its reading position on the first paint, so it must
         // not mount before the stored anchor for this chat is known.
         <div className="wx-messages-wrap" />
+      ) : messages.length === 0 ? (
+        // An empty page that survived the retries: say so instead of showing a
+        // silently blank transcript, and let the reader ask again.
+        <div className="wx-empty-chat">
+          <div>这个会话还没有可显示的消息</div>
+          <button
+            className="wx-ghost-btn"
+            onClick={() => setReloadNonce((value) => value + 1)}
+          >
+            重新加载
+          </button>
+        </div>
       ) : (
         <MessageList
           key={activeChatId}

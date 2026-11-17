@@ -41,6 +41,8 @@ export interface AppState {
   chats: ChatSummary[]
   activeChatId: number | null
   messagesByChat: Record<number, Message[]>
+  /** Ops that arrived before a chat's first page did; replayed by setHistory. */
+  pendingOps: Record<number, MessageOp[]>
   /** true when older messages may still exist on the server */
   hasMoreByChat: Record<number, boolean>
   loadingOlderByChat: Record<number, boolean>
@@ -93,6 +95,39 @@ function upsertMessage(list: Message[], message: Message): Message[] {
   return next
 }
 
+/** Ops queued for a chat whose first page has not landed yet. */
+const PENDING_OPS_LIMIT = 200
+
+/**
+ * Apply message ops to an in-memory list. Shared by `applyMessageOps` (live
+ * events) and `setHistory` (replaying the ops that arrived while the first
+ * page was still being fetched).
+ */
+function reduceOps(list: Message[], ops: MessageOp[]): { list: Message[]; deleted: Set<number> } {
+  let next = list
+  const deleted = new Set<number>()
+  for (const op of ops) {
+    switch (op.op) {
+      case 'new':
+      case 'replace':
+        next = upsertMessage(next, op.message)
+        break
+      case 'edit':
+        next = next.map((item) =>
+          item.id === op.messageId ? { ...item, text: op.text, edited: true } : item,
+        )
+        break
+      case 'delete':
+        for (const id of op.messageIds) deleted.add(id)
+        next = next.filter((item) => !op.messageIds.includes(item.id))
+        break
+      default:
+        break
+    }
+  }
+  return { list: next, deleted }
+}
+
 const EMPTY: Message[] = []
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -103,6 +138,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   chats: [],
   activeChatId: null,
   messagesByChat: {},
+  pendingOps: {},
   hasMoreByChat: {},
   loadingOlderByChat: {},
   loadingHistoryByChat: {},
@@ -133,10 +169,21 @@ export const useAppStore = create<AppState>((set, get) => ({
   setActiveChat: (activeChatId) => set({ activeChatId }),
 
   setHistory: (chatId, messages, hasMore) =>
-    set((state) => ({
-      messagesByChat: { ...state.messagesByChat, [chatId]: messages },
-      hasMoreByChat: { ...state.hasMoreByChat, [chatId]: hasMore },
-    })),
+    set((state) => {
+      // The page snapshot was fetched before the queued events arrived: replay
+      // them onto it (upsertMessage dedupes by id) and drop the queue. Without
+      // this, anything that arrived while the first page was in flight was
+      // lost for good — the pane looked loaded but was missing messages.
+      const pending = state.pendingOps[chatId]
+      const pendingOps = { ...state.pendingOps }
+      if (pending !== undefined) delete pendingOps[chatId]
+      const page = pending ? reduceOps(messages, pending).list : messages
+      return {
+        messagesByChat: { ...state.messagesByChat, [chatId]: page },
+        hasMoreByChat: { ...state.hasMoreByChat, [chatId]: hasMore },
+        pendingOps,
+      }
+    }),
 
   prependHistory: (chatId, messages, hasMore) =>
     set((state) => {
@@ -166,32 +213,21 @@ export const useAppStore = create<AppState>((set, get) => ({
       // chat) used to poison every conversation that way, which is what made
       // groups open empty and never page back.
       const existing = state.messagesByChat[chatId]
-      if (existing === undefined) return {}
-      let list = existing
-      const deleted = new Set<number>()
-      for (const op of ops) {
-        switch (op.op) {
-          case 'new':
-            list = upsertMessage(list, op.message)
-            break
-          case 'edit':
-            list = list.map((item) =>
-              item.id === op.messageId ? { ...item, text: op.text, edited: true } : item,
-            )
-            break
-          case 'replace':
-            list = upsertMessage(list, op.message)
-            break
-          case 'delete':
-            for (const id of op.messageIds) deleted.add(id)
-            list = list.filter((item) => !op.messageIds.includes(item.id))
-            break
-          case 'read':
-            break
-          default:
-            break
+      if (existing === undefined) {
+        // First page still in flight: queue the ops so `setHistory` replays
+        // them onto the page. Dropping them silently lost whatever arrived
+        // during the fetch, and a cold chat can take seconds to answer.
+        // Pure read-marker batches carry nothing to replay — skip those.
+        if (!ops.some((op) => op.op !== 'read')) return {}
+        const queued = state.pendingOps[chatId] ?? []
+        return {
+          pendingOps: {
+            ...state.pendingOps,
+            [chatId]: [...queued, ...ops].slice(-PENDING_OPS_LIMIT),
+          },
         }
       }
+      const { list, deleted } = reduceOps(existing, ops)
 
       let editing = state.editing
       if (editing && editing.chatId === chatId && deleted.has(editing.messageId)) editing = null
@@ -242,6 +278,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       chats: [],
       activeChatId: null,
       messagesByChat: {},
+      pendingOps: {},
       hasMoreByChat: {},
       loadingOlderByChat: {},
       loadingHistoryByChat: {},

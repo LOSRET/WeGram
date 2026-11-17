@@ -43,6 +43,20 @@ interface MenuState {
   y: number
 }
 
+/**
+ * Gap between reading-position writes during one scroll burst. The first scroll
+ * of a burst is written immediately; later ones are collapsed into one trailing
+ * write, so a reader who leaves right away still leaves a recorded position.
+ */
+const ANCHOR_SAVE_DELAY_MS = 250
+
+/**
+ * A history request that never settles (the proxy tunnel here flaps) used to
+ * keep `loadingRef`/`prependingRef` set for the rest of the session, which
+ * blocked every later page *and* every later position save. Cap the wait.
+ */
+const LOAD_OLDER_TIMEOUT_MS = 15_000
+
 export function MessageList({
   chat,
   messages,
@@ -97,6 +111,18 @@ export function MessageList({
   })
 
   /**
+   * The virtualizer positions rows from its own `scrollOffset`, refreshed on
+   * real scroll events only. A programmatic `scrollTop` write (landing at the
+   * bottom, restoring an anchor, prepend compensation) can leave it painting a
+   * different slice than the one on screen — the transcript then looks blank, or
+   * stuck on much older messages, with an empty tail under the scrollbar. Poking
+   * it with a scroll event makes it re-read the element; that is all it needs.
+   */
+  const resyncScroller = (): void => {
+    scrollRef.current?.dispatchEvent(new Event('scroll'))
+  }
+
+  /**
    * Rule 1, extended for #2: the first paint either restores the saved reading
    * position or lands at the bottom. Both happen while the list is still hidden
    * (`wx-messages--pending`), so the reader never sees it jump.
@@ -144,6 +170,9 @@ export function MessageList({
       }
     } finally {
       restoringRef.current = false
+      // The corrections above wrote `scrollTop` directly; make sure the
+      // virtualizer is painting the slice that is actually on screen.
+      resyncScroller()
     }
   }
 
@@ -161,7 +190,31 @@ export function MessageList({
       return
     }
 
-    scrollToBottom()
+    /**
+     * Land on the newest message with the virtualizer and the element agreeing
+     * on the offset. Rows are positioned from the virtualizer's *own*
+     * `scrollOffset`, which is only refreshed by real scroll events: a bare
+     * `scrollTop` write (what `scrollToBottom` does) lands before the
+     * virtualizer's listener exists, so it kept rendering from the top of the
+     * history while the element sat at the bottom — the transcript then looks
+     * blank, or shows a slice of very old messages, and the bottom of the scroll
+     * is empty. `scrollToEnd` writes both.
+     */
+    const stickToNewest = (): void => {
+      virtualizer.scrollToEnd()
+      scrollToBottom()
+      resyncScroller()
+    }
+
+    /** Re-stick only while the reader is still at the bottom. */
+    const restickIfAtBottom = (): void => {
+      const el = scrollRef.current
+      if (!el) return
+      if (el.scrollHeight - el.scrollTop - el.clientHeight > 40) return
+      stickToNewest()
+    }
+
+    stickToNewest()
     // Open the ready gate on the next frame, but never depend on it alone:
     // requestAnimationFrame is throttled while the window is occluded, and the
     // list must not stay invisible because of that. No cleanup cancels these:
@@ -171,11 +224,16 @@ export function MessageList({
     const finish = (): void => {
       if (opened) return
       opened = true
-      scrollToBottom()
+      stickToNewest()
       markReady()
     }
     requestAnimationFrame(finish)
     window.setTimeout(finish, 150)
+    // Row heights are only measured after the first paint, and the initial
+    // `scrollToEnd` was computed from estimates: settle once the measurements
+    // have landed (still idempotent when the reader stays put).
+    window.setTimeout(restickIfAtBottom, 150)
+    window.setTimeout(restickIfAtBottom, 400)
     // Runs once per mounted chat (MessageList is keyed by chat id).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length])
@@ -195,7 +253,17 @@ export function MessageList({
   /* ---------- reading position saved to ui.db (#2) ---------- */
 
   const lastSavedRef = useRef('')
+  /**
+   * Last position measured from a scroll event. Kept in a plain ref on purpose:
+   * by the time the debounce or the unmount cleanup runs, the rows may have been
+   * re-laid out (a prepend shifts them) and React has already nulled the DOM refs,
+   * so re-measuring there silently produced nothing.
+   */
+  const latestAnchorRef = useRef<{ messageId: number | null; offset: number } | null>(null)
   const saveTimerRef = useRef<number | null>(null)
+  const lastWriteAtRef = useRef(0)
+  /** True while *we* move the viewport (prepend compensation), not the reader. */
+  const programmaticRef = useRef(false)
 
   const measureAnchor = (): { messageId: number | null; offset: number } | null => {
     const el = scrollRef.current
@@ -216,10 +284,7 @@ export function MessageList({
     }
   }
 
-  const flushAnchor = (): void => {
-    if (!initialisedRef.current || restoringRef.current || prependingRef.current) return
-    const anchor = measureAnchor()
-    if (!anchor) return
+  const writeAnchor = (anchor: { messageId: number | null; offset: number }): void => {
     const key = `${anchor.messageId ?? 'bottom'}:${anchor.offset}`
     if (key === lastSavedRef.current) return
     lastSavedRef.current = key
@@ -230,23 +295,48 @@ export function MessageList({
     }).catch(() => undefined)
   }
 
+  /**
+   * Persist the reading position, tolerating a reader who leaves immediately.
+   *
+   * The first scroll of a burst is written straight away, so closing the app or
+   * jumping to another chat a moment later still records where the reader was;
+   * the rest of the burst only updates `latestAnchorRef` and arms a single
+   * trailing write. The old code measured *inside* the debounce and bailed when
+   * a history page happened to be in flight, which dropped the save entirely —
+   * that is what made a reopened chat land on an older position.
+   */
   const scheduleAnchorSave = (): void => {
-    if (!initialisedRef.current || restoringRef.current || prependingRef.current) return
+    if (!initialisedRef.current || restoringRef.current || programmaticRef.current) return
+    const anchor = measureAnchor()
+    if (!anchor) return
+    latestAnchorRef.current = anchor
+    const now = Date.now()
+    if (now - lastWriteAtRef.current >= ANCHOR_SAVE_DELAY_MS) {
+      lastWriteAtRef.current = now
+      writeAnchor(anchor)
+      return
+    }
     if (saveTimerRef.current !== null) return
     saveTimerRef.current = window.setTimeout(() => {
       saveTimerRef.current = null
-      flushAnchor()
-    }, 250)
+      lastWriteAtRef.current = Date.now()
+      const pending = latestAnchorRef.current
+      if (pending) writeAnchor(pending)
+    }, ANCHOR_SAVE_DELAY_MS)
   }
 
-  // Leaving the chat (or the window): write the last position immediately.
+  // Leaving the chat (or quitting): write whatever the last scroll measured.
+  // This must not re-measure — the rows are detached and `scrollRef.current` is
+  // already null here, which is why the previous version never persisted anything
+  // on the way out.
   useEffect(() => {
     return () => {
       if (saveTimerRef.current !== null) {
         window.clearTimeout(saveTimerRef.current)
         saveTimerRef.current = null
       }
-      flushAnchor()
+      const pending = latestAnchorRef.current
+      if (pending) writeAnchor(pending)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -298,42 +388,51 @@ export function MessageList({
     const el = scrollRef.current
     if (!el) return
 
-    for (let frame = 0; frame < 8; frame += 1) {
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
-      const target = snapshot.scrollTop + (el.scrollHeight - snapshot.scrollHeight)
-      if (Math.abs(target - el.scrollTop) > 0.5) el.scrollTop = target
-    }
-
-    if (!anchor) return
-    let stable = 0
-    for (let frame = 0; frame < 30 && stable < 2; frame += 1) {
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
-      const node = el.querySelector<HTMLElement>(`[data-message-id="${anchor.id}"]`)
-      if (!node) {
-        stable = 0
-        continue
+    // These `scrollTop` writes are ours, not the reader's: the position they
+    // produce is a transient one, so keep it out of the saved anchor.
+    programmaticRef.current = true
+    try {
+      for (let frame = 0; frame < 8; frame += 1) {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+        const target = snapshot.scrollTop + (el.scrollHeight - snapshot.scrollHeight)
+        if (Math.abs(target - el.scrollTop) > 0.5) el.scrollTop = target
       }
-      const offset = node.getBoundingClientRect().top - el.getBoundingClientRect().top
-      const delta = offset - anchor.offset
-      if (Math.abs(delta) > 0.5) {
-        el.scrollTop += delta
-        stable = 0
-      } else {
-        stable += 1
-      }
-    }
 
-    // Report the outcome for the dev acceptance panel (PerfPanel) and for
-    // debugging: how far the anchored row ended up from where it started.
-    const finalNode = el.querySelector<HTMLElement>(`[data-message-id="${anchor.id}"]`)
-    const finalOffset = finalNode
-      ? finalNode.getBoundingClientRect().top - el.getBoundingClientRect().top
-      : Number.NaN
-    el.dataset['anchorId'] = anchor.id
-    el.dataset['anchorVisible'] = finalNode ? '1' : '0'
-    el.dataset['anchorDelta'] = Number.isFinite(finalOffset)
-      ? (finalOffset - anchor.offset).toFixed(1)
-      : 'NaN'
+      if (!anchor) return
+      let stable = 0
+      for (let frame = 0; frame < 30 && stable < 2; frame += 1) {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+        const node = el.querySelector<HTMLElement>(`[data-message-id="${anchor.id}"]`)
+        if (!node) {
+          stable = 0
+          continue
+        }
+        const offset = node.getBoundingClientRect().top - el.getBoundingClientRect().top
+        const delta = offset - anchor.offset
+        if (Math.abs(delta) > 0.5) {
+          el.scrollTop += delta
+          stable = 0
+        } else {
+          stable += 1
+        }
+      }
+
+      // Report the outcome for the dev acceptance panel (PerfPanel) and for
+      // debugging: how far the anchored row ended up from where it started.
+      const finalNode = el.querySelector<HTMLElement>(`[data-message-id="${anchor.id}"]`)
+      const finalOffset = finalNode
+        ? finalNode.getBoundingClientRect().top - el.getBoundingClientRect().top
+        : Number.NaN
+      el.dataset['anchorId'] = anchor.id
+      el.dataset['anchorVisible'] = finalNode ? '1' : '0'
+      el.dataset['anchorDelta'] = Number.isFinite(finalOffset)
+        ? (finalOffset - anchor.offset).toFixed(1)
+        : 'NaN'
+    } finally {
+      programmaticRef.current = false
+      // Same reason as in `restoreToAnchor`: the compensation wrote `scrollTop`.
+      resyncScroller()
+    }
   }
 
   const loadOlder = async (): Promise<void> => {
@@ -343,7 +442,13 @@ export function MessageList({
     const snapshot = captureSnapshot()
     const anchor = captureAnchor()
     try {
-      await onLoadOlder()
+      // Settle even if the IPC call never answers — see LOAD_OLDER_TIMEOUT_MS.
+      await Promise.race([
+        onLoadOlder(),
+        new Promise<void>((resolve) => {
+          window.setTimeout(resolve, LOAD_OLDER_TIMEOUT_MS)
+        }),
+      ])
     } finally {
       if (snapshot) await restorePosition(snapshot, anchor)
       window.setTimeout(() => {
@@ -479,6 +584,20 @@ function findUnreadMessage(messages: Message[], marker: UnreadMarker | null): nu
   return fallback?.id ?? null
 }
 
+/**
+ * True when the text is nothing but emoji (Telegram's animated-emoji messages,
+ * or plain text made of emoji). Shown bubble-less at large size, WeChat style.
+ */
+function isEmojiOnly(text: string): boolean {
+  const trimmed = text.trim()
+  // Length cap keeps multi-line emoji spam inside a normal bubble.
+  if (!trimmed || trimmed.length > 12) return false
+  // Digits are not pictographic, so plain "123" cannot pass the first test;
+  // the second keeps keycaps, skin tones, ZWJ sequences and VS16 in play.
+  if (!/\p{Extended_Pictographic}/u.test(trimmed)) return false
+  return /^[\p{Extended_Pictographic}\u{1F3FB}-\u{1F3FF}\u200D\uFE0F\u20E3\s]+$/u.test(trimmed)
+}
+
 interface MessageRowProps {
   chat: ChatSummary
   message: Message
@@ -502,6 +621,7 @@ function MessageRow({ chat, message, repliedTo, self, readOutboxMaxId, onOpenMen
       ? message.kind
       : null
   const isSticker = message.kind === 'sticker' && media
+  const bigEmoji = message.kind === 'text' && !mediaKind && isEmojiOnly(message.text)
 
   const openMenu = (event: MouseEvent): void => {
     event.preventDefault()
@@ -536,6 +656,11 @@ function MessageRow({ chat, message, repliedTo, self, readOutboxMaxId, onOpenMen
         {isSticker ? (
           <div className="wx-sticker-wrap" onContextMenu={openMenu}>
             <StickerRenderer media={media!} size={140} />
+          </div>
+        ) : bigEmoji ? (
+          // Emoji-only message: no bubble, large glyph, like WeChat big emoji.
+          <div className="wx-big-emoji" onContextMenu={openMenu}>
+            <RichText text={message.text} entities={message.entities} />
           </div>
         ) : (
           <div
