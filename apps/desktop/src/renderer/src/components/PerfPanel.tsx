@@ -161,7 +161,11 @@ export function PerfPanel() {
             <button className="wx-button" disabled={busy} onClick={() => void runScrollTest()}>
               滚动测试
             </button>
-            <button className="wx-button wx-button--ghost" disabled={busy} onClick={() => void runAnchorTest()}>
+            <button
+              className="wx-button wx-button--ghost"
+              disabled={busy}
+              onClick={() => void runAnchorTest()}
+            >
               锚定测试
             </button>
           </div>
@@ -169,7 +173,11 @@ export function PerfPanel() {
             {results.map((result) => (
               <div key={result.label} className="wx-perf__row">
                 <span>{result.label}</span>
-                <strong className={result.pass === false ? 'wx-perf__fail' : result.pass ? 'wx-perf__pass' : ''}>
+                <strong
+                  className={
+                    result.pass === false ? 'wx-perf__fail' : result.pass ? 'wx-perf__pass' : ''
+                  }
+                >
                   {result.value}
                 </strong>
               </div>

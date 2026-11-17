@@ -66,7 +66,12 @@ function PhotoBubble({ media }: { media: MessageMedia }) {
           />
         ) : null}
         {url ? (
-          <img className="wx-photo__image" src={url} alt={media.fileName ?? '图片'} loading="lazy" />
+          <img
+            className="wx-photo__image"
+            src={url}
+            alt={media.fileName ?? '图片'}
+            loading="lazy"
+          />
         ) : (
           <span className="wx-photo__pending">
             {ratio === undefined ? <span className="wx-spinner" /> : `${Math.round(ratio * 100)}%`}
@@ -219,7 +224,10 @@ function VoiceBubble({ media }: { media: MessageMedia }) {
       audio.pause()
       setPlaying(false)
     } else {
-      void audio.play().then(() => setPlaying(true)).catch(() => undefined)
+      void audio
+        .play()
+        .then(() => setPlaying(true))
+        .catch(() => undefined)
     }
   }
 
@@ -235,7 +243,9 @@ function VoiceBubble({ media }: { media: MessageMedia }) {
         {'▁▃▅▇▅▃▁'.repeat(3)}
       </span>
       <span className="wx-voice__time">
-        {!url && ratio !== undefined ? `${Math.round(ratio * 100)}%` : formatDuration(media.duration)}
+        {!url && ratio !== undefined
+          ? `${Math.round(ratio * 100)}%`
+          : formatDuration(media.duration)}
       </span>
       {url ? (
         <audio

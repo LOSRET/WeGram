@@ -476,13 +476,21 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
         text: { _: 'formattedText', text: input.text },
       },
     })
-    const history = await this.history({ chatId: input.chatId, fromMessageId: input.messageId + 1, limit: 1 })
+    const history = await this.history({
+      chatId: input.chatId,
+      fromMessageId: input.messageId + 1,
+      limit: 1,
+    })
     const updated = history.messages.find((m) => m.id === input.messageId)
     if (!updated) throw new AppError('internal', `Message ${input.messageId} not found after edit`)
     return updated
   }
 
-  async deleteMessages(input: { chatId: number; messageIds: number[]; forBoth: boolean }): Promise<void> {
+  async deleteMessages(input: {
+    chatId: number
+    messageIds: number[]
+    forBoth: boolean
+  }): Promise<void> {
     await this.invoke({
       _: 'deleteMessages',
       chat_id: input.chatId,
@@ -561,7 +569,10 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     return { path, file }
   }
 
-  async downloadFile(input: { fileId: number; priority: number }): Promise<{ path: string; url: string }> {
+  async downloadFile(input: {
+    fileId: number
+    priority: number
+  }): Promise<{ path: string; url: string }> {
     const { path, file } = await this.fetchFilePath(input.fileId, input.priority)
     const url = registerMediaFile(path)
     this.emit({
@@ -678,7 +689,9 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
       id: String(response.id),
       title: response.title ?? '',
       ...(response.thumbnail ? { thumbnail: mapStickerThumbnail(response.thumbnail) } : {}),
-      stickers: stickers.map((sticker) => this.toSticker(sticker)).filter((item) => item.fileId > 0),
+      stickers: stickers
+        .map((sticker) => this.toSticker(sticker))
+        .filter((item) => item.fileId > 0),
     }
   }
 
@@ -858,7 +871,8 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
         // Our own profile changed (new photo): refresh the rail avatar.
         const user = update.user
         if (!user || user.id !== this.selfUserId) return
-        const fileId: number | undefined = user.profile_photo?.small?.id ?? user.profile_photo?.big?.id
+        const fileId: number | undefined =
+          user.profile_photo?.small?.id ?? user.profile_photo?.big?.id
         if (fileId) void this.loadSelfAvatar(fileId)
         return
       }
@@ -883,9 +897,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
         this.emit({
           type: 'file',
           fileId: file.id,
-          downloaded: uploading
-            ? (file.remote?.uploaded_size ?? 0)
-            : (local.downloaded_size ?? 0),
+          downloaded: uploading ? (file.remote?.uploaded_size ?? 0) : (local.downloaded_size ?? 0),
           total: file.expected_size ?? file.size ?? 0,
           ...(completed && local.path ? { url: registerMediaFile(local.path) } : {}),
           ...(uploading ? { uploading: true } : {}),
@@ -909,7 +921,9 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
         const codeLength: number | undefined = info.type?.code_length
         this.setAuth({
           kind: 'waitCode',
-          ...(typeof info.phone_number === 'string' ? { hint: `sent to ${info.phone_number}` } : {}),
+          ...(typeof info.phone_number === 'string'
+            ? { hint: `sent to ${info.phone_number}` }
+            : {}),
           ...(typeof codeLength === 'number' ? { codeLength } : {}),
         })
         return
@@ -1024,7 +1038,8 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     try {
       const user = await this.invoke({ _: 'getUser', user_id: userId })
       const name = this.mapUser(user)
-      const label = [name.firstName, name.lastName].filter(Boolean).join(' ') || name.username || '未知'
+      const label =
+        [name.firstName, name.lastName].filter(Boolean).join(' ') || name.username || '未知'
       this.userNames.set(userId, label)
       return label
     } catch {
@@ -1106,14 +1121,15 @@ function mapChatKind(type: TdObject | undefined): ChatSummary['kind'] {
 }
 
 function normalizeMtprotoSecret(secret: string): string {
-  const cleaned = secret.trim().replace(/^https?:\/\/t\.me\/proxy\?.*secret=/, '').replace(/\s/g, '')
+  const cleaned = secret
+    .trim()
+    .replace(/^https?:\/\/t\.me\/proxy\?.*secret=/, '')
+    .replace(/\s/g, '')
   return cleaned
 }
 
 function replyTo(messageId?: number): TdObject | null {
-  return messageId === undefined
-    ? null
-    : { _: 'inputMessageReplyToMessage', message_id: messageId }
+  return messageId === undefined ? null : { _: 'inputMessageReplyToMessage', message_id: messageId }
 }
 
 function formattedText(text: string | undefined): TdObject {
@@ -1414,11 +1430,19 @@ function mapContent(content: TdObject): {
     // Telegram's animated emoji: a message that is a single (usually animated)
     // emoji. Keep the glyph and let the renderer size it like WeChat big emoji.
     case 'messageAnimatedEmoji':
-      return { kind: 'text', text: typeof content.emoji === 'string' ? content.emoji : '', entities: [] }
+      return {
+        kind: 'text',
+        text: typeof content.emoji === 'string' ? content.emoji : '',
+        entities: [],
+      }
     // Dice / basketball etc. carry their emoji; the thrown value is a TDLib
     // update, not part of the message, so we show the emoji itself.
     case 'messageDice':
-      return { kind: 'text', text: typeof content.emoji === 'string' ? content.emoji : '', entities: [] }
+      return {
+        kind: 'text',
+        text: typeof content.emoji === 'string' ? content.emoji : '',
+        entities: [],
+      }
     default:
       return { kind: 'service', text: '', entities: [] }
   }
@@ -1464,7 +1488,8 @@ function mapStickerThumbnail(thumbnail: TdObject): Sticker {
   const format: string | undefined = thumbnail?.format?._
   return {
     fileId: thumbnail?.file?.id ?? 0,
-    format: format === 'thumbnailFormatTgs' ? 'tgs' : format === 'thumbnailFormatWebm' ? 'webm' : 'webp',
+    format:
+      format === 'thumbnailFormatTgs' ? 'tgs' : format === 'thumbnailFormatWebm' ? 'webm' : 'webp',
     ...(thumbnail?.width ? { width: thumbnail.width } : {}),
     ...(thumbnail?.height ? { height: thumbnail.height } : {}),
   }
@@ -1500,4 +1525,3 @@ function mapEntities(rawEntities: TdObject[] | undefined): MessageEntity[] {
   }
   return result
 }
-

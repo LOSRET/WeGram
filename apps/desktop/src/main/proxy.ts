@@ -55,7 +55,10 @@ export function toStoredProxy(config: ProxyConfig, previous: StoredProxy | null)
 }
 
 /** Resolves `MASK` placeholders against what is already stored, for the adapter. */
-export function resolveProxySecrets(config: ProxyConfig, previous: StoredProxy | null): ProxyConfig {
+export function resolveProxySecrets(
+  config: ProxyConfig,
+  previous: StoredProxy | null,
+): ProxyConfig {
   if (config.type === 'socks5') {
     if (config.password !== MASK) return config
     const stored = previous?.type === 'socks5' ? unsealSecret(previous.passwordSealed) : null

@@ -5,6 +5,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project state
 
 > **New session? Read `docs/HANDOFF.md` first** — current state, hard rules, measured surprises and next steps. For anything under `src/renderer`, read **`docs/UI-HANDOFF.md`** as well: the WeChat 4.x tokens/metrics that were measured off the real client, the icon provenance, the known deltas and the pitfalls.
+>
+> **Then read the layer notes** for the directory you are about to touch — they are short and they hold the rules that are specific to that layer: `packages/protocol/AGENTS.md`, `apps/desktop/src/main/AGENTS.md`, `apps/desktop/src/renderer/AGENTS.md`.
+>
+> **`pnpm verify` is the one command that decides whether a change is done** (lint → typecheck → test → build). It must pass before you report success.
 
 pnpm workspace with W1 + W2 + the W3 main body implemented:
 
@@ -33,6 +37,10 @@ The real TDLib adapter is verified headlessly instead: `pnpm tdlib:smoke` runs t
 
 ```powershell
 pnpm install                     # allowBuilds is configured in pnpm-workspace.yaml
+pnpm verify                      # THE gate: lint → typecheck → test → build
+pnpm lint                        # eslint, architecture rules included (0 warnings allowed)
+pnpm test                        # vitest, pure modules only (no DOM, no Electron)
+pnpm format                      # prettier --write .  (pnpm format:check to verify only)
 pnpm typecheck                   # protocol + main/preload + renderer
 pnpm build                       # electron-vite build → apps/desktop/out
 cd apps\desktop; pnpm dev       # Electron dev (needs ELECTRON_RUN_AS_NODE unset, see below)
@@ -70,7 +78,7 @@ node login.mjs    # interactive; requires TELEGRAM_API_ID / TELEGRAM_API_HASH in
 
 ## Architecture rules
 
-- Only `apps/desktop/src/main/telegram/tdlib.ts` may import `tdl`. Everything else talks to the `TelegramAdapter` interface in `telegram/adapter.ts`.
+- Only `apps/desktop/src/main/telegram/tdlib.ts` may import `tdl`. Everything else talks to the `TelegramAdapter` interface in `telegram/adapter.ts`. **ESLint enforces this** (`eslint.config.mjs`, "architecture"): importing `tdl`, `prebuilt-tdlib` or `node:sqlite` outside its one allowed file is a lint error, and so is importing Electron / Node / TDLib from the renderer.
 - The renderer must not see raw TDLib JSON: map into protocol DTOs at the adapter boundary. Adding a field means adding it to `packages/protocol/src/dto.ts` first.
 - New IPC channels go into `invokeChannels`/`invokeSchemas` (commands) or `eventChannels`/`eventSchemas` (events) in `packages/protocol/src/channels.ts`; preload and the router pick them up automatically. Never build channel names by concatenation.
 - Every event carries `seq`; the renderer is expected to detect gaps and re-sync.

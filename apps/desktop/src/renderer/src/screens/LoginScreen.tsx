@@ -59,7 +59,10 @@ export function LoginScreen() {
     }
   }
 
-  const labels: Record<Step, { title: string; subtitle: string; placeholder: string; action: string }> = {
+  const labels: Record<
+    Step,
+    { title: string; subtitle: string; placeholder: string; action: string }
+  > = {
     phone: {
       title: '登录 Telegram',
       subtitle: '用你的手机号登录，验证码会发到 Telegram 客户端。',
@@ -70,7 +73,8 @@ export function LoginScreen() {
       title: '输入验证码',
       subtitle:
         auth.kind === 'waitCode' && auth.hint ? `验证码已发送：${auth.hint}` : '验证码已发送。',
-      placeholder: auth.kind === 'waitCode' && auth.codeLength ? `${auth.codeLength} 位数字` : '验证码',
+      placeholder:
+        auth.kind === 'waitCode' && auth.codeLength ? `${auth.codeLength} 位数字` : '验证码',
       action: '确认',
     },
     password: {
@@ -101,7 +105,9 @@ export function LoginScreen() {
         <div className="wx-login__subtitle">{copy.subtitle}</div>
 
         <div className="wx-field">
-          <label htmlFor="login-input">{step === 'phone' ? '手机号' : step === 'code' ? '验证码' : '密码'}</label>
+          <label htmlFor="login-input">
+            {step === 'phone' ? '手机号' : step === 'code' ? '验证码' : '密码'}
+          </label>
           <input
             id="login-input"
             ref={inputRef}
@@ -122,8 +128,8 @@ export function LoginScreen() {
         {isMock ? (
           <div className="wx-hint">
             当前是 <strong>Mock 适配器</strong>（未检测到 TELEGRAM_API_ID / TELEGRAM_API_HASH）。
-            手机号随意但需以 + 开头，验证码 <code>12345</code>，两步验证密码{' '}
-            <code>wechatgram</code>。
+            手机号随意但需以 + 开头，验证码 <code>12345</code>，两步验证密码 <code>wechatgram</code>
+            。
           </div>
         ) : null}
 

@@ -213,8 +213,8 @@ export function ProxyPanel({ onClose }: ProxyPanelProps) {
         </div>
 
         <div className="wx-hint">
-          代理在 TDLib 初始化参数之后、任何网络请求之前应用；密码与 secret 通过 Windows
-          DPAPI 加密保存，渲染层只拿掩码。
+          代理在 TDLib 初始化参数之后、任何网络请求之前应用；密码与 secret 通过 Windows DPAPI
+          加密保存，渲染层只拿掩码。
         </div>
       </div>
     </div>

@@ -34,7 +34,8 @@ export function createHandlers({
     'auth:state': () => adapter.getAuthState(),
     'auth:start': (payload) => adapter.submitPhone((payload as { phone: string }).phone),
     'auth:code': (payload) => adapter.submitCode((payload as { code: string }).code),
-    'auth:password': (payload) => adapter.submitPassword((payload as { password: string }).password),
+    'auth:password': (payload) =>
+      adapter.submitPassword((payload as { password: string }).password),
     'auth:logout': () => adapter.logout(),
     'auth:me': () => adapter.me(),
 

@@ -522,7 +522,9 @@ export function MessageList({
                     <span>以下是新消息</span>
                   </div>
                 ) : null}
-                {newDay ? <div className="wx-day-separator">{formatDaySeparator(message.date)}</div> : null}
+                {newDay ? (
+                  <div className="wx-day-separator">{formatDaySeparator(message.date)}</div>
+                ) : null}
                 <MessageRow
                   chat={chat}
                   message={message}
@@ -609,7 +611,14 @@ interface MessageRowProps {
   onOpenMenu: (x: number, y: number) => void
 }
 
-function MessageRow({ chat, message, repliedTo, self, readOutboxMaxId, onOpenMenu }: MessageRowProps) {
+function MessageRow({
+  chat,
+  message,
+  repliedTo,
+  self,
+  readOutboxMaxId,
+  onOpenMenu,
+}: MessageRowProps) {
   if (message.kind === 'service') {
     return <div className="wx-service">{message.text || '系统消息'}</div>
   }
@@ -617,7 +626,10 @@ function MessageRow({ chat, message, repliedTo, self, readOutboxMaxId, onOpenMen
   const showSender = !message.outgoing && chat.kind !== 'private'
   const media = message.media
   const mediaKind =
-    message.kind === 'photo' || message.kind === 'video' || message.kind === 'file' || message.kind === 'voice'
+    message.kind === 'photo' ||
+    message.kind === 'video' ||
+    message.kind === 'file' ||
+    message.kind === 'voice'
       ? message.kind
       : null
   const isSticker = message.kind === 'sticker' && media
@@ -680,7 +692,9 @@ function MessageRow({ chat, message, repliedTo, self, readOutboxMaxId, onOpenMen
                 <RichText text={message.text} entities={message.entities} />
               </div>
             ) : null}
-            {!mediaKind && !message.text ? <span className="wx-bubble__empty">[不支持的消息]</span> : null}
+            {!mediaKind && !message.text ? (
+              <span className="wx-bubble__empty">[不支持的消息]</span>
+            ) : null}
           </div>
         )}
         <span className="wx-message__meta">

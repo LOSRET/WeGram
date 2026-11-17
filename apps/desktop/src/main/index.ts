@@ -68,9 +68,15 @@ async function bootstrap(): Promise<void> {
   if (!initialProxy) {
     try {
       initialProxy = parseProxyUrl(process.env['WECHATGRAM_PROXY'])
-      if (initialProxy) logger.info(`using WECHATGRAM_PROXY (${initialProxy.type} ${initialProxy.host}:${initialProxy.port})`)
+      if (initialProxy)
+        logger.info(
+          `using WECHATGRAM_PROXY (${initialProxy.type} ${initialProxy.host}:${initialProxy.port})`,
+        )
     } catch (error) {
-      logger.warn('ignoring invalid WECHATGRAM_PROXY:', error instanceof Error ? error.message : String(error))
+      logger.warn(
+        'ignoring invalid WECHATGRAM_PROXY:',
+        error instanceof Error ? error.message : String(error),
+      )
     }
   }
 
@@ -202,7 +208,10 @@ function applyTitleBarTheme(win: BrowserWindow | null, theme: 'light' | 'dark'):
       height: 32,
     })
   } catch (error) {
-    logger.warn('setTitleBarOverlay failed:', error instanceof Error ? error.message : String(error))
+    logger.warn(
+      'setTitleBarOverlay failed:',
+      error instanceof Error ? error.message : String(error),
+    )
   }
 }
 

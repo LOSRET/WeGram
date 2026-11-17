@@ -1,0 +1,18 @@
+# Build output and caches
+node_modules/
+out/
+dist/
+.cache/
+
+# Real-account TDLib session data (binary, never formatted)
+spikes/tdlib/data/
+
+# The spike folder is a frozen measurement harness with its own package.json;
+# reformatting it would only add noise to unrelated diffs.
+spikes/
+
+# Hand-wrapped prose: the Chinese design doc and the handoffs are edited by
+# humans, and reformatting them rewraps paragraphs for no benefit.
+*.md
+
+pnpm-lock.yaml

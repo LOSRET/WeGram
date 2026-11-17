@@ -78,9 +78,7 @@ export function StickerPanel({ chatId, onSent, onClose }: StickerPanelProps) {
   const send = async (sticker: Sticker): Promise<void> => {
     try {
       const result = await invoke('messages:sendSticker', { chatId, fileId: sticker.fileId })
-      useAppStore
-        .getState()
-        .applyMessageOps(chatId, [{ op: 'new', message: result.message }])
+      useAppStore.getState().applyMessageOps(chatId, [{ op: 'new', message: result.message }])
       onSent(result.message)
     } catch (cause) {
       setError(errorMessage(cause))

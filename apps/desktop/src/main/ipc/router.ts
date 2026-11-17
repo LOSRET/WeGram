@@ -1,4 +1,9 @@
-import { asAppErrorShape, invokeChannels, invokeSchemas, type InvokeChannel } from '@wechatgram/protocol'
+import {
+  asAppErrorShape,
+  invokeChannels,
+  invokeSchemas,
+  type InvokeChannel,
+} from '@wechatgram/protocol'
 import { ipcMain } from 'electron'
 
 export type IpcHandler = (payload: unknown) => Promise<unknown> | unknown
@@ -46,7 +51,9 @@ export function unregisterIpc(): void {
   registered.length = 0
 }
 
-function isZodError(error: unknown): error is { name: 'ZodError'; issues: Array<{ path: PropertyKey[]; message: string }> } {
+function isZodError(
+  error: unknown,
+): error is { name: 'ZodError'; issues: Array<{ path: PropertyKey[]; message: string }> } {
   return (
     typeof error === 'object' &&
     error !== null &&
@@ -55,7 +62,9 @@ function isZodError(error: unknown): error is { name: 'ZodError'; issues: Array<
   )
 }
 
-function formatZodError(error: { issues: Array<{ path: PropertyKey[]; message: string }> }): string {
+function formatZodError(error: {
+  issues: Array<{ path: PropertyKey[]; message: string }>
+}): string {
   return error.issues
     .map((issue) => `${issue.path.map(String).join('.') || '(root)'}: ${issue.message}`)
     .join('; ')

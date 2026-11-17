@@ -40,9 +40,10 @@ const MOCK_PASSWORD = 'wechatgram'
 const MOCK_STICKER_SET_ID = 'mock-stickers'
 
 /** Gradient pairs for the generated chat photos, picked by chat id. */
-const MOCK_AVATAR_COLORS: readonly (
-  | readonly [[number, number, number], [number, number, number]]
-)[] = [
+const MOCK_AVATAR_COLORS: readonly (readonly [
+  [number, number, number],
+  [number, number, number],
+])[] = [
   [
     [7, 193, 96],
     [12, 122, 78],
@@ -94,7 +95,13 @@ function at(minutesAgo: number): number {
   return Math.floor(Date.now() / 1000) - minutesAgo * 60
 }
 
-function text(chatId: number, id: number, minutesAgo: number, body: string, outgoing: boolean): Message {
+function text(
+  chatId: number,
+  id: number,
+  minutesAgo: number,
+  body: string,
+  outgoing: boolean,
+): Message {
   return {
     id,
     chatId,
@@ -158,9 +165,16 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
 
   async submitPhone(phone: string): Promise<AuthState> {
     if (!phone.trim().startsWith('+')) {
-      throw new AppError('auth_failed', 'Phone number must start with a country code, e.g. +8613800000000')
+      throw new AppError(
+        'auth_failed',
+        'Phone number must start with a country code, e.g. +8613800000000',
+      )
     }
-    this.setAuth({ kind: 'waitCode', hint: `sent to ${phone.trim()}`, codeLength: MOCK_CODE.length })
+    this.setAuth({
+      kind: 'waitCode',
+      hint: `sent to ${phone.trim()}`,
+      codeLength: MOCK_CODE.length,
+    })
     return this.auth
   }
 
@@ -168,7 +182,10 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     if (code.trim() !== MOCK_CODE) {
       throw new AppError('auth_failed', `Mock verification code is ${MOCK_CODE}`)
     }
-    this.setAuth({ kind: 'waitPassword', hint: 'two-step verification (mock password: wechatgram)' })
+    this.setAuth({
+      kind: 'waitPassword',
+      hint: 'two-step verification (mock password: wechatgram)',
+    })
     return this.auth
   }
 
@@ -343,7 +360,8 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   }
 
   async getStickerSet(setId: string): Promise<StickerSet> {
-    if (setId !== MOCK_STICKER_SET_ID) throw new AppError('internal', `Unknown sticker set ${setId}`)
+    if (setId !== MOCK_STICKER_SET_ID)
+      throw new AppError('internal', `Unknown sticker set ${setId}`)
     const cover = this.stickers[0]
     return {
       id: MOCK_STICKER_SET_ID,
@@ -365,7 +383,11 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     return { ...target }
   }
 
-  async deleteMessages(input: { chatId: number; messageIds: number[]; forBoth: boolean }): Promise<void> {
+  async deleteMessages(input: {
+    chatId: number
+    messageIds: number[]
+    forBoth: boolean
+  }): Promise<void> {
     const fixture = this.requireFixture(input.chatId)
     fixture.messages = fixture.messages.filter((m) => !input.messageIds.includes(m.id))
     this.emit({
@@ -397,19 +419,24 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   async searchGlobal(input: { q: string; limit: number }): Promise<ChatSummary[]> {
     const needle = input.q.toLowerCase()
     const all = [...this.fixtures.values()].map((fixture) => fixture.chat)
-    return all
-      .filter((chat) => chat.title.toLowerCase().includes(needle))
-      .slice(0, input.limit)
+    return all.filter((chat) => chat.title.toLowerCase().includes(needle)).slice(0, input.limit)
   }
 
-  async searchInChat(input: { chatId: number; q: string; fromMessageId?: number }): Promise<Message[]> {
+  async searchInChat(input: {
+    chatId: number
+    q: string
+    fromMessageId?: number
+  }): Promise<Message[]> {
     const needle = input.q.toLowerCase()
     return this.requireFixture(input.chatId).messages.filter((m) =>
       m.text.toLowerCase().includes(needle),
     )
   }
 
-  async downloadFile(input: { fileId: number; priority: number }): Promise<{ path: string; url: string }> {
+  async downloadFile(input: {
+    fileId: number
+    priority: number
+  }): Promise<{ path: string; url: string }> {
     const file = this.files.get(input.fileId)
     if (!file) throw new AppError('internal', `Unknown mock file ${input.fileId}`)
     await this.simulateTransfer(input.fileId, file.size, false)
@@ -418,10 +445,13 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
 
   async setProxy(config: ProxyConfig | null): Promise<void> {
     // Mock adapter only reports whether a proxy is configured.
-    console.log('[mock] proxy updated:', config ? `${config.type} ${config.host}:${config.port}` : 'disabled')
+    console.log(
+      '[mock] proxy updated:',
+      config ? `${config.type} ${config.host}:${config.port}` : 'disabled',
+    )
   }
 
-  async testProxy(config: ProxyConfig): Promise<ProxyTestResult> {
+  async testProxy(_config: ProxyConfig): Promise<ProxyTestResult> {
     return { ok: true, latencyMs: 1 }
   }
 
@@ -638,7 +668,10 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
         lastReadInboxMessageId: 301,
         lastReadOutboxMessageId: 0,
       },
-      messages: [text(3, 301, 26, '降温了，多穿点', false), text(3, 302, 25, '晚上回来吃饭吗', false)],
+      messages: [
+        text(3, 301, 26, '降温了，多穿点', false),
+        text(3, 302, 25, '晚上回来吃饭吗', false),
+      ],
     })
 
     this.fixtures.set(4, {

@@ -207,10 +207,7 @@ const messagesByChat: Record<number, Message[]> = {
       media: media(8002, { stickerFormat: 'tgs', stickerEmoji: '✨', width: 128, height: 128 }),
     },
   ],
-  3: [
-    msg(3, 301, '降温了，多穿点', false, 1_560),
-    msg(3, 302, '晚上回来吃饭吗', false, 1_500),
-  ],
+  3: [msg(3, 301, '降温了，多穿点', false, 1_560), msg(3, 302, '晚上回来吃饭吗', false, 1_500)],
   4: [msg(4, 401, '会议纪要已经放到共享盘', false, 10_800)],
   5: [
     msg(5, 501, 'Telegram 11.0 released', false, 36_000),
@@ -233,7 +230,13 @@ const messagesByChat: Record<number, Message[]> = {
 const drafts: Record<number, string> = {}
 const anchors: Record<number, { messageId: number; offset: number }> = {}
 
-function msg(chatId: number, id: number, text: string, outgoing: boolean, secondsAgo: number): Message {
+function msg(
+  chatId: number,
+  id: number,
+  text: string,
+  outgoing: boolean,
+  secondsAgo: number,
+): Message {
   return {
     id,
     chatId,
@@ -332,7 +335,8 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       return setAuth({ kind: 'waitPassword', hint: 'mock 密码 wechatgram' })
     }
     case 'auth:password': {
-      if (store.password !== 'wechatgram') throw { code: 'auth_failed', message: '密码是 wechatgram' }
+      if (store.password !== 'wechatgram')
+        throw { code: 'auth_failed', message: '密码是 wechatgram' }
       const next: AuthState = { kind: 'ready', me: ME }
       setAuth(next)
       emit('evt:connection', 'online')
@@ -498,7 +502,10 @@ export function installPreviewBridge(): void {
     ): Promise<InvokeResponse<C>> {
       return (await handle(channel, payload)) as InvokeResponse<C>
     },
-    on<C extends EventChannel>(channel: C, callback: (event: EventEnvelope<C>) => void): () => void {
+    on<C extends EventChannel>(
+      channel: C,
+      callback: (event: EventEnvelope<C>) => void,
+    ): () => void {
       const set = listeners.get(channel) ?? new Set()
       set.add(callback as (event: EventEnvelope<EventChannel>) => void)
       listeners.set(channel, set)

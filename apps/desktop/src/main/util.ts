@@ -1,13 +1,5 @@
 import { AppError } from '@wechatgram/protocol'
-import type {
-  AuthState,
-  ChatSummary,
-  ConnectionState,
-  Message,
-  ProxyConfig,
-  ProxyTestResult,
-  Self,
-} from '@wechatgram/protocol'
+import type { AuthState } from '@wechatgram/protocol'
 
 /** Console logger; kept dependency-free on purpose for the main process. */
 export function createLogger(scope: string) {
@@ -36,7 +28,9 @@ function parseRetryAfter(message: string): number | undefined {
   return match?.[1] ? Number(match[1]) : undefined
 }
 
-export function assertReady(state: AuthState): asserts state is Extract<AuthState, { kind: 'ready' }> {
+export function assertReady(
+  state: AuthState,
+): asserts state is Extract<AuthState, { kind: 'ready' }> {
   if (state.kind !== 'ready') {
     throw new AppError('auth_required', 'Not authorized yet')
   }

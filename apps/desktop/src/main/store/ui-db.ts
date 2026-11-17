@@ -115,8 +115,7 @@ export class UiDatabase {
 
   getSetting(key: string): string | null {
     const row = this.require().prepare('SELECT v FROM app_settings WHERE k = ?').get(key) as
-      | { v: string }
-      | undefined
+      { v: string } | undefined
     return row?.v ?? null
   }
 

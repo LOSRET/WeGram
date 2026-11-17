@@ -37,10 +37,7 @@ const bridge: TgBridge = {
     throw result.error ?? { code: 'internal', message: 'IPC call failed' }
   },
 
-  on<C extends EventChannel>(
-    channel: C,
-    callback: (event: EventEnvelope<C>) => void,
-  ): () => void {
+  on<C extends EventChannel>(channel: C, callback: (event: EventEnvelope<C>) => void): () => void {
     if (!allowedEvents.has(channel)) {
       throw new Error(`Blocked IPC event channel: ${channel}`)
     }

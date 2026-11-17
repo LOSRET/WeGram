@@ -42,13 +42,24 @@ export function StickerRenderer({ media, size = 120, preview = false }: StickerR
     const ratio = Math.round((progressRatio(progress) ?? 0) * 100)
     return (
       <div className="wx-sticker wx-sticker--loading" style={box} title={media.stickerEmoji}>
-        {ratio > 0 ? <span className="wx-sticker__pct">{ratio}%</span> : <span className="wx-spinner" />}
+        {ratio > 0 ? (
+          <span className="wx-sticker__pct">{ratio}%</span>
+        ) : (
+          <span className="wx-spinner" />
+        )}
       </div>
     )
   }
 
   if (format === 'tgs') {
-    return <TgsSticker url={url} box={box} emoji={media.stickerEmoji} label={media.stickerEmoji ?? '贴纸'} />
+    return (
+      <TgsSticker
+        url={url}
+        box={box}
+        emoji={media.stickerEmoji}
+        label={media.stickerEmoji ?? '贴纸'}
+      />
+    )
   }
   if (format === 'webm') {
     return <WebmSticker url={url} box={box} label={media.stickerEmoji ?? '贴纸'} />
@@ -137,7 +148,15 @@ function TgsSticker({ url, box, label, emoji }: AnimatedProps) {
   )
 }
 
-function WebmSticker({ url, box, label }: { url: string; box: { width: number; height: number }; label: string }) {
+function WebmSticker({
+  url,
+  box,
+  label,
+}: {
+  url: string
+  box: { width: number; height: number }
+  label: string
+}) {
   const [ref, visible] = useInView<HTMLVideoElement>()
 
   useEffect(() => {

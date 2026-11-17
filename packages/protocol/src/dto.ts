@@ -187,10 +187,19 @@ export type Message = z.infer<typeof messageSchema>
 
 export const messageOpSchema = z.discriminatedUnion('op', [
   z.object({ op: z.literal('new'), message: messageSchema }),
-  z.object({ op: z.literal('edit'), chatId: z.number().int(), messageId: z.number().int(), text: z.string() }),
+  z.object({
+    op: z.literal('edit'),
+    chatId: z.number().int(),
+    messageId: z.number().int(),
+    text: z.string(),
+  }),
   /** Full replacement, used when the server changes the content (media, caption). */
   z.object({ op: z.literal('replace'), message: messageSchema }),
-  z.object({ op: z.literal('delete'), chatId: z.number().int(), messageIds: z.array(z.number().int()) }),
+  z.object({
+    op: z.literal('delete'),
+    chatId: z.number().int(),
+    messageIds: z.array(z.number().int()),
+  }),
   z.object({ op: z.literal('read'), chatId: z.number().int(), upToMessageId: z.number().int() }),
 ])
 export type MessageOp = z.infer<typeof messageOpSchema>

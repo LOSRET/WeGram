@@ -28,7 +28,9 @@ if (!apiId || !apiHash) {
 const sessionDir = process.env['TDLIB_SESSION_DIR']?.trim() || resolve('../../spikes/tdlib/data')
 const initialProxy = parseProxyUrl(process.env['TDLIB_PROXY'])
 console.log(`session dir: ${sessionDir}`)
-console.log(`proxy      : ${initialProxy ? `${initialProxy.type} ${initialProxy.host}:${initialProxy.port}` : '(none)'}`)
+console.log(
+  `proxy      : ${initialProxy ? `${initialProxy.type} ${initialProxy.host}:${initialProxy.port}` : '(none)'}`,
+)
 
 const adapter = new TdlibAdapter({
   apiId,
@@ -93,7 +95,9 @@ async function main(): Promise<void> {
           20_000,
           'history',
         )
-        console.log(`  history    : ${history.messages.length} messages, hasMore=${history.hasMore}`)
+        console.log(
+          `  history    : ${history.messages.length} messages, hasMore=${history.hasMore}`,
+        )
         const kindsSeen = [...new Set(history.messages.map((message) => message.kind))]
         console.log(`  msg kinds  : ${kindsSeen.join(', ') || '(none)'}`)
 

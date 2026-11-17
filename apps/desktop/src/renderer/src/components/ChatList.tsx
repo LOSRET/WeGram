@@ -82,7 +82,12 @@ export function ChatList({
                 >
                   <div className="wx-avatar" style={{ background: avatarColor(chat.id) }}>
                     {chat.avatarUrl ? (
-                      <img className="wx-avatar__img" src={chat.avatarUrl} alt="" draggable={false} />
+                      <img
+                        className="wx-avatar__img"
+                        src={chat.avatarUrl}
+                        alt=""
+                        draggable={false}
+                      />
                     ) : (
                       initials(chat.title)
                     )}

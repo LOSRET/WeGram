@@ -74,7 +74,10 @@ export const invokeSchemas = {
   'auth:state': { request: noPayload, response: authStateSchema },
   'auth:start': { request: z.object({ phone: z.string().min(5) }), response: authStateSchema },
   'auth:code': { request: z.object({ code: z.string().min(1) }), response: authStateSchema },
-  'auth:password': { request: z.object({ password: z.string().min(1) }), response: authStateSchema },
+  'auth:password': {
+    request: z.object({ password: z.string().min(1) }),
+    response: authStateSchema,
+  },
   'auth:logout': { request: noPayload, response: noPayload },
   'auth:me': { request: noPayload, response: selfSchema },
   'chats:list': {
@@ -187,9 +190,7 @@ export const invokeSchemas = {
   },
   'ui:getDraft': {
     request: z.object({ chatId: z.number().int() }),
-    response: z
-      .object({ text: z.string(), replyTo: z.number().int().optional() })
-      .nullable(),
+    response: z.object({ text: z.string(), replyTo: z.number().int().optional() }).nullable(),
   },
   /**
    * `messageId: null` means "the reader was at the bottom" and clears the anchor,
@@ -208,19 +209,26 @@ export const invokeSchemas = {
     response: scrollAnchorSchema.nullable(),
   },
   'settings:get': { request: noPayload, response: appSettingsSchema },
-  'settings:set': { request: z.object({ patch: appSettingsSchema.partial() }), response: noPayload },
+  'settings:set': {
+    request: z.object({ patch: appSettingsSchema.partial() }),
+    response: noPayload,
+  },
   'proxy:get': { request: noPayload, response: proxyConfigSchema.nullable() },
   'proxy:set': { request: z.object({ config: proxyConfigSchema.nullable() }), response: noPayload },
-  'proxy:test': { request: z.object({ config: proxyConfigSchema }), response: proxyTestResultSchema },
+  'proxy:test': {
+    request: z.object({ config: proxyConfigSchema }),
+    response: proxyTestResultSchema,
+  },
   'app:info': { request: noPayload, response: appInfoSchema },
 } satisfies Record<InvokeChannel, ChannelSchema>
 
 export type InvokeRequest<C extends InvokeChannel> = z.input<(typeof invokeSchemas)[C]['request']>
-export type InvokeResponse<C extends InvokeChannel> = z.output<(typeof invokeSchemas)[C]['response']>
+export type InvokeResponse<C extends InvokeChannel> = z.output<
+  (typeof invokeSchemas)[C]['response']
+>
 
 /** Every event main pushes to the renderer is sequenced, so gaps are detectable (§7.2). */
-const envelope = <S extends z.ZodType>(payload: S) =>
-  z.object({ seq: z.number().int(), payload })
+const envelope = <S extends z.ZodType>(payload: S) => z.object({ seq: z.number().int(), payload })
 
 export const eventChannels = [
   'evt:auth',
@@ -267,6 +275,9 @@ export type EventPayload<C extends EventChannel> = EventEnvelope<C>['payload']
 
 /** The only API the preload script exposes on `window.tg`. */
 export interface TgBridge {
-  invoke<C extends InvokeChannel>(channel: C, payload?: InvokeRequest<C>): Promise<InvokeResponse<C>>
+  invoke<C extends InvokeChannel>(
+    channel: C,
+    payload?: InvokeRequest<C>,
+  ): Promise<InvokeResponse<C>>
   on<C extends EventChannel>(channel: C, callback: (event: EventEnvelope<C>) => void): () => void
 }

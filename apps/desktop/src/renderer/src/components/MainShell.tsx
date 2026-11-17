@@ -91,9 +91,7 @@ export function MainShell() {
       <div className="wx-body">
         <SideRail
           onOpenMenu={(anchor) => setMenu(anchor)}
-          onUnavailable={(label) =>
-            setToast(`${label}还没有接入，先看聊天吧`)
-          }
+          onUnavailable={(label) => setToast(`${label}还没有接入，先看聊天吧`)}
         />
         <ChatList
           chats={filteredChats}

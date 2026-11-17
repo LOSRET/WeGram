@@ -64,11 +64,7 @@ export function SideRail({ onOpenMenu, onUnavailable }: SideRailProps) {
             <span className="wx-rail__badge">{unread > 99 ? '99+' : unread}</span>
           ) : null}
         </button>
-        <button
-          className="wx-rail__btn"
-          title="通讯录"
-          onClick={() => onUnavailable('通讯录')}
-        >
+        <button className="wx-rail__btn" title="通讯录" onClick={() => onUnavailable('通讯录')}>
           <ContactsTabIcon size={24} />
         </button>
         <button className="wx-rail__btn" title="收藏" onClick={() => onUnavailable('收藏')}>

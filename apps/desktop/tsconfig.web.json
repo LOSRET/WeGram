@@ -9,5 +9,9 @@
       "@renderer/*": ["./src/renderer/src/*"]
     }
   },
-  "include": ["src/renderer/src/**/*.ts", "src/renderer/src/**/*.tsx", "../../packages/protocol/src/**/*.ts"]
+  "include": [
+    "src/renderer/src/**/*.ts",
+    "src/renderer/src/**/*.tsx",
+    "../../packages/protocol/src/**/*.ts"
+  ]
 }

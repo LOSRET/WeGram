@@ -32,9 +32,11 @@ export function ChatPane() {
   /** Chat-info popover (the "…" button in the header). */
   const [infoAt, setInfoAt] = useState<{ x: number; y: number } | null>(null)
   /** Reading position to open this chat at (#2); null → land at the bottom. */
-  const [pendingAnchor, setPendingAnchor] = useState<
-    { chatId: number; messageId: number; offset: number } | null
-  >(null)
+  const [pendingAnchor, setPendingAnchor] = useState<{
+    chatId: number
+    messageId: number
+    offset: number
+  } | null>(null)
   /**
    * The anchor has been resolved for the active chat. The list must not mount
    * before that: it captures its reading position once on the first paint, and a
@@ -126,9 +128,7 @@ export function ChatPane() {
       }
 
       if (cancelled) return
-      const found = anchor
-        ? messages.some((message) => message.id === anchor.messageId)
-        : false
+      const found = anchor ? messages.some((message) => message.id === anchor.messageId) : false
       setPendingAnchor(found && anchor ? { chatId: activeChatId, ...anchor } : null)
       useAppStore.getState().setHistory(activeChatId, messages, hasMore)
       // The position could not be reached within the budget (deep history):
@@ -235,10 +235,16 @@ export function ChatPane() {
   const confirmDelete = async (message: Message): Promise<void> => {
     setDeleting(null)
     try {
-      await invoke('messages:delete', { chatId: message.chatId, messageIds: [message.id], forBoth: true })
-      useAppStore.getState().applyMessageOps(message.chatId, [
-        { op: 'delete', chatId: message.chatId, messageIds: [message.id] },
-      ])
+      await invoke('messages:delete', {
+        chatId: message.chatId,
+        messageIds: [message.id],
+        forBoth: true,
+      })
+      useAppStore
+        .getState()
+        .applyMessageOps(message.chatId, [
+          { op: 'delete', chatId: message.chatId, messageIds: [message.id] },
+        ])
       useAppStore.getState().setToast('已删除')
     } catch (error) {
       useAppStore.getState().setError(errorMessage(error))
@@ -274,12 +280,7 @@ export function ChatPane() {
           {typing ? <span className="wx-chat__typing">对方正在输入…</span> : null}
         </h1>
         <div className="wx-chat__header-actions">
-          <button
-            className="wx-ghost-btn"
-            title="语音通话"
-            disabled
-            aria-label="语音通话"
-          >
+          <button className="wx-ghost-btn" title="语音通话" disabled aria-label="语音通话">
             <CallMenuIcon size={19} />
           </button>
           <button className="wx-ghost-btn" title="视频通话" disabled aria-label="视频通话">
@@ -302,9 +303,7 @@ export function ChatPane() {
       {loadingHistoryByChat[activeChatId] && messages.length === 0 ? (
         <div className="wx-empty-chat">
           <div className="wx-spinner" />
-          <div>
-            {restoring ? '正在恢复上次阅读位置…' : '正在拉取历史消息…'}
-          </div>
+          <div>{restoring ? '正在恢复上次阅读位置…' : '正在拉取历史消息…'}</div>
         </div>
       ) : !anchorKnown ? (
         // The list captures its reading position on the first paint, so it must
@@ -315,10 +314,7 @@ export function ChatPane() {
         // silently blank transcript, and let the reader ask again.
         <div className="wx-empty-chat">
           <div>这个会话还没有可显示的消息</div>
-          <button
-            className="wx-ghost-btn"
-            onClick={() => setReloadNonce((value) => value + 1)}
-          >
+          <button className="wx-ghost-btn" onClick={() => setReloadNonce((value) => value + 1)}>
             重新加载
           </button>
         </div>
@@ -331,9 +327,7 @@ export function ChatPane() {
           loadingOlder={Boolean(loadingOlderByChat[activeChatId])}
           initialAnchor={pendingAnchor?.chatId === activeChatId ? pendingAnchor : null}
           unreadMarker={
-            unreadMarkers[activeChatId]?.unread
-              ? (unreadMarkers[activeChatId] ?? null)
-              : null
+            unreadMarkers[activeChatId]?.unread ? (unreadMarkers[activeChatId] ?? null) : null
           }
           onLoadOlder={loadOlder}
           onReply={(message) => useAppStore.getState().setReplyTo(activeChatId, message.id)}

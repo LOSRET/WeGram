@@ -56,7 +56,11 @@ export async function loadTgsAnimation(url: string): Promise<unknown> {
 function isLottie(value: unknown): boolean {
   if (!value || typeof value !== 'object') return false
   const record = value as Record<string, unknown>
-  return Array.isArray(record['layers']) && typeof record['w'] === 'number' && typeof record['h'] === 'number'
+  return (
+    Array.isArray(record['layers']) &&
+    typeof record['w'] === 'number' &&
+    typeof record['h'] === 'number'
+  )
 }
 
 export function markTgsFailure(url: string): void {
