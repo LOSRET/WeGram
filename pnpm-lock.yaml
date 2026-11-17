@@ -190,7 +190,7 @@ importers:
       '@tanstack/react-virtual':
         specifier: ^3.14.26
         version: 3.14.26(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@wechatgram/protocol':
+      '@wegram/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
       lottie-web:

@@ -1,5 +1,5 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
-import type { ChatSummary, Message } from '@wechatgram/protocol'
+import type { ChatSummary, Message } from '@wegram/protocol'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import { isSameDay } from '../../lib/format'

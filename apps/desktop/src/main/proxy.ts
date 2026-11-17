@@ -1,4 +1,4 @@
-import { MASK, type ProxyConfig } from '@wechatgram/protocol'
+import { MASK, type ProxyConfig } from '@wegram/protocol'
 
 import { sealSecret, unsealSecret } from './security/secrets'
 import type { StoredProxy } from './store/settings'

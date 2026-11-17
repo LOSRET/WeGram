@@ -1,4 +1,4 @@
-import type { ProxyConfig } from '@wechatgram/protocol'
+import type { ProxyConfig } from '@wegram/protocol'
 
 import { errorMessage, invoke } from '../lib/ipc'
 import { useAppStore } from '../store/useAppStore'

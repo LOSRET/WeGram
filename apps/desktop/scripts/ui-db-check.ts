@@ -13,7 +13,7 @@ import { join } from 'node:path'
 
 import { UiDatabase } from '../src/main/store/ui-db'
 
-const dir = mkdtempSync(join(tmpdir(), 'wechatgram-ui-db-'))
+const dir = mkdtempSync(join(tmpdir(), 'wegram-ui-db-'))
 const file = join(dir, 'ui.db')
 
 let failures = 0

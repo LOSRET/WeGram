@@ -1,4 +1,4 @@
-import type { Message } from '@wechatgram/protocol'
+import type { Message } from '@wegram/protocol'
 import { useCallback, useEffect, type RefObject } from 'react'
 
 import { resyncScroller } from './scroller'

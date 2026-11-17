@@ -160,7 +160,7 @@ Deliberate invariants you must not undo while working here:
 ## How the refactor was verified
 
 - `pnpm verify` after every batch (lint 0 warnings, typecheck, 87 tests, build).
-- Electron + mock adapter, end to end: login (`+86138…`, `12345`, `wechatgram`) → chat list
+- Electron + mock adapter, end to end: login (`+86138…`, `12345`, `wegram`) → chat list
   → open a group (day separator, unread divider, bubbles, sticker, photo) → send a message
   (list preview, bubble, 未读 receipt) → buoy jump to bottom → open the 5000-message chat
   (lands on #5000) → scroll up 40 rows (continuous rows #4998→#4952, no blank tail, overlay
@@ -285,7 +285,7 @@ artwork — leave it), `Composer.tsx` (283), `MediaBubble.tsx` (261), `main/inde
    `electron.exe` is still alive, the single-instance lock silently keeps the OLD bundle on
    screen; close it first (`windows close electron.exe`).
 8. **The real account in `spikes/tdlib/data` is read-only.** Never send/edit/delete/forward
-   against it; `-Mock` / `WECHATGRAM_ADAPTER=mock` for anything that writes.
+   against it; `-Mock` / `WEGRAM_ADAPTER=mock` for anything that writes.
 
 ## Start-here checklist for the next session
 

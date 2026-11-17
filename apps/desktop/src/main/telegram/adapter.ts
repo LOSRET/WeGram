@@ -10,7 +10,7 @@ import type {
   Self,
   StickerSet,
   StickerSetSummary,
-} from '@wechatgram/protocol'
+} from '@wegram/protocol'
 
 export type AdapterKind = 'mock' | 'tdlib'
 

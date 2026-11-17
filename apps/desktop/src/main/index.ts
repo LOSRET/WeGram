@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import type { AppInfo } from '@wechatgram/protocol'
+import type { AppInfo } from '@wegram/protocol'
 import { app, BrowserWindow, shell } from 'electron'
 
 import { createHandlers } from './ipc/handlers'
@@ -21,10 +21,10 @@ import { setViewerTheme } from './viewer'
 const logger = createLogger('main')
 const isDev = !app.isPackaged
 
-// package.json name is the scoped workspace name ("@wechatgram/desktop"), which
-// would turn userData into a nested @wechatgram/desktop directory. Pin it.
-app.setName('WechatGram')
-app.setPath('userData', join(app.getPath('appData'), 'WechatGram'))
+// package.json name is the scoped workspace name ("@wegram/desktop"), which
+// would turn userData into a nested @wegram/desktop directory. Pin it.
+app.setName('WeGram')
+app.setPath('userData', join(app.getPath('appData'), 'WeGram'))
 
 // A custom scheme must be declared privileged before the app is ready, otherwise
 // <img>/<video>/fetch() in the renderer cannot load downloaded media.
@@ -72,14 +72,14 @@ async function bootstrap(): Promise<void> {
   let initialProxy = storedProxyToConfig(store.get().proxy)
   if (!initialProxy) {
     try {
-      initialProxy = parseProxyUrl(process.env['WECHATGRAM_PROXY'])
+      initialProxy = parseProxyUrl(process.env['WEGRAM_PROXY'])
       if (initialProxy)
         logger.info(
-          `using WECHATGRAM_PROXY (${initialProxy.type} ${initialProxy.host}:${initialProxy.port})`,
+          `using WEGRAM_PROXY (${initialProxy.type} ${initialProxy.host}:${initialProxy.port})`,
         )
     } catch (error) {
       logger.warn(
-        'ignoring invalid WECHATGRAM_PROXY:',
+        'ignoring invalid WEGRAM_PROXY:',
         error instanceof Error ? error.message : String(error),
       )
     }

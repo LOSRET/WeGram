@@ -247,7 +247,7 @@ redistribution — do not ship it in a package.
 ```powershell
 pnpm typecheck && pnpm build
 cd apps\desktop; pwsh scripts\launch-detached.ps1 -NoSandbox -Mock
-# login: +8613800000000 / 12345 / wechatgram  (keyboard only, Enter after each step)
+# login: +8613800000000 / 12345 / wegram  (keyboard only, Enter after each step)
 ```
 
 Then screenshot and compare with the reference crops. The comparison workflow that

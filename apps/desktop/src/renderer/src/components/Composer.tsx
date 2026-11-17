@@ -1,4 +1,4 @@
-import type { Message } from '@wechatgram/protocol'
+import type { Message } from '@wegram/protocol'
 import { useEffect, useRef, useState } from 'react'
 
 import { errorMessage, invoke } from '../lib/ipc'

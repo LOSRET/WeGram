@@ -1,4 +1,4 @@
-import type { MessageEntity } from '@wechatgram/protocol'
+import type { MessageEntity } from '@wegram/protocol'
 
 export interface EntityAttributes {
   type: MessageEntity['type']

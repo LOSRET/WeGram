@@ -1,4 +1,4 @@
-import type { Message, MessageKind } from '@wechatgram/protocol'
+import type { Message, MessageKind } from '@wegram/protocol'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {

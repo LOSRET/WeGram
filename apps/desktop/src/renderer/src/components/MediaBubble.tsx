@@ -1,4 +1,4 @@
-import type { MessageMedia } from '@wechatgram/protocol'
+import type { MessageMedia } from '@wegram/protocol'
 import { useRef, useState } from 'react'
 
 import { ensureMedia, formatBytes, progressRatio, useFileProgress, useMediaUrl } from '../lib/media'

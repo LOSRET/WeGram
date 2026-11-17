@@ -1,4 +1,4 @@
-import type { Self } from '@wechatgram/protocol'
+import type { Self } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
 

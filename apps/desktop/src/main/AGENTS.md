@@ -39,7 +39,7 @@ change belongs in the adapter.
 - Password / MTProxy secret are sealed with `safeStorage` (`security/secrets.ts`).
 - Packaging constraint: `tdjson.dll` cannot load from inside `app.asar`
   (`electron-builder.yml` unpacks it), and TDLib data dirs live under
-  `app.getPath('userData')`, which `index.ts` pins to `%APPDATA%\WechatGram`.
+  `app.getPath('userData')`, which `index.ts` pins to `%APPDATA%\WeGram`.
 
 ## Verify
 
@@ -53,7 +53,7 @@ pwsh apps\desktop\scripts\launch-detached.ps1 -Mock   # Electron + mock adapter
 
 `spikes/tdlib/data` is a **real account**. Never send, delete, forward or
 mark-read against it from a script — use the mock adapter (`-Mock`, or
-`WECHATGRAM_ADAPTER=mock`) for anything that writes.
+`WEGRAM_ADAPTER=mock`) for anything that writes.
 
 Never start Electron from an agent shell: Chromium cannot initialise inside the
 job object. Use `launch-detached.ps1` (creates the process via WMI); logs land in

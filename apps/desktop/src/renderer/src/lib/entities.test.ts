@@ -1,4 +1,4 @@
-import type { MessageEntity } from '@wechatgram/protocol'
+import type { MessageEntity } from '@wegram/protocol'
 import { describe, expect, it } from 'vitest'
 
 import { segmentText } from './entities'

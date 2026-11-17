@@ -56,7 +56,7 @@ const client = tdl.createClient({
     use_secret_chats: false,
     system_language_code: 'zh-hans',
     application_version: '0.0.1-spike',
-    device_model: 'WechatGram Spike',
+    device_model: 'WeGram Spike',
     system_version: 'Windows',
   },
 })

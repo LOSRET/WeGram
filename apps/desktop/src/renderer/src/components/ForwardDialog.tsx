@@ -1,4 +1,4 @@
-import type { ChatSummary, Message } from '@wechatgram/protocol'
+import type { ChatSummary, Message } from '@wegram/protocol'
 
 import { avatarColor, initials } from '../lib/format'
 

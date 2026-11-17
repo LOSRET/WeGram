@@ -1,4 +1,4 @@
-import type { Message } from '@wechatgram/protocol'
+import type { Message } from '@wegram/protocol'
 
 /** WeChat stamps a list row: HH:MM today, 昨天 HH:MM, 星期X within the week, then MM/DD. */
 export function formatChatTime(seconds: number | undefined): string {

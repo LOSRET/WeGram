@@ -1,5 +1,5 @@
-appId: dev.wechatgram.desktop
-productName: WechatGram
+appId: dev.wegram.desktop
+productName: WeGram
 directories:
   output: release
   buildResources: build

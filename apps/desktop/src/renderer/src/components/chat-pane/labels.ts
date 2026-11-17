@@ -1,4 +1,4 @@
-import type { ChatSummary } from '@wechatgram/protocol'
+import type { ChatSummary } from '@wegram/protocol'
 
 /** Chinese label for a conversation kind. */
 export function kindLabel(kind: ChatSummary['kind']): string {

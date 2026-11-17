@@ -1,4 +1,4 @@
-import type { ViewerItem } from '@wechatgram/protocol'
+import type { ViewerItem } from '@wegram/protocol'
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react'
 
 import {

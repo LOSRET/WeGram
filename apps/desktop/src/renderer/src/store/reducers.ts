@@ -1,4 +1,4 @@
-import type { ChatSummary, Message, MessageOp } from '@wechatgram/protocol'
+import type { ChatSummary, Message, MessageOp } from '@wegram/protocol'
 
 /**
  * Pure state transitions of the message/chats store.

@@ -1,8 +1,8 @@
 import { copyFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 
-import { AppError } from '@wechatgram/protocol'
-import type { AppInfo, ProxyConfig, ViewerItem } from '@wechatgram/protocol'
+import { AppError } from '@wegram/protocol'
+import type { AppInfo, ProxyConfig, ViewerItem } from '@wegram/protocol'
 import { app, BrowserWindow, clipboard, dialog, nativeImage, shell } from 'electron'
 
 import { resolveProxySecrets, toProxyView, toStoredProxy } from '../proxy'

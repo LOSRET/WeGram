@@ -1,4 +1,4 @@
-import type { MessageMedia } from '@wechatgram/protocol'
+import type { MessageMedia } from '@wegram/protocol'
 import lottie, { type AnimationItem } from 'lottie-web'
 import { useEffect, useRef, useState, type RefObject } from 'react'
 

@@ -1,4 +1,4 @@
-import type { Message } from '@wechatgram/protocol'
+import type { Message } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
 import { mapContent, serviceText, SERVICE_CONTENT_TYPES } from './content'

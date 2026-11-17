@@ -1,4 +1,4 @@
-import type { Message, MessageEntity } from '@wechatgram/protocol'
+import type { Message, MessageEntity } from '@wegram/protocol'
 
 import { registerMediaFile } from '../../../media/registry'
 import type { TdObject } from '../client'

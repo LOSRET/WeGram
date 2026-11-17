@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 
-import type { ViewerItem, ViewerState } from '@wechatgram/protocol'
-import { AppError } from '@wechatgram/protocol'
+import type { ViewerItem, ViewerState } from '@wegram/protocol'
+import { AppError } from '@wegram/protocol'
 import { app, BrowserWindow, screen } from 'electron'
 
 import { createLogger } from './util'

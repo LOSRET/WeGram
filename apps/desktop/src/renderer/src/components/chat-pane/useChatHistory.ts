@@ -1,4 +1,4 @@
-import type { ScrollAnchor } from '@wechatgram/protocol'
+import type { ScrollAnchor } from '@wegram/protocol'
 import { useEffect, useRef, useState } from 'react'
 
 import { emptyPageIsHistory } from '../../lib/history'

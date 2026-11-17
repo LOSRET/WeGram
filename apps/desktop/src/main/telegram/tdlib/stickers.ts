@@ -1,4 +1,4 @@
-import type { Sticker, StickerSet, StickerSetSummary } from '@wechatgram/protocol'
+import type { Sticker, StickerSet, StickerSetSummary } from '@wegram/protocol'
 
 import type { TdObject } from './client'
 import type { MapperContext } from './map/context'

@@ -81,11 +81,11 @@ cd apps\desktop; pnpm ui:db-check   # headless ui.db check (node:sqlite)
 cd apps\desktop; pwsh scripts\launch-detached.ps1 -NoSandbox   # only way Electron starts here (-Mock for the fake adapter, -RemoteDebugPort 9224 for CDP checks)
 ```
 
-`WECHATGRAM_ADAPTER=mock` forces the mock adapter even when credentials exist — use it for any UI work that must not touch the real account (the launch script exposes it as `-Mock`).
+`WEGRAM_ADAPTER=mock` forces the mock adapter even when credentials exist — use it for any UI work that must not touch the real account (the launch script exposes it as `-Mock`).
 
 `tdlib:smoke` reads `apps/desktop/.env` (`TELEGRAM_API_ID` / `TELEGRAM_API_HASH`) and these optional variables:
 
-- `WECHATGRAM_TDLIB_DIR` — session dir override, used by both the app and the smoke script (the script defaults to `spikes/tdlib/data`, i.e. the session created by `login.mjs`, so no second login is needed).
+- `WEGRAM_TDLIB_DIR` — session dir override, used by both the app and the smoke script (the script defaults to `spikes/tdlib/data`, i.e. the session created by `login.mjs`, so no second login is needed).
 - `TDLIB_PROXY` — `socks5://host:port`, `socks5://user:pass@host:port` or `mtproto://host:port?secret=...`. Without a proxy `getChats` hangs even though `getMe` succeeds.
 - `SMOKE_DEBUG=1` — extra per-chat/history diagnostics.
 
@@ -118,7 +118,7 @@ node login.mjs    # interactive; requires TELEGRAM_API_ID / TELEGRAM_API_HASH in
 - `messagesByChat` entries are created **only** by `setHistory`/`prependHistory`. `applyMessageOps` must not create one for a chat whose history was never loaded: `ChatPane` reads "an entry exists" as "already cached" and would then skip the first-page fetch for good. (Read receipts fire for every chat, so this poisons the whole list — it is exactly the bug that made groups open empty.)
 - Long scroll panes (chat list, transcript) use `components/OverlayScrollbar.tsx`; never reintroduce a native scrollbar there — Chromium gives those a layout gutter, so the rows re-flow whenever the bar appears. Popovers keep native thin bars on purpose.
 - Never gate content visibility on `requestAnimationFrame` alone (the list's `--pending` class): Electron throttles rAF while the window is occluded, and the pane then stays invisible with its data loaded. Always pair a frame-based reveal with a `setTimeout` fallback.
-- Without `TELEGRAM_API_ID`/`TELEGRAM_API_HASH` the app runs the mock adapter; with them it runs TDLib. `WECHATGRAM_ADAPTER=mock` forces the mock anyway. The mock is what keeps UI work unblocked without touching the real account.
+- Without `TELEGRAM_API_ID`/`TELEGRAM_API_HASH` the app runs the mock adapter; with them it runs TDLib. `WEGRAM_ADAPTER=mock` forces the mock anyway. The mock is what keeps UI work unblocked without touching the real account.
 - `src/renderer/src/lib/preview-bridge.ts` is browser-preview-only tooling. Do not let app logic depend on it.
 - Local media reaches the renderer only as a `wx-media://f/<token>` URL registered by `main/media/registry.ts`; only the adapters (and the mock) may register a path. The `wx-media` handler in `main/media/protocol.ts` resolves tokens, never request paths, and streams with Range support.
 - The custom scheme is declared with `protocol.registerSchemesAsPrivileged` before `app.whenReady()`; the CSP in `renderer/index.html` must keep `wx-media:` in `img-src`, `media-src` and `connect-src` (TGS is fetched, then gunzipped in the renderer).

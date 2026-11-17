@@ -1,5 +1,5 @@
-import { AppError } from '@wechatgram/protocol'
-import type { AuthState } from '@wechatgram/protocol'
+import { AppError } from '@wegram/protocol'
+import type { AuthState } from '@wegram/protocol'
 
 /** Console logger; kept dependency-free on purpose for the main process. */
 export function createLogger(scope: string) {

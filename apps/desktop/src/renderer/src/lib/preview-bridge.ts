@@ -18,7 +18,7 @@ import type {
   StickerSetSummary,
   TgBridge,
   ViewerItem,
-} from '@wechatgram/protocol'
+} from '@wegram/protocol'
 
 /**
  * Development-only bridge used when the renderer runs in a plain browser
@@ -68,7 +68,7 @@ const chats: ChatSummary[] = [
   },
   {
     id: 2,
-    title: 'WechatGram 产品群',
+    title: 'WeGram 产品群',
     kind: 'group',
     unread: 12,
     pinned: true,
@@ -313,7 +313,7 @@ const PREVIEW_STICKERS: Sticker[] = [
 function previewStickerSet(): StickerSet {
   return {
     id: 'preview-stickers',
-    title: 'WechatGram 贴纸',
+    title: 'WeGram 贴纸',
     ...(PREVIEW_STICKERS[0] ? { thumbnail: PREVIEW_STICKERS[0] } : {}),
     stickers: PREVIEW_STICKERS,
   }
@@ -353,11 +353,11 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       return setAuth({ kind: 'waitCode', hint: store.phone, codeLength: 5 })
     case 'auth:code': {
       if (store.code !== '12345') throw { code: 'auth_failed', message: '验证码是 12345' }
-      return setAuth({ kind: 'waitPassword', hint: 'mock 密码 wechatgram' })
+      return setAuth({ kind: 'waitPassword', hint: 'mock 密码 wegram' })
     }
     case 'auth:password': {
-      if (store.password !== 'wechatgram')
-        throw { code: 'auth_failed', message: '密码是 wechatgram' }
+      if (store.password !== 'wegram')
+        throw { code: 'auth_failed', message: '密码是 wegram' }
       const next: AuthState = { kind: 'ready', me: ME }
       setAuth(next)
       emit('evt:connection', 'online')

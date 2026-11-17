@@ -1,4 +1,4 @@
-import type { Message, Sticker, StickerSet, StickerSetSummary } from '@wechatgram/protocol'
+import type { Message, Sticker, StickerSet, StickerSetSummary } from '@wegram/protocol'
 import { useEffect, useState } from 'react'
 
 import { errorMessage, invoke } from '../lib/ipc'

@@ -1,4 +1,4 @@
-import type { ChatOp, ChatSummary } from '@wechatgram/protocol'
+import type { ChatOp, ChatSummary } from '@wegram/protocol'
 
 import { registerMediaFile } from '../../media/registry'
 import type { Logger } from '../../util'

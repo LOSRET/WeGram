@@ -1,4 +1,4 @@
-import type { InvokeChannel, InvokeRequest, InvokeResponse } from '@wechatgram/protocol'
+import type { InvokeChannel, InvokeRequest, InvokeResponse } from '@wegram/protocol'
 
 export function invoke<C extends InvokeChannel>(
   channel: C,

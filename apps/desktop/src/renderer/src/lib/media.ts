@@ -1,4 +1,4 @@
-import type { MessageMedia } from '@wechatgram/protocol'
+import type { MessageMedia } from '@wegram/protocol'
 import { useEffect } from 'react'
 
 import { useAppStore, type FileProgress } from '../store/useAppStore'

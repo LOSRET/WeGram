@@ -1,4 +1,4 @@
-# Handoff — WechatGram
+# Handoff — WeGram
 
 Written 2026-11-17 at the end of the W1/W2 session, extended the same day with the
 W3 main body. Read this first, then `docs/技术方案.md` (authoritative design, Chinese)
@@ -135,7 +135,7 @@ correctly after the visibility fix. The Electron window is left running.
 1. **The Telegram account in `spikes/tdlib/data` is real and read-only.** Never send,
    edit, delete, forward or mark-as-read against it while testing. Reading
    (`getMe`/`getChats`/`getChatHistory`) is fine. For any UI work that could write,
-   force the fake adapter: `WECHATGRAM_ADAPTER=mock` (the launch script's `-Mock`).
+   force the fake adapter: `WEGRAM_ADAPTER=mock` (the launch script's `-Mock`).
 2. **Never start Electron from the agent shell.** Shell commands run inside a Windows
    job object; Chromium aborts there (see Environment). Use
    `pwsh scripts/launch-detached.ps1`.
@@ -195,14 +195,14 @@ await window.tg.invoke('chats:list', { offset: 0, limit: 5 })
 Anything that opens a chat also marks it read on the server — use it deliberately.
 
 - The mock adapter writes its generated media to `userData/mock-media` on startup
-  (`%APPDATA%\WechatGram\mock-media`): `design-v3.png`, `sunset.png`, `需求说明.md`,
+  (`%APPDATA%\WeGram\mock-media`): `design-v3.png`, `sunset.png`, `需求说明.md`,
   `sticker-face.webp`, `sticker-heart.webp`, `sticker-wave.tgs`. Delete that folder to
   force regeneration.
 - `-RemoteDebugPort` exposes the renderer over CDP (`http://127.0.0.1:9224/json`); that
   is how the prepend/FPS numbers above were measured without opening DevTools. rAF and
   `PerfPanel` only run while the window is actually visible, so focus it first.
 
-- `tdlib:smoke` env: `TDLIB_PROXY=socks5://host:port`, `WECHATGRAM_TDLIB_DIR`,
+- `tdlib:smoke` env: `TDLIB_PROXY=socks5://host:port`, `WEGRAM_TDLIB_DIR`,
   `SMOKE_DEBUG=1`. It defaults to the spike session, so no second login is needed.
 - The browser preview installs `lib/preview-bridge.ts` when `window.tg` is missing.
   It mirrors the mock adapter for the UI only — never let app logic depend on it.
@@ -229,7 +229,7 @@ apps/desktop/src/main/
   telegram/mock-assets.ts    embedded WebP/TGS + runtime PNG encoder for mock media
   telegram/updates.ts        EventBus: 60 ms batching, monotonic seq
   telegram/events.ts         AdapterEvent → evt:* channels
-  telegram/index.ts          adapter selection (mock / tdlib, WECHATGRAM_ADAPTER)
+  telegram/index.ts          adapter selection (mock / tdlib, WEGRAM_ADAPTER)
   store/ui-db.ts             ALL node:sqlite access (drafts, theme, anchors, media cache)
   store/settings.ts          JSON store for the proxy only (DPAPI-sealed secret)
   proxy.ts, proxy-url.ts     stored ↔ view/masked config, URL parsing
@@ -474,8 +474,8 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
   logged (`dropped N message(s) from the local cache — kept in the transcript`) and the
   renderer additionally refetches once when a transcript that *had* rows goes empty
   (`useChatHistory`), so no silent wipe can park the pane on the empty state again.
-- `userData` is pinned to `%APPDATA%\WechatGram` via `app.setName`/`setPath`, because
-  the package name is `@wechatgram/desktop` and would otherwise create a nested folder.
+- `userData` is pinned to `%APPDATA%\WeGram` via `app.setName`/`setPath`, because
+  the package name is `@wegram/desktop` and would otherwise create a nested folder.
 
 ## Decisions already locked (design doc §15)
 
@@ -487,7 +487,7 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
 ## Known gaps / suggested next steps
 
 1. ~~**Unverified:** the dark-mode window-controls overlay~~ — **verified** (Electron 38,
-   `-NoSandbox -Mock`, mock login `+8613800000000` / `12345` / `wechatgram`). Measured
+   `-NoSandbox -Mock`, mock login `+8613800000000` / `12345` / `wegram`). Measured
    pixels: light title bar `#F7F7F7` with `#171717` glyphs, dark title bar `#1A1A1A`
    (JPEG of `#191919`) with `#E4E4E4` glyphs, overlay strip identical to the title bar in
    both themes, and a dark profile restarts dark from `ready-to-show`. Fixing the

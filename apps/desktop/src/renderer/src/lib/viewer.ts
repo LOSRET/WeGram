@@ -1,4 +1,4 @@
-import type { Message, ViewerItem } from '@wechatgram/protocol'
+import type { Message, ViewerItem } from '@wegram/protocol'
 
 import { useAppStore } from '../store/useAppStore'
 import { errorMessage, invoke } from './ipc'

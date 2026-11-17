@@ -1,5 +1,5 @@
-import { AppError } from '@wechatgram/protocol'
-import type { ProxyConfig, ProxyTestResult } from '@wechatgram/protocol'
+import { AppError } from '@wegram/protocol'
+import type { ProxyConfig, ProxyTestResult } from '@wegram/protocol'
 
 import { toAdapterError } from '../../util'
 import type { Logger } from '../../util'
@@ -45,7 +45,7 @@ export async function applyProxy(deps: ProxyDeps, config: ProxyConfig | null): P
     _: 'addProxy',
     proxy: { _: 'proxy', server: config.host, port: config.port, type },
     enable: true,
-    comment: 'WechatGram',
+    comment: 'WeGram',
   })
   deps.setProxyState(config)
   deps.logger.info(`proxy enabled: ${config.type} ${config.host}:${config.port}`)

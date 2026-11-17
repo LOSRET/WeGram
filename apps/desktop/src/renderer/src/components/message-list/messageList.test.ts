@@ -1,4 +1,4 @@
-import type { Message } from '@wechatgram/protocol'
+import type { Message } from '@wegram/protocol'
 import { describe, expect, it } from 'vitest'
 
 import { isEmojiOnly } from './emoji'

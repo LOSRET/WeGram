@@ -1,5 +1,5 @@
 {
-  "name": "wechatgram",
+  "name": "wegram",
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@12.18.0",
@@ -7,8 +7,8 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "pnpm --filter @wechatgram/desktop dev",
-    "build": "pnpm --filter @wechatgram/desktop build",
+    "dev": "pnpm --filter @wegram/desktop dev",
+    "build": "pnpm --filter @wegram/desktop build",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",

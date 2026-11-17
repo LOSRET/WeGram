@@ -3,7 +3,7 @@ import {
   invokeChannels,
   invokeSchemas,
   type InvokeChannel,
-} from '@wechatgram/protocol'
+} from '@wegram/protocol'
 import { ipcMain } from 'electron'
 
 export type IpcHandler = (payload: unknown) => Promise<unknown> | unknown

@@ -1,4 +1,4 @@
-import type { MessageEntity } from '@wechatgram/protocol'
+import type { MessageEntity } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
 

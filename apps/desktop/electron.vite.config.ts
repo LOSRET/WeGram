@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 
 const protocolAlias = {
-  '@wechatgram/protocol': resolve(__dirname, '../../packages/protocol/src/index.ts'),
+  '@wegram/protocol': resolve(__dirname, '../../packages/protocol/src/index.ts'),
 }
 
 const shared = {
@@ -15,7 +15,7 @@ const shared = {
 export default defineConfig({
   main: {
     ...shared,
-    plugins: [externalizeDepsPlugin({ exclude: ['@wechatgram/protocol'] })],
+    plugins: [externalizeDepsPlugin({ exclude: ['@wegram/protocol'] })],
     build: {
       rollupOptions: {
         input: { index: resolve(__dirname, 'src/main/index.ts') },
@@ -24,7 +24,7 @@ export default defineConfig({
   },
   preload: {
     ...shared,
-    plugins: [externalizeDepsPlugin({ exclude: ['@wechatgram/protocol'] })],
+    plugins: [externalizeDepsPlugin({ exclude: ['@wegram/protocol'] })],
     build: {
       rollupOptions: {
         input: { index: resolve(__dirname, 'src/preload/index.ts') },

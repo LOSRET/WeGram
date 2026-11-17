@@ -7,7 +7,7 @@ import {
   type InvokeRequest,
   type InvokeResponse,
   type TgBridge,
-} from '@wechatgram/protocol'
+} from '@wegram/protocol'
 import { contextBridge, ipcRenderer } from 'electron'
 
 const allowedInvoke = new Set<string>(invokeChannels)

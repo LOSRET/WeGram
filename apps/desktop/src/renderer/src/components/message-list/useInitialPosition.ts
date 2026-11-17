@@ -1,5 +1,5 @@
 import type { Virtualizer } from '@tanstack/react-virtual'
-import type { Message } from '@wechatgram/protocol'
+import type { Message } from '@wegram/protocol'
 import { useEffect, useLayoutEffect, type RefObject } from 'react'
 
 import { readScrollPin } from '../../lib/scrollGeometry'

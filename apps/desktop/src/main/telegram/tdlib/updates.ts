@@ -1,4 +1,4 @@
-import type { AuthState, ChatSummary, ConnectionState, Self } from '@wechatgram/protocol'
+import type { AuthState, ChatSummary, ConnectionState, Self } from '@wegram/protocol'
 
 import { registerMediaFile } from '../../media/registry'
 import type { Logger } from '../../util'

@@ -1,4 +1,4 @@
-import { AppError } from '@wechatgram/protocol'
+import { AppError } from '@wegram/protocol'
 import type {
   AuthState,
   ChatSummary,
@@ -9,7 +9,7 @@ import type {
   Self,
   StickerSet,
   StickerSetSummary,
-} from '@wechatgram/protocol'
+} from '@wegram/protocol'
 import { createClient } from 'tdl'
 
 import { createLogger, toAdapterError } from '../../util'
@@ -149,7 +149,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
         use_secret_chats: false,
         system_language_code: 'zh-hans',
         application_version: '0.1.0',
-        device_model: 'WechatGram Desktop',
+        device_model: 'WeGram Desktop',
         system_version: 'Windows',
       },
     }) as unknown as TdClientLike

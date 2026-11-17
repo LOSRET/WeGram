@@ -1,4 +1,4 @@
-import type { AuthState } from '@wechatgram/protocol'
+import type { AuthState } from '@wegram/protocol'
 
 import { errorMessage, invoke } from '@renderer/lib/ipc'
 import { useAppStore } from '@renderer/store/useAppStore'
@@ -128,7 +128,7 @@ export function LoginScreen() {
         {isMock ? (
           <div className="wx-hint">
             当前是 <strong>Mock 适配器</strong>（未检测到 TELEGRAM_API_ID / TELEGRAM_API_HASH）。
-            手机号随意但需以 + 开头，验证码 <code>12345</code>，两步验证密码 <code>wechatgram</code>
+            手机号随意但需以 + 开头，验证码 <code>12345</code>，两步验证密码 <code>wegram</code>
             。
           </div>
         ) : null}

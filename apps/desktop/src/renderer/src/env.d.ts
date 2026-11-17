@@ -1,4 +1,4 @@
-import type { TgBridge } from '@wechatgram/protocol'
+import type { TgBridge } from '@wegram/protocol'
 
 declare global {
   interface Window {

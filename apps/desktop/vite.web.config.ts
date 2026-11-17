@@ -17,7 +17,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      '@wechatgram/protocol': resolve(__dirname, '../../packages/protocol/src/index.ts'),
+      '@wegram/protocol': resolve(__dirname, '../../packages/protocol/src/index.ts'),
       '@renderer': resolve(__dirname, 'src/renderer/src'),
     },
   },

@@ -1,4 +1,4 @@
-import type { Message } from '@wechatgram/protocol'
+import type { Message } from '@wegram/protocol'
 
 /**
  * What the chat looked like when it was opened: the read boundary and the unread

@@ -2,7 +2,7 @@ import { statSync, writeFileSync } from 'node:fs'
 import { mkdir, stat, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 
-import { AppError } from '@wechatgram/protocol'
+import { AppError } from '@wegram/protocol'
 import type {
   AuthState,
   ChatSummary,
@@ -15,7 +15,7 @@ import type {
   Sticker,
   StickerSet,
   StickerSetSummary,
-} from '@wechatgram/protocol'
+} from '@wegram/protocol'
 
 import { probeImageSize } from '../media/image-size'
 import { registerMediaFile } from '../media/registry'
@@ -32,12 +32,12 @@ const ME: Self = {
   id: 1000,
   firstName: '本地',
   lastName: '账号',
-  username: 'wechatgram_demo',
+  username: 'wegram_demo',
   phone: '+86 000 0000 0000',
 }
 
 const MOCK_CODE = '12345'
-const MOCK_PASSWORD = 'wechatgram'
+const MOCK_PASSWORD = 'wegram'
 const MOCK_STICKER_SET_ID = 'mock-stickers'
 
 /** Gradient pairs for the generated chat photos, picked by chat id. */
@@ -185,14 +185,14 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     }
     this.setAuth({
       kind: 'waitPassword',
-      hint: 'two-step verification (mock password: wechatgram)',
+      hint: 'two-step verification (mock password: wegram)',
     })
     return this.auth
   }
 
   async submitPassword(password: string): Promise<AuthState> {
     if (password !== MOCK_PASSWORD) {
-      throw new AppError('auth_failed', 'Wrong mock password, use "wechatgram"')
+      throw new AppError('auth_failed', 'Wrong mock password, use "wegram"')
     }
     this.completeLogin()
     return this.auth
@@ -354,7 +354,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     return [
       {
         id: MOCK_STICKER_SET_ID,
-        title: 'WechatGram 贴纸',
+        title: 'WeGram 贴纸',
         ...(cover ? { thumbnail: cover } : {}),
       },
     ]
@@ -366,7 +366,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     const cover = this.stickers[0]
     return {
       id: MOCK_STICKER_SET_ID,
-      title: 'WechatGram 贴纸',
+      title: 'WeGram 贴纸',
       ...(cover ? { thumbnail: cover } : {}),
       stickers: this.stickers.map((sticker) => ({ ...sticker })),
     }
@@ -619,7 +619,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     this.fixtures.set(2, {
       chat: {
         id: 2,
-        title: 'WechatGram 产品群',
+        title: 'WeGram 产品群',
         kind: 'group',
         unread: 12,
         pinned: true,

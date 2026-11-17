@@ -4,7 +4,7 @@
     "lib": ["ES2023"],
     "types": ["node"],
     "paths": {
-      "@wechatgram/protocol": ["../../packages/protocol/src/index.ts"]
+      "@wegram/protocol": ["../../packages/protocol/src/index.ts"]
     }
   },
   "include": [

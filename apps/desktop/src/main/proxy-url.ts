@@ -1,4 +1,4 @@
-import type { ProxyConfig } from '@wechatgram/protocol'
+import type { ProxyConfig } from '@wegram/protocol'
 
 /**
  * Parses a proxy URL into a protocol DTO. Pure function on purpose: it is used

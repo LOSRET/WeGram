@@ -1,4 +1,4 @@
-import type { Message } from '@wechatgram/protocol'
+import type { Message } from '@wegram/protocol'
 
 /**
  * The one rule behind "may this empty page be cached as the chat's history".

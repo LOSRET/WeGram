@@ -1,5 +1,5 @@
-import { AppError } from '@wechatgram/protocol'
-import type { ChatSummary, Message } from '@wechatgram/protocol'
+import { AppError } from '@wegram/protocol'
+import type { ChatSummary, Message } from '@wegram/protocol'
 
 import { probeImageSize } from '../../media/image-size'
 import { registerMediaFile } from '../../media/registry'

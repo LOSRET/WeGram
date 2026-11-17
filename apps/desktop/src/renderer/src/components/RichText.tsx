@@ -1,4 +1,4 @@
-import type { MessageEntity } from '@wechatgram/protocol'
+import type { MessageEntity } from '@wegram/protocol'
 import { Fragment, useState, type ReactNode } from 'react'
 
 import { segmentText, type EntityAttributes } from '../lib/entities'

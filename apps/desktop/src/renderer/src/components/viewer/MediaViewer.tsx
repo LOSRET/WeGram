@@ -1,4 +1,4 @@
-import type { ViewerItem, ViewerState } from '@wechatgram/protocol'
+import type { ViewerItem, ViewerState } from '@wegram/protocol'
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
 
 import { errorMessage, invoke } from '../../lib/ipc'
@@ -139,7 +139,7 @@ export function MediaViewer() {
         setState(next)
         setIndex(next.index)
         document.documentElement.dataset['theme'] = next.theme
-        // The window title would otherwise stay the HTML document's "WechatGram";
+        // The window title would otherwise stay the HTML document's "WeGram";
         // the client calls its viewer window 图片和视频 in the task bar.
         document.title = '图片和视频'
       } catch (error) {

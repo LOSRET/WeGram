@@ -1,4 +1,4 @@
-import type { ChatSummary } from '@wechatgram/protocol'
+import type { ChatSummary } from '@wegram/protocol'
 import { useRef, type MouseEvent } from 'react'
 
 import { OverlayScrollbar } from './OverlayScrollbar'

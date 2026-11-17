@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 
-import type { ProxyConfig } from '@wechatgram/protocol'
+import type { ProxyConfig } from '@wegram/protocol'
 
 import type { TelegramAdapter } from './adapter'
 import { MockAdapter } from './mock'
@@ -25,16 +25,16 @@ export function createAdapter(options: CreateAdapterOptions): TelegramAdapter {
   const mock = (): TelegramAdapter =>
     new MockAdapter({ mediaDir: join(options.userDataDir, 'mock-media') })
 
-  // WECHATGRAM_ADAPTER=mock forces the fake adapter even when credentials exist:
+  // WEGRAM_ADAPTER=mock forces the fake adapter even when credentials exist:
   // needed for UI work and demos that must not touch the real account.
-  const forced = process.env['WECHATGRAM_ADAPTER']?.trim().toLowerCase()
+  const forced = process.env['WEGRAM_ADAPTER']?.trim().toLowerCase()
   if (forced === 'mock') return mock()
 
   if (options.apiId && options.apiHash) {
     // Dev escape hatch: point the app at an already-authorized session (for
     // example the one created by spikes/tdlib/login.mjs) instead of logging in
     // again inside the app.
-    const override = process.env['WECHATGRAM_TDLIB_DIR']?.trim()
+    const override = process.env['WEGRAM_TDLIB_DIR']?.trim()
     const sessionDir = override || join(options.userDataDir, 'tdlib', 'default')
     return new TdlibAdapter({
       apiId: options.apiId,

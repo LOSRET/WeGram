@@ -27,7 +27,7 @@ lib/preview-bridge.ts DEV-ONLY fake IPC for the browser preview
 
 The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
 (lint-enforced). It only speaks the `window.tg` contract from
-`@wechatgram/protocol`.
+`@wegram/protocol`.
 
 ## Rules that have already cost a debugging session
 

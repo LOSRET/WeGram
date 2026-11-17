@@ -1,4 +1,4 @@
-import type { ChatSummary, ConnectionState } from '@wechatgram/protocol'
+import type { ChatSummary, ConnectionState } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
 import { previewContent } from './content'

@@ -1,4 +1,4 @@
-import type { EventChannel } from '@wechatgram/protocol'
+import type { EventChannel } from '@wegram/protocol'
 
 export interface EventSink {
   send(channel: EventChannel, envelope: { seq: number; payload: unknown }): void

@@ -6,7 +6,7 @@ import type {
   ConnectionState,
   Message,
   MessageOp,
-} from '@wechatgram/protocol'
+} from '@wegram/protocol'
 import type { StateCreator } from 'zustand'
 
 export interface EditingState {

@@ -1,4 +1,4 @@
-import type { Message, MessageMedia } from '@wechatgram/protocol'
+import type { Message, MessageMedia } from '@wegram/protocol'
 import { describe, expect, it } from 'vitest'
 
 import { buildViewerStrip } from './viewer'

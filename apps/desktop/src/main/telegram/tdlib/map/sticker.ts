@@ -1,4 +1,4 @@
-import type { Sticker } from '@wechatgram/protocol'
+import type { Sticker } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
 
