@@ -3,7 +3,7 @@ import { useMemo, useState, useEffect } from 'react'
 
 import { AppMenu } from './AppMenu'
 import { ChatList } from './ChatList'
-import { ChatPane } from './ChatPane'
+import { ChatPane } from './chat-pane'
 import { PlusMenu } from './PlusMenu'
 import { ProxyPanel } from './ProxyPanel'
 import { SideRail } from './SideRail'
