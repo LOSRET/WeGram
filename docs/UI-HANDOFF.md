@@ -37,7 +37,7 @@ listed in "Known deltas" is a deliberate, documented difference.
 | `main/viewer.ts` | Viewer `BrowserWindow`: creation, re-targeting, 置顶, title-strip repaint, 保存 target by kind. |
 | `main/viewer-size.ts` | The measured 75 % × 90 % window size (pure, unit-tested). |
 | `renderer/src/lib/format.ts` | List timestamps: `HH:MM` today, `昨天 HH:MM`, `星期X` within a week, then `MM/DD`. |
-| `main/index.ts` | Window 1000×680 (min 880×600), `titleBarOverlay` height 32, colour `#e0e0e0` / `#191919`. |
+| `main/index.ts` | Window 1000×680 (min 880×600), `titleBarOverlay` height 32, colour `#e0e0e0` / `#2d2d2e`. |
 | `components/TitleBar.tsx` | **Deleted** — the strip is now only the native overlay; settings moved to `AppMenu`. |
 
 ---
@@ -54,16 +54,29 @@ sat at (276,105)–(1145,656) in that screenshot space.
 
 | Token | Light | Dark |
 |---|---|---|
-| rail / title strip | `#e0e0e0` | `#191919` |
-| conversation list | `#e7e7e9` | `#1f1f1f` |
-| chat pane | `#fbfbfb` | `#111111` |
-| composer card | `#fcfcfc` | `#1a1a1a` |
-| selected row | `#15ad70` | `#1f5c44` |
-| incoming bubble | `#eeeef0` | `#2c2c2c` |
-| outgoing bubble | `#95ec69` | `#3eb575` |
-| brand | `#07c160` | — |
-| text / secondary / tertiary | `#191919` / `#9a9a9a` / `#b7b7b7` | `#d6d6d6` / `#8a8a8a` / `#6f6f6f` |
-| hairline / strong / pane line | `#ececec` / `#dedede` / `#f2f2f2` | `#262626` / `#333333` / `#1f1f1f` |
+| rail / title strip | `#e0e0e0` | `#2d2d2e` |
+| conversation list | `#e7e7e9` | `#3b3b3d` |
+| chat pane | `#fbfbfb` | `#1e1e1f` |
+| composer card | `#fcfcfc` | `#1e1e1f` + 1 px `#2f2f30` border |
+| selected row | `#15ad70` | `#0da869` |
+| incoming bubble | `#eeeef0` | `#2f2f30` |
+| outgoing bubble | `#95ec69` | `#35d28d` |
+| brand | `#07c160` | `#07c160` |
+| search pill | `#fbfbfb` | `#454547` |
+| text / secondary / tertiary | `#191919` / `#9a9a9a` / `#b7b7b7` | `#e1e1e5` / `#7b7b80` / `#7b7b80` |
+| hairline / strong / pane line | `#ececec` / `#dedede` / `#f2f2f2` | `#2f2f30` / `#3a3a3c` / `#1e1e1f` (no header divider) |
+| rail glyphs | `#5c5c5c` | `#969697` |
+| pane-header + composer glyphs / list "+" | `#6f6f6f` / `#8a8a8a` | `#a5a5a5` / `#b1b1b1` |
+| disabled fill / ink | `#ececec` / `#b7b7b7` | `#29292a` / `#6a6a6a` |
+
+The **dark column was re-measured on 2026-11-18** (Windows dark mode) by capturing the
+window with `PrintWindow(hwnd, dc, PW_RENDERFULLCONTENT)` and taking a pixel histogram of
+each surface — see `docs/HANDOFF.md` "Non-obvious facts". It replaced an earlier dark
+block that was a near-black scheme (`#191919` / `#1f1f1f` / `#111111`) with muted greens;
+the real client lifts the surfaces instead and keeps the vivid light-theme accents. Note
+the one oddity: dark mode has only two greys (#E1E1E5 and #7B7B80), so
+`--wx-text-tertiary` equals `--wx-text-secondary` there — day labels, timestamps and the
+search placeholder all sample #7B7B80.
 
 | Metric | Value |
 |---|---|
@@ -84,7 +97,7 @@ sat at (276,105)–(1145,656) in that screenshot space.
 | overlay scrollbar | 6 px wide, `right: 2px`, radius 3, thumb `rgba(0,0,0,.22)` → `.38` when hovered/dragged (dark theme: white at the same alphas). Fades in on hover / for 900 ms after a wheel scroll. **No gutter**: rows keep their full width and the pill floats over them. |
 
 `wx-list__plus` no longer draws its own circle — the button *is* WeChat's circle-plus
-SVG, colour `#8a8a8a`.
+SVG, colour `--wx-icon-strong` (`#8a8a8a` / `#b1b1b1`).
 
 ### 2.1 The 图片和视频 window (added 2026-11-17)
 
@@ -105,8 +118,13 @@ photo, which was only 591 px wide with ~309 px gutters each side.
 | 更多 menu | 复制 / 打印 / 转发… / 收藏 / 定位到聊天位置 / 使用系统默认方式打开; 132 px min width |
 | active state | 置顶 and 预览 turn **brand green** — the only coloured glyphs in the strip |
 
-Dark theme: bar `#1f1f1f`, canvas `#141414`, symbols `#d6d6d6` (the native overlay is
-repainted from `main/viewer.ts`).
+Dark theme (**measured on a live dark viewer window, 2026-11-18**): bar `#3b3b3d` — the
+conversation list's grey, and *lighter* than the canvas, the opposite of the light theme —
+canvas `#242424`, toolbar glyphs `#b1b1b1`, group hairlines `#4f4f51`, and a 1 px `#2d2d2d`
+line under the bar. That is why the viewer draws with `--wx-viewer-icon` /
+`--wx-viewer-sep` instead of the general `--wx-text` / `--wx-line-strong`. The native
+overlay is repainted from `main/viewer.ts` and must stay equal to `--wx-viewer-bar` or the
+strip shows a seam.
 
 **The video window is the same window** (the client titles both 图片和视频). Measured off
 a second live window showing a 9:16 clip; the screenshot was 1538×978 and the CSS scale
@@ -286,8 +304,11 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
    WeChat's own ~30 px ones — height and colour match, widths do not.
 6. **List column is a fixed 238 px**; WeChat lets you drag it.
 7. **Search field filters the loaded chat list locally** — global search is still W4.
-8. **Dark mode** tokens exist and were exercised, but the rail icon grey (`#8a8a8a`) was
-   only tuned for light mode.
+8. **Dark mode** is measured end to end (§2, re-done 2026-11-18): surfaces, accents, text
+   greys, the rail/toolbar glyph greys and the disabled send button all sample the client's
+   own ink — the shell *and* the standalone viewer window (§2.1) — and the app was verified
+   next to the client in the Electron window. The only dark value still inferred is the link
+   blue (`#576b95`, kept from the light theme).
 9. **The brand mark is Telegram's, not WeChat's.** `TelegramLogo` in `Icon.tsx` is
    the Simple Icons roundel (`https://simpleicons.org/?q=telegram`, CC0 1.0) copied
    verbatim; the plane is a hole in the disc, so no white fill is painted. It is used

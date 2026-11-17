@@ -297,10 +297,24 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
   env(titlebar-area-width, 100%)))`. A fixed spacer only pushes content into the buttons.
   The overlay colour also has to be repainted from the main process on theme change.
   **Whatever sits under the controls must match the overlay colour** (what
-  `applyTitleBarTheme` sends — currently the rail colour `#e0e0e0` / `#191919`, height
+  `applyTitleBarTheme` sends — currently the rail colour `#e0e0e0` / `#2d2d2e`, height
   32 px) or the bitmap shows a seam — that is why the login screen (`wx-login::before`)
   paints its own 32 px strip. The overlay covers only the right-hand control area, not
   the whole strip, so the strip keeps the rest of the window looking consistent.
+- **The dark palette is a *lifted* grey scheme, not near-black — measured 2026-11-18.**
+  Captured the running client with `PrintWindow(hwnd, dc, 2)` and took a pixel histogram
+  per surface: title strip / rail **#2D2D2E**, conversation list **#3B3B3D**, chat pane
+  **#1E1E1F**, incoming bubble **#2F2F30**, own bubble **#35D28D**, selected row
+  **#0DA869**, search pill **#454547**, text **#E1E1E5**, secondary **#7B7B80**, rail glyphs
+  **#969697**, toolbar glyphs **#A5A5A5**, disabled send fill **#29292A** with **#6A6A6A**
+  ink. The dark accents are the vivid light-theme greens, not darkened ones, and there is
+  **no divider under the pane header** — one flat surface. The previous dark block
+  (`#191919` / `#1f1f1f` / `#111111`, muted greens) was wrong. Why PrintWindow: the DSH
+  overlay card sits on top of the screen, so `ImageGrab` captures *it*; the computer-tool
+  screenshot excludes the card but is a re-encoded JPEG; `PrintWindow` returns the
+  window's own pixels (pass `PW_RENDERFULLCONTENT = 2`, and call
+  `SetProcessDpiAwareness(2)` first or `GetWindowRect` answers in virtualised pixels and
+  the bottom of the window is cut off).
 - **`node:sqlite` exists in Electron 38** (bundled Node 22.22) — no better-sqlite3, no
   Electron-ABI rebuild. It is flagged experimental upstream, hence the single-file
   confinement. Expect an `ExperimentalWarning` in the log.
@@ -497,7 +511,7 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
    with a divider (same as the shell), which also gives the login window its **only drag
    region** (it could not be moved before logging in).
    *Superseded by the WeChat UI pass*: the overlay is now 32 px and rail-coloured
-   (`#e0e0e0` / `#191919`), and the same strip is 32 px — see `docs/UI-HANDOFF.md` §2.
+   (`#e0e0e0` / `#2d2d2e`), and the same strip is 32 px — see `docs/UI-HANDOFF.md` §2.
    The dark/light verification itself still holds.
 2. ~~**`ui.db` scroll-anchor wiring**~~ — **done** with the decided UX ("restore only when
    the reader was not at the bottom"):
