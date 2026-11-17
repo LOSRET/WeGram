@@ -10,9 +10,9 @@ own handoff — **`docs/UI-HANDOFF.md`** (measured tokens and metrics, icon prov
 known deltas, pitfalls). Read it before touching anything under `src/renderer`.
 
 The code was then split for agent maintenance and given a real verification layer
-(`pnpm verify`, 87 unit tests, lint-enforced architecture rules). **`docs/REFACTOR-HANDOFF.md`**
+(`pnpm verify`, 132 unit tests, lint-enforced architecture rules). **`docs/REFACTOR-HANDOFF.md`**
 records what moved where, the conventions the code now enforces, and the batches that are
-still pending (`tdlib.ts`, `mock.ts`, `preview-bridge.ts`, `styles/index.css`,
+still pending (`mock.ts`, `preview-bridge.ts`, `styles/index.css`,
 `packages/protocol`). Read it before restructuring anything.
 
 ## Where things stand
@@ -210,7 +210,7 @@ apps/desktop/src/main/
   media/protocol.ts          protocol.handle('wx-media') with Range streaming + MIME
   media/image-size.ts        PNG/JPEG/WebP/GIF header probe (inputPhoto needs real sizes)
   telegram/adapter.ts        TelegramAdapter interface + event types (the seam)
-  telegram/tdlib.ts          ONLY file allowed to import `tdl`
+  telegram/tdlib/           ONLY folder allowed to import `tdl` (index/client/actions/updates/avatar-cache/stickers/proxy/map)
   telegram/mock.ts           fake adapter incl. a 5000-message chat (id 99) + media fixtures
   telegram/mock-assets.ts    embedded WebP/TGS + runtime PNG encoder for mock media
   telegram/updates.ts        EventBus: 60 ms batching, monotonic seq
@@ -260,7 +260,7 @@ only (formatters, entity segmentation, image header probe, proxy URL, store redu
 the store invariants) — scroll/virtualisation behaviour still has to be confirmed in the
 Electron window.
 
-Rules that keep it maintainable: only `telegram/tdlib.ts` knows TDLib JSON; new fields
+Rules that keep it maintainable: only `telegram/tdlib/**` knows TDLib JSON; new fields
 start in `dto.ts`; new channels go into the channel tables in `channels.ts` (preload and
 router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
 
@@ -524,10 +524,12 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
 ## Session leftovers
 
 **2026-11-17, refactor session:** `pnpm verify` (lint → typecheck → vitest → build) is the
-gate; 87 unit tests, ESLint now enforces the architecture rules, Prettier owns formatting.
+gate; 132 unit tests, ESLint now enforces the architecture rules, Prettier owns formatting.
 The Electron window used for the mock walkthrough was **closed**, so nothing is running —
-launch it detached again when you need it. Remaining work is the split of `tdlib.ts`,
-`mock.ts`, `preview-bridge.ts`, `styles/index.css` and `packages/protocol`: see
+launch it detached again when you need it. Batch 4 (the `tdlib.ts` split) is done — batch 4a added the explicit
+`MapperContext`, 4b moved the adapter into `telegram/tdlib/` and added 45 mapper tests.
+Remaining work is the split of `mock.ts`, `preview-bridge.ts`, `styles/index.css` and
+`packages/protocol`: see
 `docs/REFACTOR-HANDOFF.md` (including the one open observation about a short transcript that
 restored a saved anchor still counting as "not at the bottom").
 
@@ -546,6 +548,7 @@ The UI/real-account changes are **committed** on `main` in four commits on top o
 real-account fixes, and this documentation. `pnpm typecheck && pnpm build` were green
 before each of them; the working tree is clean.
 
-The refactor session added six more commits on top of `395ac19` (`f1d0a9e` the pending
-real-account fixes, then batches 0–3 and the doc updates). `pnpm verify` — not just
-typecheck + build — was green before each, and the working tree is clean.
+The refactor sessions added nine more commits on top of `395ac19` (`f1d0a9e` the pending
+real-account fixes, then batches 0–3, the doc updates, and batch 4 as two commits).
+`pnpm verify` — not just typecheck + build — was green before each; batch 4 also passed
+`pnpm tdlib:smoke` and a mock Electron pass, and the working tree is clean.

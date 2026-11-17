@@ -10,7 +10,8 @@
 import reactHooks from 'eslint-plugin-react-hooks'
 import tseslint from 'typescript-eslint'
 
-const TDLIB_ONLY = 'apps/desktop/src/main/telegram/tdlib.ts'
+// The whole adapter folder may touch `tdl`; everything else goes through TelegramAdapter.
+const TDLIB_DIR = 'apps/desktop/src/main/telegram/tdlib/**'
 
 export default tseslint.config(
   {
@@ -60,7 +61,7 @@ export default tseslint.config(
   // swapping the protocol library stays inside `telegram/`.
   {
     files: ['apps/desktop/src/**/*.{ts,tsx}', 'apps/desktop/scripts/**/*.ts'],
-    ignores: [TDLIB_ONLY, 'apps/desktop/src/main/telegram/tdlib/**'],
+    ignores: [TDLIB_DIR],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -69,11 +70,11 @@ export default tseslint.config(
             {
               name: 'tdl',
               message:
-                'Only main/telegram/tdlib.ts may import `tdl` — everything else goes through TelegramAdapter (docs/HANDOFF.md "Architecture map").',
+                'Only main/telegram/tdlib/** may import `tdl` — everything else goes through TelegramAdapter (docs/HANDOFF.md "Architecture map").',
             },
             {
               name: 'prebuilt-tdlib',
-              message: 'Only main/telegram/tdlib.ts may load tdjson.',
+              message: 'Only main/telegram/tdlib/** may load tdjson.',
             },
           ],
         },

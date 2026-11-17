@@ -5,7 +5,7 @@ import { z } from 'zod'
  *
  * Rule of this package: everything that crosses IPC is declared here, and the
  * renderer never sees raw TDLib JSON. When TDLib changes a field, only the
- * adapter in `apps/desktop/src/main/telegram/tdlib.ts` needs to be touched.
+ * adapter in `apps/desktop/src/main/telegram/tdlib/**` needs to be touched.
  */
 
 export const selfSchema = z.object({

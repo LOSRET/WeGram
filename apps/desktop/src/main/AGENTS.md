@@ -10,14 +10,14 @@ adds what is specific to this layer.
 index.ts            app lifecycle, window, adapter wiring, media scheme
 ipc/router.ts       per-channel zod validation, Result envelope
 ipc/handlers.ts     one handler per invoke channel
-telegram/           adapter.ts (the seam) / tdlib.ts / mock.ts / updates.ts / events.ts
+telegram/           adapter.ts (the seam) / tdlib/ (real adapter) / mock.ts / updates.ts / events.ts
 media/              registry.ts (token → path) / protocol.ts (wx-media://) / image-size.ts
 store/              ui-db.ts (all SQL) / settings.ts (proxy only)
 proxy*.ts           proxy DTO ↔ stored config
 security/secrets.ts safeStorage (DPAPI) seal/unseal
 ```
 
-Everything except `telegram/tdlib.ts` talks to the `TelegramAdapter` interface.
+Everything except `telegram/tdlib/**` (the real adapter folder) talks to the `TelegramAdapter` interface.
 **ESLint enforces this**: importing `tdl` or `prebuilt-tdlib` anywhere else is an
 error (`eslint.config.mjs` → "architecture"). If a change seems to need it, the
 change belongs in the adapter.

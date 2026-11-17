@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 >
 > **Then read the layer notes** for the directory you are about to touch — they are short and they hold the rules that are specific to that layer: `packages/protocol/AGENTS.md`, `apps/desktop/src/main/AGENTS.md`, `apps/desktop/src/renderer/AGENTS.md`.
 >
-> **Restructuring or splitting files? Read `docs/REFACTOR-HANDOFF.md` first** — what already moved and why, the conventions the code now enforces mechanically, and the batches still pending (`tdlib.ts`, `mock.ts`, `preview-bridge.ts`, `styles/index.css`, `packages/protocol`).
+> **Restructuring or splitting files? Read `docs/REFACTOR-HANDOFF.md` first** — what already moved and why, the conventions the code now enforces mechanically, and the batches still pending (`mock.ts`, `preview-bridge.ts`, `styles/index.css`, `packages/protocol`).
 >
 > **`pnpm verify` is the one command that decides whether a change is done** (lint → typecheck → test → build). It must pass before you report success.
 
@@ -80,7 +80,7 @@ node login.mjs    # interactive; requires TELEGRAM_API_ID / TELEGRAM_API_HASH in
 
 ## Architecture rules
 
-- Only `apps/desktop/src/main/telegram/tdlib.ts` may import `tdl`. Everything else talks to the `TelegramAdapter` interface in `telegram/adapter.ts`. **ESLint enforces this** (`eslint.config.mjs`, "architecture"): importing `tdl`, `prebuilt-tdlib` or `node:sqlite` outside its one allowed file is a lint error, and so is importing Electron / Node / TDLib from the renderer.
+- Only `apps/desktop/src/main/telegram/tdlib/**` (the adapter folder: `index.ts`, `client.ts`, `actions.ts`, `updates.ts`, `avatar-cache.ts`, `stickers.ts`, `proxy.ts`, `map/*`) may import `tdl` / `prebuilt-tdlib`. Everything else talks to the `TelegramAdapter` interface in `telegram/adapter.ts`. **ESLint enforces this** (`eslint.config.mjs`, "architecture"): importing `tdl`, `prebuilt-tdlib` or `node:sqlite` outside its one allowed file is a lint error, and so is importing Electron / Node / TDLib from the renderer.
 - The renderer must not see raw TDLib JSON: map into protocol DTOs at the adapter boundary. Adding a field means adding it to `packages/protocol/src/dto.ts` first.
 - New IPC channels go into `invokeChannels`/`invokeSchemas` (commands) or `eventChannels`/`eventSchemas` (events) in `packages/protocol/src/channels.ts`; preload and the router pick them up automatically. Never build channel names by concatenation.
 - Every event carries `seq`; the renderer is expected to detect gaps and re-sync.

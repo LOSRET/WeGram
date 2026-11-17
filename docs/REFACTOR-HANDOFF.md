@@ -1,21 +1,26 @@
 # Refactor handoff — splitting the code for agent maintenance
 
 Written 2026-11-17, directly after the refactor session that did **batches 0–3** of the
-approved plan. Read this together with `docs/HANDOFF.md` (project state, measured TDLib
-behaviour) and the three layer notes (`packages/protocol/AGENTS.md`,
-`apps/desktop/src/main/AGENTS.md`, `apps/desktop/src/renderer/AGENTS.md`).
+approved plan. **Batch 4** was completed later the same day — see "Batch 4 (done)" for the
+layout actually built and the three deliberate deviations. Read this together with
+`docs/HANDOFF.md` (project state, measured TDLib behaviour) and the three layer notes
+(`packages/protocol/AGENTS.md`, `apps/desktop/src/main/AGENTS.md`,
+`apps/desktop/src/renderer/AGENTS.md`).
 
 Audience: the next agent session. Everything below was measured or executed, not planned.
 
 ## TL;DR
 
 - Working tree is **clean**, all work is committed on `main`, and `pnpm verify` is green.
-- Six commits: one that commits the pre-existing dirty tree, then batches 0–3, then docs.
-- The repo now has **87 unit tests** (was 0), ESLint that enforces the architecture rules
+- Nine commits: the pre-existing dirty tree, batches 0–3, docs, then batch 4 as **two
+  commits** (mapper context first, then the file move) with its doc updates folded into the
+  second.
+- The repo now has **132 unit tests** (was 0), ESLint that enforces the architecture rules
   from prose, and Prettier as the single formatter.
-- `useAppStore.ts` (293), `MessageList.tsx` (705) and `ChatPane.tsx` (415) are gone;
-  they are now 20 small modules, none over 223 lines.
-- **Batches 4–8 are not started**: `tdlib.ts`, `mock.ts`, `preview-bridge.ts`,
+- `useAppStore.ts` (293), `MessageList.tsx` (705), `ChatPane.tsx` (415) and
+  `telegram/tdlib.ts` (1527) are gone; they are now 20 renderer modules (none over 223
+  lines) and 14 adapter modules (the largest, `index.ts`, is 400 lines).
+- **Batches 5–8 are not started**: `mock.ts`, `preview-bridge.ts`,
   `styles/index.css`, `packages/protocol`. See "Remaining batches" for the exact target
   layout and the risks.
 
@@ -29,6 +34,8 @@ Audience: the next agent session. Everything below was measured or executed, not
 | `8b9c3ec` | **Batch 2** — message-list split + 13 tests (unread divider, context menu, emoji detection). |
 | `8209857` | **Batch 3** — chat-pane split (no new tests: the extracted parts are IPC orchestration). |
 | `680720f` | Docs: architecture map + renderer AGENTS.md point at the new modules. |
+| `5c0c863` | **Batch 4a** — the DTO mappers take an explicit `MapperContext` (behaviour identical: same caches, same lazy `getUser`/`getChat` fallbacks). |
+| (next commit) | **Batch 4b** — `tdlib.ts` (1527) becomes `tdlib/` (14 modules + 5 test files), the mappers get 45 tests, and the architecture docs/rules move from the file to the folder. |
 
 Commits are GPG-signed (`commit.gpgsign=true` works in this session — unlike the note
 about the root commit in `docs/HANDOFF.md`). Branch: `main`.
@@ -38,7 +45,7 @@ about the root commit in `docs/HANDOFF.md`). Branch: `main`.
 ```powershell
 pnpm verify          # THE gate: lint -> typecheck -> test -> build. ~8 s.
 pnpm lint            # eslint . --max-warnings 0   (errors AND warnings fail)
-pnpm test            # vitest run                  (87 tests, node environment)
+pnpm test            # vitest run                  (132 tests, node environment)
 pnpm test:watch
 pnpm format          # prettier --write .          (format:check to verify only)
 ```
@@ -57,6 +64,11 @@ Root devDependencies added: `eslint 10.15.0`, `typescript-eslint 8.72.2`,
 | `renderer/src/components/message-list/messageList.test.ts` | unread-divider anchor choice, context-menu rules, `isEmojiOnly` |
 | `main/proxy-url.test.ts` | `socks5://` / `mtproto://` parsing, credential decoding, the error cases |
 | `main/media/image-size.test.ts` | PNG / GIF / WebP (VP8X, VP8L, VP8) / JPEG SOF header probing |
+| `main/telegram/tdlib/map/content.test.ts` | `mapContent` for every supported TDLib content type, `serviceText` composition (WeChat wording, 你 vs the sender, member names), `previewContent`, the size pickers, `mediaUrls` |
+| `main/telegram/tdlib/map/message.test.ts` | sender resolution (user / channel chat / `未知`), service-message text, unsupported content, caption entities, reply/edit flags |
+| `main/telegram/tdlib/map/chat.test.ts` | `mapChat` fields, the title-cache side effect, optional-field omission, `mapChatKind`, `mapConnectionState` |
+| `main/telegram/tdlib/map/entities.test.ts` | the TL entity type table, unknown types dropped, offset/length defaults |
+| `main/telegram/tdlib/map/sticker.test.ts` | sticker + set-cover thumbnail format mapping |
 
 **What it does NOT cover, and where you must verify instead:**
 
@@ -156,38 +168,60 @@ Deliberate invariants you must not undo while working here:
   `.cache/app.log` held no errors (only Node's `node:sqlite` experimental warning).
 - The Electron window was **closed** afterwards; nothing is left running.
 
-## Remaining batches (approved scope: 4–8, not started)
+## Remaining batches (approved scope: 5–8, not started)
 
-Order matters: 4 is the only high-risk one and is the only code verified exclusively
-against the real account. Do it in a dedicated session with `tdlib:smoke` available.
+Order matters less now: batch 4 was the only high-risk one and the only code verified
+exclusively against the real account. Batches 5–7 are renderer/mock work; 8 is optional.
 
-### Batch 4 — `main/telegram/tdlib.ts` (1527 lines) → `main/telegram/tdlib/`
+### Batch 4 (done) — `main/telegram/tdlib.ts` (1527) → `main/telegram/tdlib/`
+
+Built exactly as planned, in the two required commits:
 
 ```
 index.ts          TdlibAdapter: lifecycle, auth state machine, connection, invoke wrapper
-client.ts         configureTdlib, TdClientLike, safeVersion
-avatar-cache.ts   loadSelfAvatar / prefetchChatAvatars / queue+flush upserts (4-wide pool)
-updates.ts        handleUpdate dispatch table + handleAuthorizationState
-actions.ts        history / sendText / sendMedia / sendSticker / edit / delete / forward /
-                  markRead / openChat / getChat / search*
+client.ts         TdObject / TdClientLike, configureTdlib, safeVersion
+avatar-cache.ts   AvatarCache class: own + chat photos, 4-wide pool, 120 ms batched upserts
+updates.ts        createUpdateHandler(deps): update dispatch + authorization state machine
+actions.ts        history / listChats / getChat / openChat / send* / edit / delete / forward /
+                  markRead / search* / downloadFile / fetchFilePath, as functions over ActionDeps
 stickers.ts       listStickerSets / getStickerSet / toSticker
-proxy.ts          setProxy / testProxy / applyProxy / waitForOnline
-map/chat.ts       mapChat, mapChatKind, mapConnectionState, previewContent
-map/message.ts    mapMessage, mapEntities
+proxy.ts          setProxy / testProxy / applyProxy / waitForOnline, as functions over ProxyDeps
+map/context.ts    MapperContext (chatTitles, chatAvatarUrls, stickerSizes, resolvers)
+map/chat.ts       mapChat, mapChatKind, mapConnectionState
+map/message.ts    mapMessage
+map/entities.ts   mapEntities + the TL entity type table   (added — see below)
 map/content.ts    mapContent, serviceText, previewContent, mediaUrls, pickLargest,
-                  pickSmallestAtLeast (the ~330-line block at the bottom)
+                  pickSmallestAtLeast, size/label helpers
 map/sticker.ts    mapStickerThumbnail, mapStickerFormat
+map/user.ts       mapUser                                 (added — see below)
 ```
 
-Key step, do it as **two commits**: the mappers are currently private methods that read
-`this.chatTitles`, `this.chatAvatarUrls`, `this.stickerSizes`. First turn them into pure
-functions taking an explicit `MapperContext` (behaviour identical), then move files.
-That makes `mapContent`/`mapEntities`/`serviceText` unit-testable — they are the part most
-likely to be broken by a future field change, and they have no tests today.
+Three deliberate deviations from the sketch above, all for acyclic imports:
 
-Acceptance: `pnpm verify` + `pnpm tdlib:smoke` (read-only: getMe / getChats / history
-paging) + one mock Electron run. Update the wording in `CLAUDE.md` ("Architecture rules")
-and `apps/desktop/src/main/AGENTS.md` from `telegram/tdlib.ts` to `telegram/tdlib/**`.
+1. **`map/entities.ts`** exists because `mapContent` needs `mapEntities` for photo/video
+   captions while `mapMessage` needs `mapContent`. Keeping `mapEntities` in `map/message.ts`
+   (as the first sketch said) would have made `content ↔ message` a runtime cycle.
+2. **`map/user.ts`** holds `mapUser`, used by both `me()` and `resolveUserName` — it is not a
+   chat mapper, so it did not belong in `map/chat.ts`.
+3. **`previewContent` lives in `map/content.ts`** (it is built from `extractText` /
+   `mapContentLabel` / `servicePreview`), not duplicated in `map/chat.ts`.
+
+Mechanics worth keeping: every helper module takes a small **deps interface** defined in that
+module (`ActionDeps`, `ProxyDeps`, `UpdateDeps`, `StickerDeps`, `AvatarCacheOptions`) and
+`index.ts` is the composition root that builds them in its constructor. `AvatarCache` owns all
+photo state (including our own avatar) instead of the adapter; its `urls` map is handed to the
+`MapperContext` as `chatAvatarUrls`. The private photo helpers kept their bodies but became
+methods with the class prefix dropped — `loadSelfAvatar` → `loadSelf`,
+`prefetchChatAvatars` → `prefetch`, `resolveChatAvatar` → `resolve`,
+`queueAvatarUpsert` → `queueUpsert`, `flushAvatarUpserts` → `flushUpserts` — so a line-by-line
+review of the move should start there. The `eslint.config.mjs` rule now ignores
+`apps/desktop/src/main/telegram/tdlib/**` instead of the old file path.
+
+Acceptance that was run: `pnpm verify` (132 tests) + `pnpm tdlib:smoke` read-only against the
+real session (getMe, 20 chats, history with `hasMore=true`, channel `senderChatId` names) + a
+mock Electron pass (login → chat list with avatars → 5000-message chat paging #4952→#5000 →
+send text → sticker picker, send sticker → chat-info popover `已加载 101 条`), `.cache/app.log`
+clean apart from the known `node:sqlite` experimental warning.
 
 ### Batch 5 — `main/telegram/mock.ts` (884) → `mock/`
 
