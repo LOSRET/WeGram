@@ -8,6 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 >
 > **Then read the layer notes** for the directory you are about to touch — they are short and they hold the rules that are specific to that layer: `packages/protocol/AGENTS.md`, `apps/desktop/src/main/AGENTS.md`, `apps/desktop/src/renderer/AGENTS.md`.
 >
+> **Restructuring or splitting files? Read `docs/REFACTOR-HANDOFF.md` first** — what already moved and why, the conventions the code now enforces mechanically, and the batches still pending (`tdlib.ts`, `mock.ts`, `preview-bridge.ts`, `styles/index.css`, `packages/protocol`).
+>
 > **`pnpm verify` is the one command that decides whether a change is done** (lint → typecheck → test → build). It must pass before you report success.
 
 pnpm workspace with W1 + W2 + the W3 main body implemented:

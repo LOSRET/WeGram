@@ -9,6 +9,12 @@ The renderer was later rebuilt against the real WeChat 4.x client; that work has
 own handoff — **`docs/UI-HANDOFF.md`** (measured tokens and metrics, icon provenance,
 known deltas, pitfalls). Read it before touching anything under `src/renderer`.
 
+The code was then split for agent maintenance and given a real verification layer
+(`pnpm verify`, 87 unit tests, lint-enforced architecture rules). **`docs/REFACTOR-HANDOFF.md`**
+records what moved where, the conventions the code now enforces, and the batches that are
+still pending (`tdlib.ts`, `mock.ts`, `preview-bridge.ts`, `styles/index.css`,
+`packages/protocol`). Read it before restructuring anything.
+
 ## Where things stand
 
 Greenfield → working skeleton in three milestones:
@@ -517,9 +523,18 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
 
 ## Session leftovers
 
-The Electron window is **left running** (real adapter, launched detached, maximised) so
-the next session can pick it up; close it with `windows close electron.exe` before the
-next launch, or the single-instance lock silently keeps the old bundle.
+**2026-11-17, refactor session:** `pnpm verify` (lint → typecheck → vitest → build) is the
+gate; 87 unit tests, ESLint now enforces the architecture rules, Prettier owns formatting.
+The Electron window used for the mock walkthrough was **closed**, so nothing is running —
+launch it detached again when you need it. Remaining work is the split of `tdlib.ts`,
+`mock.ts`, `preview-bridge.ts`, `styles/index.css` and `packages/protocol`: see
+`docs/REFACTOR-HANDOFF.md` (including the one open observation about a short transcript that
+restored a saved anchor still counting as "not at the bottom").
+
+**Earlier (W3) session:** the Electron window was left running (real adapter, launched
+detached, maximised) so the next session could pick it up; close it with
+`windows close electron.exe` before the next launch, or the single-instance lock silently
+keeps the old bundle.
 
 The Vite preview server and the remote-debugged browser windows started during the
 session were closed. `.cache/` keeps logs and is gitignored; it also holds the throwaway
@@ -530,3 +545,7 @@ The UI/real-account changes are **committed** on `main` in four commits on top o
 `a3d9a5f` — the "+" card and brand mark, avatars + overlay scrollbars, the three
 real-account fixes, and this documentation. `pnpm typecheck && pnpm build` were green
 before each of them; the working tree is clean.
+
+The refactor session added six more commits on top of `395ac19` (`f1d0a9e` the pending
+real-account fixes, then batches 0–3 and the doc updates). `pnpm verify` — not just
+typecheck + build — was green before each, and the working tree is clean.
