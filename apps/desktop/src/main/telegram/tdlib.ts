@@ -64,6 +64,27 @@ const AVATAR_WORKERS = 4
 /** Coalescing window for pushing finished avatars back to the renderer. */
 const AVATAR_FLUSH_MS = 120
 
+/**
+ * The cached lookups a mapper may read.
+ *
+ * TDLib reuses ids everywhere (`messageSenderChat` is a chat id, a chat title is
+ * only known from `getChat`) and avatars arrive after the message does, so the
+ * mappers read from the adapter's caches. Passing that state explicitly keeps
+ * them testable: a unit test can hand in three plain maps and a stub resolver.
+ */
+export interface MapperContext {
+  /** Chat titles, used for `messageSenderChat` (channel posts, anonymous admins). */
+  readonly chatTitles: Map<number, string>
+  /** Chat photos: chat id → `wx-media://` URL. */
+  readonly chatAvatarUrls: Map<number, string>
+  /** Sticker file id → pixel size, so the picker can send without a lookup. */
+  readonly stickerSizes: Map<number, { width: number; height: number }>
+  /** Cached sender name; falls back to one `getUser` round trip. */
+  resolveUserName(userId: number): Promise<string>
+  /** Cached chat title; falls back to one `getChat` round trip. */
+  resolveChatTitle(chatId: number): Promise<string>
+}
+
 export interface TdlibAdapterOptions {
   apiId: number
   apiHash: string
@@ -108,6 +129,15 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   private avatarWorkers = 0
   private avatarFlushTimer: NodeJS.Timeout | null = null
   private readonly pendingAvatarUpserts = new Set<number>()
+
+  /** What the mappers may read; built once so the maps stay identity-stable. */
+  private readonly mapper: MapperContext = {
+    chatTitles: this.chatTitles,
+    chatAvatarUrls: this.chatAvatarUrls,
+    stickerSizes: this.stickerSizes,
+    resolveUserName: (userId) => this.resolveUserName(userId),
+    resolveChatTitle: (chatId) => this.resolveChatTitle(chatId),
+  }
 
   constructor(private readonly options: TdlibAdapterOptions) {
     super()
@@ -205,12 +235,12 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     const fileId: number | undefined = raw.profile_photo?.small?.id ?? raw.profile_photo?.big?.id
     // Already fetched: hand the renderer the picture with the profile in one go.
     if (fileId && this.selfAvatarFileId === fileId && this.selfAvatarUrl) {
-      return { ...this.mapUser(raw), avatarUrl: this.selfAvatarUrl }
+      return { ...mapUser(raw), avatarUrl: this.selfAvatarUrl }
     }
     // Otherwise fetch it in the background and announce it with a fresh auth
     // event — authorisation must not wait for a network round trip.
     if (fileId) void this.loadSelfAvatar(fileId)
-    return this.mapUser(raw)
+    return mapUser(raw)
   }
 
   /**
@@ -440,7 +470,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
         }, limit ${limit})`,
       )
     }
-    const mapped = await Promise.all(page.map((raw) => this.mapMessage(input.chatId, raw)))
+    const mapped = await Promise.all(page.map((raw) => mapMessage(this.mapper, input.chatId, raw)))
     return { messages: mapped, hasMore: !exhausted && mapped.length > 0 }
   }
 
@@ -462,7 +492,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
         clear_draft: true,
       },
     })
-    const message = await this.mapMessage(input.chatId, response)
+    const message = await mapMessage(this.mapper, input.chatId, response)
     return { localId: `td-${message.id}`, message }
   }
 
@@ -544,7 +574,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
       filter: { _: 'searchMessagesFilterEmpty' },
     })
     const rawMessages: TdObject[] = Array.isArray(response.messages) ? response.messages : []
-    return Promise.all(rawMessages.map((raw) => this.mapMessage(input.chatId, raw)))
+    return Promise.all(rawMessages.map((raw) => mapMessage(this.mapper, input.chatId, raw)))
   }
 
   /**
@@ -636,7 +666,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
       options: null,
       input_message_content: content,
     })
-    const message = await this.mapMessage(input.chatId, response)
+    const message = await mapMessage(this.mapper, input.chatId, response)
     return { localId: `td-${message.id}`, message }
   }
 
@@ -665,7 +695,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
         emoji: '',
       },
     })
-    const message = await this.mapMessage(input.chatId, response)
+    const message = await mapMessage(this.mapper, input.chatId, response)
     return { localId: `td-${message.id}`, message }
   }
 
@@ -690,23 +720,8 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
       title: response.title ?? '',
       ...(response.thumbnail ? { thumbnail: mapStickerThumbnail(response.thumbnail) } : {}),
       stickers: stickers
-        .map((sticker) => this.toSticker(sticker))
+        .map((sticker) => toSticker(this.mapper, sticker))
         .filter((item) => item.fileId > 0),
-    }
-  }
-
-  private toSticker(raw: TdObject): Sticker {
-    const fileId: number = raw?.sticker?.id ?? 0
-    if (fileId && raw?.width && raw?.height) {
-      this.stickerSizes.set(fileId, { width: raw.width, height: raw.height })
-    }
-    return {
-      fileId,
-      format: mapStickerFormat(raw?.format?._) ?? 'webp',
-      ...(raw?.emoji ? { emoji: raw.emoji } : {}),
-      ...(raw?.width ? { width: raw.width } : {}),
-      ...(raw?.height ? { height: raw.height } : {}),
-      ...(raw?.thumbnail?.file?.id ? { thumbFileId: raw.thumbnail.file.id } : {}),
     }
   }
 
@@ -800,7 +815,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
       case 'updateNewMessage': {
         const raw = update.message
         if (!raw) return
-        const message = await this.mapMessage(raw.chat_id, raw)
+        const message = await mapMessage(this.mapper, raw.chat_id, raw)
         this.emit({ type: 'messages', chatId: raw.chat_id, ops: [{ op: 'new', message }] })
         await this.emitChatUpsert(raw.chat_id)
         return
@@ -818,7 +833,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
             message_id: messageId,
           })
           if (!raw || raw._ === 'error') return
-          const message = await this.mapMessage(chatId, raw)
+          const message = await mapMessage(this.mapper, chatId, raw)
           this.emit({ type: 'messages', chatId, ops: [{ op: 'replace', message }] })
         } catch {
           // The message may have been deleted in the same batch.
@@ -967,69 +982,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
 
   private async fetchChatSummary(chatId: number): Promise<ChatSummary> {
     const chat = await this.invoke({ _: 'getChat', chat_id: chatId })
-    return this.mapChat(chat)
-  }
-
-  private mapChat(chat: TdObject): ChatSummary {
-    const positions: TdObject[] = Array.isArray(chat.positions) ? chat.positions : []
-    const mainPosition = positions.find((position) => position.list?._ === 'chatListMain')
-    const lastMessage = chat.last_message
-    if (typeof chat.title === 'string') this.chatTitles.set(chat.id, chat.title)
-    const avatarUrl = this.chatAvatarUrls.get(chat.id)
-    return {
-      id: chat.id,
-      title: chat.title ?? '',
-      kind: mapChatKind(chat.type),
-      unread: chat.unread_count ?? 0,
-      pinned: Boolean(mainPosition?.is_pinned),
-      muted: Boolean(chat.notification_settings?.is_muted),
-      lastReadInboxMessageId: Number(chat.last_read_inbox_message_id ?? 0),
-      lastReadOutboxMessageId: Number(chat.last_read_outbox_message_id ?? 0),
-      ...(lastMessage ? { lastMessageText: previewContent(lastMessage.content) } : {}),
-      ...(lastMessage ? { lastMessageAt: Number(lastMessage.date) } : {}),
-      ...(avatarUrl ? { avatarUrl } : {}),
-    }
-  }
-
-  private async mapMessage(chatId: number, raw: TdObject): Promise<Message> {
-    // `sender_id` is either `messageSenderUser { user_id }` or
-    // `messageSenderChat { chat_id }` — channel posts and anonymous admins use
-    // the latter. Reading only `user_id` used to leave those as `未知`.
-    const senderUserId: number = raw.sender_id?.user_id ?? 0
-    const senderChatId: number = raw.sender_id?.chat_id ?? 0
-    const senderName = senderUserId
-      ? await this.resolveUserName(senderUserId)
-      : senderChatId
-        ? await this.resolveChatTitle(senderChatId)
-        : '未知'
-    const content = raw.content ?? {}
-    const mapped = mapContent(content)
-    let text = mapped.text
-    if (mapped.kind === 'service' && text === '') {
-      text = SERVICE_CONTENT_TYPES.has(content._)
-        ? await serviceText(content, {
-            senderName,
-            outgoing: Boolean(raw.is_outgoing),
-            resolveUserName: (userId: number) => this.resolveUserName(userId),
-          })
-        : '[暂不支持的消息]'
-    }
-
-    return {
-      id: raw.id,
-      chatId,
-      senderId: senderUserId,
-      ...(senderChatId ? { senderChatId } : {}),
-      senderName,
-      outgoing: Boolean(raw.is_outgoing),
-      date: Number(raw.date),
-      kind: mapped.kind,
-      text,
-      ...(mapped.entities.length ? { entities: mapped.entities } : {}),
-      ...(mapped.media ? { media: mapped.media } : {}),
-      ...(raw.reply_to?.message_id ? { replyToId: raw.reply_to.message_id } : {}),
-      ...(raw.edit_date ? { edited: true } : {}),
-    }
+    return mapChat(this.mapper, chat)
   }
 
   private async resolveUserName(userId: number): Promise<string> {
@@ -1037,7 +990,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     if (cached) return cached
     try {
       const user = await this.invoke({ _: 'getUser', user_id: userId })
-      const name = this.mapUser(user)
+      const name = mapUser(user)
       const label =
         [name.firstName, name.lastName].filter(Boolean).join(' ') || name.username || '未知'
       this.userNames.set(userId, label)
@@ -1060,17 +1013,6 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     }
   }
 
-  private mapUser(user: TdObject): Self {
-    const username: string | undefined = user.usernames?.active_usernames?.[0]
-    return {
-      id: user.id,
-      firstName: user.first_name ?? '',
-      ...(user.last_name ? { lastName: user.last_name } : {}),
-      ...(username ? { username } : {}),
-      ...(user.phone_number ? { phone: user.phone_number } : {}),
-    }
-  }
-
   private async invoke(method: TdObject): Promise<any> {
     const client = this.client
     if (!client) throw new AppError('internal', 'TDLib client is not started')
@@ -1090,6 +1032,79 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     if (this.connection === state) return
     this.connection = state
     this.emit({ type: 'connection', state })
+  }
+}
+
+function mapUser(user: TdObject): Self {
+  const username: string | undefined = user.usernames?.active_usernames?.[0]
+  return {
+    id: user.id,
+    firstName: user.first_name ?? '',
+    ...(user.last_name ? { lastName: user.last_name } : {}),
+    ...(username ? { username } : {}),
+    ...(user.phone_number ? { phone: user.phone_number } : {}),
+  }
+}
+
+function mapChat(ctx: MapperContext, chat: TdObject): ChatSummary {
+  const positions: TdObject[] = Array.isArray(chat.positions) ? chat.positions : []
+  const mainPosition = positions.find((position) => position.list?._ === 'chatListMain')
+  const lastMessage = chat.last_message
+  if (typeof chat.title === 'string') ctx.chatTitles.set(chat.id, chat.title)
+  const avatarUrl = ctx.chatAvatarUrls.get(chat.id)
+  return {
+    id: chat.id,
+    title: chat.title ?? '',
+    kind: mapChatKind(chat.type),
+    unread: chat.unread_count ?? 0,
+    pinned: Boolean(mainPosition?.is_pinned),
+    muted: Boolean(chat.notification_settings?.is_muted),
+    lastReadInboxMessageId: Number(chat.last_read_inbox_message_id ?? 0),
+    lastReadOutboxMessageId: Number(chat.last_read_outbox_message_id ?? 0),
+    ...(lastMessage ? { lastMessageText: previewContent(lastMessage.content) } : {}),
+    ...(lastMessage ? { lastMessageAt: Number(lastMessage.date) } : {}),
+    ...(avatarUrl ? { avatarUrl } : {}),
+  }
+}
+
+async function mapMessage(ctx: MapperContext, chatId: number, raw: TdObject): Promise<Message> {
+  // `sender_id` is either `messageSenderUser { user_id }` or
+  // `messageSenderChat { chat_id }` — channel posts and anonymous admins use
+  // the latter. Reading only `user_id` used to leave those as `未知`.
+  const senderUserId: number = raw.sender_id?.user_id ?? 0
+  const senderChatId: number = raw.sender_id?.chat_id ?? 0
+  const senderName = senderUserId
+    ? await ctx.resolveUserName(senderUserId)
+    : senderChatId
+      ? await ctx.resolveChatTitle(senderChatId)
+      : '未知'
+  const content = raw.content ?? {}
+  const mapped = mapContent(content)
+  let text = mapped.text
+  if (mapped.kind === 'service' && text === '') {
+    text = SERVICE_CONTENT_TYPES.has(content._)
+      ? await serviceText(content, {
+          senderName,
+          outgoing: Boolean(raw.is_outgoing),
+          resolveUserName: (userId: number) => ctx.resolveUserName(userId),
+        })
+      : '[暂不支持的消息]'
+  }
+
+  return {
+    id: raw.id,
+    chatId,
+    senderId: senderUserId,
+    ...(senderChatId ? { senderChatId } : {}),
+    senderName,
+    outgoing: Boolean(raw.is_outgoing),
+    date: Number(raw.date),
+    kind: mapped.kind,
+    text,
+    ...(mapped.entities.length ? { entities: mapped.entities } : {}),
+    ...(mapped.media ? { media: mapped.media } : {}),
+    ...(raw.reply_to?.message_id ? { replyToId: raw.reply_to.message_id } : {}),
+    ...(raw.edit_date ? { edited: true } : {}),
   }
 }
 
@@ -1481,6 +1496,21 @@ function pickSmallestAtLeast(sizes: TdObject[], minWidth: number): TdObject | un
   return [...sizes]
     .filter((size) => (size.width ?? 0) >= minWidth)
     .sort((a, b) => (a.width ?? 0) - (b.width ?? 0))[0]
+}
+
+function toSticker(ctx: MapperContext, raw: TdObject): Sticker {
+  const fileId: number = raw?.sticker?.id ?? 0
+  if (fileId && raw?.width && raw?.height) {
+    ctx.stickerSizes.set(fileId, { width: raw.width, height: raw.height })
+  }
+  return {
+    fileId,
+    format: mapStickerFormat(raw?.format?._) ?? 'webp',
+    ...(raw?.emoji ? { emoji: raw.emoji } : {}),
+    ...(raw?.width ? { width: raw.width } : {}),
+    ...(raw?.height ? { height: raw.height } : {}),
+    ...(raw?.thumbnail?.file?.id ? { thumbFileId: raw.thumbnail.file.id } : {}),
+  }
 }
 
 /** Set covers are thumbnails, not stickers, but they render through the same path. */
