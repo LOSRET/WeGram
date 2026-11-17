@@ -42,8 +42,6 @@ export function ChatPane() {
   const chats = useAppStore((state) => state.chats)
   const messagesByChat = useAppStore((state) => state.messagesByChat)
   const hasMoreByChat = useAppStore((state) => state.hasMoreByChat)
-  const loadingOlderByChat = useAppStore((state) => state.loadingOlderByChat)
-  const loadingHistoryByChat = useAppStore((state) => state.loadingHistoryByChat)
   const replyToByChat = useAppStore((state) => state.replyToByChat)
   const editing = useAppStore((state) => state.editing)
   const typingByChat = useAppStore((state) => state.typingByChat)
@@ -61,7 +59,8 @@ export function ChatPane() {
   /** Chat-info popover (the "…" button in the header). */
   const [infoAt, setInfoAt] = useState<{ x: number; y: number } | null>(null)
 
-  const { pendingLanding, anchorKnown, restoring, reload, loadOlder } = useChatHistory(activeChatId)
+  const { pendingLanding, anchorKnown, restoring, loadingHistory, loadingOlder, reload, loadOlder } =
+    useChatHistory(activeChatId)
 
   const chat = chats.find((item) => item.id === activeChatId) ?? null
   const messages = activeChatId ? (messagesByChat[activeChatId] ?? []) : []
@@ -119,7 +118,7 @@ export function ChatPane() {
     <main className="wx-chat">
       <ChatHeader title={chat.title} typing={typing} onOpenInfo={setInfoAt} />
 
-      {loadingHistoryByChat[activeChatId] && messages.length === 0 ? (
+      {loadingHistory && messages.length === 0 ? (
         <LoadingPlaceholder restoring={restoring} />
       ) : !anchorKnown ? (
         <AnchorPendingPlaceholder />
@@ -131,7 +130,7 @@ export function ChatPane() {
           chat={chat}
           messages={messages}
           hasMore={Boolean(hasMoreByChat[activeChatId])}
-          loadingOlder={Boolean(loadingOlderByChat[activeChatId])}
+          loadingOlder={loadingOlder}
           landing={pendingLanding?.chatId === activeChatId ? pendingLanding.position : null}
           unreadMarker={
             unreadMarkers[activeChatId]?.unread ? (unreadMarkers[activeChatId] ?? null) : null

@@ -39,14 +39,6 @@ export const createMessagesSlice: SliceCreator<MessageActions> = (set) => ({
       }
     }),
 
-  setLoadingOlder: (chatId, loading) =>
-    set((state) => ({ loadingOlderByChat: { ...state.loadingOlderByChat, [chatId]: loading } })),
-
-  setLoadingHistory: (chatId, loading) =>
-    set((state) => ({
-      loadingHistoryByChat: { ...state.loadingHistoryByChat, [chatId]: loading },
-    })),
-
   applyMessageOps: (chatId, ops) =>
     set((state) => {
       // Only a chat whose first page is already in memory may be patched here.

@@ -1,11 +1,13 @@
 import '@renderer/styles/index.css'
 
+import { QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import { App } from '@renderer/App'
 import { MediaViewer } from '@renderer/components/viewer/MediaViewer'
 import { installPreviewBridge } from '@renderer/lib/preview-bridge'
+import { queryClient } from '@renderer/lib/query'
 
 // Browser preview (pnpm web): no preload script exists, so install a mock bridge.
 installPreviewBridge()
@@ -18,4 +20,10 @@ if (!container) throw new Error('#root is missing from index.html')
 // hydration — only `viewer:init`).
 const isViewer = window.location.hash.startsWith('#viewer')
 
-createRoot(container).render(<StrictMode>{isViewer ? <MediaViewer /> : <App />}</StrictMode>)
+createRoot(container).render(
+  <StrictMode>
+    <QueryClientProvider client={queryClient}>
+      {isViewer ? <MediaViewer /> : <App />}
+    </QueryClientProvider>
+  </StrictMode>,
+)

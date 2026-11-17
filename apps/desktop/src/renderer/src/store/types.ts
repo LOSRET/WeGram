@@ -50,8 +50,6 @@ export interface AppData {
   pendingOps: Record<number, MessageOp[]>
   /** true when older messages may still exist on the server */
   hasMoreByChat: Record<number, boolean>
-  loadingOlderByChat: Record<number, boolean>
-  loadingHistoryByChat: Record<number, boolean>
   replyToByChat: Record<number, number | null>
   typingByChat: Record<number, boolean>
   editing: EditingState | null
@@ -81,8 +79,6 @@ export interface ChatActions {
 export interface MessageActions {
   setHistory: (chatId: number, messages: Message[], hasMore: boolean) => void
   prependHistory: (chatId: number, messages: Message[], hasMore: boolean) => void
-  setLoadingOlder: (chatId: number, loading: boolean) => void
-  setLoadingHistory: (chatId: number, loading: boolean) => void
   applyMessageOps: (chatId: number, ops: MessageOp[]) => void
   setReplyTo: (chatId: number, messageId: number | null) => void
   setEditing: (editing: EditingState | null) => void
