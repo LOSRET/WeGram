@@ -3,7 +3,16 @@ import { MainShell } from '@renderer/components/MainShell'
 import { PerfPanel } from '@renderer/components/PerfPanel'
 import { LoginScreen } from '@renderer/screens/LoginScreen'
 import { useAppStore } from '@renderer/store/useAppStore'
+import type { MessageOp } from '@wegram/protocol'
 import { useEffect } from 'react'
+
+import { classifySeq, needsResync } from './lib/eventSeq'
+
+/** Page sizes for the re-sync reads — the same ones the panes open with. */
+const RESYNC_CHAT_LIMIT = 100
+const RESYNC_MESSAGE_LIMIT = 50
+/** Collapse a burst of holes into one repair. */
+const RESYNC_DELAY_MS = 250
 
 export function App() {
   const auth = useAppStore((state) => state.auth)
@@ -32,24 +41,100 @@ export function App() {
       )
     }
 
+    /**
+     * Event-order guard (design doc §7.3, "every event carries `seq`; the renderer is
+     * expected to detect gaps and re-sync").
+     *
+     * All eight `evt:*` channels draw from one counter, so a hole means state the
+     * renderer will never be told about again: a dropped `evt:chats` batch leaves the
+     * list's preview and unread counts stale, a dropped `evt:messages` batch leaves a
+     * message missing until the chat is reopened. Instead of pretending, the repair
+     * re-reads what the stream mutates and merges it through the same reducer.
+     */
+    let lastSeq: number | null = null
+    let resyncTimer: number | null = null
+    let resyncing = false
+
+    const resync = async (): Promise<void> => {
+      // Signing in or out resets every collection the repair would touch, and the
+      // shell fetches the list itself the moment it becomes ready.
+      if (useAppStore.getState().auth.kind !== 'ready' || resyncing) return
+      resyncing = true
+      try {
+        const chats = await invoke('chats:list', { limit: RESYNC_CHAT_LIMIT, offset: 0 })
+        useAppStore.getState().setChats(chats)
+
+        const activeChatId = useAppStore.getState().activeChatId
+        if (activeChatId !== null) {
+          const page = await invoke('messages:history', {
+            chatId: activeChatId,
+            limit: RESYNC_MESSAGE_LIMIT,
+          })
+          /**
+           * Applied as ops, not written with `setHistory`: `setHistory` replaces the
+           * whole list with one page, which would throw away every older page a reader
+           * paged back to. `upsertMessage` appends what is missing and overwrites what
+           * changed, which is exactly "repair without moving the viewport".
+           */
+          const ops: MessageOp[] = page.messages.map((message) => ({ op: 'replace', message }))
+          useAppStore.getState().applyMessageOps(activeChatId, ops)
+        }
+      } catch (cause) {
+        useAppStore.getState().setError(`事件流断档，重新同步失败：${errorMessage(cause)}`)
+      } finally {
+        resyncing = false
+      }
+    }
+
+    const scheduleResync = (): void => {
+      if (resyncTimer !== null) return
+      resyncTimer = window.setTimeout(() => {
+        resyncTimer = null
+        void resync()
+      }, RESYNC_DELAY_MS)
+    }
+
+    const track = (seq: number): void => {
+      const verdict = classifySeq(lastSeq, seq)
+      // A duplicate keeps the baseline where it is: moving it would turn the next
+      // genuinely contiguous event into a "gap".
+      if (verdict === 'duplicate') return
+      lastSeq = seq
+      if (needsResync(verdict)) scheduleResync()
+    }
+
     const unsubscribers = [
-      window.tg.on('evt:auth', ({ payload }) => store.setAuth(payload)),
-      window.tg.on('evt:connection', ({ payload }) => store.setConnection(payload)),
-      window.tg.on('evt:chats', ({ payload }) => store.applyChatOps(payload.ops)),
-      window.tg.on('evt:messages', ({ payload }) =>
-        store.applyMessageOps(payload.chatId, payload.ops),
-      ),
-      window.tg.on('evt:typing', ({ payload }) => {
+      window.tg.on('evt:auth', (event) => {
+        track(event.seq)
+        store.setAuth(event.payload)
+      }),
+      window.tg.on('evt:connection', (event) => {
+        track(event.seq)
+        store.setConnection(event.payload)
+      }),
+      window.tg.on('evt:chats', (event) => {
+        track(event.seq)
+        store.applyChatOps(event.payload.ops)
+      }),
+      window.tg.on('evt:messages', (event) => {
+        track(event.seq)
+        store.applyMessageOps(event.payload.chatId, event.payload.ops)
+      }),
+      window.tg.on('evt:typing', (event) => {
+        track(event.seq)
         // `updateChatAction` is a one-shot event: without an expiry timer the
         // header would claim "typing" forever (§6.1).
-        if (payload.until > Date.now()) {
-          store.setTyping(payload.chatId, true)
-          scheduleTypingExpiry(payload.chatId, payload.until)
+        const { chatId, until } = event.payload
+        if (until > Date.now()) {
+          store.setTyping(chatId, true)
+          scheduleTypingExpiry(chatId, until)
         } else {
-          store.setTyping(payload.chatId, false)
+          store.setTyping(chatId, false)
         }
       }),
-      window.tg.on('evt:file', ({ payload }) => {
+      window.tg.on('evt:file', (event) => {
+        track(event.seq)
+        const payload = event.payload
         useAppStore.getState().setMediaProgress(
           payload.fileId,
           {
@@ -61,9 +146,13 @@ export function App() {
           payload.url,
         )
       }),
-      window.tg.on('evt:error', ({ payload }) => store.setError(payload.message)),
+      window.tg.on('evt:error', (event) => {
+        track(event.seq)
+        store.setError(event.payload.message)
+      }),
     ]
     return () => {
+      if (resyncTimer !== null) window.clearTimeout(resyncTimer)
       for (const timer of typingTimers.values()) window.clearTimeout(timer)
       typingTimers.clear()
       unsubscribers.forEach((unsubscribe) => unsubscribe())
