@@ -8,6 +8,10 @@ export function mapChat(ctx: MapperContext, chat: TdObject): ChatSummary {
   const positions: TdObject[] = Array.isArray(chat.positions) ? chat.positions : []
   const mainPosition = positions.find((position) => position.list?._ === 'chatListMain')
   const lastMessage = chat.last_message
+  // 0 means "nothing read yet", not message 0: the unread divider must then fall
+  // back to the unread counter instead of being pinned above the first row of the
+  // loaded page (findUnreadMessage treats null as "no marker").
+  const lastReadInbox = Number(chat.last_read_inbox_message_id ?? 0)
   if (typeof chat.title === 'string') ctx.chatTitles.set(chat.id, chat.title)
   const avatarUrl = ctx.chatAvatarUrls.get(chat.id)
   return {
@@ -17,7 +21,7 @@ export function mapChat(ctx: MapperContext, chat: TdObject): ChatSummary {
     unread: chat.unread_count ?? 0,
     pinned: Boolean(mainPosition?.is_pinned),
     muted: Boolean(chat.notification_settings?.is_muted),
-    lastReadInboxMessageId: Number(chat.last_read_inbox_message_id ?? 0),
+    ...(lastReadInbox > 0 ? { lastReadInboxMessageId: lastReadInbox } : {}),
     lastReadOutboxMessageId: Number(chat.last_read_outbox_message_id ?? 0),
     ...(lastMessage ? { lastMessageText: previewContent(lastMessage.content) } : {}),
     ...(lastMessage ? { lastMessageAt: Number(lastMessage.date) } : {}),

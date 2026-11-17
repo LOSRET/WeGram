@@ -66,6 +66,8 @@ describe('mapChat', () => {
     expect(chat).not.toHaveProperty('lastMessageText')
     expect(chat).not.toHaveProperty('lastMessageAt')
     expect(chat).not.toHaveProperty('avatarUrl')
+    // 0 is "nothing read yet", not message 0: the unread divider needs the null.
+    expect(chat).not.toHaveProperty('lastReadInboxMessageId')
     expect(chat.unread).toBe(0)
     expect(chat.pinned).toBe(false)
     expect(chat.muted).toBe(false)

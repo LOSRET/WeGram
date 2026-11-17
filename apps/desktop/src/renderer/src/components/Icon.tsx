@@ -63,6 +63,42 @@ export function MomentsTabIcon({ size = 24, ...rest }: IconProps) {
 }
 
 /**
+ * Transcript "跳转到最新消息" pill: the double chevron WeChat draws at its left.
+ *
+ * Hand-drawn (the Weixin.dll payload manifest has no recoverable name→glyph map,
+ * see `docs/UI-HANDOFF.md` §3) from the client's own pill: two round-capped
+ * chevrons, ~15 × 7 px each, ~3 px apart, stroke ≈ 1.7 px.
+ */
+export function JumpToLatestIcon({ size = 14, ...rest }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={(size * 18) / 16}
+      viewBox="0 0 16 18"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+      {...rest}
+    >
+      <path
+        d="M2.6 2.2 8 7.6 13.4 2.2"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M2.6 10.2 8 15.6 13.4 10.2"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+/**
  * Empty-chat watermark and login mark: the Telegram paper-plane roundel from
  * Simple Icons (<https://simpleicons.org/?q=telegram>, CC0 1.0), copied verbatim
  * and drawn with `currentColor`. The plane is a hole in the disc (subtracted

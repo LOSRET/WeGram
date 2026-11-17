@@ -1,15 +1,19 @@
 import type { MessageMedia } from '@wechatgram/protocol'
 import { useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 
 import { ensureMedia, formatBytes, progressRatio, useFileProgress, useMediaUrl } from '../lib/media'
 import { formatDuration } from '../lib/format'
 import { errorMessage, invoke } from '../lib/ipc'
+import { openPhotoViewer, openVideoViewer } from '../lib/viewer'
+import { PlayIcon } from './viewer/ViewerIcons'
 import { useAppStore } from '../store/useAppStore'
 
 interface MediaBubbleProps {
   media: MessageMedia
   kind: 'photo' | 'video' | 'file' | 'voice'
+  /** Conversation and message the media belongs to; the photo viewer needs both. */
+  chatId: number
+  messageId: number
 }
 
 const MAX_PHOTO_W = 240
@@ -21,9 +25,11 @@ const MAX_PHOTO_H = 300
  * height changes on load must not move the anchored row), so the blur-up
  * thumbnail appears in place and the bubble never collapses.
  */
-export function MediaBubble({ media, kind }: MediaBubbleProps) {
-  if (kind === 'photo') return <PhotoBubble media={media} />
-  if (kind === 'video') return <VideoBubble media={media} />
+export function MediaBubble({ media, kind, chatId, messageId }: MediaBubbleProps) {
+  if (kind === 'photo') return <PhotoBubble media={media} chatId={chatId} messageId={messageId} />
+  if (kind === 'video') {
+    return <VideoBubble media={media} chatId={chatId} messageId={messageId} />
+  }
   if (kind === 'voice') return <VoiceBubble media={media} />
   return <FileBubble media={media} />
 }
@@ -33,11 +39,18 @@ function useBubbleProgress(media: MessageMedia) {
   return { ratio: progressRatio(progress), completed: progress?.completed ?? false }
 }
 
-function PhotoBubble({ media }: { media: MessageMedia }) {
+function PhotoBubble({
+  media,
+  chatId,
+  messageId,
+}: {
+  media: MessageMedia
+  chatId: number
+  messageId: number
+}) {
   const url = useMediaUrl(media, 10)
   const { ratio } = useBubbleProgress(media)
   const progress = useFileProgress(media.fileId)
-  const [lightbox, setLightbox] = useState(false)
   const uploading = Boolean(progress && !progress.completed && ratio !== undefined)
 
   const width = media.width ?? 4
@@ -49,104 +62,61 @@ function PhotoBubble({ media }: { media: MessageMedia }) {
   }
 
   return (
-    <>
-      <button
-        type="button"
-        className="wx-photo"
-        style={box}
-        onClick={() => url && setLightbox(true)}
-        title="查看大图"
-      >
-        {media.minithumbnail ? (
-          <img
-            className="wx-photo__thumb"
-            src={`data:image/jpeg;base64,${media.minithumbnail}`}
-            alt=""
-            aria-hidden
-          />
-        ) : null}
-        {url ? (
-          <img
-            className="wx-photo__image"
-            src={url}
-            alt={media.fileName ?? '图片'}
-            loading="lazy"
-          />
-        ) : (
-          <span className="wx-photo__pending">
-            {ratio === undefined ? <span className="wx-spinner" /> : `${Math.round(ratio * 100)}%`}
-          </span>
-        )}
-        {url && uploading ? (
-          <span className="wx-photo__upload">{Math.round((ratio ?? 0) * 100)}%</span>
-        ) : null}
-      </button>
-
-      {lightbox && url
-        ? createPortal(
-            // Portal: virtualised rows are transform-positioned, and a fixed
-            // overlay inside a transformed ancestor would be positioned against
-            // that row instead of the window.
-            <div className="wx-lightbox" onClick={() => setLightbox(false)}>
-              <img
-                src={url}
-                alt={media.fileName ?? '图片'}
-                onClick={(event) => event.stopPropagation()}
-              />
-              <div className="wx-lightbox__actions">
-                <button
-                  className="wx-button"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    void invoke('media:open', { fileId: media.fileId }).catch((error) =>
-                      useAppStore.getState().setError(errorMessage(error)),
-                    )
-                  }}
-                >
-                  在系统中打开
-                </button>
-                <button className="wx-button wx-button--ghost" onClick={() => setLightbox(false)}>
-                  关闭
-                </button>
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
-    </>
+    <button
+      type="button"
+      className="wx-photo"
+      style={box}
+      // The client opens the photo in its own window, not in an overlay.
+      onClick={() => openPhotoViewer(chatId, messageId)}
+      title="查看大图"
+    >
+      {media.minithumbnail ? (
+        <img
+          className="wx-photo__thumb"
+          src={`data:image/jpeg;base64,${media.minithumbnail}`}
+          alt=""
+          aria-hidden
+        />
+      ) : null}
+      {url ? (
+        <img className="wx-photo__image" src={url} alt={media.fileName ?? '图片'} loading="lazy" />
+      ) : (
+        <span className="wx-photo__pending">
+          {ratio === undefined ? <span className="wx-spinner" /> : `${Math.round(ratio * 100)}%`}
+        </span>
+      )}
+      {url && uploading ? (
+        <span className="wx-photo__upload">{Math.round((ratio ?? 0) * 100)}%</span>
+      ) : null}
+    </button>
   )
 }
 
-function VideoBubble({ media }: { media: MessageMedia }) {
+function VideoBubble({
+  media,
+  chatId,
+  messageId,
+}: {
+  media: MessageMedia
+  chatId: number
+  messageId: number
+}) {
   const url = useMediaUrl(media, 6)
   const { ratio } = useBubbleProgress(media)
-  const [playing, setPlaying] = useState(false)
 
   const width = media.width ?? 16
   const height = media.height ?? 9
   const scale = Math.min(MAX_PHOTO_W / width, MAX_PHOTO_H / height)
   const box = { width: Math.round(width * scale), height: Math.round(height * scale) }
 
-  if (url && playing) {
-    return (
-      <video
-        className="wx-video"
-        style={box}
-        src={url}
-        controls
-        autoPlay
-        playsInline
-        onEnded={() => setPlaying(false)}
-      />
-    )
-  }
-
+  // Like a photo, a video opens in the client's 图片和视频 window — it does not
+  // play inside the bubble, and the transport lives in that window's player bar.
   return (
     <button
       type="button"
       className="wx-video wx-video--poster"
       style={box}
-      onClick={() => setPlaying(true)}
+      onClick={() => openVideoViewer(chatId, messageId)}
       title="播放视频"
     >
       {media.minithumbnail ? (
@@ -157,7 +127,9 @@ function VideoBubble({ media }: { media: MessageMedia }) {
           aria-hidden
         />
       ) : null}
-      <span className="wx-video__play">▶</span>
+      <span className="wx-video__play" aria-hidden>
+        <PlayIcon size={34} />
+      </span>
       {media.duration ? (
         <span className="wx-video__duration">{formatDuration(media.duration)}</span>
       ) : null}

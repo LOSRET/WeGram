@@ -99,7 +99,9 @@ export function MessageRow({
                 {repliedTo.senderName}：{messagePreview(repliedTo)}
               </div>
             ) : null}
-            {mediaKind && media ? <MediaBubble media={media} kind={mediaKind} /> : null}
+            {mediaKind && media ? (
+              <MediaBubble media={media} kind={mediaKind} chatId={chat.id} messageId={message.id} />
+            ) : null}
             {message.text ? (
               <div className={mediaKind ? 'wx-caption' : undefined}>
                 <RichText text={message.text} entities={message.entities} />

@@ -266,12 +266,20 @@ artwork — leave it), `Composer.tsx` (283), `MediaBubble.tsx` (261), `main/inde
    (long SVG attribute blocks get one attribute per line). It is mechanical — use
    `git show -w <commit>` when reviewing `5780819`.
 5. **`pnpm format` must not reach `spikes/` or `*.md`** — both are in `.prettierignore`.
-6. **Known unfixed observation (pre-existing, not from this refactor):** when a *short*
+6. ~~**Known unfixed observation (pre-existing, not from this refactor):** when a *short*
    transcript (< one viewport) restored a saved anchor, `useAnchoredScroll.unpin()` leaves
    `atBottom === false` and no scroll event ever fires to correct it, so the next incoming
-   message shows the “↓ N 条新消息” buoy instead of sticking to the bottom. Plausible fix:
-   treat "content shorter than viewport" as pinned in `useAnchoredScroll`. Needs its own
-   decision, no test exists for it.
+   message shows the “↓ N 条新消息” buoy instead of sticking to the bottom.~~ **Fixed.** The
+   root cause is wider than the restore: the pin was only refreshed by scroll events, so any
+   layout change that left a transcript shorter than the viewport (restore, window resize,
+   rows measuring shorter than the virtualizer's estimates, a shrink) kept `atBottom` stale.
+   The rule now lives in `lib/scrollGeometry.ts` and is re-derived from geometry by both
+   ResizeObservers and after a restore; a stored anchor that can no longer be used is cleared.
+   Fixing it surfaced a second, pre-existing defect: `useChatHistory` announced
+   `anchorKnown === false` in an *effect*, so a cached chat mounted the list one frame early
+   at the bottom, which wrote `bottom` over the stored anchor before `ui:getAnchor` read it —
+   cached chats never restored. That reset now happens during render. See `docs/HANDOFF.md`
+   → "Non-obvious facts".
 7. **Electron launch:** always `pwsh apps\desktop\scripts\launch-detached.ps1 -NoSandbox -Mock`
    from a normal (non-job) shell path — the agent shell cannot start Chromium. If an older
    `electron.exe` is still alive, the single-instance lock silently keeps the OLD bundle on

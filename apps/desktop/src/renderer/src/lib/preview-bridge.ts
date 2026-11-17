@@ -17,6 +17,7 @@ import type {
   StickerSet,
   StickerSetSummary,
   TgBridge,
+  ViewerItem,
 } from '@wechatgram/protocol'
 
 /**
@@ -227,6 +228,23 @@ const messagesByChat: Record<number, Message[]> = {
   99: perfMessages,
 }
 
+/**
+ * The adapter's read rule in three lines: the marker only moves forward, and
+ * `unread` is whatever is still newer than it. `upTo === null` means "the newest
+ * message" (`chats:open`).
+ */
+function applyPreviewRead(chatId: number, upTo: number | null): void {
+  const chat = chats.find((item) => item.id === chatId)
+  if (!chat) return
+  const list = messagesByChat[chatId] ?? []
+  const marker = upTo ?? list[list.length - 1]?.id ?? null
+  if (marker !== null) chat.lastReadInboxMessageId = marker
+  chat.unread = list.filter(
+    (message) => !message.outgoing && message.id > (chat.lastReadInboxMessageId ?? 0),
+  ).length
+  emit('evt:chats', { ops: [{ op: 'upsert', chat: { ...chat } }] })
+}
+
 const drafts: Record<number, string> = {}
 const anchors: Record<number, { messageId: number; offset: number }> = {}
 
@@ -310,8 +328,11 @@ function media(fileId: number, extra: Partial<MessageMedia> = {}): MessageMedia 
 }
 
 let nextId = 9000
+/** The chat the UI last opened; the dev injector below delivers arrivals into it. */
+let openChatId: number | null = null
 let proxy: ProxyConfig | null = null
 let settings: AppSettings = { theme: 'light' }
+let previewViewer: { items: ViewerItem[]; index: number; title?: string } | null = null
 
 const info: AppInfo = {
   version: '0.1.0',
@@ -353,11 +374,13 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'chats:get':
       return chats.find((chat) => chat.id === store.chatId)
     case 'chats:open': {
-      const chat = chats.find((item) => item.id === store.chatId)
-      if (chat) {
-        chat.unread = 0
-        emit('evt:chats', { ops: [{ op: 'upsert', chat: { ...chat } }] })
-      }
+      openChatId = Number(store.chatId)
+      applyPreviewRead(openChatId, null)
+      return undefined
+    }
+    case 'messages:read': {
+      const upTo = Number(store.upToMessageId)
+      if (Number.isFinite(upTo)) applyPreviewRead(Number(store.chatId), upTo)
       return undefined
     }
     case 'messages:history': {
@@ -487,6 +510,24 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       return undefined
     case 'proxy:test':
       return { ok: true, latencyMs: 3 } satisfies ProxyTestResult
+    /**
+     * The viewer is its own Electron window, so the browser preview can only
+     * record the request (a photo or video click is a no-op there).
+     */
+    case 'viewer:open':
+      previewViewer = payload as { items: ViewerItem[]; index: number; title?: string }
+      return undefined
+    case 'viewer:init':
+      if (!previewViewer) throw { code: 'internal', message: '查看器还没有打开' }
+      return { items: previewViewer.items, index: previewViewer.index, theme: settings.theme }
+    case 'viewer:save':
+    case 'viewer:copy':
+    case 'viewer:reveal':
+      throw { code: 'not_implemented', message: '浏览器预览不能访问本地文件' }
+    case 'viewer:pin':
+      return { onTop: false }
+    case 'viewer:close':
+      return undefined
     default:
       throw { code: 'not_implemented', message: `${channel} is not wired in the browser preview` }
   }
@@ -516,4 +557,30 @@ export function installPreviewBridge(): void {
   }
 
   window.tg = bridge
+
+  /**
+   * Dev-only arrival injector for the browser preview.
+   *
+   * The mock adapter's traffic is random (one chat every 12 s) and never lands in
+   * the 5000-message fixture, the only chat tall enough to scroll up in — so
+   * arrival behaviour (the buoy's count, unread badges, auto-scroll) could not be
+   * exercised on demand. Console: `__wxPreviewIncoming('文案')`.
+   */
+  const previewWindow: Window & { __wxPreviewIncoming?: (text?: string) => void } = window
+  previewWindow.__wxPreviewIncoming = (text = '预览：新消息') => {
+    if (openChatId === null) return
+    const chatId = openChatId
+    const message = msg(chatId, nextId++, text, false, 0)
+    messagesByChat[chatId] = [...(messagesByChat[chatId] ?? []), message]
+    emit('evt:messages', { chatId, ops: [{ op: 'new', message }] })
+    // Mirror the adapter: an incoming message also bumps the chat's unread count,
+    // which is what the row badge and the rail total read.
+    const chat = chats.find((item) => item.id === chatId)
+    if (chat) {
+      chat.unread += 1
+      chat.lastMessageText = message.text
+      chat.lastMessageAt = message.date
+      emit('evt:chats', { ops: [{ op: 'upsert', chat: { ...chat } }] })
+    }
+  }
 }

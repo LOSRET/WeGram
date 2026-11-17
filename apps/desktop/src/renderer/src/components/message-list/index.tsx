@@ -1,18 +1,20 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { ChatSummary, Message } from '@wechatgram/protocol'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import { isSameDay } from '../../lib/format'
 import { useAnchoredScroll } from '../../lib/useAnchoredScroll'
 import { useAppStore } from '../../store/useAppStore'
 import type { UnreadMarker } from '../../store/useAppStore'
 import { ContextMenu, type MenuItem } from '../ContextMenu'
+import { JumpToLatestIcon } from '../Icon'
 import { OverlayScrollbar } from '../OverlayScrollbar'
 import { DaySeparator, UnreadDivider } from './Divider'
 import { MessageRow } from './MessageRow'
 import { buildMessageMenuItems } from './menu'
+import { countUnreadBelow } from './unreadBelow'
 import { useScrollFlags } from './scrollFlags'
-import { findUnreadMessage } from './unread'
+import { findUnreadMessage, type LandingPosition } from './unread'
 import { useAnchorSave } from './useAnchorSave'
 import { useInitialPosition } from './useInitialPosition'
 import { usePrependRestore } from './usePrependRestore'
@@ -22,8 +24,14 @@ export interface MessageListProps {
   messages: Message[]
   hasMore: boolean
   loadingOlder: boolean
-  /** Saved reading position to open the chat at; null means "land at the bottom". */
-  initialAnchor: { messageId: number; offset: number } | null
+  /** Where the chat opens: saved row, unread divider, or (null) the newest message. */
+  landing: LandingPosition | null
+  /**
+   * The newest message whose row has been on screen, or null before the first
+   * measurement. The pane reports `messages:read` up to it: only the list knows
+   * what the reader actually saw, and a chat left scrolled up must stay unread.
+   */
+  onSeenUpToChange: (messageId: number | null) => void
   /** What was unread when the chat was opened, for the "以下是新消息" divider. */
   unreadMarker: UnreadMarker | null
   onLoadOlder: () => Promise<void>
@@ -60,8 +68,9 @@ export function MessageList({
   messages,
   hasMore,
   loadingOlder,
-  initialAnchor,
+  landing,
   unreadMarker,
+  onSeenUpToChange,
   onLoadOlder,
   onReply,
   onEdit,
@@ -73,7 +82,6 @@ export function MessageList({
   const hostRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const [menu, setMenu] = useState<MenuState | null>(null)
-  const [buoy, setBuoy] = useState(0)
 
   const auth = useAppStore((state) => state.auth)
   const self =
@@ -92,10 +100,13 @@ export function MessageList({
     ? messages.findIndex((message) => message.id === unreadMessageId)
     : -1
 
-  const { ready, atBottom, markReady, scrollToBottom, unpin } = useAnchoredScroll({
+  const flags = useScrollFlags()
+
+  const { ready, atBottom, markReady, scrollToBottom, unpin, syncPin } = useAnchoredScroll({
     scrollRef,
     contentRef,
     resetKey: chat.id,
+    restoringRef: flags.restoring,
   })
 
   const virtualizer = useVirtualizer({
@@ -106,21 +117,44 @@ export function MessageList({
     getItemKey: (index) => messages[index]?.id ?? index,
   })
 
-  const flags = useScrollFlags()
-
   useInitialPosition({
     scrollRef,
     messages,
-    initialAnchor,
+    landing,
     flags,
     virtualizer,
     ready,
     markReady,
     scrollToBottom,
     unpin,
+    syncPin,
   })
 
-  const { scheduleAnchorSave } = useAnchorSave({ chatId: chat.id, scrollRef, flags })
+  const { scheduleAnchorSave, savePosition } = useAnchorSave({ chatId: chat.id, scrollRef, flags })
+
+  /**
+   * The landing has to survive the reader leaving without scrolling.
+   *
+   *  - A saved position that turned out to be unusable — the transcript fits the
+   *    viewport, so the reader is looking at the newest message anyway — must not
+   *    stay in `ui.db`: a later, longer transcript would reopen scrolled up to an
+   *    old row. Nothing else clears it, because a transcript that fits never
+   *    scrolls.
+   *  - Opening at the unread divider is itself a reading position, and no scroll
+   *    event will ever record it. Stored as "this row at the top", because the
+   *    divider only exists for this open (see `useAnchorSave.savePosition`).
+   */
+  useEffect(() => {
+    if (!ready || landing === null || flags.restoring.current) return
+    if (landing.kind === 'unread') {
+      if (atBottom) scheduleAnchorSave()
+      else savePosition({ messageId: landing.messageId, offset: 0 })
+      return
+    }
+    if (!atBottom) return
+    scheduleAnchorSave()
+    // `flags` itself is a fresh object per render; the ref inside it is stable.
+  }, [ready, atBottom, landing, scheduleAnchorSave, savePosition, flags.restoring])
 
   const { loadOlder } = usePrependRestore({
     scrollRef,
@@ -131,16 +165,57 @@ export function MessageList({
     onLoadOlder,
   })
 
-  // Buoy for messages that arrived while the reader is scrolled up (rule 3).
-  const previousCount = useRef(messages.length)
-  useEffect(() => {
-    const previous = previousCount.current
-    previousCount.current = messages.length
-    if (messages.length > previous && !atBottom && !flags.prepending.current) {
-      setBuoy((count) => count + (messages.length - previous))
+  /**
+   * The pill's N is "how many new messages are still below the fold", derived from
+   * the same read marker the chat row and the rail badge come from — not a counter
+   * of arrivals. That is what keeps the three numbers agreeing: our own
+   * `messages:read` moves the marker, the server answers with the new unread count,
+   * and the pill follows. See `components/message-list/unreadBelow.ts`.
+   */
+  const [seenIndex, setSeenIndex] = useState(-1)
+  const buoy = countUnreadBelow(messages, chat.lastReadInboxMessageId ?? null, seenIndex)
+
+  /** How far the reader has actually read, in message ids (see `lib/readGate.ts`). */
+  const seenUpToRef = useRef<number | null>(null)
+
+  /**
+   * One measurement pass over the rendered rows answers both questions the
+   * transcript has about the viewport: how far the read marker may move (the newest
+   * row that has been on screen), and which row is the last one above the fold (the
+   * pill counts what is left below it). A single definition of "seen" — a row whose
+   * top edge is inside the viewport — instead of two that drift apart.
+   */
+  const measureViewport = useCallback(() => {
+    const scroller = scrollRef.current
+    if (!scroller) return
+
+    const viewport = scroller.getBoundingClientRect()
+    const height = scroller.clientHeight
+    let newestSeen = seenUpToRef.current
+    let newestSeenIndex = -1
+
+    for (const slot of scroller.querySelectorAll<HTMLElement>('[data-message-id]')) {
+      const top = slot.getBoundingClientRect().top - viewport.top
+      if (top >= height) continue
+      const index = Number(slot.dataset.index)
+      const message = messages[index]
+      if (!message) continue
+      if (index > newestSeenIndex) newestSeenIndex = index
+      if (newestSeen === null || message.id > newestSeen) newestSeen = message.id
     }
-    if (atBottom && buoy !== 0) setBuoy(0)
-  }, [messages.length, atBottom, buoy, flags.prepending])
+
+    if (newestSeenIndex !== seenIndex) setSeenIndex(newestSeenIndex)
+    if (newestSeen !== seenUpToRef.current) {
+      seenUpToRef.current = newestSeen
+      onSeenUpToChange(newestSeen)
+    }
+  }, [messages, onSeenUpToChange, seenIndex, scrollRef])
+
+  // Runs after every commit, so a row that grew (`measureElement`, an image
+  // finishing) is covered as well: geometry decides, not the scroll event.
+  useLayoutEffect(() => {
+    measureViewport()
+  })
 
   const menuItems = (message: Message): MenuItem[] =>
     buildMessageMenuItems(message, { onReply, onCopy, onForward, onEdit, onDelete })
@@ -152,6 +227,7 @@ export function MessageList({
         ref={scrollRef}
         onScroll={(event) => {
           if (event.currentTarget.scrollTop < 160) void loadOlder()
+          measureViewport()
           scheduleAnchorSave()
         }}
         data-testid="message-scroller"
@@ -198,15 +274,17 @@ export function MessageList({
 
       {loadingOlder ? <div className="wx-messages__loading">正在加载更早的消息…</div> : null}
 
-      {buoy > 0 ? (
-        <button
-          className="wx-buoy"
-          onClick={() => {
-            scrollToBottom(true)
-            setBuoy(0)
-          }}
-        >
-          ↓ {buoy} 条新消息
+      {/*
+        WeChat's pill belongs to "the reader is not at the newest message", not to
+        new arrivals: reopening a chat at a saved position (or at the unread
+        divider) leaves the reader stranded without it. The counter only changes
+        the wording — and it counts the arrivals still below the viewport, never
+        the ones already read.
+      */}
+      {ready && !atBottom ? (
+        <button className="wx-buoy" onClick={() => scrollToBottom(true)}>
+          <JumpToLatestIcon className="wx-buoy__icon" />
+          <span>{buoy > 0 ? `${buoy} 条新消息` : '跳转到最新消息'}</span>
         </button>
       ) : null}
 

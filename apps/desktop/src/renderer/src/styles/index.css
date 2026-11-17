@@ -62,13 +62,23 @@
 
   /* Sizes (WeChat 4.x metrics) */
   --wx-titlebar-h: 32px;
-  --wx-rail-w: 42px;
+  --wx-rail-w: 61px;
+  /* Rail glyph grey: measured #5a–#5d on the client's core pixels (a 30 % darker
+     grey than the #8a8a8a this used to carry, which is why the icons read both
+     thinner and smaller than the client's at the same line width). */
+  --wx-rail-icon: #5c5c5c;
   --wx-sidebar-w: 238px;
   --wx-list-head-h: 43px;
   --wx-list-item-h: 65px;
   --wx-avatar: 40px;
   --wx-avatar-msg: 38px;
   --wx-pane-head-h: 46px;
+
+  /* Standalone image viewer (design doc §9.5). The client's viewer is a lighter
+     strip than the shell chrome: #e6e6e6 bar over a #f7f7f7 canvas. */
+  --wx-viewer-bar: #e6e6e6;
+  --wx-viewer-canvas: #f7f7f7;
+  --wx-viewer-bar-h: 40px;
 }
 
 [data-theme='dark'] {
@@ -92,6 +102,11 @@
   --wx-brand-weak: rgba(7, 193, 96, 0.16);
   --wx-scrollbar-thumb: rgba(255, 255, 255, 0.22);
   --wx-scrollbar-thumb-active: rgba(255, 255, 255, 0.38);
+  /* Not measured on the client in dark mode; kept one step lighter than the
+     light-theme grey so the glyphs stay legible on #191919. */
+  --wx-rail-icon: #9a9a9a;
+  --wx-viewer-bar: #1f1f1f;
+  --wx-viewer-canvas: #141414;
 }
 
 * {
@@ -336,7 +351,7 @@ select {
   border: none;
   border-radius: 7px;
   background: transparent;
-  color: #8a8a8a;
+  color: var(--wx-rail-icon);
 }
 
 .wx-rail__btn:hover {
@@ -696,7 +711,10 @@ select {
   min-height: 0;
   overflow-y: auto;
   overflow-anchor: none;
-  padding: 10px 8px 4px 16px;
+  /* Symmetric and generous, like the client: the transcript is inset from both
+     pane edges by the same amount (measured 21–25 px on the client; the outgoing
+     column used to sit 8 px from the edge, which read as "glued to the wall"). */
+  padding: 10px 22px 4px 22px;
   position: relative;
   /* The virtualizer positions rows absolutely; keep block flow, not flex. */
 }
@@ -732,18 +750,32 @@ select {
   pointer-events: none;
 }
 
+/* "跳转到最新消息" — measured off the client's own pill: white, no border, soft
+   shadow, green double chevron + green 13 px label, ~29 px tall, 16 px from the
+   right edge of the transcript and 14 px above its bottom. It is shown whenever the
+   reader is not at the newest message, not only when something arrived. */
 .wx-buoy {
   position: absolute;
-  left: 50%;
+  /* Aligned with the transcript's right inset, i.e. with the outgoing avatars. */
+  right: 22px;
   bottom: 14px;
-  transform: translateX(-50%);
-  padding: 6px 14px;
-  border: 1px solid var(--wx-line);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 29px;
+  padding: 0 13px;
+  border: 0;
   border-radius: 999px;
   background: var(--wx-elevated);
   color: var(--wx-brand-text);
-  font-size: 12px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+  font-size: 13px;
+  line-height: 1;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+}
+
+.wx-buoy__icon {
+  flex: none;
 }
 
 /* ---------- Message rows ---------- */
@@ -1735,29 +1767,320 @@ select {
   line-height: 16px;
 }
 
-.wx-lightbox {
-  position: fixed;
-  inset: 0;
-  z-index: 140;
+/* ==========================================================================
+   Standalone viewer (design doc §9.5) — the client's 图片和视频 window
+
+   Measured off the client's own viewer window: a 40 px toolbar strip that also
+   carries the window controls, the photo or video contained on a light canvas
+   below it, no padding around the picture. Buttons are 32 px on a 40 px pitch,
+   grouped by hairlines; the open 预览 board is brand green.
+
+   The video half adds the client's floating player bar (see .wx-player below).
+   ========================================================================== */
+
+.wx-viewer {
   display: flex;
   flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--wx-viewer-canvas);
+  user-select: none;
+}
+
+.wx-viewer__bar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  height: var(--wx-viewer-bar-h);
+  /* Right: three native window buttons (3 × 46 px) plus the 更多 gutter. */
+  padding: 0 150px 0 30px;
+  background: var(--wx-viewer-bar);
+  border-bottom: 1px solid var(--wx-line);
+  -webkit-app-region: drag;
+}
+
+.wx-viewer__icon {
+  display: flex;
+  flex: none;
   align-items: center;
   justify-content: center;
-  gap: 14px;
-  background: rgba(0, 0, 0, 0.86);
-}
-
-.wx-lightbox img {
-  max-width: 88vw;
-  max-height: 82vh;
-  object-fit: contain;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
   border-radius: 4px;
-  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.5);
+  background: transparent;
+  color: var(--wx-text);
+  -webkit-app-region: no-drag;
 }
 
-.wx-lightbox__actions {
+.wx-viewer__icon:hover:not(:disabled) {
+  background: var(--wx-row-hover);
+}
+
+.wx-viewer__icon:disabled {
+  color: var(--wx-text-tertiary);
+  cursor: default;
+}
+
+.wx-viewer__icon.is-active {
+  color: var(--wx-brand);
+}
+
+.wx-viewer__sep {
+  flex: none;
+  width: 1px;
+  height: 18px;
+  margin: 0 3px;
+  background: var(--wx-line-strong);
+}
+
+.wx-viewer__grow {
+  flex: 1 1 auto;
+}
+
+.wx-viewer__body {
   display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.wx-viewer__canvas {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.wx-viewer__canvas.is-pannable {
+  cursor: grab;
+}
+
+.wx-viewer__canvas.is-pannable:active {
+  cursor: grabbing;
+}
+
+/* The size comes from lib/zoom.ts; max-* only applies while it is unknown. */
+.wx-viewer__image {
+  display: block;
+  object-fit: contain;
+  -webkit-user-drag: none;
+  will-change: transform;
+}
+
+/* Video canvas: the clip is fitted the same way a photo is — by its long side,
+   no padding — and the player bar floats over it, so nothing reflows when the
+   bar hides itself. Measured off the client: 40 px tall, 84 px / 82 px in from
+   the window sides, 20 px above the bottom edge, rgba(0,0,0,.45) over the
+   footage with white glyphs (its own #f7f7f7 canvas shows through as #888888). */
+.wx-viewer__stage {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wx-viewer__video {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  background: #000;
+  -webkit-user-drag: none;
+  cursor: pointer;
+}
+
+.wx-player {
+  position: absolute;
+  right: 82px;
+  bottom: 20px;
+  left: 84px;
+  display: flex;
+  align-items: center;
   gap: 10px;
+  height: 40px;
+  padding: 0 10px 0 4px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 13px;
+  transition: opacity 0.18s ease;
+}
+
+.wx-player.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.wx-player__icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #fff;
+}
+
+.wx-player__icon:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.wx-player__time {
+  flex: none;
+  min-width: 40px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.2px;
+}
+
+/* The timeline is 2 px of track with a 10 px thumb, not a native range input:
+   the client's bar is drawn over arbitrary footage and Chromium's slider cannot
+   be made to look like it. */
+.wx-player__track {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  height: 16px;
+  min-width: 60px;
+  cursor: pointer;
+}
+
+.wx-player__track::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.wx-player__played {
+  position: absolute;
+  left: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: #fff;
+}
+
+.wx-player__thumb {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  border-radius: 50%;
+  background: #fff;
+  transform: translateY(-50%);
+  transition: transform 0.12s ease;
+}
+
+.wx-player__track:hover .wx-player__thumb {
+  transform: translateY(-50%) scale(1.2);
+}
+
+.wx-player__rate {
+  flex: none;
+  height: 28px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+}
+
+.wx-player__rate:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.wx-viewer__status {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--wx-text-secondary);
+  font-size: 13px;
+}
+
+.wx-viewer__status--error {
+  background: none;
+  color: var(--wx-danger);
+}
+
+/* 预览: the thumbnail board. The client docks it in its own window; here it is a
+   column inside the viewer, so the photo refits instead of hiding under it
+   (documented delta). */
+.wx-viewer__grid {
+  display: grid;
+  flex: none;
+  align-content: start;
+  grid-auto-rows: 62px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  width: 268px;
+  padding: 10px;
+  overflow-y: auto;
+  background: var(--wx-elevated);
+  border-left: 1px solid var(--wx-line);
+}
+
+.wx-viewer__cell {
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  border: none;
+  border-radius: 4px;
+  background: var(--wx-pane-line);
+}
+
+.wx-viewer__cell img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wx-viewer__cell.is-active {
+  outline: 2px solid var(--wx-brand);
+  outline-offset: -2px;
+}
+
+.wx-viewer__cell-empty {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--wx-list);
+}
+
+.wx-viewer__notice {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  z-index: 90;
+  padding: 7px 14px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 13px;
+  transform: translateX(-50%);
 }
 
 .wx-video {
@@ -1780,9 +2103,10 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 34px;
   color: #fff;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+  /* The glyph is ViewerIcons' PlayIcon, so the bubble and the player bar draw
+     the same shape; the shadow is the old text-shadow, now on the SVG. */
+  filter: drop-shadow(0 2px 12px rgba(0, 0, 0, 0.5));
 }
 
 .wx-video__duration {

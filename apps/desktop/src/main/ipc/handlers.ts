@@ -1,11 +1,23 @@
+import { copyFile } from 'node:fs/promises'
+import { basename, join } from 'node:path'
+
 import { AppError } from '@wechatgram/protocol'
-import type { AppInfo, ProxyConfig } from '@wechatgram/protocol'
-import { BrowserWindow, dialog, shell } from 'electron'
+import type { AppInfo, ProxyConfig, ViewerItem } from '@wechatgram/protocol'
+import { app, BrowserWindow, clipboard, dialog, nativeImage, shell } from 'electron'
 
 import { resolveProxySecrets, toProxyView, toStoredProxy } from '../proxy'
 import type { SettingsStore } from '../store/settings'
 import type { UiDatabase } from '../store/ui-db'
 import type { TelegramAdapter } from '../telegram/adapter'
+import {
+  closeViewer,
+  getViewerWindow,
+  isViewerWindow,
+  openViewer,
+  setViewerPin,
+  viewerItem,
+  viewerState,
+} from '../viewer'
 import type { IpcHandlerMap } from './router'
 
 export interface HandlerDeps {
@@ -152,5 +164,62 @@ export function createHandlers({
       const { config } = payload as { config: ProxyConfig }
       return adapter.testProxy(resolveProxySecrets(config, store.get().proxy))
     },
+
+    'viewer:open': (payload) => {
+      const request = payload as { items: ViewerItem[]; index: number }
+      const focused = BrowserWindow.getFocusedWindow()
+      openViewer(request, isViewerWindow(focused) ? null : focused)
+    },
+    'viewer:init': () => viewerState(),
+    'viewer:save': async (payload) => {
+      const { fileId } = payload as { fileId: number }
+      // Only files the protocol layer just produced are ever copied.
+      const { path: source } = await adapter.downloadFile({ fileId, priority: 32 })
+      const item = viewerItem(fileId)
+      const name = item?.fileName?.trim() || basename(source)
+      const video = item?.kind === 'video'
+      const options: Electron.SaveDialogOptions = {
+        defaultPath: join(app.getPath(video ? 'videos' : 'pictures'), name),
+        filters: [
+          video
+            ? { name: '视频', extensions: [extensionOf(name, 'mp4')] }
+            : { name: '图片', extensions: [extensionOf(name, 'png')] },
+        ],
+      }
+      const win = getViewerWindow()
+      const result = win
+        ? await dialog.showSaveDialog(win, options)
+        : await dialog.showSaveDialog(options)
+      if (result.canceled || !result.filePath) return { canceled: true }
+      await copyFile(source, result.filePath)
+      return { canceled: false, path: result.filePath }
+    },
+    'viewer:copy': async (payload) => {
+      const { fileId } = payload as { fileId: number }
+      // The clipboard holds bitmaps only; a video would need CF_HDROP, which
+      // Electron does not expose, and the client does not offer it either.
+      if (viewerItem(fileId)?.kind === 'video') {
+        throw new AppError('not_implemented', '视频不支持复制到剪贴板')
+      }
+      const { path: source } = await adapter.downloadFile({ fileId, priority: 32 })
+      const image = nativeImage.createFromPath(source)
+      if (image.isEmpty()) throw new AppError('internal', 'Failed to decode the image')
+      clipboard.writeImage(image)
+    },
+    'viewer:reveal': async (payload) => {
+      const { fileId } = payload as { fileId: number }
+      const { path: source } = await adapter.downloadFile({ fileId, priority: 32 })
+      shell.showItemInFolder(source)
+    },
+    'viewer:pin': (payload) => ({ onTop: setViewerPin((payload as { onTop: boolean }).onTop) }),
+    'viewer:close': () => {
+      closeViewer()
+    },
   }
+}
+
+/** Extension of a media file name, for the Save-As filter; the fallback if unknown. */
+function extensionOf(name: string, fallback: string): string {
+  const extension = name.includes('.') ? (name.split('.').pop() ?? '') : ''
+  return /^[a-z0-9]{2,5}$/i.test(extension) ? extension.toLowerCase() : fallback
 }

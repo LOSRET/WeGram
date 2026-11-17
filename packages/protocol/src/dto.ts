@@ -255,6 +255,42 @@ export const appSettingsSchema = z.object({
 })
 export type AppSettings = z.infer<typeof appSettingsSchema>
 
+/**
+ * One item of the strip the standalone viewer window pages through.
+ *
+ * The client puts photos **and** videos in the same 图片和视频 window, so the item
+ * carries its kind: the toolbar is shared, only the canvas and the bottom player
+ * bar differ.
+ *
+ * The renderer owns the transcript, so it hands the viewer the whole strip plus
+ * the index that was clicked; 上一张/下一张 then works without asking the adapter
+ * for history again.
+ */
+export const viewerItemSchema = z.object({
+  /** Media file id the viewer downloads through `media:download`. */
+  fileId: z.number().int().positive(),
+  /** Message carrying the media, so 更多 → 定位到聊天位置 keeps its origin. */
+  messageId: z.number().int().optional(),
+  kind: z.enum(['photo', 'video']),
+  fileName: z.string().optional(),
+  width: z.number().int().positive().optional(),
+  height: z.number().int().positive().optional(),
+  size: z.number().int().nonnegative().optional(),
+  /** Seconds; lets the player show the total before the file has loaded. */
+  duration: z.number().nonnegative().optional(),
+  /** base64 JPEG, ~40px: paints the 预览 grid before a file has been fetched. */
+  minithumbnail: z.string().optional(),
+})
+export type ViewerItem = z.infer<typeof viewerItemSchema>
+
+/** What `viewer:init` answers: the strip, the current index and the theme. */
+export const viewerStateSchema = z.object({
+  items: z.array(viewerItemSchema).min(1).max(200),
+  index: z.number().int().nonnegative(),
+  theme: appSettingsSchema.shape.theme,
+})
+export type ViewerState = z.infer<typeof viewerStateSchema>
+
 export const appInfoSchema = z.object({
   version: z.string(),
   appVersion: z.string(),

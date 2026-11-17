@@ -21,6 +21,7 @@ import { probeImageSize } from '../media/image-size'
 import { registerMediaFile } from '../media/registry'
 import { AdapterEmitter, type MediaKind, type TelegramAdapter } from './adapter'
 import {
+  SAMPLE_VIDEO_WEBM,
   STICKER_FACE_WEBP,
   STICKER_HEART_WEBP,
   STICKER_WAVE_TGS,
@@ -413,7 +414,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   }
 
   async markRead(input: { chatId: number; upToMessageId: number }): Promise<void> {
-    this.applyRead(input.chatId)
+    this.applyRead(input.chatId, input.upToMessageId)
   }
 
   async searchGlobal(input: { q: string; limit: number }): Promise<ChatSummary[]> {
@@ -487,6 +488,8 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     await writeFile(heartPath, Buffer.from(STICKER_HEART_WEBP, 'base64'))
     const wavePath = join(this.options.mediaDir, 'sticker-wave.tgs')
     await writeFile(wavePath, Buffer.from(STICKER_WAVE_TGS, 'base64'))
+    const clipPath = join(this.options.mediaDir, 'sample-video.webm')
+    await writeFile(clipPath, Buffer.from(SAMPLE_VIDEO_WEBM, 'base64'))
 
     const avatarPath = join(this.options.mediaDir, 'self-avatar.png')
     await writeFile(avatarPath, createGradientPng(256, 256, [7, 193, 96], [24, 96, 180]))
@@ -498,6 +501,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     this.addFile(7101, designPath, 'design-v3.png', 'image/png', 1200, 800)
     this.addFile(7102, sunsetPath, 'sunset.png', 'image/png', 900, 1200)
     this.addFile(7201, specPath, '需求说明.md', 'text/markdown')
+    this.addFile(7301, clipPath, 'sample-video.webm', 'video/webm', 270, 480)
 
     this.stickers.push(
       { fileId: 7001, format: 'webp', emoji: '😀', width: 128, height: 128, thumbFileId: 7001 },
@@ -557,10 +561,10 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
         unread: 0,
         pinned: true,
         muted: false,
-        lastMessageText: '[文件] 需求说明.md',
-        lastMessageAt: at(3),
+        lastMessageText: '[视频] 这段录屏看一下',
+        lastMessageAt: at(2),
         lastReadInboxMessageId: 106,
-        lastReadOutboxMessageId: 105,
+        lastReadOutboxMessageId: 106,
       },
       messages: [
         text(1, 101, 240, '本周的设计稿放这里', false),
@@ -597,6 +601,17 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
           kind: 'sticker',
           text: '',
           media: this.mediaOf(7001, { stickerFormat: 'webp', stickerEmoji: '😀' }),
+        },
+        {
+          id: 106,
+          chatId: 1,
+          senderId: ME.id,
+          senderName: '我',
+          outgoing: true,
+          date: at(2),
+          kind: 'video',
+          text: '这段录屏看一下',
+          media: this.mediaOf(7301, { duration: 6 }),
         },
       ],
     })
@@ -752,11 +767,21 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     })
   }
 
-  private applyRead(chatId: number): void {
+  /**
+   * Marks everything up to `upToMessageId` read the way TDLib does: the marker only
+   * moves forward and `unread` is whatever is still newer than it. Reporting the
+   * marker (instead of always "0 unread") is what lets the renderer watch the chat
+   * row and the rail badge fall message by message while the reader scrolls.
+   */
+  private applyRead(chatId: number, upToMessageId?: number): void {
     const fixture = this.requireFixture(chatId)
     const latest = fixture.messages[fixture.messages.length - 1]
-    fixture.chat.unread = 0
-    if (latest) fixture.chat.lastReadInboxMessageId = latest.id
+    const upTo = upToMessageId ?? latest?.id
+    if (upTo === undefined) return
+    fixture.chat.lastReadInboxMessageId = Math.max(fixture.chat.lastReadInboxMessageId ?? 0, upTo)
+    fixture.chat.unread = fixture.messages.filter(
+      (message) => !message.outgoing && message.id > upTo,
+    ).length
     this.emit({ type: 'chats', ops: [{ op: 'upsert', chat: { ...fixture.chat } }] })
   }
 

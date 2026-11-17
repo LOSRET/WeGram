@@ -16,6 +16,7 @@ import type { TelegramAdapter } from './telegram/adapter'
 import { publishAdapterEvent } from './telegram/events'
 import { EventBus } from './telegram/updates'
 import { createLogger } from './util'
+import { setViewerTheme } from './viewer'
 
 const logger = createLogger('main')
 const isDev = !app.isPackaged
@@ -58,6 +59,10 @@ async function bootstrap(): Promise<void> {
 
   uiDb = new UiDatabase(join(userDataDir, 'ui.db'))
   uiDb.open()
+
+  // A viewer opened before the first theme change must still get a dark strip,
+  // so seed the module with the stored theme instead of defaulting to light.
+  setViewerTheme(storedTheme(uiDb))
 
   const apiId = Number(process.env.TELEGRAM_API_ID ?? 0)
   const apiHash = (process.env.TELEGRAM_API_HASH ?? '').trim()
@@ -111,7 +116,10 @@ async function bootstrap(): Promise<void> {
       store,
       uiDb,
       info,
-      onThemeChange: (theme) => applyTitleBarTheme(mainWindow, theme),
+      onThemeChange: (theme) => {
+        applyTitleBarTheme(mainWindow, theme)
+        setViewerTheme(theme)
+      },
     }),
   )
 

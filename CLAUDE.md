@@ -35,6 +35,35 @@ The real TDLib adapter is verified headlessly instead: `pnpm tdlib:smoke` runs t
 
 **Real-account pass (same day):** the adapter was then driven end-to-end in the Electron window behind the mandatory SOCKS proxy, which surfaced three defects that the mock cannot reproduce — history paging stopped on short TDLib answers, read receipts poisoned every chat's cache, and an occluded window could freeze the transcript's visibility gate. All three are fixed; the rail and the chat rows now load real profile photos, and both long panes use WeChat's floating overlay scrollbar. Details: `docs/HANDOFF.md` → "Real-account session" and "Non-obvious facts".
 
+## Coding standards
+
+Ported from the rules that already run the rustracker project (`D:\vibe-coding\rustracker\CLAUDE.md` and `.trae/rules/project_rules.md`), re-expressed for this stack. They bias toward caution over speed; they never override the architecture rules further down. The layer notes (`packages/protocol/AGENTS.md`, `src/main/AGENTS.md`, `src/renderer/AGENTS.md`) are more specific and win for their subtree.
+
+### Working agreements
+
+- **State assumptions; ask when the request has more than one reading.** If a simpler design exists, say so before implementing it the hard way.
+- **Never guess an API, flag or config from memory.** Check the installed types (`node_modules`), the Electron/TDLib docs, or an existing call site first. A wrong TDLib field name is exactly the kind of thing that type-checks and fails at runtime.
+- **Every changed line traces to the request.** No drive-by renaming, reformatting or refactoring of code that is not broken; match the surrounding style even when you'd write it differently.
+- **Clean up only your own orphans.** Remove the imports/variables your change made unused; leave pre-existing dead code in place and mention it.
+- **Don't delete code you don't understand.** Surface the suspicion instead of acting on it.
+
+### Non-negotiable code rules
+
+The TypeScript/Electron equivalent of rustracker's "no `.unwrap()` in production code" — a crash is a crash, whether it comes from a panic or from an `undefined`:
+
+- No non-null assertions (`x!`) and no `as` used to silence the checker. Narrow with a runtime check; `!` just moves the failure into the renderer, where it surfaces as a blank pane far from the cause.
+- No new `any`. Lint leaves `no-explicit-any` off on purpose, so this is review discipline: use `unknown` plus a zod parse at the boundary.
+- Validate every external input where it enters: IPC payloads through the zod schemas in `packages/protocol`, TDLib JSON in the `map/*` layer, media and TGS bytes as untrusted (§10).
+- No empty `catch {}` and no catch that only logs. Errors cross the boundary as `AppError`; the renderer gets a code, never a stack.
+- No `console.log` on shipped paths — use the existing logger/error channel. Existing occurrences are not a licence to add more.
+- No new dependency without asking. No `electron`, `node:*`, `tdl` or `prebuilt-tdlib` import outside the folders the architecture rules allow.
+- Protocol first: a new field or channel goes into `dto.ts` / `channels.ts` before the implementation.
+- Keep side effects at the edges; pure logic belongs in testable modules (`lib/`, `*.test.ts`), because `pnpm test` is DOM-free and Electron-free by design.
+
+**Done means** `pnpm verify` green (lint → typecheck → test → build) with zero warnings. While iterating, use the narrow command (`pnpm vitest run <file>`, `pnpm typecheck`); when reporting, say exactly what you ran and what you skipped — never claim success on a subset.
+
+**Git.** Verify before committing (at least `pnpm typecheck && pnpm lint`). One logical change per commit, Conventional Commit messages. Small fix → current branch; multi-file feature or refactor → new branch.
+
 ## Commands
 
 ```powershell

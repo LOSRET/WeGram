@@ -80,10 +80,21 @@ export async function listChats(
   return summaries
 }
 
+/**
+ * Marks the conversation read.
+ *
+ * The newest id must come from `getChat` (`last_message.id`), never from a
+ * history page: `getChatHistory` treats `from_message_id` as *exclusive*
+ * (measured 2026-11-17), so a page anchored on the newest message ends one
+ * message below it. Marking that page read left the real last message unread
+ * forever — the chat list badge stayed at "1" however often the chat was
+ * opened, while the official client cleared it on the first click.
+ */
 export async function openChat(deps: ActionDeps, chatId: number): Promise<void> {
-  const page = await history(deps, { chatId, limit: 1 })
-  const latest = page.messages.at(-1)
-  if (latest) await markRead(deps, { chatId, upToMessageId: latest.id })
+  const chat = await deps.invoke({ _: 'getChat', chat_id: chatId })
+  const lastId: number | undefined = chat?.last_message?.id
+  if (!lastId) return
+  await markRead(deps, { chatId, upToMessageId: lastId })
 }
 
 /**
@@ -125,13 +136,20 @@ export async function history(
       )
       return { messages: [], hasMore: false }
     }
-    anchor = lastId
+    // `getChatHistory` returns messages *older than* `from_message_id` (it is
+    // exclusive; measured 2026-11-17: from=4975493120 answered 4974444544…).
+    // Anchoring exactly on the last message therefore dropped the newest message
+    // from the first page — one message was never loaded, and `openChat` marked
+    // the wrong id as read, so the unread badge never cleared. One past the last
+    // message is the request that includes it.
+    anchor = lastId + 1
   }
 
   const collected: TdObject[] = []
   const seen = new Set<number>()
   let cursor: number = anchor
-  // The first page may include its anchor; every later round is strictly older.
+  // The first page includes its anchor, because the implicit anchor above is one
+  // past the last message; every later round is strictly older.
   let below = input.fromMessageId
   let exhausted = false
   // A short answer is topped up over a few rounds; bounded so a slow link

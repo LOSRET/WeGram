@@ -31,6 +31,20 @@ Greenfield → working skeleton in three milestones:
   real generated PNG/WebP/TGS media, so every renderer path is exercised offline.
 - Spike 2 (real login + session reuse) is **done and verified**; the session lives in
   `spikes/tdlib/data`.
+- **Image viewer (W3 addendum)**: a photo no longer opens an overlay inside the
+  transcript — it opens WeChat's standalone viewer window (75 % × 90 % of the screen,
+  40 px toolbar carrying 置顶 / 上一张 / 下一张 / 预览 / 缩放 / 原始大小 / 旋转 / 保存 / 更多,
+  wheel + drag zoom, Esc to close). Design: `技术方案.md` §9.5; measured metrics and the
+  deltas vs the client: `UI-HANDOFF.md` §2.1 and §5 items 12–16.
+- **Video in the same window (W3 addendum, later)**: the client's 图片和视频 window also
+  plays videos. A video bubble no longer plays inline with Chromium's native controls —
+  clicking it opens the viewer window, which takes `ViewerItem.kind` and renders
+  `VideoCanvas` (fitted `<video>` + the client's translucent player bar: play/pause,
+  2 px timeline with a 10 px thumb, `00:00` clocks, 倍速 0.5–2×, mute, idle hiding,
+  Space/←/→/M). Toolbar loses the zoom/rotate group for videos; 保存 lands in 视频 and
+  复制/打印 are hidden. Measured metrics: `UI-HANDOFF.md` §2.1 (second table), deltas 17–20.
+  The mock now ships a 6 s WebM fixture (`mock-assets.ts` `SAMPLE_VIDEO_WEBM`) so the
+  window is reachable without the real account.
 
 Verified at the end of the W2 session: `pnpm typecheck`, `pnpm build`, `pnpm tdlib:smoke`,
 `pnpm ui:db-check`, and the browser acceptance panel (`?perf=1`) — 5000 messages at
@@ -304,6 +318,27 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
   (c) `unpin()` must be called before restoring or the stick-to-bottom `ResizeObserver`
   undoes it. The anchor is "first visible slot + its offset", and *no row at all* (a
   null anchor) means "was at the bottom".
+- **"Anchor known" has to be reset during render, not in an effect.** `useChatHistory`
+  used to set `anchorKnown = false` inside its effect, so the render for a *new* chat still
+  carried the old chat's `true`. `ChatPane` then mounted the list one frame early — with
+  `pendingAnchor` already per-chat (null) — and that mount landed at the bottom and wrote
+  `bottom` into `ui.db` before the new chat's `ui:getAnchor` could answer. Measured on the
+  mock: the stored anchor `{14958, -46}` was read as `null` on the very next open, so every
+  *cached* chat reopened at the bottom. The reset is now an in-render state adjustment
+  (`stateChatId !== activeChatId`), which React resolves before committing children. The
+  cold path was never affected: with no cached messages the pane shows a placeholder, not
+  the list.
+- **The stick-to-bottom pin is a function of geometry, not of scroll events.**
+  `lib/scrollGeometry.ts` (`readScrollPin`) is the single rule; `useAnchoredScroll`
+  re-derives it from both `ResizeObserver`s (content *and* container) and after a restore,
+  and `useAnchorSave` uses the same predicate. Why: a transcript shorter than the viewport
+  never scrolls, so waiting for a scroll event leaves `atBottom === false` forever — the
+  next incoming message then raises "↓ N 条新消息" over a message the reader can see, and the
+  list stops following new messages. Three measured ways into that state: a restored anchor
+  whose rows measure shorter than the virtualizer's `estimateSize: 68`, a window grown until
+  the transcript fits, and a transcript that shrank (delete/edit). A layout change is also
+  when a stored anchor becomes unusable, so `MessageList` then records "bottom" once —
+  nothing else would ever clear it.
 - **`wx-media://` must be declared before `app.whenReady()`** with
   `protocol.registerSchemesAsPrivileged` (standard/secure/supportFetchAPI/stream), or
   `<img>`/`<video>`/`fetch` cannot load it. The CSP also needs it in **`connect-src`**,
@@ -401,11 +436,44 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
   have landed.
 - **An empty first history page is not "an empty chat".** A cold local TDLib database can
   answer `messages:history` with `[]`; the renderer used to cache that, after which the
-  transcript stayed blank for the rest of the session. `ChatPane` now retries three times
-  before believing it, does not treat an empty entry as cached, shows an explicit
-  "这个会话还没有可显示的消息" + 重新加载 state, and the adapter logs both halves of the
-  chain (`no last_message` / `getChatHistory returned nothing`) so the next occurrence is
-  explainable from `.cache/app.log`.
+  transcript stayed blank for the rest of the session. Now (2026-11-17, second pass) the page
+  is retried three times *and* an empty answer is not cached at all while the chat list says
+  the chat has messages (`ChatSummary.lastMessageAt`, the same `last_message` the adapter
+  anchors its first page on) — the entry simply stays absent, so the next open or 重新加载 asks
+  again, and the placeholder says "消息还没从服务器同步下来" instead of claiming the chat is
+  empty. A genuinely empty chat (no `lastMessageAt`) still caches its page and still reads
+  "这个会话还没有可显示的消息". The adapter logs both halves of the chain (`no last_message` /
+  `getChatHistory returned nothing`) so the next occurrence is explainable from
+  `.cache/app.log`.
+- **`getChatHistory` treats `from_message_id` as exclusive (measured 2026-11-17).**
+  The request returns messages *strictly older* than the id, so a first page anchored
+  exactly on `chat.last_message.id` never contained the newest message — and `openChat`
+  marked the message *below* it as read. Every chat therefore kept a badge of at least
+  "1" however often it was opened, while clicking the same chat in the official client
+  cleared it (reproduced on 心惊报: TDLib's `last_read_inbox_message_id` stayed one post
+  behind, and `unread_count` never dropped to 0; `from=4975493120` answered `4974444544`).
+  Fixed in `actions.ts`: the implicit first-page anchor is `last_message.id + 1` (so the
+  newest message is loaded), and `openChat` reads up to `getChat.last_message.id`
+  directly instead of trusting a history page. The renderer additionally reports the
+  newest message as read while the chat is open in a focused, visible window
+  (`chat-pane`), so messages arriving during the conversation no longer leave the badge
+  lit. `mapChat` now omits `lastReadInboxMessageId` when TDLib reports 0 — 0 means
+  "nothing read yet", not message 0 — so the unread divider falls back to the unread
+  counter instead of being pinned above the first row of the loaded page.
+- **`updateDeleteMessages` is not always a deletion — and the cache-only variant emptied
+  the open chat (measured 2026-11-17).** The TDLib update carries `is_permanent` and
+  `from_cache`; `from_cache: true` means "deleted only from the cache and can possibly be
+  retrieved again in the future". TDLib emits those while the app sits idle in the
+  background: reproduced on the real account by leaving the window occluded for ~2 minutes —
+  a `{from_cache: true, is_permanent: false}` batch for **all 50** cached messages of the
+  open chat (`[dbg]` trace: `setHistory … 50` → the eviction → `applyMessageOps emptied
+  chat`), after which the pane showed "这个会话还没有可显示的消息" while 重新加载 fetched the
+  same 50 messages back from the server. The adapter ignored both flags, so every cache trim
+  looked like a user deletion — this is the "切到后台再切回来消息就没了" bug. Fixed in
+  `updates.ts` / `map/deletion.ts`: only `from_cache !== true` removes rows; evictions are
+  logged (`dropped N message(s) from the local cache — kept in the transcript`) and the
+  renderer additionally refetches once when a transcript that *had* rows goes empty
+  (`useChatHistory`), so no silent wipe can park the pane on the empty state again.
 - `userData` is pinned to `%APPDATA%\WechatGram` via `app.setName`/`setPath`, because
   the package name is `@wechatgram/desktop` and would otherwise create a nested folder.
 
@@ -523,15 +591,26 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
 
 ## Session leftovers
 
+**2026-11-17, scroll-anchor session:** the recorded "short transcript restored a saved anchor
+but counts as not at the bottom" observation is **fixed** — the pin is now derived from
+geometry (`lib/scrollGeometry.ts`) instead of scroll events, and the stale anchor is cleared.
+Fixing it exposed the cached-chat mount race above (cached chats never restored at all),
+which is fixed too. Measured in the mock Electron window, with the CDP helpers in `.cache/`:
+stored `{14958, -46}` on the 5000-message chat restores to `scrollTop 586` /
+`firstVisible 14958 @ -46`; a cached short chat opens at the bottom, drops its anchor
+(`ui:getAnchor → null`) and raises no buoy when a message arrives; growing the viewport until
+the transcript fits re-pins the list (it used to show "↓ 1 条新消息" for a fully visible
+message) and it keeps following new messages; the buoy still appears when genuinely scrolled
+up and its click returns to the bottom. `apps/desktop/src/renderer/src/lib/scrollGeometry.test.ts`
+covers the predicate (5 cases). The working tree carries these changes **uncommitted**.
+The Electron window used for the walkthrough was closed.
+
 **2026-11-17, refactor session:** `pnpm verify` (lint → typecheck → vitest → build) is the
-gate; 132 unit tests, ESLint now enforces the architecture rules, Prettier owns formatting.
-The Electron window used for the mock walkthrough was **closed**, so nothing is running —
-launch it detached again when you need it. Batch 4 (the `tdlib.ts` split) is done — batch 4a added the explicit
+gate; 137 unit tests, ESLint now enforces the architecture rules, Prettier owns formatting.
+Batch 4 (the `tdlib.ts` split) is done — batch 4a added the explicit
 `MapperContext`, 4b moved the adapter into `telegram/tdlib/` and added 45 mapper tests.
 Remaining work is the split of `mock.ts`, `preview-bridge.ts`, `styles/index.css` and
-`packages/protocol`: see
-`docs/REFACTOR-HANDOFF.md` (including the one open observation about a short transcript that
-restored a saved anchor still counting as "not at the bottom").
+`packages/protocol`: see `docs/REFACTOR-HANDOFF.md`.
 
 **Earlier (W3) session:** the Electron window was left running (real adapter, launched
 detached, maximised) so the next session could pick it up; close it with

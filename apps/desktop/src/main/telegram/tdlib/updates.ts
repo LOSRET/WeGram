@@ -6,6 +6,7 @@ import type { AdapterEvent } from '../adapter'
 import type { TdObject } from './client'
 import { mapConnectionState } from './map/chat'
 import type { MapperContext } from './map/context'
+import { isTranscriptRemoval } from './map/deletion'
 import { mapMessage } from './map/message'
 
 /** What the update stream needs from the adapter. */
@@ -73,13 +74,29 @@ export function createUpdateHandler(deps: UpdateDeps): (update: TdObject) => Pro
         }
         return
       }
-      case 'updateDeleteMessages':
+      case 'updateDeleteMessages': {
+        const messageIds: number[] = Array.isArray(update.message_ids) ? update.message_ids : []
+        if (messageIds.length === 0) return
+        /**
+         * TDLib also reports *cache evictions* here: while the app sat idle in the
+         * background it dropped all 50 cached messages of the open chat with
+         * `from_cache: true`, and mapping that to a `delete` emptied the transcript
+         * even though the server still served every message (重新加载 brought them
+         * back). Cache-only events must not remove rows — see `map/deletion.ts`.
+         */
+        if (!isTranscriptRemoval(update)) {
+          deps.logger.info(
+            `history: chat ${update.chat_id} dropped ${messageIds.length} message(s) from the local cache — kept in the transcript`,
+          )
+          return
+        }
         deps.emit({
           type: 'messages',
           chatId: update.chat_id,
-          ops: [{ op: 'delete', chatId: update.chat_id, messageIds: update.message_ids ?? [] }],
+          ops: [{ op: 'delete', chatId: update.chat_id, messageIds }],
         })
         return
+      }
       case 'updateChatReadInbox':
         deps.emit({
           type: 'messages',

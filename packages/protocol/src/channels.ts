@@ -16,6 +16,8 @@ import {
   selfSchema,
   stickerSetSchema,
   stickerSetSummarySchema,
+  viewerItemSchema,
+  viewerStateSchema,
 } from './dto'
 import { appErrorSchema } from './errors'
 
@@ -62,6 +64,13 @@ export const invokeChannels = [
   'proxy:set',
   'proxy:test',
   'app:info',
+  'viewer:open',
+  'viewer:init',
+  'viewer:save',
+  'viewer:copy',
+  'viewer:reveal',
+  'viewer:pin',
+  'viewer:close',
 ] as const
 
 export type InvokeChannel = (typeof invokeChannels)[number]
@@ -220,6 +229,33 @@ export const invokeSchemas = {
     response: proxyTestResultSchema,
   },
   'app:info': { request: noPayload, response: appInfoSchema },
+  /**
+   * Opens (or re-targets) the standalone 图片和视频 window. The renderer sends the
+   * strip it wants to page through, because it owns the transcript.
+   */
+  'viewer:open': {
+    request: z.object({
+      items: z.array(viewerItemSchema).min(1).max(200),
+      index: z.number().int().nonnegative(),
+    }),
+    response: noPayload,
+  },
+  /** Called by the viewer window itself to learn what it has to show. */
+  'viewer:init': { request: noPayload, response: viewerStateSchema },
+  /** 保存: a real Save-As dialog for the media file, extension preserved. */
+  'viewer:save': {
+    request: z.object({ fileId: z.number().int() }),
+    response: z.object({ canceled: z.boolean(), path: z.string().optional() }),
+  },
+  /** 复制: puts the decoded bitmap on the clipboard, not the file path. Photos only. */
+  'viewer:copy': { request: z.object({ fileId: z.number().int() }), response: noPayload },
+  'viewer:reveal': { request: z.object({ fileId: z.number().int() }), response: noPayload },
+  /** 置顶: always-on-top for this window only; answers the state it settled on. */
+  'viewer:pin': {
+    request: z.object({ onTop: z.boolean() }),
+    response: z.object({ onTop: z.boolean() }),
+  },
+  'viewer:close': { request: noPayload, response: noPayload },
 } satisfies Record<InvokeChannel, ChannelSchema>
 
 export type InvokeRequest<C extends InvokeChannel> = z.input<(typeof invokeSchemas)[C]['request']>

@@ -19,7 +19,7 @@ interface SideRailProps {
 }
 
 /**
- * The 42 px icon rail on the far left of WeChat: avatar on top, the four
+ * The 61 px icon rail on the far left of WeChat: avatar on top, the four
  * sections under it, device + settings pinned to the bottom.
  *
  * Only 聊天 has a working view; the other sections report that they are not
@@ -59,7 +59,7 @@ export function SideRail({ onOpenMenu, onUnavailable }: SideRailProps) {
 
       <div className="wx-rail__nav">
         <button className="wx-rail__btn wx-rail__btn--active" title="聊天" aria-current="page">
-          <TelegramLogo size={26} className="wx-rail__brand" />
+          <TelegramLogo size={21} className="wx-rail__brand" />
           {unread > 0 ? (
             <span className="wx-rail__badge">{unread > 99 ? '99+' : unread}</span>
           ) : null}
@@ -68,7 +68,7 @@ export function SideRail({ onOpenMenu, onUnavailable }: SideRailProps) {
           <ContactsTabIcon size={24} />
         </button>
         <button className="wx-rail__btn" title="收藏" onClick={() => onUnavailable('收藏')}>
-          <CubeTabIcon size={23} />
+          <CubeTabIcon size={24} />
         </button>
         <button className="wx-rail__btn" title="朋友圈" onClick={() => onUnavailable('朋友圈')}>
           <MomentsTabIcon size={24} />
@@ -77,10 +77,10 @@ export function SideRail({ onOpenMenu, onUnavailable }: SideRailProps) {
 
       <div className="wx-rail__bottom">
         <button className="wx-rail__btn" title="手机" onClick={() => onUnavailable('手机')}>
-          <DeviceIcon size={22} />
+          <DeviceIcon size={23} />
         </button>
         <button className="wx-rail__btn" title="设置" onClick={openMenu}>
-          <MenuIcon size={22} />
+          <MenuIcon size={23} />
         </button>
       </div>
     </nav>

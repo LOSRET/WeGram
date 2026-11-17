@@ -2,31 +2,47 @@ import type { Virtualizer } from '@tanstack/react-virtual'
 import type { Message } from '@wechatgram/protocol'
 import { useEffect, useLayoutEffect, type RefObject } from 'react'
 
+import { readScrollPin } from '../../lib/scrollGeometry'
 import { resyncScroller } from './scroller'
 import type { ScrollFlags } from './scrollFlags'
+import type { LandingPosition } from './unread'
 
 interface UseInitialPositionParams {
   scrollRef: RefObject<HTMLDivElement | null>
   messages: Message[]
-  /** Saved reading position to open the chat at; null means "land at the bottom". */
-  initialAnchor: { messageId: number; offset: number } | null
+  /** Where the chat opens: a saved row, the unread divider, or (null) the newest message. */
+  landing: LandingPosition | null
   flags: ScrollFlags
   virtualizer: Virtualizer<HTMLDivElement, Element>
   ready: boolean
   markReady: () => void
   scrollToBottom: () => void
   unpin: () => void
+  syncPin: () => void
 }
 
 /**
- * Where the transcript sits on its first paint: the saved reading position, or
- * the newest message.
+ * Distance from a message slot's top to the "以下是新消息" line drawn above it.
  *
- * Both happen while the list is still hidden (`wx-messages--pending`), so the
+ * The unread landing has to align the *line*, not the slot: aligning the slot puts
+ * the line above the viewport edge, which is the one thing the reader is looking
+ * for. Returns 0 when this slot carries no divider (it is not the unread row).
+ */
+function dividerOffset(slot: HTMLElement): number {
+  const divider = slot.querySelector<HTMLElement>('.wx-unread-divider')
+  if (!divider) return 0
+  return divider.getBoundingClientRect().top - slot.getBoundingClientRect().top
+}
+
+/**
+ * Where the transcript sits on its first paint: the saved reading position, the
+ * unread divider, or the newest message.
+ *
+ * All of them happen while the list is still hidden (`wx-messages--pending`), so the
  * reader never sees it jump. Two things are load-bearing here and easy to undo:
  *
  *  1. The virtualizer measures rows lazily, so a single `scrollToIndex` is only an
- *     estimate; the position is corrected against the anchor row's DOM node until
+ *     estimate; the position is corrected against the target row's DOM node until
  *     it stops moving — the same two-stage idea as the prepend compensation.
  *  2. Reveal must never hinge on animation frames alone. Chromium throttles rAF
  *     for an occluded window, and a list that stays hidden is indistinguishable
@@ -35,21 +51,26 @@ interface UseInitialPositionParams {
 export function useInitialPosition({
   scrollRef,
   messages,
-  initialAnchor,
+  landing,
   flags,
   virtualizer,
   ready,
   markReady,
   scrollToBottom,
   unpin,
+  syncPin,
 }: UseInitialPositionParams): void {
-  const restoreToAnchor = async (messageId: number, offset: number): Promise<void> => {
+  const restoreTo = async (position: LandingPosition): Promise<void> => {
     const el = scrollRef.current
     if (!el) return
     flags.restoring.current = true
     unpin()
+    const targetId = position.messageId
+    /** Row offset to align to: the saved one, or the divider the row carries. */
+    const offsetOf = (node: HTMLElement): number =>
+      position.kind === 'unread' ? dividerOffset(node) : position.offset
     try {
-      let index = messages.findIndex((message) => message.id === messageId)
+      let index = messages.findIndex((message) => message.id === targetId)
       if (index < 0) return
       virtualizer.scrollToIndex(index, { align: 'start' })
 
@@ -60,19 +81,38 @@ export function useInitialPosition({
       for (let frame = 0; frame < 40 && stable < 2 && Date.now() < deadline; frame += 1) {
         await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
         if (!scrollRef.current) return
-        index = messages.findIndex((message) => message.id === messageId)
+        /**
+         * Nothing to restore: the rows measured shorter than the viewport, so the
+         * whole transcript is visible and the reader is looking at the newest
+         * message. Correcting further cannot move `scrollTop`, and leaving the list
+         * unpinned would raise the "↓ N 条新消息" buoy over a message the reader can
+         * see. `finally` re-pins it. (Checked here and not before the first frame:
+         * on mount the virtualizer has not seen its scroll element yet, so the
+         * transcript reports as fitting even when it does not.)
+         */
+        if (readScrollPin(el).fits) break
+        index = messages.findIndex((message) => message.id === targetId)
         if (index < 0) return
-        const node = el.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`)
+        const node = el.querySelector<HTMLElement>(`[data-message-id="${targetId}"]`)
         if (!node) {
           // Row is outside the rendered window (estimate was off): nudge again.
           virtualizer.scrollToIndex(index, { align: 'start' })
           stable = 0
           continue
         }
-        const delta = node.getBoundingClientRect().top - el.getBoundingClientRect().top - offset
+        const delta =
+          node.getBoundingClientRect().top - el.getBoundingClientRect().top - offsetOf(node)
         if (Math.abs(delta) > 0.5) {
           el.scrollTop += delta
           stable = 0
+          /**
+           * Clamped at the end of the transcript. The unread block is shorter than
+           * the viewport, so the divider cannot reach the top edge; without this
+           * the loop keeps asking for a position the scroller does not have and the
+           * list stays hidden until the deadline — the reader sees a blank pane for
+           * up to 900 ms on every short unread block.
+           */
+          if (delta > 0 && el.scrollTop + el.clientHeight >= el.scrollHeight - 1) break
         } else {
           stable += 1
         }
@@ -82,6 +122,11 @@ export function useInitialPosition({
       // The corrections above wrote `scrollTop` directly; make sure the
       // virtualizer is painting the slice that is actually on screen.
       resyncScroller(el)
+      // The synthetic scroll event only reaches the listener once it is attached,
+      // and the geometry here is the settled one: re-derive the pin from it rather
+      // than trusting an event. A transcript that measures shorter than the viewport
+      // is at the bottom, and this is the only place that can notice it.
+      syncPin()
     }
   }
 
@@ -89,10 +134,10 @@ export function useInitialPosition({
     if (flags.initialised.current || messages.length === 0) return
     flags.initialised.current = true
 
-    const anchor = initialAnchor
-    if (anchor && messages.some((message) => message.id === anchor.messageId)) {
-      void restoreToAnchor(anchor.messageId, anchor.offset).finally(markReady)
-      // `restoreToAnchor` walks frames with rAF, which Chromium throttles for an
+    const position = landing
+    if (position && messages.some((message) => message.id === position.messageId)) {
+      void restoreTo(position).finally(markReady)
+      // `restoreTo` walks frames with rAF, which Chromium throttles for an
       // occluded window — without this the list would stay invisible (the
       // `--pending` gate) for as long as that lasts.
       window.setTimeout(markReady, 700)

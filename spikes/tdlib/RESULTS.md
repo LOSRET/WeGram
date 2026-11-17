@@ -54,6 +54,15 @@
 2. **`getChatHistory` 的 `from_message_id = 0` 只返回本地缓存的最后一条**,不会触发服务器拉取(第一次 1 条,1ms 返回)。
    要拿真正的一页,必须锚定一个已存在的 message id:首屏用 `chat.last_message.id`,实测 50 条耗时 3.4s(首次联网)。
 3. `offset` 为负数是「取比锚点**更新**的消息」(`offset=-49` 只返回 2 条),分页不能用它做向后翻页;应用层用 `offset: 0` + 「严格小于锚点 id」过滤,语义才稳定。
+4. **`from_message_id` is exclusive (measured 2026-11-17 on the real account).**
+   `getChatHistory(from = X, offset = 0)` answers with messages *strictly older* than
+   `X` — it never includes the anchor itself (`from = 4975493120` answered
+   `4974444544…`). Anchoring the first page on `chat.last_message.id` therefore drops
+   the newest message, and `viewMessages` marks the wrong id as read: every chat kept
+   an unread badge of at least "1" however often it was opened, while the official
+   client cleared it on the first click. The first page must anchor on
+   `last_message.id + 1`, and read marking must use `getChat`'s `last_message.id`
+   directly. See `docs/HANDOFF.md` → "Non-obvious facts".
 
 ## 对项目的四个前置结论(打包阶段务必照做)
 

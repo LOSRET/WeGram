@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, type RefObject } from 'react'
 
 import { invoke } from '../../lib/ipc'
+import { readScrollPin } from '../../lib/scrollGeometry'
 import type { ScrollFlags } from './scrollFlags'
 
 /** Saved reading position: `messageId: null` means "the reader was at the bottom". */
@@ -34,6 +35,8 @@ interface UseAnchorSaveParams {
  */
 export function useAnchorSave({ chatId, scrollRef, flags }: UseAnchorSaveParams): {
   scheduleAnchorSave: () => void
+  /** Write a known position immediately — for landings the geometry cannot measure. */
+  savePosition: (anchor: Anchor) => void
 } {
   const lastSavedKeyRef = useRef('')
   const latestAnchorRef = useRef<Anchor | null>(null)
@@ -43,10 +46,10 @@ export function useAnchorSave({ chatId, scrollRef, flags }: UseAnchorSaveParams)
   const measureAnchor = useCallback((): Anchor | null => {
     const el = scrollRef.current
     if (!el) return null
-    const distance = el.scrollHeight - el.scrollTop - el.clientHeight
     // At (or within a hair of) the bottom: no anchor at all is the two-in-one
-    // "read to the end" flag — reopening lands on the newest message.
-    if (distance <= 40) return { messageId: null, offset: 0 }
+    // "read to the end" flag — reopening lands on the newest message. The rule is
+    // shared with the pin state (`lib/scrollGeometry`) so the two cannot drift.
+    if (readScrollPin(el).pinned) return { messageId: null, offset: 0 }
     const containerTop = el.getBoundingClientRect().top
     const slot = [...el.querySelectorAll<HTMLElement>('.wx-message-slot')].find(
       (node) => node.getBoundingClientRect().bottom > containerTop + 4,
@@ -93,6 +96,20 @@ export function useAnchorSave({ chatId, scrollRef, flags }: UseAnchorSaveParams)
     }, ANCHOR_SAVE_DELAY_MS)
   }, [flags, measureAnchor, writeAnchor])
 
+  /**
+   * Opening at the unread divider is a reading position the DOM does not express:
+   * the divider is only painted for this open, so measuring it would store a row
+   * offset that reopens as an empty band where the line used to be. The caller
+   * knows the row and the intent, so it writes them directly.
+   */
+  const savePosition = useCallback(
+    (anchor: Anchor): void => {
+      latestAnchorRef.current = anchor
+      writeAnchor(anchor)
+    },
+    [writeAnchor],
+  )
+
   // Leaving the chat (or quitting): write whatever the last scroll measured.
   // Deliberately does not re-measure — see the note above.
   useEffect(() => {
@@ -108,5 +125,5 @@ export function useAnchorSave({ chatId, scrollRef, flags }: UseAnchorSaveParams)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return { scheduleAnchorSave }
+  return { scheduleAnchorSave, savePosition }
 }

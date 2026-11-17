@@ -16,7 +16,7 @@ listed in "Known deltas" is a deliberate, documented difference.
 |---|---|
 | `renderer/src/styles/index.css` | Rewritten. All design tokens + every component style. Single source of truth for colour/size. |
 | `renderer/src/components/MainShell.tsx` | Three-column shell, owns the toast + app menu + settings dialog state. |
-| `renderer/src/components/SideRail.tsx` | 42 px icon rail: avatar (connection dot), 聊天/通讯录/收藏/朋友圈, 手机/设置. The avatar is the account's real profile photo (`Self.avatarUrl`), initials until it arrives. The 聊天 tab is the Telegram mark in brand green. |
+| `renderer/src/components/SideRail.tsx` | 61 px icon rail: avatar (connection dot), 聊天/通讯录/收藏/朋友圈, 手机/设置. The avatar is the account's real profile photo (`Self.avatarUrl`), initials until it arrives. The 聊天 tab is the Telegram mark in brand green. |
 | `renderer/src/components/ChatList.tsx` | Search pill + circular "+" (both inside the list column) + 65 px rows. Selecting the row that is already open toggles the conversation shut. Rows show the real chat photo when `ChatSummary.avatarUrl` is present, initials otherwise. |
 | `renderer/src/components/OverlayScrollbar.tsx` | WeChat's floating scrollbar: a 6 px translucent pill drawn over the rows (hover/scroll/drag), so long lists get no layout gutter and nothing re-flows when it appears. Used by the chat list and the transcript. |
 | `renderer/src/components/ChatPane.tsx` | 46 px header (title, typing, call/… buttons), watermark empty state, chat-info popover. |
@@ -28,6 +28,14 @@ listed in "Known deltas" is a deliberate, documented difference.
 | `renderer/src/components/Icon.tsx` | Payload re-exports, the design-system compass, and `TelegramLogo` — the Simple Icons roundel that serves as the rail's 聊天 tab, the login mark and the empty-pane watermark (tinted through `currentColor`). |
 | `renderer/src/components/WechatIcons.tsx` | **Generated** from `Weixin.dll` payloads — see §3. Never hand-edit; regenerate. |
 | `renderer/src/screens/LoginScreen.tsx` | WeChat-style centred card, brand watermark, `autocomplete=off`, caret restored after each step. |
+| `renderer/src/components/viewer/MediaViewer.tsx` | **The standalone 图片和视频 window** (`#viewer` route): toolbar strip, photo canvas, 预览 board, 更多 menu, notice pill; picks the video canvas for a `video` item. |
+| `renderer/src/components/viewer/VideoCanvas.tsx` | The video half: fitted `<video>`, the client's translucent player bar (play/pause, timeline, times, 倍速, mute), idle hiding, Space/←/→/M keys. |
+| `renderer/src/components/viewer/ViewerIcons.tsx` | Toolbar glyphs (payload art) plus the traced 预览 and player glyphs (see §3). |
+| `renderer/src/lib/zoom.ts` | Fit / zoom / rotate / pan-clamp maths (pure, unit-tested). |
+| `renderer/src/lib/player.ts` | Player-bar maths: `playerClock`, `progressRatio`, `seekTarget`, `timeAtRatio`, `PLAYBACK_RATES` (pure, unit-tested). |
+| `renderer/src/lib/viewer.ts` | Hand-off: `buildViewerStrip` collects one kind of media from the transcript and calls `viewer:open` (pure, unit-tested). |
+| `main/viewer.ts` | Viewer `BrowserWindow`: creation, re-targeting, 置顶, title-strip repaint, 保存 target by kind. |
+| `main/viewer-size.ts` | The measured 75 % × 90 % window size (pure, unit-tested). |
 | `renderer/src/lib/format.ts` | List timestamps: `HH:MM` today, `昨天 HH:MM`, `星期X` within a week, then `MM/DD`. |
 | `main/index.ts` | Window 1000×680 (min 880×600), `titleBarOverlay` height 32, colour `#e0e0e0` / `#191919`. |
 | `components/TitleBar.tsx` | **Deleted** — the strip is now only the native overlay; settings moved to `AppMenu`. |
@@ -60,11 +68,13 @@ sat at (276,105)–(1145,656) in that screenshot space.
 | Metric | Value |
 |---|---|
 | title strip | 32 px (native overlay, same colour as the rail) |
-| rail width | 42 px, avatar 32 px (radius 8), 26 px icons, 48 px pitch |
+| rail width | **61 px** (re-measured 2026-11-18: 54 screenshot px ÷ 0.889; the earlier 42 px was wrong), avatar 32 px (radius 8), 21–24 px glyphs, 48 px pitch |
+| rail glyphs | ink at the 50 %-coverage contour: 通讯录 20 × 16, cube 16 × 18, 朋友圈 18 × 18, 手机 12 × 18, ≡ bars 14–16 wide. Core grey **#5a–#5d**: the client paints the rail at `#5c5c5c`, not the `#8a8a8a` it used to carry (the lighter grey reads thinner *and* smaller at the same line width). Token: `--wx-rail-icon`. Known residue: our ≡ payload (`#0158`) draws three equal 13 px bars in a 12 px block where the client draws 14 / 16 / 14 in 11 px, and 手机 measures 12 × 17 — payload proportions, not scale, so scaling only trades one error for the other. |
 | list column | 238 px; header row 43 px; search pill 29 px tall, radius 5; rows 65 px |
 | list avatar | 40 px, radius 6; title 14 px, preview 12 px, time 11 px |
 | pane header | 46 px, title 15 px/500, left padding 18 |
 | message avatar | 38 px, radius 6; gap to bubble 8 px; row padding-bottom 14 px |
+| transcript inset | 22 px on **both** sides — the client measures 21–25 px, symmetric; the outgoing column used to sit 8 px from the edge. The 跳转到最新消息 pill shares this inset, so it lines up with the outgoing avatars |
 | bubble | `padding: 8px 12px`, radius 6, font 14 px/1.45, max-width `min(560px, 66%)` |
 | composer card | radius 8, 1 px `#ececec` border, margins 6/9 px; input min-height 84; toolbar 42 |
 | send button | 72×30, radius 4; disabled `#ececec` on tertiary text, enabled brand green |
@@ -75,6 +85,44 @@ sat at (276,105)–(1145,656) in that screenshot space.
 
 `wx-list__plus` no longer draws its own circle — the button *is* WeChat's circle-plus
 SVG, colour `#8a8a8a`.
+
+### 2.1 The 图片和视频 window (added 2026-11-17)
+
+Measured the same way, off a live viewer window (screenshot space 1366×768, CSS px =
+×1.1245). The window sat at (93,17)–(1113,705): **1147 × 774 CSS px on a 1536×864
+display**, i.e. 75 % of the screen width and 90 % of its height — *not* sized to the
+photo, which was only 591 px wide with ~309 px gutters each side.
+
+| Token / metric | Value |
+|---|---|
+| toolbar strip | 40 px, `#e6e6e6` (lighter than the shell's `#e0e0e0`), 1 px `#ececec` bottom line |
+| canvas | `#f7f7f7`, **no padding**: a height-limited photo touches the toolbar and the bottom edge |
+| buttons | 32 × 32, 8 px gap (40 px pitch), 18 px glyphs, 4 px radius, hover `rgba(0,0,0,.045)` |
+| group dividers | 1 px × 18 px `#dedede`, 3 px either side (→ 54 px between groups) |
+| first button | 45 px from the window edge |
+| toolbar order | 📌 ｜ ← → ▦ ｜ ⊕ ⊖ 1:1 ｜ ↻ ｜ ⇩ ｜ … 更多 ｜ (native window controls) |
+| 预览 board | the client docks it in its **own window** to the right; here it is a 268 px column of 4 × 62 px cells inside the viewer |
+| 更多 menu | 复制 / 打印 / 转发… / 收藏 / 定位到聊天位置 / 使用系统默认方式打开; 132 px min width |
+| active state | 置顶 and 预览 turn **brand green** — the only coloured glyphs in the strip |
+
+Dark theme: bar `#1f1f1f`, canvas `#141414`, symbols `#d6d6d6` (the native overlay is
+repainted from `main/viewer.ts`).
+
+**The video window is the same window** (the client titles both 图片和视频). Measured off
+a second live window showing a 9:16 clip; the screenshot was 1538×978 and the CSS scale
+is derived from the toolbar: the button pitch measures 50 screenshot px against our 40
+CSS px, so **CSS px = screenshot px ÷ 1.25**.
+
+| Token / metric | Value |
+|---|---|
+| window | **1230 × 782 CSS px** — 80 % of the 1536 px CSS screen width, the same 90 % height as the photo window; still created at 75 % here (delta 17) |
+| toolbar | identical to the photo window (40 px, `#e6e6e6`), so the pin sits 45 px from the edge as measured |
+| toolbar order | 📌 ｜ ← → ▦ ｜ ⇩ ｜ … ｜ window controls — **no zoom group, no rotate**; the 查看原视频 pill is left out (delta 18) |
+| canvas | `#f7f7f7`, and the clip is fitted **by height with no padding** (410 × 728 CSS for a 9:16 clip in that window) |
+| player bar | 40 px tall, **84 px from the left, 82 px from the right, 20 px above the bottom**, 8 px radius, `rgba(0,0,0,.45)` — over the `#f7f7f7` canvas it samples `#888888`, over the footage it darkens the frame |
+| bar contents | ▶/❚❚ 32 px icon, elapsed `00:01` 13 px tabular, timeline (2 px track, played part white, 10 px white thumb), total `00:51`, 倍速 text button, speaker |
+| bar behaviour | floats over the clip and hides after 2.4 s of playback without pointer movement; visible whenever it is paused, while the timeline is dragged and while the 倍速 menu is open |
+| keyboard | Space / K play-pause, ←/→ seek ±5 s, M mute, Escape closes the menu / 预览 / window |
 
 ---
 
@@ -131,6 +179,39 @@ soft-IoU over all 2500 masks, best hit confirmed by eye; scripts
 | `MoreIcon` (…) | `#0846` | `ScissorsIcon` | `#0859` |
 | `CallIcon` (话机) | `#0300` | `ChevronDownIcon` | `#0555` (12×12) |
 | `StickerCubeIcon` (贴纸 cube) | `#1268` | `CallBubbleIcon` (was `#1755`, empty bubble) | `#1206` |
+
+**The image-viewer toolbar is payload art too** (2026-11-17, second pass). The earlier
+"the viewer draws its own glyphs" note was wrong: eight of the nine buttons are in the
+same 2345-document payload block. They were located by cropping each glyph out of a
+native viewer screenshot, then walking the payload masks by eye — the preview glyphs
+sit in one run around `#2335`–`#2345` (`image_*` / `picture_*`), the pin and the
+download tray come from the `pushpin`/`download` families:
+
+| Button | Payload | ViewBox | Notes |
+|---|---|---|---|
+| 置顶 pin | `#0531` (`pushpin_regular`) | 24 | same bell silhouette as the client |
+| 上一张 / 下一张 | `#2344` / `#2336` (`image_arrow{left,right}_normal`) | 16 | long-tailed arrows |
+| 放大 / 缩小 | `#2341` / `#2342` (`image_zoom{in,out}_normal`) | 16 | magnifier with ± |
+| 原始大小 | `#2337` (`picture_original_normal`) | 16 | literally a "1:1" pill, *not* a frame with ticks |
+| 旋转 | `#2340` (`image_rotate_normal`, mirrored twin of `#2338`) | 24 | `transform="scale(-1 1) translate(-24 0)"` is load-bearing |
+| 保存 | `#0776` (`download_regular`) | 24 | tray + down arrow |
+| 预览 (3×3 board) | **no payload** | — | one of the ~260 named assets the DLL does not carry; still traced |
+
+All of these are filled `evenodd` outlines painted at `fill-opacity="0.9"` in the
+client; `ViewerIcons.tsx` drops the opacity and fills with `currentColor` so the bar's
+idle / hover / brand-green states still work.
+
+**How the payload was chosen (repeatable).** The manifest order *does* track the payload
+order — `magnifying_glass_regular.svg` sits at manifest index 759 and its payload is
+`#0760`, i.e. offset +1 for the first ~770 entries — but the two sequences drift (the
+manifest lists 2609 SVGs, the binary carries 2345), so by the preview block the offset
+is ~+60 and per-index lookup is wrong. Identify by shape instead:
+`.cache/wxsvg/match_native.py` crops the toolbar glyphs out of a native screenshot and
+ranks all masks with a symmetric Chamfer distance on outer contours (style-agnostic:
+filled and outlined twins score alike), then confirm the top hit with
+`.cache/wxsvg/proof_sheet.py`, which prints native crop vs payload side by side. The
+`viewer_chamfer.py` scores are only a shortlist — at 18 px the crops are too soft to
+rank a magnifier above a filled dot on their own.
 
 **Weight is per family, not per library.** Many glyphs ship as regular / medium /
 heavy siblings that differ only in stroke (measured at 24-unit scale by
@@ -225,6 +306,40 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
     protocol has no create-chat, contact-search or notes channel, so each entry only
     raises the same "还没有接入" toast as the rail's other sections. Settings, theme and
     sign-out stay behind the rail's "≡" button.
+12. **Image viewer — two toolbar entries are missing on purpose.** The client's strip
+    also carries 编辑 (a full picture editor) and the "用 AI 处理 / 提取文字、翻译等" block;
+    neither has anything behind it here, so both are left out rather than shipped as
+    dead buttons. Everything else in the strip works.
+13. **Viewer glyphs are payload art, except 预览.** Eight of the nine buttons are the
+    client's own SVG documents (§3.1): pin, both arrows, both magnifiers, the "1:1"
+    pill, the rotate frame and the download tray. `ViewerIcons.tsx` carries them as
+    filled `currentColor` paths. Only the 3×3 预览 board is traced — no payload for it
+    exists in this build.
+14. **预览 is a column, not a second window.** The client opens the thumbnail board in a
+    separate window docked to the right of the viewer; ours is a 268 px column inside
+    it, so the photo refits instead of hiding under the board. Cells paint
+    `MessageMedia.minithumbnail` instantly; a photo without one is downloaded at
+    priority 2 while the board is open.
+15. **定位到聊天位置 only closes the viewer.** Scrolling the transcript to a given
+    message needs a "locate message" channel the protocol does not have yet; closing the
+    window hands focus back to the chat, which is where the photo came from.
+16. **The viewer's window controls are the native ones** (3 × 46 px), like the shell's
+    (see delta 5), so 更多 sits ~25 px further from the right edge than in the client.
+17. **One window size for both kinds.** The client's video window measures 80 % of the
+    screen width against the photo window's 75 %; ours keeps a single size, because a
+    strip can mix photos and videos and resizing the window mid-browse is worse than
+    being 5 % narrower. `main/viewer-size.ts` is the one place to change it.
+18. **The video strip has no 查看原视频 pill.** In the client that pill opens the
+    uncompressed original, which exists because WeChat re-encodes whatever you send.
+    TDLib hands this app a single file per video, so the pill would be a dead button —
+    the 6.7 M of the reference clip has no counterpart here.
+19. **The video opens in the viewer window, not in the bubble.** Clicking the bubble used
+    to play inline with Chromium's native controls; it now opens 图片和视频 like a photo,
+    which is why `VideoCanvas` owns the transport. 保存 writes the video to 视频 (the
+    photo path still opens 图片), and 更多 hides 复制 / 打印 for videos: the clipboard
+    holds bitmaps only, and Electron exposes no file-drop clipboard format.
+20. **The video canvas never zooms or pans.** The zoom group, 1:1, rotate and the wheel
+    listener are photo-only; a video is always fitted to the canvas.
 
 ---
 

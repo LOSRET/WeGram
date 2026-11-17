@@ -34,11 +34,22 @@ export function AnchorPendingPlaceholder() {
 /**
  * An empty page that survived the retries: say so instead of showing a silently
  * blank transcript, and let the reader ask again.
+ *
+ * Two very different things end up here, and they must not share a sentence: a
+ * chat that has no messages at all, and a chat the chat list *knows* has messages
+ * but TDLib has not served them yet (the empty answer is not cached in that case —
+ * see `useChatHistory`, so this state recovers on the next open).
  */
-export function EmptyTranscriptPlaceholder({ onReload }: { onReload: () => void }) {
+export function EmptyTranscriptPlaceholder({
+  onReload,
+  unsynced = false,
+}: {
+  onReload: () => void
+  unsynced?: boolean
+}) {
   return (
     <div className="wx-empty-chat">
-      <div>这个会话还没有可显示的消息</div>
+      <div>{unsynced ? '消息还没从服务器同步下来' : '这个会话还没有可显示的消息'}</div>
       <button className="wx-ghost-btn" onClick={onReload}>
         重新加载
       </button>
