@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import { isEmojiOnly } from './emoji'
 import { buildMessageMenuItems } from './menu'
+import { messagesById, pickSeenUpTo } from './seen'
 import { countUnreadBelow } from './unreadBelow'
 import { findUnreadMessage, pickPagingTarget, resolveLanding } from './unread'
 
@@ -248,5 +249,85 @@ describe('countUnreadBelow', () => {
   it('never counts messages above the viewport, however new the marker is behind', () => {
     // Scrolled down over 10 and 11 without reporting them: they are seen already.
     expect(countUnreadBelow(transcript, 9, 1)).toBe(2)
+  })
+})
+
+describe('pickSeenUpTo', () => {
+  const ids = [10, 11, 12, 13, 14, 15]
+  const rows = (indexes: number[], starts: number[]) =>
+    indexes.map((index, position) => ({ index, start: starts[position] ?? 0 }))
+
+  it('counts every row whose top edge is above the viewport bottom', () => {
+    expect(
+      pickSeenUpTo({
+        items: rows([0, 1, 2, 3], [0, 100, 200, 300]),
+        sizerOffset: 10,
+        viewportHeight: 500,
+        idAt: (index) => ids[index],
+      }),
+    ).toEqual({ newestIndex: 3, newestId: 13 })
+  })
+
+  it('leaves the overscan rows below the fold to the pill', () => {
+    // Scrolled 290px into a window 100px tall: rows 2 and 3 are on screen, and the
+    // overscan rows below them are what "3 条新消息" counts.
+    expect(
+      pickSeenUpTo({
+        items: rows([2, 3, 4, 5], [200, 300, 400, 500]),
+        sizerOffset: -290,
+        viewportHeight: 100,
+        idAt: (index) => ids[index],
+      }),
+    ).toEqual({ newestIndex: 3, newestId: 13 })
+  })
+
+  it('does not count a row that starts exactly at the bottom edge', () => {
+    expect(
+      pickSeenUpTo({
+        items: rows([0], [0]),
+        sizerOffset: 10,
+        viewportHeight: 10,
+        idAt: (index) => ids[index],
+      }),
+    ).toEqual({ newestIndex: -1, newestId: null })
+  })
+
+  it('has nothing seen without rows', () => {
+    expect(
+      pickSeenUpTo({ items: [], sizerOffset: 0, viewportHeight: 400, idAt: () => 1 }),
+    ).toEqual({ newestIndex: -1, newestId: null })
+  })
+
+  it('skips a row whose message is gone (a shrunk transcript)', () => {
+    expect(
+      pickSeenUpTo({
+        items: rows([0, 1, 2], [0, 100, 200]),
+        sizerOffset: 0,
+        viewportHeight: 400,
+        idAt: (index) => (index === 2 ? undefined : ids[index]),
+      }),
+    ).toEqual({ newestIndex: 1, newestId: 11 })
+  })
+
+  it('takes the highest id and the highest index independently', () => {
+    // Message ids are not guaranteed to ascend with the list index.
+    expect(
+      pickSeenUpTo({
+        items: rows([0, 1], [0, 100]),
+        sizerOffset: 0,
+        viewportHeight: 400,
+        idAt: (index) => (index === 0 ? 50 : 12),
+      }),
+    ).toEqual({ newestIndex: 1, newestId: 50 })
+  })
+})
+
+describe('messagesById', () => {
+  it('indexes the transcript by message id, keeping the objects', () => {
+    const transcript = [message(10), message(20)]
+    const byId = messagesById(transcript)
+    expect(byId.size).toBe(2)
+    expect(byId.get(20)).toBe(transcript[1])
+    expect(byId.get(99)).toBeUndefined()
   })
 })

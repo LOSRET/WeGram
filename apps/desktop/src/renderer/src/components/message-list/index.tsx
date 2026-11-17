@@ -1,17 +1,18 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { ChatSummary, Message } from '@wegram/protocol'
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 import { isSameDay } from '../../lib/format'
 import { useAnchoredScroll } from '../../lib/useAnchoredScroll'
 import { useAppStore } from '../../store/useAppStore'
 import type { UnreadMarker } from '../../store/useAppStore'
-import { ContextMenu, type MenuItem } from '../ContextMenu'
+import { ContextMenu } from '../ContextMenu'
 import { JumpToLatestIcon } from '../Icon'
 import { OverlayScrollbar } from '../OverlayScrollbar'
 import { DaySeparator, UnreadDivider } from './Divider'
 import { MessageRow } from './MessageRow'
 import { buildMessageMenuItems } from './menu'
+import { messagesById, pickSeenUpTo } from './seen'
 import { countUnreadBelow } from './unreadBelow'
 import { useScrollFlags } from './scrollFlags'
 import { findUnreadMessage, type LandingPosition } from './unread'
@@ -84,13 +85,18 @@ export function MessageList({
   const [menu, setMenu] = useState<MenuState | null>(null)
 
   const auth = useAppStore((state) => state.auth)
-  const self =
-    auth.kind === 'ready'
-      ? {
-          id: auth.me.id,
-          name: [auth.me.firstName, auth.me.lastName].filter(Boolean).join(''),
-        }
-      : { id: 1000, name: '我' }
+  // Memoised because every rendered row takes it as a prop: a fresh object per
+  // render would re-render all of them and defeat `memo` in `MessageRow`.
+  const self = useMemo(
+    () =>
+      auth.kind === 'ready'
+        ? {
+            id: auth.me.id,
+            name: [auth.me.firstName, auth.me.lastName].filter(Boolean).join(''),
+          }
+        : { id: 1000, name: '我' },
+    [auth],
+  )
 
   // Captured once per mounted chat: the divider must not jump as the read marker
   // moves after `chats:open`. Stored as an id, not an index, because prepending
@@ -99,6 +105,9 @@ export function MessageList({
   const unreadIndex = unreadMessageId
     ? messages.findIndex((message) => message.id === unreadMessageId)
     : -1
+
+  /** Reply quotes are looked up per rendered row — build the index once per page. */
+  const byId = useMemo(() => messagesById(messages), [messages])
 
   const flags = useScrollFlags()
 
@@ -187,29 +196,28 @@ export function MessageList({
    */
   const measureViewport = useCallback(() => {
     const scroller = scrollRef.current
-    if (!scroller) return
+    const sizer = contentRef.current
+    if (!scroller || !sizer) return
 
-    const viewport = scroller.getBoundingClientRect()
-    const height = scroller.clientHeight
-    let newestSeen = seenUpToRef.current
-    let newestSeenIndex = -1
+    const { newestIndex, newestId } = pickSeenUpTo({
+      items: virtualizer.getVirtualItems(),
+      /**
+       * The sizer sits inside the scroller's own padding, and the padding scrolls
+       * with the content: this one difference is "top padding - scrollTop", which
+       * is what turns a row's `start` into its distance from the viewport's top.
+       * Two rect reads per commit instead of one per rendered row.
+       */
+      sizerOffset: sizer.getBoundingClientRect().top - scroller.getBoundingClientRect().top,
+      viewportHeight: scroller.clientHeight,
+      idAt: (index) => messages[index]?.id,
+    })
 
-    for (const slot of scroller.querySelectorAll<HTMLElement>('[data-message-id]')) {
-      const top = slot.getBoundingClientRect().top - viewport.top
-      if (top >= height) continue
-      const index = Number(slot.dataset.index)
-      const message = messages[index]
-      if (!message) continue
-      if (index > newestSeenIndex) newestSeenIndex = index
-      if (newestSeen === null || message.id > newestSeen) newestSeen = message.id
+    setSeenIndex((previous) => (previous === newestIndex ? previous : newestIndex))
+    if (newestId !== seenUpToRef.current) {
+      seenUpToRef.current = newestId
+      onSeenUpToChange(newestId)
     }
-
-    if (newestSeenIndex !== seenIndex) setSeenIndex(newestSeenIndex)
-    if (newestSeen !== seenUpToRef.current) {
-      seenUpToRef.current = newestSeen
-      onSeenUpToChange(newestSeen)
-    }
-  }, [messages, onSeenUpToChange, seenIndex, scrollRef])
+  }, [messages, onSeenUpToChange, scrollRef, contentRef, virtualizer])
 
   // Runs after every commit, so a row that grew (`measureElement`, an image
   // finishing) is covered as well: geometry decides, not the scroll event.
@@ -217,8 +225,10 @@ export function MessageList({
     measureViewport()
   })
 
-  const menuItems = (message: Message): MenuItem[] =>
-    buildMessageMenuItems(message, { onReply, onCopy, onForward, onEdit, onDelete })
+  /** One stable handler for every row: a fresh arrow per row defeats `memo`. */
+  const openMenu = useCallback((message: Message, x: number, y: number): void => {
+    setMenu({ message, x, y })
+  }, [])
 
   return (
     <div className="wx-messages-wrap" ref={hostRef}>
@@ -242,9 +252,9 @@ export function MessageList({
             if (!message) return null
             const previous = messages[virtualItem.index - 1]
             const newDay = !previous || !isSameDay(previous.date, message.date)
-            const repliedTo = message.replyToId
-              ? (messages.find((item) => item.id === message.replyToId) ?? null)
-              : null
+            // A map, not a `find` per row: this ran once per visible row on every
+            // render, i.e. O(visible x transcript).
+            const repliedTo = message.replyToId ? (byId.get(message.replyToId) ?? null) : null
             return (
               <div
                 key={virtualItem.key}
@@ -262,7 +272,7 @@ export function MessageList({
                   repliedTo={repliedTo}
                   self={self}
                   readOutboxMaxId={chat.lastReadOutboxMessageId ?? 0}
-                  onOpenMenu={(x, y) => setMenu({ message, x, y })}
+                  onOpenMenu={openMenu}
                 />
               </div>
             )
@@ -292,7 +302,13 @@ export function MessageList({
         <ContextMenu
           x={menu.x}
           y={menu.y}
-          items={menuItems(menu.message)}
+          items={buildMessageMenuItems(menu.message, {
+            onReply,
+            onCopy,
+            onForward,
+            onEdit,
+            onDelete,
+          })}
           onClose={() => setMenu(null)}
         />
       ) : null}

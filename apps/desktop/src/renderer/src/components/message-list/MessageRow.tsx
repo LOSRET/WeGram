@@ -1,5 +1,5 @@
 import type { ChatSummary, Message } from '@wegram/protocol'
-import type { MouseEvent } from 'react'
+import { memo, type MouseEvent } from 'react'
 
 import { avatarColor, formatMessageTime, initials, messagePreview } from '../../lib/format'
 import { MediaBubble } from '../MediaBubble'
@@ -15,7 +15,11 @@ export interface MessageRowProps {
   self: { id: number; name: string }
   /** Highest outgoing id the peer has read; drives the 已读/未读 receipt. */
   readOutboxMaxId: number
-  onOpenMenu: (x: number, y: number) => void
+  /**
+   * Takes the row it was raised from, so the list can hand every row the same
+   * stable callback: a per-row arrow function made `memo` useless.
+   */
+  onOpenMenu: (message: Message, x: number, y: number) => void
 }
 
 /**
@@ -23,8 +27,12 @@ export interface MessageRowProps {
  * the time/edit/read meta line and the hover "⋯" button.
  *
  * Purely presentational — all timing and windowing lives in `index.tsx`.
+ *
+ * Memoised: the list re-renders on every scroll measurement (the "seen" index moves
+ * as rows pass the fold), and without this every row in the window re-rendered with
+ * it. Its props are kept referentially stable by the caller for exactly this.
  */
-export function MessageRow({
+export const MessageRow = memo(function MessageRow({
   chat,
   message,
   repliedTo,
@@ -50,7 +58,7 @@ export function MessageRow({
 
   const openMenu = (event: MouseEvent): void => {
     event.preventDefault()
-    onOpenMenu(event.clientX, event.clientY)
+    onOpenMenu(message, event.clientX, event.clientY)
   }
 
   const readReceipt = message.outgoing
@@ -124,11 +132,11 @@ export function MessageRow({
         title="更多"
         onClick={(event) => {
           const rect = event.currentTarget.getBoundingClientRect()
-          onOpenMenu(rect.left, rect.bottom + 4)
+          onOpenMenu(message, rect.left, rect.bottom + 4)
         }}
       >
         ⋯
       </button>
     </div>
   )
-}
+})
