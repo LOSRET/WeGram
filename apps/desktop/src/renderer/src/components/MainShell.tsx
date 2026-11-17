@@ -1,5 +1,5 @@
 import type { ChatSummary } from '@wegram/protocol'
-import { useMemo, useState, useEffect } from 'react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react'
 
 import { AppMenu } from './AppMenu'
 import { ChatList } from './ChatList'
@@ -24,6 +24,12 @@ export function MainShell() {
   const setToast = useAppStore((state) => state.setToast)
 
   const [query, setQuery] = useState('')
+  /**
+   * The field stays responsive while the list recomputes: typing filters synchronously
+   * today, which on a full page of chats means every keystroke waits for the render of
+   * every row. `query` still feeds the input and the "no matches" copy.
+   */
+  const deferredQuery = useDeferredValue(query)
   const [proxyOpen, setProxyOpen] = useState(false)
   /** The rail's "≡" menu (settings / theme / sign out). */
   const [menu, setMenu] = useState<Anchor | null>(null)
@@ -39,23 +45,29 @@ export function MainShell() {
   }, [toast])
 
   const filteredChats = useMemo(() => {
-    const needle = query.trim().toLowerCase()
+    const needle = deferredQuery.trim().toLowerCase()
     if (!needle) return chats
     return chats.filter((chat) => chat.title.toLowerCase().includes(needle))
-  }, [chats, query])
+  }, [chats, deferredQuery])
 
   /**
    * Selecting the row that is already open toggles the conversation shut: the
    * right pane goes back to its initial watermark state and the list keeps its
    * filter, so the reader can pick the same or another chat again.
    */
-  const openChat = async (chat: ChatSummary) => {
-    if (chat.id === activeChatId) {
-      useAppStore.getState().setActiveChat(null)
+  /**
+   * Stable for the life of the shell, so memoised rows keep their identity when the
+   * selection changes: everything it needs is read from the store at call time
+   * (`activeChatId` included — reading the prop would rebuild the callback on every
+   * selection and re-render the whole list).
+   */
+  const openChat = useCallback((chat: ChatSummary): void => {
+    const store = useAppStore.getState()
+    if (chat.id === store.activeChatId) {
+      store.setActiveChat(null)
       return
     }
 
-    const store = useAppStore.getState()
     // Snapshot before `chats:open` reports the chat as read, or the unread
     // divider would disappear before the list ever mounts.
     store.setUnreadMarker(
@@ -65,13 +77,11 @@ export function MainShell() {
         : null,
     )
     store.setActiveChat(chat.id)
-    try {
-      // History is loaded by ChatPane; this only triggers read state.
-      await invoke('chats:open', { chatId: chat.id })
-    } catch (cause) {
-      setError(errorMessage(cause))
-    }
-  }
+    // History is loaded by ChatPane; this only triggers read state.
+    void invoke('chats:open', { chatId: chat.id }).catch((cause) => {
+      useAppStore.getState().setError(errorMessage(cause))
+    })
+  }, [])
 
   return (
     <div className="wx-app">
@@ -98,7 +108,7 @@ export function MainShell() {
           activeChatId={activeChatId}
           query={query}
           onQueryChange={setQuery}
-          onSelect={(chat) => void openChat(chat)}
+          onSelect={openChat}
           onOpenPlus={(anchor) => setPlusMenu(anchor)}
         />
         <ChatPane />

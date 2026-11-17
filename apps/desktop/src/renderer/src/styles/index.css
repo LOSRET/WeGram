@@ -513,6 +513,21 @@ select {
   overflow-x: hidden;
 }
 
+/* The conversation rows are absolutely positioned by the virtualiser (fixed 65 px
+   rows, so there is nothing to measure): the sizer carries the total height and the
+   view keeps scrolling natively, which is what the overlay bar mirrors. */
+.wx-list__sizer {
+  position: relative;
+  width: 100%;
+}
+
+.wx-list__slot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+}
+
 .wx-list__empty {
   padding: 28px 16px;
   font-size: 13px;
