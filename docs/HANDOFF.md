@@ -602,7 +602,8 @@ stored `{14958, -46}` on the 5000-message chat restores to `scrollTop 586` /
 the transcript fits re-pins the list (it used to show "↓ 1 条新消息" for a fully visible
 message) and it keeps following new messages; the buoy still appears when genuinely scrolled
 up and its click returns to the bottom. `apps/desktop/src/renderer/src/lib/scrollGeometry.test.ts`
-covers the predicate (5 cases). The working tree carries these changes **uncommitted**.
+covers the predicate (5 cases). These changes are committed (`feat(viewer)`, 22039a5),
+together with the viewer window, the read-receipt and eviction fixes above.
 The Electron window used for the walkthrough was closed.
 
 **2026-11-17, refactor session:** `pnpm verify` (lint → typecheck → vitest → build) is the
