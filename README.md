@@ -5,9 +5,6 @@
 
 [中文](#中文) · [English](#english)
 
-> 仓库目录名仍沿用历史的 `WechatGram`，产品名与包名已经是 **WeGram**。
-> The checkout folder is still named `WechatGram` for history; the product and package name is **WeGram**.
-
 ---
 
 ## 中文
