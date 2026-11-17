@@ -8,8 +8,10 @@ only adds what is specific to this layer.
 
 ```
 App.tsx               bootstrap + the ONE place that subscribes to evt:*
-store/                zustand: chats, messages, drafts, media URLs/progress
-components/           one file per visual concern (MessageList, ChatPane, Composer, …)
+store/                zustand: data defaults (initialState.ts), pure reducers, slices
+components/message-list/  virtualiser + MessageRow + Divider + the three scroll hooks
+components/chat-pane/     render tree + useChatHistory + messageActions + placeholders
+components/           the remaining visual concerns (Composer, MediaBubble, …)
 lib/ipc.ts            thin `window.tg` wrapper
 lib/format.ts         time / preview / avatar helpers (pure, unit-tested)
 lib/entities.ts       TL entity → text segments (pure, unit-tested)

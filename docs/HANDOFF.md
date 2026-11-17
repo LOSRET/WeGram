@@ -217,9 +217,21 @@ apps/desktop/src/main/
   preload/index.ts           window.tg.invoke / window.tg.on, channel whitelist
 apps/desktop/src/renderer/src/
   App.tsx                    bootstrap + event subscription (one place), typing expiry
-  store/useAppStore.ts       zustand state (chats, messages, drafts, media URLs/progress)
-  components/MessageList.tsx virtualiser + anchored prepend + context menu + day separators
-                             + unread divider + read receipts
+  store/                     zustand, split: types.ts (AppData + action interfaces),
+                             initialState.ts (DATA_DEFAULTS, the only initial state),
+                             reducers.ts (pure sortChats/upsertMessage/reduceOps),
+                             slices/{auth,chats,messages,media,ui}.ts,
+                             useAppStore.ts (assembler; unchanged import path)
+  components/message-list/   index.tsx (virtualiser + render tree) + MessageRow.tsx,
+                             Divider.tsx, useInitialPosition.ts (anchor restore or land
+                             at the bottom + reveal nets), usePrependRestore.ts (two-stage
+                             compensation, loadOlder), useAnchorSave.ts (ui:saveAnchor),
+                             scrollFlags.ts, scroller.ts (resyncScroller),
+                             emoji.ts / menu.ts / unread.ts (pure helpers)
+  components/chat-pane/      index.tsx (render tree + modal state) + useChatHistory.ts
+                             (first page, empty-page retries, paging to the saved anchor,
+                             loadOlder), messageActions.ts (send/edit/delete/forward/copy),
+                             ChatHeader.tsx, ChatInfoPopover.tsx, Placeholders.tsx, labels.ts
   components/MediaBubble.tsx photo lightbox / video / file card / voice bar + progress
   components/StickerRenderer.tsx WebP <img>, TGS lottie, WebM <video>, offscreen pause
   components/StickerPanel.tsx installed sets → grid → send sticker
@@ -234,6 +246,13 @@ apps/desktop/src/renderer/src/
 scripts/                     launch-detached.ps1 (-RemoteDebugPort for CDP),
                              tdlib-smoke.ts, ui-db-check.ts
 ```
+
+Layered agent notes live next to the code they govern: `packages/protocol/AGENTS.md`,
+`apps/desktop/src/main/AGENTS.md`, `apps/desktop/src/renderer/AGENTS.md`. `pnpm verify`
+(lint → typecheck → vitest → build) is the gate; the unit tests cover the pure modules
+only (formatters, entity segmentation, image header probe, proxy URL, store reducers and
+the store invariants) — scroll/virtualisation behaviour still has to be confirmed in the
+Electron window.
 
 Rules that keep it maintainable: only `telegram/tdlib.ts` knows TDLib JSON; new fields
 start in `dto.ts`; new channels go into the channel tables in `channels.ts` (preload and
