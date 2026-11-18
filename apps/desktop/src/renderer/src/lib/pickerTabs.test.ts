@@ -1,21 +1,82 @@
 import { describe, expect, it } from 'vitest'
 
-import { tabPaging } from './pickerTabs'
+import { pageForIndex, stripWindow } from './pickerTabs'
 
-describe('tabPaging', () => {
-  it('keeps all seven sets visible without an arrow', () => {
-    // 搜索 + 表情 + 7 sets = the strip's nine slots.
-    expect(tabPaging(7)).toEqual({ paged: false, pageSize: 7, pageCount: 1 })
+describe('stripWindow', () => {
+  it('shows every tab when the row fits, with no arrows', () => {
+    expect(stripWindow(8, 0)).toEqual({
+      start: 0,
+      count: 8,
+      hasLeft: false,
+      hasRight: false,
+      pageCount: 1,
+    })
+    expect(stripWindow(9, 0).count).toBe(9)
   })
 
-  it('reserves a slot for 下一页 and pages six sets at a time', () => {
-    // 搜索 + 表情 + 6 sets + 下一页 = nine slots; the seventh set moves to page 2.
-    expect(tabPaging(8)).toEqual({ paged: true, pageSize: 6, pageCount: 2 })
-    expect(tabPaging(12)).toEqual({ paged: true, pageSize: 6, pageCount: 2 })
-    expect(tabPaging(13)).toEqual({ paged: true, pageSize: 6, pageCount: 3 })
+  it('puts 下一页 on the first page and 上一页 on the last one', () => {
+    // 搜索 + 表情 + 8 sets = 10 tabs. The first window shows eight tabs plus 下一页;
+    // the second window is clamped to the end: 上一页 plus the last eight tabs.
+    expect(stripWindow(10, 0)).toEqual({
+      start: 0,
+      count: 8,
+      hasLeft: false,
+      hasRight: true,
+      pageCount: 2,
+    })
+    expect(stripWindow(10, 1)).toEqual({
+      start: 2,
+      count: 8,
+      hasLeft: true,
+      hasRight: false,
+      pageCount: 2,
+    })
   })
 
-  it('handles an account with no sticker sets', () => {
-    expect(tabPaging(0)).toEqual({ paged: false, pageSize: 0, pageCount: 1 })
+  it('shows both arrows on a middle page', () => {
+    // 2 fixed + 16 sets = 18 tabs -> three windows: 0..7, 7..14, 10..17.
+    expect(stripWindow(18, 1)).toEqual({
+      start: 7,
+      count: 8,
+      hasLeft: true,
+      hasRight: true,
+      pageCount: 3,
+    })
+    expect(stripWindow(18, 2)).toEqual({
+      start: 10,
+      count: 8,
+      hasLeft: true,
+      hasRight: false,
+      pageCount: 3,
+    })
+  })
+
+  it('never offers a right arrow past the final window', () => {
+    for (let total = 10; total < 40; total += 1) {
+      const last = stripWindow(total, 999)
+      expect(last.hasRight).toBe(false)
+      expect(last.start + last.count).toBe(total)
+    }
+  })
+
+  it('clamps an out-of-range page into the row', () => {
+    expect(stripWindow(10, 99)).toEqual(stripWindow(10, 1))
+    expect(stripWindow(10, -3)).toEqual(stripWindow(10, 0))
+  })
+})
+
+describe('pageForIndex', () => {
+  it('finds the window that contains a scrolled-off set', () => {
+    expect(pageForIndex(18, 0)).toBe(0)
+    // Index 7 is still on the first window (tabs 0..7); the first scrolled-off
+    // tab is index 8.
+    expect(pageForIndex(18, 7)).toBe(0)
+    expect(pageForIndex(18, 8)).toBe(1)
+    expect(pageForIndex(18, 17)).toBe(2)
+  })
+
+  it('falls back to the first page for an index that does not exist', () => {
+    expect(pageForIndex(10, 99)).toBe(0)
+    expect(pageForIndex(10, -1)).toBe(0)
   })
 })

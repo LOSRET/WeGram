@@ -2832,6 +2832,10 @@ select {
   transform: rotate(-90deg);
 }
 
+.wx-picker__prev {
+  transform: rotate(90deg);
+}
+
 .wx-picker__search {
   display: flex;
   flex-direction: column;

@@ -5,7 +5,7 @@ import { loadLatestWindow } from '../lib/anchoredWindow'
 import { EMOJI, RECENT_EMOJI_LIMIT, mergeRecentEmoji, searchEmoji } from '../lib/emoji'
 import type { EmojiItem } from '../lib/emoji'
 import { errorMessage, invoke } from '../lib/ipc'
-import { tabPaging } from '../lib/pickerTabs'
+import { pageForIndex, stripWindow } from '../lib/pickerTabs'
 import { useAppStore } from '../store/useAppStore'
 import { StickerRenderer } from './StickerRenderer'
 import { ChevronDownIcon, EmojiIcon, SearchIcon } from './WechatIcons'
@@ -201,12 +201,20 @@ export function ExpressionPicker({
     }
   }
 
-  const { paged, pageSize, pageCount } = tabPaging(sets.length)
-  const visibleSets = paged ? sets.slice(page * pageSize, page * pageSize + pageSize) : sets
+  // The strip pages the whole row, 搜索 and 表情 included: at the far right the
+  // client's 上一页 arrow sits where the first tabs used to be, as the user's
+  // reference screenshot shows.
+  const stripItems = [
+    { key: 'search', kind: 'search' as const },
+    { key: 'emoji', kind: 'emoji' as const },
+    ...sets.map((set) => ({ key: `set:${set.id}`, kind: 'set' as const, set })),
+  ]
+  const strip = stripWindow(stripItems.length, page)
+  const visibleTabs = stripItems.slice(strip.start, strip.start + strip.count)
 
   const openSet = (setId: string): void => {
-    const index = sets.findIndex((set) => set.id === setId)
-    if (index >= 0) setPage(Math.floor(index / pageSize))
+    const index = stripItems.findIndex((item) => item.kind === 'set' && item.set.id === setId)
+    if (index >= 0) setPage(pageForIndex(stripItems.length, index))
     setTab({ kind: 'set', id: setId })
     setQuery('')
   }
@@ -346,43 +354,59 @@ export function ExpressionPicker({
       </div>
 
       <div className="wx-picker__tabs">
-        <button
-          className={`wx-picker__tab${tab.kind === 'search' ? ' wx-picker__tab--active' : ''}`}
-          onClick={() => setTab({ kind: 'search' })}
-          title="搜索表情"
-          aria-label="搜索表情"
-        >
-          <SearchIcon size={20} />
-        </button>
-        <button
-          className={`wx-picker__tab${tab.kind === 'emoji' ? ' wx-picker__tab--active' : ''}`}
-          onClick={() => setTab({ kind: 'emoji' })}
-          title="表情"
-          aria-label="表情"
-        >
-          <EmojiIcon size={22} />
-        </button>
-        {visibleSets.map((set) => (
-          <button
-            key={set.id}
-            className={`wx-picker__tab wx-picker__tab--set${
-              tab.kind === 'set' && tab.id === set.id ? ' wx-picker__tab--active' : ''
-            }`}
-            onClick={() => setTab({ kind: 'set', id: set.id })}
-            title={set.title}
-            aria-label={set.title}
-          >
-            {set.thumbnail ? (
-              <StickerRenderer media={stickerMedia(set.thumbnail)} size={28} preview />
-            ) : (
-              <span className="wx-picker__tab-text">{set.title.slice(0, 2)}</span>
-            )}
-          </button>
-        ))}
-        {paged ? (
+        {strip.hasLeft ? (
           <button
             className="wx-picker__tab"
-            onClick={() => setPage((current) => (current + 1) % pageCount)}
+            onClick={() => setPage((current) => Math.max(0, current - 1))}
+            title="上一页"
+            aria-label="上一页"
+          >
+            <ChevronDownIcon size={10} className="wx-picker__prev" />
+          </button>
+        ) : null}
+        {visibleTabs.map((item) =>
+          item.kind === 'search' ? (
+            <button
+              key={item.key}
+              className={`wx-picker__tab${tab.kind === 'search' ? ' wx-picker__tab--active' : ''}`}
+              onClick={() => setTab({ kind: 'search' })}
+              title="搜索表情"
+              aria-label="搜索表情"
+            >
+              <SearchIcon size={20} />
+            </button>
+          ) : item.kind === 'emoji' ? (
+            <button
+              key={item.key}
+              className={`wx-picker__tab${tab.kind === 'emoji' ? ' wx-picker__tab--active' : ''}`}
+              onClick={() => setTab({ kind: 'emoji' })}
+              title="表情"
+              aria-label="表情"
+            >
+              <EmojiIcon size={22} />
+            </button>
+          ) : (
+            <button
+              key={item.key}
+              className={`wx-picker__tab wx-picker__tab--set${
+                tab.kind === 'set' && tab.id === item.set.id ? ' wx-picker__tab--active' : ''
+              }`}
+              onClick={() => setTab({ kind: 'set', id: item.set.id })}
+              title={item.set.title}
+              aria-label={item.set.title}
+            >
+              {item.set.thumbnail ? (
+                <StickerRenderer media={stickerMedia(item.set.thumbnail)} size={28} preview />
+              ) : (
+                <span className="wx-picker__tab-text">{item.set.title.slice(0, 2)}</span>
+              )}
+            </button>
+          ),
+        )}
+        {strip.hasRight ? (
+          <button
+            className="wx-picker__tab"
+            onClick={() => setPage((current) => Math.min(current + 1, strip.pageCount - 1))}
             title="下一页"
             aria-label="下一页"
           >

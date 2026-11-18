@@ -192,9 +192,13 @@ Measured on the same client (screenshot space, same ×1.1245 conversion):
   所有表情 follows it.
 - Emoji grid **10 columns × 44 px**, 12 px side inset; the art measures **24 px**.
 - Tab strip **45 px** tall, 14 px inset, 5 px gaps, **44 px slots**; the selected pill is
-  **32 × 32**, radius 7, `#ececec`. Order: **搜索 / 表情 / installed sets / 下一页**.
-  With 搜索 + 表情 fixed, a strip without the arrow fits seven sets; when it overflows,
-  each page shows six so 下一页 can take the ninth slot (`lib/pickerTabs.ts`).
+  **32 × 32**, radius 7, `#ececec`. Order: **搜索 / 表情 / installed sets**, paged by
+  **上一页 / 下一页** at the row's ends. The client pages the whole row rather than
+  pinning 搜索/表情: on the last page its left arrow sits where the first tabs used to
+  be (confirmed by the user's last-page screenshot). A window shows **eight tabs with
+  one arrow** and **seven between two arrows**; the last page is clamped to the end and
+  has only the left arrow, so 下一页 disappears there. Nine slots; the maths lives in
+  `lib/pickerTabs.ts` and is unit-tested.
 - The client shows **no scrollbar** in the card. The body hides the native one, and the
   grid columns are `1fr` so a bar appearing could never clip the tenth column.
 
