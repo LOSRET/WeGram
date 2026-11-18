@@ -180,6 +180,13 @@ export const messageSchema = z.object({
    */
   senderChatId: z.number().int().optional(),
   senderName: z.string(),
+  /**
+   * `wx-media://` URL of the sender's profile photo, when it was already
+   * downloaded while the message was mapped. Photos that finish later arrive on
+   * `evt:avatars` (keyed by user id), or with the chat's own `avatarUrl` when the
+   * sender is a chat (channel post, anonymous admin).
+   */
+  senderAvatarUrl: z.string().optional(),
   outgoing: z.boolean(),
   date: z.number().int(),
   kind: messageKindSchema,
@@ -190,6 +197,18 @@ export const messageSchema = z.object({
   edited: z.boolean().optional(),
 })
 export type Message = z.infer<typeof messageSchema>
+
+/**
+ * A profile photo that finished downloading *after* the rows carrying it were
+ * mapped. Users are identified by id rather than by message, because the same
+ * person posts in many chats and the renderer draws one photo for all of them.
+ */
+export const userAvatarSchema = z.object({
+  userId: z.number().int(),
+  /** `wx-media://` URL served by the main process. */
+  url: z.string(),
+})
+export type UserAvatar = z.infer<typeof userAvatarSchema>
 
 export const messageOpSchema = z.discriminatedUnion('op', [
   z.object({ op: z.literal('new'), message: messageSchema }),

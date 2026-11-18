@@ -40,6 +40,24 @@ const ME: Self = {
 
 const now = () => Math.floor(Date.now() / 1000)
 
+/** Gradient pairs for the preview's sender photos, picked by user id. */
+const PREVIEW_AVATAR_COLORS: readonly (readonly [string, string])[] = [
+  ['#4C9AFF', '#1B3C8C'],
+  ['#7B61FF', '#3A2478'],
+  ['#FF9F43', '#B4482A'],
+  ['#2ED573', '#11704A'],
+  ['#FF6B81', '#A02B48'],
+  ['#00C2D1', '#0A5C70'],
+  ['#B57BFF', '#4B2880'],
+]
+
+/** A face for a preview sender: transcript rows draw it like a real profile photo. */
+function senderAvatar(userId: number): string {
+  const pair = PREVIEW_AVATAR_COLORS[Math.abs(userId) % PREVIEW_AVATAR_COLORS.length] ??
+    PREVIEW_AVATAR_COLORS[0] ?? ['#4C9AFF', '#1B3C8C']
+  return svgUrl(96, 96, pair[0], pair[1])
+}
+
 /** A real gzip'd Lottie file, so the TGS path is exercised in the browser. */
 const PREVIEW_TGS =
   'data:application/gzip;base64,H4sIAGBJ+2oC/6VT226DMAz9Fz9HyIxLKb8y8ZBxKxoUlrB2COXfZyfRGB172SSIybF9jh2HFW6QQxKcghgENAryCAV0E+RkRjJnsnfIw6dMwMXb60A5d3mrWyUHSquqysZLretZQ/5cCOjlUiv+Xr/c3ZVsKGBeII89i36jfK0s/krhK4y8SAfY9NkmM1WISMwdB3zQFoOYtgs7CiNcosNTj2NhjLAMceIoouSvDOdvRRiOVr8Xiv8ViVIvMnkRdCJpLOhB9si9BwU6XO9xKlf4l1VAX+RUu7nwHKBVNIBu3gBV8kRtW/pA/KAoL6x2aJgZP2JVlzPY/pi+6Ym+fCAIMBIYnFJaokxsx7SxITqF0JM2Xd9vpDM3cVyVPESPD+lnF3hYiSl8Fa0a3yfg7cMfo91deBmYojCfs22fcmYDAAA='
@@ -143,16 +161,21 @@ const chats: ChatSummary[] = [
   },
 ]
 
-const perfMessages: Message[] = Array.from({ length: 5000 }, (_, index) => ({
-  id: 10_000 + index,
-  chatId: 99,
-  senderId: index % 3 === 0 ? ME.id : 30 + (index % 5),
-  senderName: index % 3 === 0 ? '我' : `成员${index % 5}`,
-  outgoing: index % 3 === 0,
-  date: now() - (600 - Math.floor(index / 10)) * 60,
-  kind: 'text' as const,
-  text: `压测消息 #${index + 1}：这是一条用于验证虚拟滚动与锚定补偿的中等长度消息。`,
-}))
+const perfMessages: Message[] = Array.from({ length: 5000 }, (_, index) => {
+  const outgoing = index % 3 === 0
+  const senderId = outgoing ? ME.id : 30 + (index % 5)
+  return {
+    id: 10_000 + index,
+    chatId: 99,
+    senderId,
+    senderName: outgoing ? '我' : `成员${index % 5}`,
+    ...(outgoing ? {} : { senderAvatarUrl: senderAvatar(senderId) }),
+    outgoing,
+    date: now() - (600 - Math.floor(index / 10)) * 60,
+    kind: 'text' as const,
+    text: `压测消息 #${index + 1}：这是一条用于验证虚拟滚动与锚定补偿的中等长度消息。`,
+  }
+})
 
 const messagesByChat: Record<number, Message[]> = {
   1: [
@@ -202,6 +225,7 @@ const messagesByChat: Record<number, Message[]> = {
       chatId: 2,
       senderId: 27,
       senderName: '成员2',
+      senderAvatarUrl: senderAvatar(27),
       outgoing: false,
       date: now() - 240,
       kind: 'photo',
@@ -213,6 +237,7 @@ const messagesByChat: Record<number, Message[]> = {
       chatId: 2,
       senderId: 27,
       senderName: '成员2',
+      senderAvatarUrl: senderAvatar(27),
       outgoing: false,
       date: now() - 150,
       kind: 'sticker',
@@ -278,11 +303,15 @@ function msg(
   outgoing: boolean,
   secondsAgo: number,
 ): Message {
+  const senderId = outgoing ? ME.id : chatId * 10 + 7
   return {
     id,
     chatId,
-    senderId: outgoing ? ME.id : chatId * 10 + 7,
+    senderId,
     senderName: outgoing ? '我' : '对方',
+    // Our own rows draw the rail's photo from `auth.me`, everybody else's from
+    // the row itself (the real adapter pushes late ones through `evt:avatars`).
+    ...(senderId === ME.id ? {} : { senderAvatarUrl: senderAvatar(senderId) }),
     outgoing,
     date: now() - secondsAgo,
     kind: 'text',

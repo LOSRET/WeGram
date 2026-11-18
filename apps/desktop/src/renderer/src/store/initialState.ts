@@ -24,5 +24,6 @@ export const DATA_DEFAULTS: AppData = {
   error: null,
   mediaUrls: {},
   mediaProgress: {},
+  userAvatars: {},
   unreadMarkers: {},
 }

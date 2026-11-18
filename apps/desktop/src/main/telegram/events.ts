@@ -16,6 +16,9 @@ export function publishAdapterEvent(bus: EventBus, event: AdapterEvent): void {
     case 'messages':
       bus.publish('evt:messages', { chatId: event.chatId, ops: event.ops })
       return
+    case 'avatars':
+      bus.publish('evt:avatars', { avatars: event.avatars })
+      return
     case 'typing':
       bus.publish('evt:typing', {
         chatId: event.chatId,

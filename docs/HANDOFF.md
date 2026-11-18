@@ -57,6 +57,12 @@ Greenfield → working skeleton in three milestones:
   复制/打印 are hidden. Measured metrics: `UI-HANDOFF.md` §2.1 (second table), deltas 17–20.
   The mock now ships a 6 s WebM fixture (`mock-assets.ts` `SAMPLE_VIDEO_WEBM`) so the
   window is reachable without the real account.
+- **Sender photos in the transcript (W3 addendum)**: group members are no longer
+  initials. `Message.senderAvatarUrl` carries the picture a row can already draw, and
+  the adapter's photo pool (the one that fetched chat photos) now resolves **people**
+  too, keyed by user id; a photo that finishes after the page was mapped arrives on the
+  new `evt:avatars` event instead of forcing a refetch. Our own rows draw
+  `Self.avatarUrl`, a channel post draws the chat photo. Design: `技术方案.md` §7.2.
 
 Verified at the end of the W2 session: `pnpm typecheck`, `pnpm build`, `pnpm tdlib:smoke`,
 `pnpm ui:db-check`, and the browser acceptance panel (`?perf=1`) — 5000 messages at
@@ -489,6 +495,15 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
   own photo is fetched in the background and announced with a second `auth` event, so
   authorisation never waits on the network; `updateUser` (self) and `updateChatPhoto`
   (a chat) invalidate and refetch.
+- **Sender photos ride the same pool and a second event.** `mapMessage` never waits for
+  a photo: it copies the cached URL (`userAvatarUrls`), then queues the sender through
+  the 4-wide pool. Finished ones are batched into `evt:avatars` (keyed by user id, so one
+  person's photo serves every chat) rather than re-emitting messages — a transcript page
+  has no way to patch 40 rows without a refetch. Consequences worth knowing: the pool is
+  shared with chat photos, so opening a big group right after start-up queues dozens of
+  senders (if chat photos feel slow, that queue is the first suspect); "this person has
+  no photo" is remembered for the session, and `updateUser` for somebody else refetches
+  only when the file id actually changed (it also fires for name-only changes).
 - **This TDLib's `inputMessagePhoto` has no width/height.** Dimensions live on
   `inputPhoto`, so a photo cannot be sent without knowing its pixel size. The main
   process parses PNG/JPEG/WebP/GIF headers first; when it cannot, the file is sent as a
@@ -660,17 +675,20 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
    and returns to the phone form; a multi-account list would need several TDLib sessions,
    which the adapter does not model.
 9. **UI deltas vs the real client** are catalogued in `docs/UI-HANDOFF.md` §5 (composer
-   toolbar loses the scissors chevron, message-row avatars still draw initials, no pin
-   button, fixed 238 px list, rail sections other than 聊天 only raise a toast, dark rail
-   icon grey untuned). §6 has the ordered follow-ups.
+   toolbar loses the scissors chevron, no pin button, fixed 238 px list, rail sections
+   other than 聊天 only raise a toast, dark rail icon grey untuned). §6 has the ordered
+   follow-ups.
 10. **The chat list is not virtualised.** This account renders **526 rows** at once
     (measured in the DOM). It is still smooth, but it is the next scaling risk, and the
     avatar pool only prefetches what it is handed: the 100-chat first page plus whatever
     arrives through `emitChatUpsert`. A row scrolled into view without an update event
     keeps its initials until the chat is touched.
-11. **Message-row (sender) avatars are still initials.** `Message` carries no photo
-    field; doing it properly means `senderPhotoFileId` in the DTO plus a cache keyed by
-    user id, or a `getUserProfilePhotos` call per sender.
+11. ~~**Message-row (sender) avatars are still initials.**~~ **Done** — `UserAvatar`
+    `{ userId, url }`, `Message.senderAvatarUrl` and `evt:avatars`; the adapter caches by
+    user id (`AvatarCache.userUrls`) and resolves through `getUser` → `profile_photo.small`,
+    the same `downloadFile(synchronous)` path chat photos use. Remaining edge: a linked
+    channel's photo in an anonymous-admin post only shows once that chat's own photo is
+    cached (the row then carries it); the open chat's photo is live via `chat.avatarUrl`.
 12. **Popovers keep native scrollbars** (modals, forward list, sticker grid). Only the
     two long panes use `<OverlayScrollbar>`; converting the rest is mechanical but was
     not worth the churn while the complaint was the list and the transcript.

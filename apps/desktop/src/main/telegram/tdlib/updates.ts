@@ -21,6 +21,8 @@ export interface UpdateDeps {
   fetchChatSummary(chatId: number): Promise<ChatSummary>
   avatars: {
     prefetch(chatIds: number[]): void
+    /** Refetch somebody else's photo, but only when it actually changed. */
+    syncUserPhoto(userId: number, fileId: number | undefined): void
     invalidate(chatId: number): void
     loadSelf(fileId: number): void
   }
@@ -133,12 +135,18 @@ export function createUpdateHandler(deps: UpdateDeps): (update: TdObject) => Pro
         return
       }
       case 'updateUser': {
-        // Our own profile changed (new photo): refresh the rail avatar.
         const user = update.user
-        if (!user || user.id !== deps.getSelfUserId()) return
+        if (!user) return
         const fileId: number | undefined =
           user.profile_photo?.small?.id ?? user.profile_photo?.big?.id
-        if (fileId) deps.avatars.loadSelf(fileId)
+        if (user.id === deps.getSelfUserId()) {
+          // Our own profile changed (new photo): refresh the rail avatar.
+          if (fileId) deps.avatars.loadSelf(fileId)
+          return
+        }
+        // Somebody in a transcript changed their picture (or their name only,
+        // which `syncUserPhoto` answers with a no-op).
+        deps.avatars.syncUserPhoto(user.id, fileId)
         return
       }
       case 'updateChatAction':

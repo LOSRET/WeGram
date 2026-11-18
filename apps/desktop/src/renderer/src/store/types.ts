@@ -6,6 +6,7 @@ import type {
   ConnectionState,
   Message,
   MessageOp,
+  UserAvatar,
 } from '@wegram/protocol'
 import type { StateCreator } from 'zustand'
 
@@ -58,6 +59,12 @@ export interface AppData {
   /** fileId → wx-media:// URL, filled by downloads and by `evt:file`. */
   mediaUrls: Record<number, string>
   mediaProgress: Record<number, FileProgress>
+  /**
+   * userId → wx-media:// URL for photos that finished downloading after their
+   * rows were mapped (`evt:avatars`). The same person posts in several chats, so
+   * the face lives here instead of on each message.
+   */
+  userAvatars: Record<number, string>
   unreadMarkers: Record<number, UnreadMarker | null>
 }
 
@@ -85,6 +92,10 @@ export interface MessageActions {
   setUnreadMarker: (chatId: number, marker: UnreadMarker | null) => void
 }
 
+export interface AvatarActions {
+  setUserAvatars: (avatars: UserAvatar[]) => void
+}
+
 export interface MediaActions {
   setMediaUrl: (fileId: number, url: string) => void
   setMediaProgress: (fileId: number, progress: FileProgress, url?: string) => void
@@ -97,7 +108,14 @@ export interface UiActions {
 }
 
 export interface AppState
-  extends AppData, AuthActions, ChatActions, MessageActions, MediaActions, UiActions {}
+  extends
+    AppData,
+    AuthActions,
+    ChatActions,
+    MessageActions,
+    AvatarActions,
+    MediaActions,
+    UiActions {}
 
 /**
  * A zustand slice: it may only return actions, never data. Data is seeded by

@@ -19,6 +19,14 @@ export async function mapMessage(
     : senderChatId
       ? await ctx.resolveChatTitle(senderChatId)
       : '未知'
+  // The photo is a bonus, never a reason to hold the message back: a cached one
+  // travels with the row, an uncached one is queued and arrives on evt:avatars.
+  const senderAvatarUrl = senderUserId
+    ? ctx.userAvatarUrls.get(senderUserId)
+    : senderChatId
+      ? ctx.chatAvatarUrls.get(senderChatId)
+      : undefined
+  if (senderUserId) ctx.prefetchUserAvatars([senderUserId])
   const content = raw.content ?? {}
   const mapped = mapContent(content)
   let text = mapped.text
@@ -38,6 +46,7 @@ export async function mapMessage(
     senderId: senderUserId,
     ...(senderChatId ? { senderChatId } : {}),
     senderName,
+    ...(senderAvatarUrl ? { senderAvatarUrl } : {}),
     outgoing: Boolean(raw.is_outgoing),
     date: Number(raw.date),
     kind: mapped.kind,

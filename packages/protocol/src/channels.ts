@@ -15,6 +15,7 @@ import {
   scrollAnchorSchema,
   selfSchema,
   stickerSetSchema,
+  userAvatarSchema,
   stickerSetSummarySchema,
   viewerItemSchema,
   viewerStateSchema,
@@ -286,6 +287,11 @@ export const eventChannels = [
   'evt:connection',
   'evt:chats',
   'evt:messages',
+  /**
+   * Profile photos of other people that finished downloading after their
+   * messages were mapped (a group's senders, the peer of a private chat).
+   */
+  'evt:avatars',
   'evt:typing',
   'evt:file',
   'evt:error',
@@ -298,6 +304,7 @@ export const eventSchemas = {
   'evt:connection': envelope(connectionStateSchema),
   'evt:chats': envelope(z.object({ ops: z.array(chatOpSchema) })),
   'evt:messages': envelope(z.object({ chatId: z.number().int(), ops: z.array(messageOpSchema) })),
+  'evt:avatars': envelope(z.object({ avatars: z.array(userAvatarSchema) })),
   'evt:typing': envelope(
     z.object({
       chatId: z.number().int(),

@@ -20,7 +20,7 @@ listed in "Known deltas" is a deliberate, documented difference.
 | `renderer/src/components/ChatList.tsx` | Search pill + circular "+" (both inside the list column) + 65 px rows. Selecting the row that is already open toggles the conversation shut. Rows show the real chat photo when `ChatSummary.avatarUrl` is present, initials otherwise. |
 | `renderer/src/components/OverlayScrollbar.tsx` | WeChat's floating scrollbar: a 6 px translucent pill drawn over the rows (hover/scroll/drag), so long lists get no layout gutter and nothing re-flows when it appears. Used by the chat list and the transcript. |
 | `renderer/src/components/ChatPane.tsx` | 46 px header (title, typing, call/… buttons), watermark empty state, chat-info popover. |
-| `renderer/src/components/MessageList.tsx` | Bubbles, own avatar on the right, hover-only timestamp/read receipt, day + unread separators. |
+| `renderer/src/components/MessageList.tsx` | Bubbles, real sender photos on both sides (own avatar on the right; `senderAvatarUrl`, `evt:avatars`, `Self.avatarUrl`), hover-only timestamp/read receipt, day + unread separators. |
 | `renderer/src/components/Composer.tsx` | Bordered input card, toolbar under the text, attach menu, send button inside the card. |
 | `renderer/src/components/ContextMenu.tsx` | Exports `Popup` (positioned, closes on Escape/outside click) plus the message menu. |
 | `renderer/src/components/AppMenu.tsx` | The rail "≡" menu: settings, theme, sign out, adapter caption. |
@@ -328,10 +328,12 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
    right-hand "语音输入" circle is **deliberately left out** — the send button sits
    right after the toolbar.
 2. **Avatars are real where the protocol carries them, initials elsewhere.** The rail
-   avatar and every chat row now load the account's/profile photo through
-   `wx-media://` (`Self.avatarUrl`, `ChatSummary.avatarUrl`); the rows without a photo
-   keep the coloured initial square. **Message rows still draw initials** — `Message` has
-   no sender-photo field (see `docs/HANDOFF.md` "Known gaps" 11).
+   avatar, every chat row and now **every message row** load the account's/profile photo
+   through `wx-media://` (`Self.avatarUrl`, `ChatSummary.avatarUrl`,
+   `Message.senderAvatarUrl` / `evt:avatars`); subjects without a photo keep the coloured
+   initial square. A sender's photo is downloaded in the background, so a row opened on a
+   cold cache shows its initial for a moment and swaps in the picture when
+   `evt:avatars` lands — that is the intended behaviour, not a missing image.
 3. **Rail sections other than 聊天** only raise a toast. 通讯录 is cheap to build from
    `chat.kind === 'private'`; 收藏 and 朋友圈 have no data at all.
 4. **No pin (always-on-top) button** in the title strip; WeChat has one left of the
@@ -441,9 +443,11 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
    already has `muted`/`pinned`.
 4. Global search overlay (W4) and in-chat search.
 5. Pin button + draggable list width, if the client fidelity matters more than scope.
-6. ~~Avatar photos once the DTO carries them~~ — done for the rail and the chat list.
-   Next: sender avatars in the transcript (needs a photo id on `Message`), and a
-   virtualised chat list (526 rows render at once on this account).
+6. ~~Avatar photos once the DTO carries them~~ — done for the rail, the chat list and
+   **the transcript's sender rows** (`Message.senderAvatarUrl` + `evt:avatars`;
+   `components/message-list/senderAvatar.ts` owns the priority rule and is unit-tested).
+   Next: a virtualised chat list (526 rows render at once on this account), and profile
+   photos in 通讯录 / the chat-info popover once those views exist.
 
 ---
 
@@ -467,7 +471,12 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
   `restoreToAnchor` first.
 - **A slow avatar is a slow tunnel, not slow code.** One 160 px photo measured 16 s on a
   flapping SOCKS connection and 65–230 ms on a healthy one. Check the proxy before
-  touching `prefetchChatAvatars`.
+  touching the avatar pool.
+- **A sender photo that never appears is usually "not queued", not "not drawn".** Rows
+  read `message.senderAvatarUrl`, then `evt:avatars` keyed by user id (`userAvatars` in
+  the store); a channel/anonymous-admin post reads the chat's `avatarUrl`. If a row keeps
+  its initial, check that the id matches what the adapter keyed (`senderId` is 0 for
+  `senderChatId` senders) before touching `senderAvatar.ts`.
 - **The login window is a real second window.** Before a sign-in completes the shell
   does not exist, so closing the login window (its × / Alt+F4) quits the app through
   `window-all-closed`; after the hand-over the shell is the only window and signing out

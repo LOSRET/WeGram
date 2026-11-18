@@ -12,7 +12,12 @@ export interface MessageRowProps {
   message: Message
   repliedTo: Message | null
   /** Identity of the signed-in account, for the avatar on our own messages. */
-  self: { id: number; name: string }
+  self: { id: number; name: string; avatarUrl: string | undefined }
+  /**
+   * The sender's profile photo, when it is known. `undefined` draws the initials
+   * placeholder: a photo can still be on its way (`evt:avatars`).
+   */
+  avatarUrl: string | undefined
   /** Highest outgoing id the peer has read; drives the 已读/未读 receipt. */
   readOutboxMaxId: number
   /**
@@ -37,6 +42,7 @@ export const MessageRow = memo(function MessageRow({
   message,
   repliedTo,
   self,
+  avatarUrl,
   readOutboxMaxId,
   onOpenMenu,
 }: MessageRowProps) {
@@ -71,15 +77,23 @@ export const MessageRow = memo(function MessageRow({
     <div className={`wx-message-row${message.outgoing ? ' wx-message-row--self' : ''}`}>
       <div
         className="wx-avatar wx-avatar--small"
-        style={{
-          background: avatarColor(
-            message.outgoing
-              ? (self.id ?? 1000)
-              : message.senderChatId || message.senderId || chat.id,
-          ),
-        }}
+        style={
+          avatarUrl
+            ? undefined
+            : {
+                background: avatarColor(
+                  message.outgoing
+                    ? (self.id ?? 1000)
+                    : message.senderChatId || message.senderId || chat.id,
+                ),
+              }
+        }
       >
-        {initials(message.outgoing ? self.name : message.senderName)}
+        {avatarUrl ? (
+          <img className="wx-avatar__img" src={avatarUrl} alt="" draggable={false} />
+        ) : (
+          initials(message.outgoing ? self.name : message.senderName)
+        )}
       </div>
 
       <div className={`wx-message-stack${message.outgoing ? ' wx-message-stack--self' : ''}`}>

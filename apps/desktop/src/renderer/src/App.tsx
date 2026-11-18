@@ -44,7 +44,7 @@ export function App() {
      * Event-order guard (design doc §7.3, "every event carries `seq`; the renderer is
      * expected to detect gaps and re-sync").
      *
-     * All eight `evt:*` channels draw from one counter, so a hole means state the
+     * Every `evt:*` channel draws from one counter, so a hole means state the
      * renderer will never be told about again: a dropped `evt:chats` batch leaves the
      * list's preview and unread counts stale, a dropped `evt:messages` batch leaves a
      * message missing until the chat is reopened. Instead of pretending, the repair
@@ -118,6 +118,10 @@ export function App() {
       window.tg.on('evt:messages', (event) => {
         track(event.seq)
         store.applyMessageOps(event.payload.chatId, event.payload.ops)
+      }),
+      window.tg.on('evt:avatars', (event) => {
+        track(event.seq)
+        store.setUserAvatars(event.payload.avatars)
       }),
       window.tg.on('evt:typing', (event) => {
         track(event.seq)

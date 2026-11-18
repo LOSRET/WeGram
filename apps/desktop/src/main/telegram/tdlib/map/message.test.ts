@@ -12,9 +12,11 @@ function makeContext(overrides: Partial<MapperContext> = {}): MapperContext {
   return {
     chatTitles: new Map(),
     chatAvatarUrls: new Map(),
+    userAvatarUrls: new Map(),
     stickerSizes: new Map(),
     resolveUserName: async (userId) => `user-${userId}`,
     resolveChatTitle: async (chatId) => `chat-${chatId}`,
+    prefetchUserAvatars: () => undefined,
     ...overrides,
   }
 }
@@ -43,6 +45,42 @@ describe('mapMessage', () => {
       replyToId: 99,
       edited: true,
     })
+  })
+
+  it('carries a cached sender photo and queues one that is missing', async () => {
+    const prefetchUserAvatars = vi.fn()
+    const raw = {
+      id: 101,
+      date: 10,
+      sender_id: { _: 'messageSenderUser', user_id: 42 },
+      content: { _: 'messageText', text: { text: 'hi' } },
+    }
+
+    const cached = await mapMessage(
+      makeContext({ userAvatarUrls: new Map([[42, 'wx-media://f/face']]), prefetchUserAvatars }),
+      7,
+      raw,
+    )
+    expect(cached.senderAvatarUrl).toBe('wx-media://f/face')
+
+    const missing = await mapMessage(makeContext({ prefetchUserAvatars }), 7, raw)
+    expect(missing).not.toHaveProperty('senderAvatarUrl')
+    expect(prefetchUserAvatars).toHaveBeenCalledWith([42])
+  })
+
+  it('draws a channel post with the chat photo', async () => {
+    const message = await mapMessage(
+      makeContext({ chatAvatarUrls: new Map([[55, 'wx-media://f/channel']]) }),
+      8,
+      {
+        id: 2,
+        date: 10,
+        sender_id: { _: 'messageSenderChat', chat_id: 55 },
+        content: { _: 'messageText', text: { text: 'post' } },
+      },
+    )
+
+    expect(message.senderAvatarUrl).toBe('wx-media://f/channel')
   })
 
   it('resolves a channel post through the chat title and keeps senderChatId', async () => {

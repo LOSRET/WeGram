@@ -7,9 +7,11 @@ function makeContext(overrides: Partial<MapperContext> = {}): MapperContext {
   return {
     chatTitles: new Map(),
     chatAvatarUrls: new Map(),
+    userAvatarUrls: new Map(),
     stickerSizes: new Map(),
     resolveUserName: async (userId) => `user-${userId}`,
     resolveChatTitle: async (chatId) => `chat-${chatId}`,
+    prefetchUserAvatars: () => undefined,
     ...overrides,
   }
 }

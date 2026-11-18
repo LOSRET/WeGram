@@ -16,6 +16,7 @@ import type {
   Sticker,
   StickerSet,
   StickerSetSummary,
+  UserAvatar,
 } from '@wegram/protocol'
 
 import { probeImageSize } from '../media/image-size'
@@ -140,6 +141,11 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   private qrTimer: NodeJS.Timeout | null = null
   /** Generated avatar for the rail, so the mock exercises the real image path. */
   private selfAvatarUrl: string | null = null
+  /** Sender id → generated photo, so transcript rows show faces instead of initials. */
+  private readonly userAvatarUrls = new Map<number, string>()
+  /** One sender whose photo arrives late, to exercise `evt:avatars`. */
+  private lateAvatarId: number | null = null
+  private lateAvatarTimer: NodeJS.Timeout | null = null
 
   constructor(private readonly options: MockAdapterOptions) {
     super()
@@ -157,6 +163,8 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   async stop(): Promise<void> {
     if (this.timer) clearInterval(this.timer)
     this.timer = null
+    if (this.lateAvatarTimer) clearTimeout(this.lateAvatarTimer)
+    this.lateAvatarTimer = null
     this.clearQrTimer()
   }
 
@@ -489,7 +497,13 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
 
   /* ---------- fixture plumbing ---------- */
 
-  /** Every fixture chat gets a generated photo, so the list exercises <img>. */
+  /**
+   * Every fixture chat gets a generated photo, so the list exercises <img>;
+   * every fixture sender gets one too, so the transcript does not stay on
+   * initials. One sender is left without a photo on purpose — its `evt:avatars`
+   * arrives after login, which is the path the real adapter needs for photos
+   * that finish downloading after a page was mapped.
+   */
   private attachAvatarFixtures(): void {
     for (const [chatId, fixture] of this.fixtures) {
       const pair = MOCK_AVATAR_COLORS[chatId % MOCK_AVATAR_COLORS.length] ?? MOCK_AVATAR_COLORS[0]!
@@ -498,6 +512,50 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
       writeFileSync(path, createGradientPng(128, 128, from, to))
       fixture.chat.avatarUrl = registerMediaFile(path)
     }
+
+    const senderIds = new Set<number>()
+    for (const fixture of this.fixtures.values()) {
+      for (const message of fixture.messages) {
+        if (message.senderId > 0 && message.senderId !== ME.id) senderIds.add(message.senderId)
+      }
+    }
+    this.userAvatarUrls.clear()
+    this.lateAvatarId = null
+    for (const userId of [...senderIds].sort((a, b) => a - b)) {
+      const pair =
+        MOCK_AVATAR_COLORS[(userId + 2) % MOCK_AVATAR_COLORS.length] ?? MOCK_AVATAR_COLORS[0]!
+      const [from, to] = pair
+      const path = join(this.options.mediaDir, `user-avatar-${userId}.png`)
+      writeFileSync(path, createGradientPng(128, 128, from, to))
+      this.userAvatarUrls.set(userId, registerMediaFile(path))
+      if (this.lateAvatarId === null) this.lateAvatarId = userId
+      else this.stampSenderAvatar(userId)
+    }
+  }
+
+  /** Copies a known photo onto every fixture row of one sender. */
+  private stampSenderAvatar(userId: number): void {
+    const url = this.userAvatarUrls.get(userId)
+    if (!url) return
+    for (const fixture of this.fixtures.values()) {
+      for (const message of fixture.messages) {
+        if (message.senderId === userId) message.senderAvatarUrl = url
+      }
+    }
+  }
+
+  /** Delivers the deferred sender photo the way the real cache does: an event. */
+  private scheduleLateAvatar(): void {
+    const userId = this.lateAvatarId
+    if (userId === null || this.lateAvatarTimer) return
+    this.lateAvatarTimer = setTimeout(() => {
+      this.lateAvatarTimer = null
+      const url = this.userAvatarUrls.get(userId)
+      if (!url) return
+      this.stampSenderAvatar(userId)
+      const avatars: UserAvatar[] = [{ userId, url }]
+      this.emit({ type: 'avatars', avatars })
+    }, 1_500)
   }
 
   private async materializeMedia(): Promise<void> {
@@ -891,11 +949,14 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     const target = fixtures[Math.floor(Math.random() * fixtures.length)]
     if (!target) return
 
+    const senderId = target.chat.id * 10 + 7
+    const senderAvatarUrl = this.userAvatarUrls.get(senderId)
     const message: Message = {
       id: this.nextMessageId++,
       chatId: target.chat.id,
-      senderId: target.chat.id * 10 + 7,
+      senderId,
       senderName: '对方',
+      ...(senderAvatarUrl ? { senderAvatarUrl } : {}),
       outgoing: false,
       date: Math.floor(Date.now() / 1000),
       kind: 'text',
@@ -915,6 +976,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
       action: 'typing',
       until: Date.now() + 3000,
     })
+    this.scheduleLateAvatar()
   }
 }
 

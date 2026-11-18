@@ -12,6 +12,7 @@ import { OverlayScrollbar } from '../OverlayScrollbar'
 import { DaySeparator, UnreadDivider } from './Divider'
 import { MessageRow } from './MessageRow'
 import { buildMessageMenuItems } from './menu'
+import { senderAvatarUrl } from './senderAvatar'
 import { messagesById, pickSeenUpTo } from './seen'
 import { countUnreadBelow } from './unreadBelow'
 import { useScrollFlags } from './scrollFlags'
@@ -85,6 +86,9 @@ export function MessageList({
   const [menu, setMenu] = useState<MenuState | null>(null)
 
   const auth = useAppStore((state) => state.auth)
+  // Photos of people that finished downloading after their rows were mapped
+  // (`evt:avatars`), plus whatever the row itself already carried.
+  const userAvatars = useAppStore((state) => state.userAvatars)
   // Memoised because every rendered row takes it as a prop: a fresh object per
   // render would re-render all of them and defeat `memo` in `MessageRow`.
   const self = useMemo(
@@ -93,8 +97,9 @@ export function MessageList({
         ? {
             id: auth.me.id,
             name: [auth.me.firstName, auth.me.lastName].filter(Boolean).join(''),
+            avatarUrl: auth.me.avatarUrl,
           }
-        : { id: 1000, name: '我' },
+        : { id: 1000, name: '我', avatarUrl: undefined },
     [auth],
   )
 
@@ -271,6 +276,7 @@ export function MessageList({
                   message={message}
                   repliedTo={repliedTo}
                   self={self}
+                  avatarUrl={senderAvatarUrl(message, chat, self, userAvatars)}
                   readOutboxMaxId={chat.lastReadOutboxMessageId ?? 0}
                   onOpenMenu={openMenu}
                 />

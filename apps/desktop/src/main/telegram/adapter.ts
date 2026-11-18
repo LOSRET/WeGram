@@ -10,6 +10,7 @@ import type {
   Self,
   StickerSet,
   StickerSetSummary,
+  UserAvatar,
 } from '@wegram/protocol'
 
 export type AdapterKind = 'mock' | 'tdlib'
@@ -25,6 +26,7 @@ export type AdapterEvent =
   | { type: 'connection'; state: ConnectionState }
   | { type: 'chats'; ops: ChatOp[] }
   | { type: 'messages'; chatId: number; ops: MessageOp[] }
+  | { type: 'avatars'; avatars: UserAvatar[] }
   | { type: 'typing'; chatId: number; userId: number; action: string; until: number }
   | {
       type: 'file'

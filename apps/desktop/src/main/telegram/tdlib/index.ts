@@ -81,6 +81,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
         actions.downloadFile(this.actionDeps, { fileId, priority }),
       fetchChatSummary: (chatId) => actions.fetchChatSummary(this.actionDeps, chatId),
       emitChats: (ops) => this.emit({ type: 'chats', ops }),
+      emitAvatars: (avatars) => this.emit({ type: 'avatars', avatars }),
       onSelfAvatar: (url) => {
         if (this.auth.kind === 'ready') {
           this.setAuth({ kind: 'ready', me: { ...this.auth.me, avatarUrl: url } })
@@ -91,9 +92,11 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     this.mapper = {
       chatTitles: this.chatTitles,
       chatAvatarUrls: this.avatars.urls,
+      userAvatarUrls: this.avatars.userUrls,
       stickerSizes: this.stickerSizes,
       resolveUserName: (userId) => this.resolveUserName(userId),
       resolveChatTitle: (chatId) => this.resolveChatTitle(chatId),
+      prefetchUserAvatars: (userIds) => this.avatars.prefetchUsers(userIds),
     }
 
     this.actionDeps = {
@@ -129,6 +132,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
         loadSelf: (fileId) => {
           void this.avatars.loadSelf(fileId)
         },
+        syncUserPhoto: (userId, fileId) => this.avatars.syncUserPhoto(userId, fileId),
       },
       getSelfUserId: () => this.selfUserId,
       safeVersion: () => safeVersion(this.client),
