@@ -203,6 +203,18 @@ placeholder), runs `pnpm verify`, then `pnpm --filter @wegram/desktop package:wi
 (`electron-vite build && electron-builder --win`). A re-run uploads the assets with
 `--clobber` instead of failing on the existing release.
 
+**Two repository secrets are required**: `TELEGRAM_API_ID` and `TELEGRAM_API_HASH`
+(the deployment's own my.telegram.org app). `electron.vite.config.ts` inlines them into the
+**main bundle only** — preload and renderer never see them — and the workflow fails in ~2s
+when either is missing. A packaged build therefore always has credentials:
+
+- credentials precedence: `process.env`/dev `.env` → the inlined value;
+- a packaged build without credentials shows an error dialog and quits, and it **ignores**
+  `WEGRAM_ADAPTER=mock` — the fixture data set is development-only (`createAdapter` refuses
+  it when `!allowMock`);
+- the mock-only UI hints (登录窗's `Mock 适配器：10 秒后自动模拟扫码`, the 设置菜单's
+  `Mock 适配器 · v0.1.0`) can only appear in `pnpm dev`.
+
 The first real build is in: run 44301387485 on tag `v0.1.0` finished green in 4m31s and
 published `WeGram-0.1.0-x64.exe` (108 MB) + its `.blockmap`.
 
@@ -627,8 +639,9 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
    `WeGram-0.1.0-x64.exe` from CI (see Release packaging above), and `release/win-unpacked` is
    verified locally. Nobody has run the installer yet, so these stay unverified: install /
    uninstall / per-user vs per-machine, code signing (currently skipped — SmartScreen will
-   complain), auto-update (no `publish` config, no `electron-updater` in the app) and the
-   sandboxed launch on a clean machine.
+   complain), auto-update (no `publish` config, no `electron-updater` in the app), the
+   sandboxed launch on a clean machine, and the inlined-credentials path end to end (the
+   v0.1.0 artifact predates it, so it still boots the mock adapter).
 6. Minor: the preload bundle is 187 kB because it imports the protocol index (zod). If it
    matters, split a channels-only entry point.
 7. Minor: `tdlib:smoke` only checks the *first* channel of the chat list for

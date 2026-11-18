@@ -47,6 +47,12 @@ change belongs in the adapter.
 - Packaging constraint: `tdjson.dll` cannot load from inside `app.asar`
   (`electron-builder.yml` unpacks it), and TDLib data dirs live under
   `app.getPath('userData')`, which `index.ts` pins to `%APPDATA%\WeGram`.
+- **Credentials are build-time, and mock is development-only.** `bootstrap()` resolves
+  `TELEGRAM_API_ID`/`TELEGRAM_API_HASH` from the environment first, then from
+  `__WEGRAM_API_CREDENTIALS__` (inlined by `electron.vite.config.ts`); a packaged build
+  with neither shows an error dialog and quits, and `createAdapter` refuses the mock
+  adapter when `allowMock` (= `isDev`) is false. Never add a second place that reads
+  credentials.
 
 ## Verify
 
