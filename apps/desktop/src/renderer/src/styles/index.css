@@ -826,6 +826,24 @@ select {
   width: 100%;
 }
 
+/* 定位到聊天位置: the row the viewer pointed at flashes once and fades out — the
+   highlight is a moment, never a state the message carries. The tint comes from
+   the brand token so light and dark themes both read as "this is the one". */
+.wx-message-slot.is-located .wx-message-row {
+  border-radius: 6px;
+  animation: wx-locate-flash 1.6s ease-out;
+}
+
+@keyframes wx-locate-flash {
+  0%,
+  45% {
+    background: color-mix(in srgb, var(--wx-brand) 14%, transparent);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
 .wx-messages__loading {
   position: absolute;
   top: 8px;

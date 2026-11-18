@@ -60,6 +60,12 @@ export interface AppData {
   hasNewerByChat: Record<number, boolean>
   /** Per-chat request to scroll to the newest message after a window reload. */
   jumpToLatest: { chatId: number; tick: number } | null
+  /**
+   * 定位到聊天位置: the row the viewer asked the shell to show. `tick` makes a
+   * repeated locate of the same row a new request; the landing path reads it once
+   * and the list clears it after it has scrolled (see `clearLocate`).
+   */
+  locate: { chatId: number; messageId: number; tick: number } | null
   replyToByChat: Record<number, number | null>
   typingByChat: Record<number, boolean>
   editing: EditingState | null
@@ -105,6 +111,10 @@ export interface MessageActions {
   applyMessageOps: (chatId: number, ops: MessageOp[]) => void
   /** Ask the list to scroll to the newest message (after a latest-window reload). */
   requestJumpToLatest: (chatId: number) => void
+  /** Ask the shell to open a conversation on one message (定位到聊天位置). */
+  requestLocate: (chatId: number, messageId: number) => void
+  /** The locate was honoured (or its row is gone); it must not be replayed. */
+  clearLocate: () => void
   setReplyTo: (chatId: number, messageId: number | null) => void
   setEditing: (editing: EditingState | null) => void
   setUnreadMarker: (chatId: number, marker: UnreadMarker | null) => void

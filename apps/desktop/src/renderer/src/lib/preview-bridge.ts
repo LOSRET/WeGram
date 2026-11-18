@@ -703,6 +703,9 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'viewer:copy':
     case 'viewer:reveal':
       throw { code: 'not_implemented', message: '浏览器预览不能访问本地文件' }
+    // The browser preview has no shell window to raise above the viewer.
+    case 'viewer:locate':
+      return undefined
     case 'viewer:pin':
       return { onTop: false }
     case 'viewer:close':

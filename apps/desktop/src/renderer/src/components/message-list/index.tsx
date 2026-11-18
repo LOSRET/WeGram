@@ -33,6 +33,11 @@ export interface MessageListProps {
   /** Where the chat opens: saved row, unread divider, or (null) the newest message. */
   landing: LandingPosition | null
   /**
+   * 定位到聊天位置: the row to scroll to and flash once (the viewer asked for it).
+   * Already in `messages` — the pane loads a window around it first.
+   */
+  located: number | null
+  /**
    * The newest message whose row has been on screen, or null before the first
    * measurement. The pane reports `messages:read` up to it: only the list knows
    * what the reader actually saw, and a chat left scrolled up must stay unread.
@@ -88,7 +93,9 @@ export function MessageList({
   hasMore,
   hasNewer,
   loadingOlder,
-
+  landing,
+  located,
+  unreadMarker,
   onSeenUpToChange,
   onLoadOlder,
   onLoadNewer,
@@ -242,6 +249,45 @@ export function MessageList({
     }
   }, [jumpToLatest, chat.id, virtualizer, scrollToBottom])
 
+  /**
+   * 定位到聊天位置: one scroll to the requested row, then a flash that fades out by
+   * itself (the list owns the timer; nothing outside knows the row is special).
+   *
+   * The rows array is read through a ref: a message arriving must not re-run the
+   * scroll, or every arrival would yank the reader back to the located picture.
+   */
+  const rowsRef = useRef(rows)
+  rowsRef.current = rows
+  const [flashId, setFlashId] = useState<number | null>(null)
+  useEffect(() => {
+    if (located === null) return
+    const el = scrollRef.current
+    if (!el) return
+    const scrollToRow = (): boolean => {
+      const index = findRowIndex(rowsRef.current, located)
+      if (index < 0) return false
+      virtualizer.scrollToIndex(index, { align: 'start' })
+      resyncScroller(el)
+      return true
+    }
+    if (!scrollToRow()) return
+    setFlashId(located)
+    /**
+     * Row heights are estimates until they are measured, and the first page may
+     * still be settling; one correction after the paint is what the anchored
+     * restore does in a loop. The frame-based path gets the timer net the whole
+     * list uses: rAF is throttled while the window is occluded.
+     */
+    const correct = window.setTimeout(() => {
+      scrollToRow()
+    }, 80)
+    const flashOut = window.setTimeout(() => setFlashId(null), 1600)
+    return () => {
+      window.clearTimeout(correct)
+      window.clearTimeout(flashOut)
+    }
+  }, [located, virtualizer])
+
   const { loadOlder } = usePrependRestore({
     scrollRef,
     messages,
@@ -356,7 +402,11 @@ export function MessageList({
                 data-message-id={first.id}
                 data-row-key={row.key}
                 ref={virtualizer.measureElement}
-                className="wx-message-slot"
+                className={`wx-message-slot${
+                  flashId !== null && row.messages.some((message) => message.id === flashId)
+                    ? ' is-located'
+                    : ''
+                }`}
                 style={{ transform: `translateY(${virtualItem.start}px)` }}
               >
                 {virtualItem.index === unreadRowIndex ? <UnreadDivider /> : null}

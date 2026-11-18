@@ -352,11 +352,19 @@ export function MediaViewer() {
     }
   }
 
+  /**
+   * 定位到聊天位置: the window stays open. Main raises the shell above it and
+   * tells the transcript to open this conversation on this message; the viewer
+   * keeps showing the picture, so the reader can flip back without reopening it.
+   */
   const locateInChat = async (): Promise<void> => {
-    // The transcript owns the message list; closing the viewer hands the focus
-    // back to the chat window, which is where the photo came from.
+    const messageId = item?.messageId
+    if (!messageId) {
+      showNotice('这条媒体不来自聊天')
+      return
+    }
     try {
-      await invoke('viewer:close')
+      await invoke('viewer:locate', { messageId })
     } catch (error) {
       showNotice(errorMessage(error))
     }

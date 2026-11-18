@@ -47,6 +47,16 @@ change belongs in the adapter.
 - Packaging constraint: `tdjson.dll` cannot load from inside `app.asar`
   (`electron-builder.yml` unpacks it), and TDLib data dirs live under
   `app.getPath('userData')`, which `index.ts` pins to `%APPDATA%\WeGram`.
+- **The viewer is a plain top-level window on purpose** (no `parent`): the task bar then
+  looks like WeChat's — same process, same group, one WeGram button whose hover preview
+  lists both windows. An *owned* window is in that same group too (measured: 3 windows of
+  one process show as "3 个运行窗口" under one button), so ownership never affected the
+  task bar; it only forces "always above the owner", which is why 定位到聊天位置 could not
+  raise the chat and the ownership was dropped. What ownership gave for free is now
+  explicit and must stay: the shell `moveTop()`s itself when it has to come forward,
+  `hide()/show()`s the viewer with its own minimize/restore, and `closeViewer()`s on
+  teardown (`window-all-closed` would otherwise leave an orphan viewer and the app would
+  never quit).
 - **Credentials are build-time, and mock is development-only.** `bootstrap()` resolves
   `TELEGRAM_API_ID`/`TELEGRAM_API_HASH` from the environment first, then from
   `__WEGRAM_API_CREDENTIALS__` (inlined by `electron.vite.config.ts`); a packaged build

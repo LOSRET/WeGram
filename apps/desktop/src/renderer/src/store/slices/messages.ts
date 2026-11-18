@@ -154,6 +154,13 @@ export const createMessagesSlice: SliceCreator<MessageActions> = (set) => ({
       jumpToLatest: { chatId, tick: (state.jumpToLatest?.tick ?? 0) + 1 },
     })),
 
+  requestLocate: (chatId, messageId) =>
+    set((state) => ({
+      locate: { chatId, messageId, tick: (state.locate?.tick ?? 0) + 1 },
+    })),
+
+  clearLocate: () => set({ locate: null }),
+
   setReplyTo: (chatId, messageId) =>
     set((state) => ({ replyToByChat: { ...state.replyToByChat, [chatId]: messageId } })),
 

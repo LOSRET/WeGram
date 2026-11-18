@@ -76,6 +76,7 @@ export function ChatPane() {
     anchorKnown,
     restoring,
     loadingHistory,
+    located,
     loadingOlder,
     hasNewer,
     reload,
@@ -217,6 +218,7 @@ export function ChatPane() {
           }}
           onReturnToLatest={returnToLatest}
           landing={pendingLanding?.chatId === activeChatId ? pendingLanding.position : null}
+          located={located?.chatId === activeChatId ? located.messageId : null}
           unreadMarker={
             unreadMarkers[activeChatId]?.unread ? (unreadMarkers[activeChatId] ?? null) : null
           }

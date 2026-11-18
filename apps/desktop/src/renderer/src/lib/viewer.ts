@@ -47,7 +47,11 @@ function openViewer(chatId: number, messageId: number, kind: ViewerKind): void {
   const store = useAppStore.getState()
   const strip = buildViewerStrip(store.messagesByChat[chatId] ?? [], kind, messageId)
   if (!strip) return
-  void invoke('viewer:open', strip).catch((error) => store.setError(errorMessage(error)))
+  // The conversation travels with the strip: 定位到聊天位置 in the viewer hands it
+  // back to the shell, which has to know which chat to open.
+  void invoke('viewer:open', { chatId, ...strip }).catch((error) =>
+    store.setError(errorMessage(error)),
+  )
 }
 
 /** Opens the standalone viewer on one photo of a conversation. */

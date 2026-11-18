@@ -166,6 +166,16 @@ describe('anchored windows', () => {
     useAppStore.getState().requestJumpToLatest(CHAT_ID)
     expect(useAppStore.getState().jumpToLatest?.tick).toBe(2)
   })
+
+  it('keeps a locate request until the list hands it back, bumping its tick', () => {
+    useAppStore.getState().requestLocate(CHAT_ID, 42)
+    expect(useAppStore.getState().locate).toMatchObject({ chatId: CHAT_ID, messageId: 42, tick: 1 })
+    useAppStore.getState().requestLocate(CHAT_ID, 42)
+    expect(useAppStore.getState().locate?.tick).toBe(2)
+
+    useAppStore.getState().clearLocate()
+    expect(useAppStore.getState().locate).toBeNull()
+  })
 })
 
 describe('prependHistory', () => {

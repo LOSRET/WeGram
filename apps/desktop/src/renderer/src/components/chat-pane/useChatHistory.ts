@@ -5,7 +5,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { HISTORY_PAGE_SIZE, emptyPageIsHistory } from '../../lib/history'
 import { errorMessage, invoke } from '../../lib/ipc'
 import { useAppStore } from '../../store/useAppStore'
-import { pickPagingTarget, resolveLanding, type LandingPosition } from '../message-list/unread'
+import {
+  locateLanding,
+  pickPagingTarget,
+  resolveLanding,
+  type LandingPosition,
+  type PagingTarget,
+} from '../message-list/unread'
 
 /** Messages kept on each side of a message when a window is loaded around it. */
 const AROUND_CONTEXT = 25
@@ -14,6 +20,8 @@ const EMPTY_PAGE_RETRIES = 3
 const EMPTY_PAGE_RETRY_DELAY_MS = 800
 /** One quiet retry after a failed first fetch (the proxy tunnel here flaps). */
 const FAILED_FETCH_RETRY_DELAY_MS = 1500
+/** How long a 定位到聊天位置 row stays marked for the list to scroll to and flash. */
+const LOCATED_CLEAR_MS = 1600
 
 export interface PendingLanding {
   chatId: number
@@ -33,6 +41,11 @@ export interface ChatHistoryState {
   restoring: boolean
   /** The first page is still in flight; the pane shows its loading state while empty. */
   loadingHistory: boolean
+  /**
+   * The row 定位到聊天位置 asked for, once it is in the loaded window. The list
+   * scrolls to it and flashes it; it clears itself after `LOCATED_CLEAR_MS`.
+   */
+  located: { chatId: number; messageId: number } | null
   loadingOlder: boolean
   /** The loaded window stops short of the newest message (anchored by a deep row). */
   hasNewer: boolean
@@ -104,7 +117,10 @@ async function readFirstPage(
    * saved position outrank the divider" — the reader who left *after* the read
    * boundary must keep their row.
    */
-  const target = pickPagingTarget(anchor, marker)
+  const locate = useAppStore.getState().locate
+  const locating = locate !== null && locate.chatId === chatId ? locate.messageId : null
+  const target: PagingTarget | null =
+    locating !== null ? { kind: 'locate', messageId: locating } : pickPagingTarget(anchor, marker)
 
   const first = await invoke('messages:history', { chatId, limit: HISTORY_PAGE_SIZE })
   signal.throwIfAborted()
@@ -147,8 +163,10 @@ async function readFirstPage(
     }
   }
 
-  let landing = resolveLanding(messages, marker, anchor)
-  if (target !== null && landing === null) {
+  // A located row outranks the saved position and the unread divider: the reader
+  // asked for that message from the viewer, and that is where the chat opens.
+  let landing = locateLanding(messages, locating) ?? resolveLanding(messages, marker, anchor)
+  if (locating === null && target !== null && landing === null) {
     // The row we paged for is gone (deleted, or the window came back without it).
     // The newest page is the only honest fallback; opening on an arbitrary row
     // would be worse than opening at the bottom.
@@ -192,6 +210,16 @@ async function readFirstPage(
  */
 export function useChatHistory(activeChatId: number | null): ChatHistoryState {
   const [pendingLanding, setPendingLanding] = useState<PendingLanding | null>(null)
+  /**
+   * 定位到聊天位置. The first-page path above reaches the row while the chat is
+   * opening; this covers the chat that is *already* open, where the row may sit
+   * outside the loaded window (an anchored window, or a transcript left at the
+   * bottom) and needs one `messages:around` before the list can scroll to it.
+   */
+  const [located, setLocated] = useState<{ chatId: number; messageId: number } | null>(null)
+  const locate = useAppStore((state) => state.locate)
+  /** The locate tick whose window fetch already came back without the row. */
+  const locateFetched = useRef<number | null>(null)
   const [anchorKnown, setAnchorKnown] = useState(false)
   const [restoring, setRestoring] = useState(false)
   const [loadingOlder, setLoadingOlder] = useState(false)
@@ -305,6 +333,71 @@ export function useChatHistory(activeChatId: number | null): ChatHistoryState {
   const hasNewer = useAppStore((state) =>
     activeChatId === null ? false : state.hasNewerByChat[activeChatId] === true,
   )
+  /**
+   * The located row may arrive with a page that keeps the row *count* unchanged (a
+   * window loaded around it), so the effect below watches the array itself rather
+   * than a length: `setHistory` replaces it, which is exactly when to look again.
+   */
+  const locatedMessages = useAppStore((state) =>
+    activeChatId === null ? null : (state.messagesByChat[activeChatId] ?? null),
+  )
+
+  /**
+   * 定位到聊天位置 on a conversation that is already open. Waiting for
+   * `anchorKnown` keeps this off the first-page path (that one pages *around* the
+   * row before mounting the list, so nothing is fetched twice).
+   */
+  useEffect(() => {
+    if (locate === null || locate.chatId !== activeChatId) return
+    if (!anchorKnown) return
+    const store = useAppStore.getState()
+    const loaded = locatedMessages ?? []
+    if (loaded.some((message) => message.id === locate.messageId)) {
+      setLocated({ chatId: locate.chatId, messageId: locate.messageId })
+      store.clearLocate()
+      return
+    }
+    /**
+     * Nothing to fetch: an empty transcript has no row, and a window that came
+     * back without it means the message is gone. Clearing the request stops the
+     * effect from asking again — it would otherwise loop on every page.
+     */
+    if (loaded.length === 0 || locateFetched.current === locate.tick) {
+      store.clearLocate()
+      return
+    }
+    locateFetched.current = locate.tick
+    let cancelled = false
+    void invoke('messages:around', {
+      chatId: activeChatId,
+      messageId: locate.messageId,
+      limit: AROUND_CONTEXT,
+    })
+      .then((around) => {
+        if (cancelled) return
+        // The reader asked for this row, so replacing the window is the point:
+        // the list lands there instead of paging towards it.
+        useAppStore
+          .getState()
+          .setHistory(activeChatId, around.messages, around.hasMore, around.hasNewer)
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return
+        useAppStore.getState().setError(errorMessage(error))
+        useAppStore.getState().clearLocate()
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [locate, activeChatId, anchorKnown, locatedMessages])
+
+  /** The flash is one shot: a remount of the list must not replay it. */
+  useEffect(() => {
+    if (located === null) return
+    const timer = window.setTimeout(() => setLocated(null), LOCATED_CLEAR_MS)
+    return () => window.clearTimeout(timer)
+  }, [located])
+
   const hadRowsFor = useRef<number | null>(null)
   /**
    * A transcript that had rows and now has none was not emptied by the reader, so
@@ -387,6 +480,7 @@ export function useChatHistory(activeChatId: number | null): ChatHistoryState {
     anchorKnown,
     restoring,
     loadingHistory: needsFetch && (history.isPending || history.isFetching),
+    located,
     loadingOlder,
     hasNewer,
     reload,

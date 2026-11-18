@@ -100,6 +100,11 @@ export const invokeChannels = [
   'viewer:copy',
   'viewer:reveal',
   'viewer:pin',
+  /**
+   * 定位到聊天位置: the viewer hands the message it shows back to the shell, which
+   * brings itself forward and lands on that row. The viewer stays open.
+   */
+  'viewer:locate',
   'viewer:close',
 ] as const
 
@@ -305,6 +310,8 @@ export const invokeSchemas = {
    */
   'viewer:open': {
     request: z.object({
+      /** The conversation the strip was taken from; 定位到聊天位置 needs it. */
+      chatId: z.number().int(),
       items: z.array(viewerItemSchema).min(1).max(200),
       index: z.number().int().nonnegative(),
     }),
@@ -324,6 +331,15 @@ export const invokeSchemas = {
   'viewer:pin': {
     request: z.object({ onTop: z.boolean() }),
     response: z.object({ onTop: z.boolean() }),
+  },
+  /**
+   * 定位到聊天位置: the shell opens the conversation of the item the viewer is on
+   * and scrolls to it. The message id comes from the viewer (it may have paged
+   * since opening); the chat comes from the strip `viewer:open` registered.
+   */
+  'viewer:locate': {
+    request: z.object({ messageId: z.number().int() }),
+    response: noPayload,
   },
   'viewer:close': { request: noPayload, response: noPayload },
 } satisfies Record<InvokeChannel, ChannelSchema>
@@ -350,6 +366,11 @@ export const eventChannels = [
   'evt:file',
   /** TDLib reloaded the installed sticker sets; the picker refetches them. */
   'evt:stickerSets',
+  /**
+   * The viewer asked the shell to show a message (定位到聊天位置). Main raises the
+   * shell window first, then publishes this; the viewer window stays open.
+   */
+  'evt:locate',
   'evt:error',
 ] as const
 
@@ -382,6 +403,7 @@ export const eventSchemas = {
     }),
   ),
   'evt:stickerSets': envelope(z.object({})),
+  'evt:locate': envelope(z.object({ chatId: z.number().int(), messageId: z.number().int() })),
   'evt:error': envelope(appErrorSchema),
 } satisfies Record<EventChannel, z.ZodType>
 

@@ -26,7 +26,11 @@ export type LandingPosition =
 
 /** The message id the first page has to reach back to before the list may mount. */
 export interface PagingTarget {
-  kind: 'anchor' | 'unread'
+  /**
+   * `locate` is 定位到聊天位置 from the viewer: the chat opens on a row the reader
+   * asked for, which outranks both the saved position and the unread divider.
+   */
+  kind: 'anchor' | 'unread' | 'locate'
   messageId: number
 }
 
@@ -84,6 +88,22 @@ export function pickPagingTarget(
     return { kind: 'unread', messageId: marker.lastReadInboxMessageId }
   }
   return anchor ? { kind: 'anchor', messageId: anchor.messageId } : null
+}
+
+/**
+ * Where a 定位到聊天位置 request lands: the requested row at the very top of the
+ * viewport, so the flashed bubble is fully visible (the list centres it afterwards
+ * only if it has to). Null when the row is not in this window — the caller then
+ * falls back to the normal landing rule.
+ */
+export function locateLanding(
+  messages: Message[],
+  messageId: number | null,
+): LandingPosition | null {
+  if (messageId === null) return null
+  return messages.some((message) => message.id === messageId)
+    ? { kind: 'anchor', messageId, offset: 0 }
+    : null
 }
 
 /**

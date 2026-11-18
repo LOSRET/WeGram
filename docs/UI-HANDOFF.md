@@ -455,9 +455,21 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
     it, so the photo refits instead of hiding under the board. Cells paint
     `MessageMedia.minithumbnail` instantly; a photo without one is downloaded at
     priority 2 while the board is open.
-15. **定位到聊天位置 only closes the viewer.** Scrolling the transcript to a given
-    message needs a "locate message" channel the protocol does not have yet; closing the
-    window hands focus back to the chat, which is where the photo came from.
+15. **定位到聊天位置 keeps the viewer open.** The client closes the window and jumps in
+    the chat; its viewer is an overlay *of* the chat window, so there is nothing to raise.
+    Ours is a separate window, so the shell comes forward above it instead: the viewer
+    sends `viewer:locate`, main `moveTop()`s and focuses the shell, then publishes
+    `evt:locate`; the shell opens that conversation on that row (`messages:around` when
+    the row is outside the loaded window) and flashes it for 1.6 s.
+
+    **The viewer is a plain top-level window, not a child of the shell.** That is what
+    makes our task bar match the client's screenshot: one WeGram button whose hover
+    preview lists 微信 and 图片和视频. Windows groups by application, and an *owned*
+    window lands in that same group anyway (measured: 3 windows of one process —
+    1 unowned, 1 owned, 1 plain — read as "3 个运行窗口" under a single button), so
+    ownership never bought anything there. What ownership did give for free is now
+    explicit: the shell `hide()/show()`s the viewer with its own minimize/restore, and
+    closes it when the shell closes (`window-all-closed` would otherwise never fire).
 16. **The viewer's window controls are the native ones** (3 × 46 px), like the shell's
     (see delta 5), so 更多 sits ~25 px further from the right edge than in the client.
 17. **One window size for both kinds.** The client's video window measures 80 % of the

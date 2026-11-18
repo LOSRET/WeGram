@@ -18,7 +18,12 @@ import type { TelegramAdapter } from './telegram/adapter'
 import { publishAdapterEvent } from './telegram/events'
 import { EventBus } from './telegram/updates'
 import { createLogger } from './util'
-import { setViewerTheme } from './viewer'
+import {
+  closeViewer,
+  hideViewerWithShell,
+  setViewerTheme,
+  showViewerWithShell,
+} from './viewer'
 
 const logger = createLogger('main')
 const isDev = !app.isPackaged
@@ -162,6 +167,16 @@ async function bootstrap(): Promise<void> {
       onAuthInteraction: () => {
         authInteracted = true
       },
+      /**
+       * 定位到聊天位置: the viewer stays open, the shell comes forward above it and
+       * the renderer opens the conversation on that message.
+       */
+      onLocate: ({ chatId, messageId }) => {
+        const win = mainWindow
+        if (!win || win.isDestroyed()) return
+        raiseShellAboveViewer(win)
+        bus?.publish('evt:locate', { chatId, messageId })
+      },
     }),
   )
 
@@ -213,6 +228,10 @@ function showMainWindow(theme: 'light' | 'dark', closeLogin: 'immediate' | 'afte
   mainWindow = win
   win.on('closed', () => {
     if (mainWindow === win) mainWindow = null
+    // The viewer is a separate top-level window, so it does not die with this one:
+    // close it explicitly, or signing out would leave a picture window floating and
+    // `window-all-closed` would never fire.
+    closeViewer()
   })
   if (closeLogin === 'immediate') {
     // First sign-in: the login window must not linger on the profile step. The
@@ -221,6 +240,21 @@ function showMainWindow(theme: 'light' | 'dark', closeLogin: 'immediate' | 'afte
   } else {
     win.once('ready-to-show', () => closeLoginWindow())
   }
+}
+
+/**
+ * Brings the shell window forward above the standalone viewer.
+ *
+ * Both are plain top-level windows, so `moveTop()` is what puts the chat on top of
+ * the still-open picture (design: the viewer is not owned by the shell, which is
+ * what keeps the task bar looking like WeChat's — one WeGram button with both
+ * windows in its hover preview).
+ */
+function raiseShellAboveViewer(win: BrowserWindow): void {
+  if (win.isMinimized()) win.restore()
+  if (!win.isVisible()) win.show()
+  win.moveTop()
+  win.focus()
 }
 
 /**
@@ -275,6 +309,11 @@ function createMainWindow(theme: 'light' | 'dark'): BrowserWindow {
     applyTitleBarTheme(win, theme)
     win.show()
   })
+
+  // The viewer is not owned by this window any more, so its "put the picture away
+  // with the chat" behaviour is explicit here (see main/viewer.ts).
+  win.on('minimize', hideViewerWithShell)
+  win.on('restore', showViewerWithShell)
 
   win.webContents.setWindowOpenHandler(({ url }) => {
     openExternal(url)

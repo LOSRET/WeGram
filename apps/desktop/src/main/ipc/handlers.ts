@@ -16,6 +16,7 @@ import {
   isViewerWindow,
   openViewer,
   setViewerPin,
+  viewerChatId,
   viewerItem,
   viewerState,
 } from '../viewer'
@@ -39,6 +40,11 @@ export interface HandlerDeps {
    * the profile step (see index.ts `syncWindowsToAuth`).
    */
   onAuthInteraction: () => void
+  /**
+   * 定位到聊天位置: raises the shell above the viewer (which stays open) and tells
+   * the renderer to open that conversation on that message.
+   */
+  onLocate: (target: { chatId: number; messageId: number }) => void
 }
 
 /**
@@ -53,6 +59,7 @@ export function createHandlers({
   onThemeChange,
   onLoginEnter,
   onAuthInteraction,
+  onLocate,
 }: HandlerDeps): IpcHandlerMap {
   return {
     'app:info': () => info,
@@ -225,7 +232,7 @@ export function createHandlers({
     },
 
     'viewer:open': (payload) => {
-      const request = payload as { items: ViewerItem[]; index: number }
+      const request = payload as { chatId: number; items: ViewerItem[]; index: number }
       const focused = BrowserWindow.getFocusedWindow()
       openViewer(request, isViewerWindow(focused) ? null : focused)
     },
@@ -271,6 +278,16 @@ export function createHandlers({
       shell.showItemInFolder(source)
     },
     'viewer:pin': (payload) => ({ onTop: setViewerPin((payload as { onTop: boolean }).onTop) }),
+    /**
+     * 定位到聊天位置. Unlike the client this keeps the viewer window open: the
+     * shell is raised above it instead (index.ts), so the reader can look at both.
+     */
+    'viewer:locate': (payload) => {
+      const { messageId } = payload as { messageId: number }
+      const chatId = viewerChatId()
+      if (chatId === null) throw new AppError('internal', 'Nothing is open in the viewer')
+      onLocate({ chatId, messageId })
+    },
     'viewer:close': () => {
       closeViewer()
     },

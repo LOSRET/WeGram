@@ -6,6 +6,7 @@ import type { MessageOp } from '@wegram/protocol'
 import { useEffect } from 'react'
 
 import { classifySeq, needsResync } from './lib/eventSeq'
+import { activateChat } from './lib/openChat'
 
 /** Page sizes for the re-sync reads — the same ones the panes open with. */
 const RESYNC_CHAT_LIMIT = 100
@@ -152,6 +153,21 @@ export function App() {
       window.tg.on('evt:stickerSets', (event) => {
         track(event.seq)
         store.noteStickerSetsChanged()
+      }),
+      /**
+       * 定位到聊天位置: the viewer hands one message back, main has already raised
+       * the shell above it. The request goes into the store *before* the
+       * conversation activates, because the first-page fetch reads it to page
+       * around that row instead of opening on the newest message.
+       */
+      window.tg.on('evt:locate', (event) => {
+        track(event.seq)
+        const { chatId, messageId } = event.payload
+        const state = useAppStore.getState()
+        const chat = state.chats.find((item) => item.id === chatId)
+        if (!chat) return
+        state.requestLocate(chatId, messageId)
+        if (state.activeChatId !== chatId) activateChat(chat)
       }),
       window.tg.on('evt:error', (event) => {
         track(event.seq)

@@ -16,6 +16,8 @@ export const VIEWER_TOOLBAR_H = 40
 const VIEWER_TITLE = '图片和视频'
 
 export interface ViewerRequest {
+  /** The conversation the strip came from; 定位到聊天位置 hands it back to the shell. */
+  chatId: number
   items: ViewerItem[]
   index: number
 }
@@ -26,9 +28,17 @@ let theme: 'light' | 'dark' = 'light'
 
 /**
  * WeChat opens media in its own window (图片和视频): a toolbar strip carrying the
- * window controls, the photo or video underneath on a light canvas. That window
- * is independent of the transcript but stays above it, so it is parented to the
- * main window and centred on the same display.
+ * window controls, the photo or video underneath on a light canvas.
+ *
+ * It is a **plain top-level window**, not a child of the shell. That is what makes
+ * the task bar behave like WeChat's: one WeGram button whose hover preview lists
+ * both windows (the client shows 微信 and 图片和视频 the same way — Windows groups
+ * by application, not by window ownership). The price is that nothing keeps the two
+ * windows in order for us, so what ownership gave for free is explicit: the shell
+ * raises itself with `moveTop()` (index.ts `raiseShellAboveViewer`), the viewer
+ * hides and comes back with the shell's minimize/restore (`hideViewerWithShell`), and
+ * closing the shell closes the viewer (index.ts). The window is still centred on the
+ * shell's display.
  */
 export function openViewer(next: ViewerRequest, parent: BrowserWindow | null): void {
   request = { ...next, index: clampIndex(next.index, next.items.length) }
@@ -36,6 +46,10 @@ export function openViewer(next: ViewerRequest, parent: BrowserWindow | null): v
   const existing = viewerWindow
   if (existing && !existing.isDestroyed()) {
     if (existing.isMinimized()) existing.restore()
+    // A plain window is not automatically above the shell: opening a photo again
+    // has to bring it forward explicitly.
+    existing.show()
+    existing.moveTop()
     existing.focus()
     // The viewer keeps no state worth merging, so a reload is the whole
     // "re-target" protocol: reload re-reads `viewer:init`. A dedicated event
@@ -49,6 +63,7 @@ export function openViewer(next: ViewerRequest, parent: BrowserWindow | null): v
   win.on('closed', () => {
     viewerWindow = null
     request = null
+    hiddenWithShell = false
   })
 }
 
@@ -60,6 +75,35 @@ export function getViewerWindow(): BrowserWindow | null {
 export function viewerState(): ViewerState {
   if (!request) throw new AppError('internal', 'Nothing is open in the viewer')
   return { items: request.items, index: request.index, theme }
+}
+
+/**
+ * The conversation the open strip belongs to — 定位到聊天位置 hands the message id
+ * back through `viewer:locate` and main pairs it with this chat.
+ */
+export function viewerChatId(): number | null {
+  return request?.chatId ?? null
+}
+
+/**
+ * The viewer is a plain window, so it no longer disappears with the shell on its
+ * own. Minimizing the shell puts the picture away and restoring it brings it back
+ * — the behaviour an owned window gives for free, spelled out because the task bar
+ * grouping (one WeGram icon, two windows) needs an unowned window.
+ */
+let hiddenWithShell = false
+
+export function hideViewerWithShell(): void {
+  const win = getViewerWindow()
+  if (!win || !win.isVisible()) return
+  hiddenWithShell = true
+  win.hide()
+}
+
+export function showViewerWithShell(): void {
+  if (!hiddenWithShell) return
+  hiddenWithShell = false
+  getViewerWindow()?.show()
 }
 
 /** The item the viewer was opened with, for 保存/复制/在文件夹中显示 naming. */
@@ -114,7 +158,6 @@ function createViewerWindow(parent: BrowserWindow | null): BrowserWindow {
     // The viewer paints its own toolbar into the title strip, like the shell.
     titleBarStyle: 'hidden',
     titleBarOverlay: titleBarOverlay(theme),
-    ...(parent ? { parent } : {}),
     backgroundColor: theme === 'dark' ? '#242424' : '#f7f7f7',
     title: VIEWER_TITLE,
     webPreferences: {
@@ -136,7 +179,12 @@ function createViewerWindow(parent: BrowserWindow | null): BrowserWindow {
     height: size.height,
   })
 
-  win.once('ready-to-show', () => win.show())
+  win.once('ready-to-show', () => {
+    win.show()
+    // Nothing owns this window any more, so it raises and focuses itself.
+    win.moveTop()
+    win.focus()
+  })
 
   win.webContents.setWindowOpenHandler(({ url }) => {
     logger.warn(`viewer refused window.open(${url})`)

@@ -19,6 +19,7 @@ export const DATA_DEFAULTS: AppData = {
   hasMoreByChat: {},
   hasNewerByChat: {},
   jumpToLatest: null,
+  locate: null,
   replyToByChat: {},
   typingByChat: {},
   editing: null,

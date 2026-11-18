@@ -7,7 +7,8 @@ import { ChatPane } from './chat-pane'
 import { PlusMenu } from './PlusMenu'
 import { ProxyPanel } from './ProxyPanel'
 import { SideRail } from './SideRail'
-import { errorMessage, invoke } from '../lib/ipc'
+import { invoke } from '../lib/ipc'
+import { activateChat } from '../lib/openChat'
 import { useAppStore } from '../store/useAppStore'
 
 interface Anchor {
@@ -67,20 +68,7 @@ export function MainShell() {
       store.setActiveChat(null)
       return
     }
-
-    // Snapshot before our own first `messages:read` can move the marker, or the
-    // unread divider would disappear before the list ever mounts.
-    store.setUnreadMarker(
-      chat.id,
-      chat.unread > 0
-        ? { lastReadInboxMessageId: chat.lastReadInboxMessageId ?? null, unread: chat.unread }
-        : null,
-    )
-    store.setActiveChat(chat.id)
-    // History is loaded by ChatPane; this only triggers read state.
-    void invoke('chats:open', { chatId: chat.id }).catch((cause) => {
-      useAppStore.getState().setError(errorMessage(cause))
-    })
+    activateChat(chat)
   }, [])
 
   return (

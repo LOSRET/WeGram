@@ -5,7 +5,7 @@ import { isEmojiOnly } from './emoji'
 import { buildMessageMenuItems } from './menu'
 import { messagesById, pickSeenUpTo } from './seen'
 import { countUnreadBelow } from './unreadBelow'
-import { findUnreadMessage, pickPagingTarget, resolveLanding } from './unread'
+import { findUnreadMessage, locateLanding, pickPagingTarget, resolveLanding } from './unread'
 
 function message(id: number, overrides: Partial<Message> = {}): Message {
   return {
@@ -110,6 +110,18 @@ describe('resolveLanding', () => {
       kind: 'unread',
       messageId: 12,
     })
+  })
+})
+
+describe('locateLanding', () => {
+  it('lands on the requested row at the top of the viewport', () => {
+    // 定位到聊天位置 outranks both the saved position and the unread divider.
+    expect(locateLanding(messages, 12)).toEqual({ kind: 'anchor', messageId: 12, offset: 0 })
+  })
+
+  it('has nothing to say without a request or when the row is not loaded', () => {
+    expect(locateLanding(messages, null)).toBeNull()
+    expect(locateLanding(messages, 99)).toBeNull()
   })
 })
 
