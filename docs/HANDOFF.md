@@ -203,11 +203,15 @@ placeholder), runs `pnpm verify`, then `pnpm --filter @wegram/desktop package:wi
 (`electron-vite build && electron-builder --win`). A re-run uploads the assets with
 `--clobber` instead of failing on the existing release.
 
-Locally the same script stops one step short: `release/win-unpacked` is produced with
-`app.asar.unpacked/node_modules/@prebuilt-tdlib/win32-x64/tdjson.dll` in place, but NSIS fails
-at `UninstallerReader`, which runs the just-built installer once to read its uninstaller — that
-child process dies in this shell (the same job-object class of failure as Electron itself). The
-first NSIS build therefore happens on CI.
+The first real build is in: run 44301387485 on tag `v0.1.0` finished green in 4m31s and
+published `WeGram-0.1.0-x64.exe` (108 MB) + its `.blockmap`.
+
+Packaging **cannot** be verified locally, so always read the run instead: the same script does
+produce `release/win-unpacked` here with
+`app.asar.unpacked/node_modules/@prebuilt-tdlib/win32-x64/tdjson.dll` in place, but the NSIS
+phase runs the freshly built installer stub once (its `BUILD_UNINSTALLER` pass writes
+`__uninstaller.exe`, which electron-builder then signs), and that child process does not survive
+this shell — the same job-object class of failure as Electron itself. It works on the runner.
 
 Reading and driving the real renderer over CDP is what produced the numbers above. The
 helper is `.cache/cdp-eval.mjs` (gitignored; ~30 lines: read
@@ -619,12 +623,12 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
    `mapMessage` resolves `messageSenderChat` through the chat-title cache, verified on
    the real account by the `senderChat` line of `tdlib:smoke`. Mock + preview fixtures
    grew a channel-post example (chat 5, message 502).
-5. **The NSIS installer has never been produced**: `electron-builder` config exists
-   (`asarUnpack` for `@prebuilt-tdlib`/`prebuilt-tdlib`) and `.github/workflows/release.yml`
-   now builds + publishes it from a version tag, but no CI run has happened yet. Locally only
-   `release/win-unpacked` is verified (see Release packaging above). Still unverified:
-   the NSIS step itself, auto-update (no `publish` config, no `electron-updater` in the app)
-   and the sandboxed launch on a clean machine.
+5. **The installer exists but has never been installed**: `v0.1.0` published
+   `WeGram-0.1.0-x64.exe` from CI (see Release packaging above), and `release/win-unpacked` is
+   verified locally. Nobody has run the installer yet, so these stay unverified: install /
+   uninstall / per-user vs per-machine, code signing (currently skipped — SmartScreen will
+   complain), auto-update (no `publish` config, no `electron-updater` in the app) and the
+   sandboxed launch on a clean machine.
 6. Minor: the preload bundle is 187 kB because it imports the protocol index (zod). If it
    matters, split a channels-only entry point.
 7. Minor: `tdlib:smoke` only checks the *first* channel of the chat list for
