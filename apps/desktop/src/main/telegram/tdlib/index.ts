@@ -139,7 +139,9 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     if (this.client) return
     configureTdlib(this.logger)
 
-    this.client = createClient({
+    // `restartAuth()` drops this client and creates another one; every callback
+    // checks identity first so a dying client cannot touch the adapter.
+    const client = createClient({
       apiId: this.options.apiId,
       apiHash: this.options.apiHash,
       databaseDirectory: this.options.databaseDirectory,
@@ -153,14 +155,22 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
         system_version: 'Windows',
       },
     }) as unknown as TdClientLike
+    this.client = client
 
-    this.client.on('update', (update) => {
+    client.on('update', (update) => {
+      if (this.client !== client) return
       void this.handleUpdate(update).catch((error) => {
         this.logger.warn('update handler failed:', error instanceof Error ? error.message : error)
       })
     })
-    this.client.on('error', (error) => this.logger.warn('client error:', error.message))
-    this.client.on('close', () => this.setAuth({ kind: 'closed' }))
+    client.on('error', (error) => {
+      if (this.client !== client) return
+      this.logger.warn('client error:', error.message)
+    })
+    client.on('close', () => {
+      if (this.client !== client) return
+      this.setAuth({ kind: 'closed' })
+    })
 
     // Proxy must be in place before any network request (§6.4). tdl queues
     // requests until it has sent the TDLib parameters, so calling it here is
@@ -213,6 +223,51 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
 
   async submitPassword(password: string): Promise<AuthState> {
     await this.invoke({ _: 'checkAuthenticationPassword', password })
+    return this.auth
+  }
+
+  /**
+   * TDLib's QR login: valid in `waitPhoneNumber`; the answer arrives as an
+   * `updateAuthorizationState` with `authorizationStateWaitOtherDeviceConfirmation`
+   * and a fresh `tg://login?token=…` link, which the mapper turns into `waitQr`.
+   */
+  async requestQrCode(): Promise<AuthState> {
+    await this.invoke({ _: 'requestQrCodeAuthentication' })
+    return this.auth
+  }
+
+  /**
+   * Switch from QR to the phone form. TDLib has no call to cancel a pending
+   * `waitOtherDeviceConfirmation` (setAuthenticationPhoneNumber refuses that
+   * state), so the only way is to destroy the instance and start a fresh one.
+   * Nothing is stored yet at this point, so destroying the database is safe.
+   */
+  async restartAuth(): Promise<AuthState> {
+    if (this.auth.kind === 'ready') {
+      throw new AppError('invalid_payload', 'Already signed in')
+    }
+
+    const client = this.client
+    if (client) {
+      // Detach first: the old client's close/update callbacks must not fire into
+      // this adapter while the replacement is starting.
+      this.client = null
+      const closed = new Promise<void>((resolve) => {
+        client.on('close', () => resolve())
+      })
+      try {
+        await client.invoke({ _: 'destroy' })
+      } catch (error) {
+        this.logger.warn('destroy failed:', error instanceof Error ? error.message : String(error))
+      }
+      // `destroy` deletes the local database; wait for TDLib to close the
+      // instance before a new client opens the same directories.
+      await Promise.race([closed, delay(5_000)])
+    }
+
+    this.selfUserId = null
+    this.setAuth({ kind: 'idle' })
+    await this.start()
     return this.auth
   }
 
@@ -397,4 +452,8 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   private isOnline(): boolean {
     return this.connection === 'online'
   }
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }

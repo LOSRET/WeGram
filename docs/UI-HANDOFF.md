@@ -27,7 +27,10 @@ listed in "Known deltas" is a deliberate, documented difference.
 | `renderer/src/components/PlusMenu.tsx` | The list header's "+" card: 发起群聊 / 添加朋友 / 写笔记 with their payload glyphs (all three toast — none is in the protocol). |
 | `renderer/src/components/Icon.tsx` | Payload re-exports, the design-system compass, and `TelegramLogo` — the Simple Icons roundel that serves as the rail's 聊天 tab, the login mark and the empty-pane watermark (tinted through `currentColor`). |
 | `renderer/src/components/WechatIcons.tsx` | **Generated** from `Weixin.dll` payloads — see §3. Never hand-edit; regenerate. |
-| `renderer/src/screens/LoginScreen.tsx` | WeChat-style centred card, brand watermark, `autocomplete=off`, caret restored after each step. |
+| `renderer/src/screens/LoginWindow.tsx` | **The standalone login window** (`#login` route): self-drawn title strip (WeGram / 齿轮 / ×), the QR screen, the phone → code → 2FA fallback, the profile step with 进入 WeGram, footer links, proxy and help sheets. |
+| `renderer/src/components/QrCode.tsx` | The login QR: `qrcode`'s matrix as one SVG path (350-ish dark modules in a single element), never themed. |
+| `renderer/src/lib/qr.ts` | QR matrix + path helpers (pure, unit-tested). |
+| `main/login-window.ts` | The login `BrowserWindow`: frameless 280×373, fixed size, centred on the primary work area, loads the renderer with `#login`, closes/re-focuses itself. |
 | `renderer/src/components/viewer/MediaViewer.tsx` | **The standalone 图片和视频 window** (`#viewer` route): toolbar strip, photo canvas, 预览 board, 更多 menu, notice pill; picks the video canvas for a `video` item. |
 | `renderer/src/components/viewer/VideoCanvas.tsx` | The video half: fitted `<video>`, the client's translucent player bar (play/pause, timeline, times, 倍速, mute), idle hiding, Space/←/→/M keys. |
 | `renderer/src/components/viewer/ViewerIcons.tsx` | Toolbar glyphs (payload art) plus the traced 预览 and player glyphs (see §3). |
@@ -141,6 +144,35 @@ CSS px, so **CSS px = screenshot px ÷ 1.25**.
 | bar contents | ▶/❚❚ 32 px icon, elapsed `00:01` 13 px tabular, timeline (2 px track, played part white, 10 px white thumb), total `00:51`, 倍速 text button, speaker |
 | bar behaviour | floats over the clip and hides after 2.4 s of playback without pointer movement; visible whenever it is paused, while the timeline is dragged and while the 倍速 menu is open |
 | keyboard | Space / K play-pause, ←/→ seek ±5 s, M mute, Escape closes the menu / 预览 / window |
+
+### 2.2 The login window (added 2026-11-18)
+
+The client's login is a **separate window**, not a page inside the shell. Measured off
+the two reference screenshots (366×487 and 365×487 at 125 % scaling, so **CSS px =
+screenshot px ÷ 1.25**; both windows are 350×466 device px):
+
+- **Window**: **280 × 373 CSS px**, frameless — the client draws its own × and has no
+  minimise/maximise — centred in the work area, flat `#fafafa`, OS-rounded corners.
+- **Title strip**: 32 px. `微信` at 12 px from the left, 14 px `#6e6e73`; gear and ×
+  are 1.2 px `#4d4d4d` hairlines in 28 px hit boxes on a 44 px pitch (centres at 214 and
+  258), 8 px from the right edge. The whole strip drags the window.
+- **QR step**: QR 136 × 136 at (72, 80); green `扫码登录` 14 px `#00c375`, centred at
+  y 255; footer link 14 px `#304b82`, centred at y 341.
+- **Profile step**: avatar 80 × 80, radius 12, at (100, 70); name 16 px `#191919` at
+  y 180; **168 × 36, radius 6, `#00c375`** button with 16 px white text at (56, 272);
+  footer `切换账号 | 仅传输文件` at y 341, 1 px `#dedede` divider, 17 px gaps.
+- Dark was **not** measured on the client; `--wx-login-*` follows the shell's scheme.
+
+What we built: **the same QR step, driven by TDLib**. `requestQrCodeAuthentication`
+yields a `tg://login?token=…` link (`AuthState.waitQr`), and the renderer encodes it
+with the approved `qrcode` dependency into a 136 px SVG — near-black on white, never
+inverted in dark mode. The footer's right link is `登录帮助` instead of `仅传输文件`;
+the left one is `用手机号登录`, which rebuilds the TDLib auth client (`auth:reset`)
+because TDLib cannot leave a pending QR confirmation. The gear opens the proxy
+settings. **A user-driven sign-in ends in the shell; only a session restored at
+startup shows the profile step** (WeChat's rule). Tokens are the `--wx-login-*`
+block; code is `main/login-window.ts`, `screens/LoginWindow.tsx`,
+`components/QrCode.tsx` and `lib/qr.ts` (`#login` hash of the same bundle).
 
 ---
 
@@ -265,7 +297,11 @@ redistribution — do not ship it in a package.
 ```powershell
 pnpm typecheck && pnpm build
 cd apps\desktop; pwsh scripts\launch-detached.ps1 -NoSandbox -Mock
-# login: +8613800000000 / 12345 / wegram  (keyboard only, Enter after each step)
+# the login window opens first (280×373) on the QR screen; the mock confirms the
+# QR after 10 s and the shell opens directly. 用手机号登录 goes to the form:
+# +8613800000000 / 12345 / wegram, keyboard only, Enter after each step.
+cd apps\desktop; pnpm web
+# http://localhost:5174/#login → the login window; the plain URL is the shell
 ```
 
 Then screenshot and compare with the reference crops. The comparison workflow that
@@ -275,7 +311,7 @@ paste side by side, read once. Reference crops live in `.cache/wxref` (gitignore
 Checklist used at the end of this session: rail icons, list header, row spacing and
 colours, selected row, bubbles both sides, day/unread separators, composer card,
 hover timestamp, context menu, delete confirm, forward sheet, sticker panel, app menu,
-chat-info popover, settings dialog, dark mode, empty-pane watermark, login card.
+chat-info popover, settings dialog, dark mode, empty-pane watermark, login window (all three steps, profile step, proxy + help sheets, light and dark).
 
 `pnpm web` (vite on :5174) is fine for CSS iteration, but **do not use it to judge the
 pane**: Chrome's "save password" bubble appears after the preview login, sits over the
@@ -312,9 +348,10 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
 9. **The brand mark is Telegram's, not WeChat's.** `TelegramLogo` in `Icon.tsx` is
    the Simple Icons roundel (`https://simpleicons.org/?q=telegram`, CC0 1.0) copied
    verbatim; the plane is a hole in the disc, so no white fill is painted. It is used
-   three times: the rail's 聊天 tab in `--wx-brand` (`#07c160`), the login card in the
-   same green, and the empty-pane watermark in the light `#efefef` / `#222` it had
-   before — the watermark stays low-contrast rather than becoming a green logo.
+   three times: the rail's 聊天 tab in `--wx-brand` (`#07c160`), the login window's
+   brand mark in `--wx-login-green` (the client's login green `#00c375`), and the
+   empty-pane watermark in the light `#efefef` / `#222` it had before — the watermark
+   stays low-contrast rather than becoming a green logo.
 10. **Re-selecting the open conversation closes it.** In the client, clicking the
     highlighted row does nothing; here it is a toggle: the right pane returns to the
     watermark state and the list keeps its search filter (requested 2026-11-17). The
@@ -361,6 +398,34 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
     holds bitmaps only, and Electron exposes no file-drop clipboard format.
 20. **The video canvas never zooms or pans.** The zoom group, 1:1, rotate and the wheel
     listener are photo-only; a video is always fitted to the canvas.
+21. **The login QR is generated locally from TDLib's link.** `requestQrCodeAuthentication`
+    answers with `tg://login?token=…` (`AuthState.waitQr`, refreshed every few
+    seconds); the approved `qrcode` dependency turns it into one SVG path. The token
+    never leaves the app — no third-party QR service. Unit tests pin the matrix shape
+    and the dark-module count; a real phone scan is still on the verification list
+    (design doc §14). The code is deliberately **not** inverted in dark mode.
+22. **The phone form is a fallback, and switching to it rebuilds the client.** TDLib
+    refuses `setAuthenticationPhoneNumber` in `waitOtherDeviceConfirmation` and has no
+    cancel call, so `auth:reset` destroys and recreates the auth client (nothing is
+    stored yet). The phone entry can go back to the QR (`auth:qr`); once a
+    code/password query is pending it cannot.
+23. **First sign-in goes straight to the shell; a restored session shows the profile.**
+    Main tracks `authInteracted`: a `ready` state after any QR/phone request opens the
+    shell immediately and closes the login window (the profile step never lingers),
+    while a session restored at startup stops on the avatar / 进入 WeGram screen. The
+    mock cannot persist a session, so that path was exercised by temporarily making
+    the mock start authorized.
+24. **The login footer is `用手机号登录 | 登录帮助`.** WeChat's `仅传输文件` has no
+    Telegram counterpart; the QR screen offers the phone fallback (a real need when
+    no other device can scan) and the help sheet (proxy, code source, mock
+    credentials). `切换账号` on the profile step really signs out.
+25. **The login window's gear and × are hand-drawn.** The client's two glyphs are not in
+    the recoverable payload set (§3), so `SettingsGearIcon` / `CloseIcon` are hand-drawn
+    at the measured 1.2 px weight. Everything else in the window comes from
+    `--wx-login-*` tokens, not literal colours.
+26. **The 280×373 login window is fixed.** The client's window is the same size and also
+    not resizable; ours is centred on the primary display every time (the client
+    remembers where you left it) — one less piece of window state to persist.
 
 ---
 
@@ -403,7 +468,16 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
 - **A slow avatar is a slow tunnel, not slow code.** One 160 px photo measured 16 s on a
   flapping SOCKS connection and 65–230 ms on a healthy one. Check the proxy before
   touching `prefetchChatAvatars`.
+- **The login window is a real second window.** Before a sign-in completes the shell
+  does not exist, so closing the login window (its × / Alt+F4) quits the app through
+  `window-all-closed`; after the hand-over the shell is the only window and signing out
+  recreates the login window first, then closes the shell. If a run ever leaves two
+  windows or none, check `syncWindowsToAuth` / `showMainWindow` in `main/index.ts`.
+- **A pending QR confirmation cannot be cancelled in TDLib.** `setAuthenticationPhoneNumber`
+  is refused in `waitOtherDeviceConfirmation` and there is no cancel call; the phone
+  link therefore restarts the client (`auth:reset`). Do not "optimise" that into a
+  direct phone submit — it fails at the TDLib boundary.
 - Login needs three submits; the field is re-focused after each step only because of
-  the fix in `LoginScreen.tsx` — if it regresses, typing stops going anywhere.
+  the focus effect in `LoginWindow.tsx` — if it regresses, typing stops going anywhere.
 - The reference screenshots and comparison PNGs are in `.cache` and therefore
   gitignored; the numbers above are the durable part.

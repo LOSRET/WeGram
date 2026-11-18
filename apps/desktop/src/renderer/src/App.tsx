@@ -1,7 +1,6 @@
 import { errorMessage, invoke } from '@renderer/lib/ipc'
 import { MainShell } from '@renderer/components/MainShell'
 import { PerfPanel } from '@renderer/components/PerfPanel'
-import { LoginScreen } from '@renderer/screens/LoginScreen'
 import { useAppStore } from '@renderer/store/useAppStore'
 import type { MessageOp } from '@wegram/protocol'
 import { useEffect } from 'react'
@@ -189,13 +188,19 @@ export function App() {
     })()
   }, [ready])
 
-  return auth.kind === 'ready' ? (
+  /**
+   * The shell window only exists once an account is signed in (`login:enter`),
+   * and the main process closes it the moment authorization leaves `ready`. The
+   * short gap while `auth:state` is in flight paints the window background
+   * instead of an empty three-column shell.
+   */
+  if (!ready) return null
+
+  return (
     <>
       <MainShell />
       {showPerfPanel ? <PerfPanel /> : null}
     </>
-  ) : (
-    <LoginScreen />
   )
 }
 

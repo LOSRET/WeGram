@@ -6,12 +6,17 @@ import { useEffect, useState } from 'react'
 
 interface ProxyPanelProps {
   onClose: () => void
+  /**
+   * Where a load failure is reported. The shell keeps it in the store; the login
+   * window (which owns no store slice) hands in its own error line instead.
+   */
+  onError?: (message: string) => void
 }
 
 type Status = { kind: 'idle' | 'busy' | 'ok' | 'fail'; text?: string }
 
 /** SOCKS5 / MTProxy settings, including a one-shot connectivity test (§6.4). */
-export function ProxyPanel({ onClose }: ProxyPanelProps) {
+export function ProxyPanel({ onClose, onError }: ProxyPanelProps) {
   const setError = useAppStore((state) => state.setError)
 
   const [type, setType] = useState<'socks5' | 'mtproto'>('socks5')
@@ -37,10 +42,11 @@ export function ProxyPanel({ onClose }: ProxyPanelProps) {
           setSecret(config.secret ?? '')
         }
       } catch (error) {
-        setError(errorMessage(error))
+        const report = onError ?? setError
+        report(errorMessage(error))
       }
     })()
-  }, [setError])
+  }, [onError, setError])
 
   const buildConfig = (): ProxyConfig | null => {
     if (!host.trim() || !Number(port)) return null

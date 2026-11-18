@@ -28,7 +28,15 @@ import type {
  * Never install this when `window.tg` exists.
  */
 
-const ME: Self = { id: 1000, firstName: '预览', lastName: '账号', username: 'preview' }
+const ME: Self = {
+  id: 1000,
+  firstName: '预览',
+  lastName: '账号',
+  username: 'preview',
+  // The login window's profile step shows the account photo; a fixture gradient
+  // keeps that path exercised in the browser.
+  avatarUrl: svgUrl(160, 160, '#cfe8ff', '#f3c9a9'),
+}
 
 const now = () => Math.floor(Date.now() / 1000)
 
@@ -45,12 +53,27 @@ function emit(channel: EventChannel, payload: unknown): void {
   for (const listener of listeners.get(channel) ?? []) listener(envelope)
 }
 
-let auth: AuthState = { kind: 'waitPhoneNumber' }
+/**
+ * The shell is the default browser-preview route. `#login` previews the login
+ * window, which must start signed out so the phone form (not the profile step)
+ * is what you land on.
+ */
+let auth: AuthState = window.location.hash.startsWith('#login')
+  ? { kind: 'waitPhoneNumber' }
+  : { kind: 'ready', me: ME }
 
 function setAuth(next: AuthState): AuthState {
   auth = next
   emit('evt:auth', next)
   return next
+}
+
+/** Fake QR confirmation; the mock adapter does the same in the main process. */
+let qrTimer: number | null = null
+
+function clearQrTimer(): void {
+  if (qrTimer !== null) window.clearTimeout(qrTimer)
+  qrTimer = null
 }
 
 const chats: ChatSummary[] = [
@@ -356,14 +379,32 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       return setAuth({ kind: 'waitPassword', hint: 'mock 密码 wegram' })
     }
     case 'auth:password': {
-      if (store.password !== 'wegram')
-        throw { code: 'auth_failed', message: '密码是 wegram' }
+      if (store.password !== 'wegram') throw { code: 'auth_failed', message: '密码是 wegram' }
+      clearQrTimer()
       const next: AuthState = { kind: 'ready', me: ME }
       setAuth(next)
       emit('evt:connection', 'online')
       return next
     }
+    case 'auth:qr': {
+      if (auth.kind !== 'waitPhoneNumber') return auth
+      const next = setAuth({
+        kind: 'waitQr',
+        link: `tg://login?token=preview-${Math.random().toString(36).slice(2, 10)}`,
+      })
+      clearQrTimer()
+      qrTimer = window.setTimeout(() => {
+        qrTimer = null
+        setAuth({ kind: 'ready', me: ME })
+        emit('evt:connection', 'online')
+      }, 10_000)
+      return next
+    }
+    case 'auth:reset':
+      clearQrTimer()
+      return setAuth({ kind: 'waitPhoneNumber' })
     case 'auth:logout':
+      clearQrTimer()
       emit('evt:connection', 'offline')
       setAuth({ kind: 'waitPhoneNumber' })
       return undefined
@@ -528,6 +569,13 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'viewer:pin':
       return { onTop: false }
     case 'viewer:close':
+      return undefined
+    /**
+     * Window hand-over is Electron main's job. In the browser preview the
+     * "windows" are routes, so these two are no-ops.
+     */
+    case 'login:enter':
+    case 'login:close':
       return undefined
     default:
       throw { code: 'not_implemented', message: `${channel} is not wired in the browser preview` }

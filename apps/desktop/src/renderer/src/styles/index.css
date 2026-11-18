@@ -96,6 +96,22 @@
   --wx-viewer-icon: #191919;
   --wx-viewer-sep: #dedede;
   --wx-viewer-bar-h: 40px;
+
+  /* Login window (design doc §9.6), measured on the client's 280×373 sheet:
+     #fafafa paper, #00c375 action green (bluer than --wx-brand), #304b82 links,
+     #6e6e73 strip text, 1.2 px #4d4d4d chrome glyphs. */
+  --wx-login-bg: #fafafa;
+  --wx-login-green: #00c375;
+  --wx-login-green-active: #06b269;
+  --wx-login-link: #304b82;
+  --wx-login-ink: #6e6e73;
+  --wx-login-glyph: #4d4d4d;
+  --wx-login-field: #ffffff;
+  --wx-login-field-line: #e6e6e6;
+  /* The login QR is deliberately not themed: a dark code on the dark sheet
+     would not scan, so both themes keep it near-black on white. */
+  --wx-login-qr-light: #ffffff;
+  --wx-login-qr-dark: #2d2d2d;
 }
 
 [data-theme='dark'] {
@@ -145,6 +161,17 @@
   --wx-viewer-canvas: #242424;
   --wx-viewer-icon: #b1b1b1;
   --wx-viewer-sep: #4f4f51;
+
+  /* The login window has no measured dark counterpart yet; these follow the
+     shell's dark scheme (design doc §9.6 notes the same). */
+  --wx-login-bg: #1e1e1f;
+  --wx-login-green: #07c160;
+  --wx-login-green-active: #06ad56;
+  --wx-login-link: #7d90b8;
+  --wx-login-ink: #7b7b80;
+  --wx-login-glyph: #b1b1b1;
+  --wx-login-field: #2f2f30;
+  --wx-login-field-line: #3a3a3c;
 }
 
 * {
@@ -1602,75 +1629,385 @@ select {
   }
 }
 
-/* ---------- Login ---------- */
+/* ---------- Login window (design doc §9.6) ----------
+   Its own 280×373 window, not a page inside the shell. Everything here is local
+   to that window: #fafafa paper, a 32 px self-drawn strip (no system controls),
+   14 px #304b82 footer links, and the client's 80 px profile avatar. */
 
 .wx-login {
-  position: relative;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
   height: 100%;
-  background: var(--wx-pane);
+  overflow: hidden;
+  background: var(--wx-login-bg);
+  color: var(--wx-text);
+  user-select: none;
 }
 
-/* The login screen has no title bar of its own, but the native window controls
-   are still painted over the top-right corner by titleBarOverlay. This strip
-   gives them the same colour the shell's title bar uses. */
-.wx-login::before {
-  content: '';
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: var(--wx-titlebar-h);
-  background: var(--wx-rail);
+.wx-login input {
+  user-select: text;
+}
+
+/* The client's strip: app name on the left, only 设置 and × on the right. The
+   whole strip drags the window; the two buttons are the no-drag islands. */
+.wx-login__titlebar {
+  display: flex;
+  align-items: center;
+  flex: 0 0 32px;
+  padding: 0 8px 0 12px;
   -webkit-app-region: drag;
 }
 
-.wx-login__card {
-  position: relative;
+.wx-login__name {
+  flex: 1;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--wx-login-ink);
+}
+
+.wx-login__tool {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--wx-login-glyph);
+  -webkit-app-region: no-drag;
+}
+
+.wx-login__tool + .wx-login__tool {
+  margin-left: 16px;
+}
+
+.wx-login__tool:hover {
+  color: var(--wx-text);
+}
+
+.wx-login__body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  width: 340px;
-  padding: 28px 32px 26px;
-  border-radius: 8px;
-  background: var(--wx-elevated);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  flex: 1;
+  min-height: 0;
+  padding: 38px 32px 0;
   text-align: center;
 }
 
-.wx-login__logo {
-  color: var(--wx-brand);
-  margin-bottom: 2px;
+.wx-login__body--center {
+  justify-content: center;
+  gap: 14px;
+  padding-bottom: 40px;
+}
+
+.wx-login__body--center .wx-login__title,
+.wx-login__body--center .wx-login__subtitle {
+  margin-top: 0;
+}
+
+.wx-login__mark {
+  flex: 0 0 auto;
+  color: var(--wx-login-green);
+}
+
+.wx-login__mark--muted {
+  color: var(--wx-text-tertiary);
+}
+
+.wx-login__spinner {
+  display: grid;
+  place-items: center;
 }
 
 .wx-login__title {
+  margin-top: 10px;
   font-size: 16px;
   font-weight: 500;
+  line-height: 20px;
   color: var(--wx-text);
 }
 
 .wx-login__subtitle {
+  display: -webkit-box;
+  max-width: 100%;
+  margin-top: 4px;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   font-size: 12px;
-  line-height: 1.6;
+  line-height: 16px;
   color: var(--wx-text-secondary);
 }
 
-.wx-login__card .wx-field {
+.wx-login__input {
   width: 100%;
-  text-align: left;
+  height: 34px;
+  margin-top: 10px;
+  padding: 0 10px;
+  border: 1px solid var(--wx-login-field-line);
+  border-radius: 4px;
+  background: var(--wx-login-field);
+  font-size: 14px;
+  color: var(--wx-text);
 }
 
-.wx-login__card .wx-button {
-  width: 100%;
+.wx-login__input::placeholder {
+  color: var(--wx-text-tertiary);
+}
+
+.wx-login__input:focus {
+  border-color: var(--wx-login-green);
+}
+
+.wx-login__button {
+  width: 168px;
   height: 36px;
+  margin-top: 10px;
+  border: none;
+  border-radius: 6px;
+  background: var(--wx-login-green);
+  color: #ffffff;
+  font-size: 16px;
+  white-space: nowrap;
+}
+
+.wx-login__button:hover:not(:disabled) {
+  background: var(--wx-login-green-active);
+}
+
+.wx-login__button:disabled {
+  background: var(--wx-fill-disabled);
+  color: var(--wx-text-disabled);
+  cursor: default;
+}
+
+.wx-login__feedback {
+  width: 100%;
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.wx-login__error {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  color: var(--wx-danger);
+}
+
+.wx-login__hint {
+  color: var(--wx-text-tertiary);
+}
+
+.wx-login__avatar {
+  width: 80px;
+  height: 80px;
+  flex: 0 0 80px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.wx-login__avatar--empty {
+  display: grid;
+  place-items: center;
+  color: #ffffff;
+  font-size: 30px;
+}
+
+.wx-login__profile-name {
+  margin-top: 30px;
+  font-size: 16px;
+  line-height: 22px;
+  color: var(--wx-text);
+}
+
+/* The client puts the 进入 button 70 px under the name, not right below it. */
+.wx-login__profile-name + .wx-login__button {
+  margin-top: 70px;
+}
+
+.wx-login__footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 17px;
+  flex: 0 0 auto;
+  padding: 0 16px 21px;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.wx-login__link {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--wx-login-link);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.wx-login__link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.wx-login__link:disabled {
+  color: var(--wx-text-tertiary);
+  cursor: default;
+}
+
+.wx-login__sep {
+  width: 1px;
+  height: 14px;
+  background: var(--wx-line-strong);
+}
+
+/* ---------- Login QR (design doc §9.6) ---------- */
+
+/* The client puts its QR 80 px below the top edge; the strip is 32 px, so the
+   body adds 48. */
+.wx-login__body--qr {
+  padding-top: 48px;
+}
+
+.wx-qr {
+  display: block;
+  flex: 0 0 auto;
+  border-radius: 2px;
+  background: var(--wx-login-qr-light);
+}
+
+.wx-qr__light {
+  fill: var(--wx-login-qr-light);
+}
+
+.wx-qr__dark {
+  fill: var(--wx-login-qr-dark);
+}
+
+.wx-qr--failed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 136px;
+  height: 136px;
+  font-size: 12px;
+  color: var(--wx-danger);
+  border: 1px dashed var(--wx-line-strong);
+  border-radius: 4px;
+}
+
+.wx-login__qr-placeholder {
+  display: grid;
+  place-items: center;
+  width: 136px;
+  height: 136px;
+  border: 1px dashed var(--wx-line-strong);
+  border-radius: 4px;
+}
+
+.wx-login__qr-label {
+  margin-top: 30px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--wx-login-green);
+}
+
+.wx-login__qr-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--wx-text-secondary);
+}
+
+.wx-login__qr-hint--error {
+  color: var(--wx-danger);
+}
+
+.wx-login__qr-mock {
+  margin-top: 8px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--wx-text-tertiary);
+}
+
+.wx-login__qr-retry {
+  margin-top: 12px;
+}
+
+/* The shell's settings modal is 440 px wide; inside the 280 px window it becomes
+   a single narrow column. The card scrolls internally rather than growing past
+   the window, so 保存并应用 stays reachable at the bottom. */
+.wx-login .wx-modal-backdrop {
+  align-items: flex-start;
+  padding: 20px 12px;
+  overflow-y: auto;
+}
+
+.wx-login .wx-modal {
+  width: 100%;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  padding: 10px;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.wx-login .wx-modal__header {
   font-size: 14px;
 }
 
-.wx-login__card .wx-hint,
-.wx-login__card .wx-error {
-  text-align: left;
+.wx-login .wx-modal .wx-field {
+  gap: 3px;
+}
+
+.wx-login .wx-modal .wx-field label {
+  font-size: 11px;
+  line-height: 14px;
+}
+
+.wx-login .wx-modal .wx-input {
+  height: 28px;
+  font-size: 12px;
+}
+
+/* Host/port and user/password share a row (the shell stacks them because its
+   modal is 440 px); the three action buttons do too, as text-only pills. */
+.wx-login .wx-modal .wx-row {
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.wx-login .wx-modal .wx-row > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.wx-login .wx-modal .wx-button {
   width: 100%;
+  height: 26px;
+  padding: 0 4px;
+  font-size: 11px;
+}
+
+.wx-login .wx-modal .wx-status {
+  font-size: 11px;
+}
+
+/* The protocol note under the proxy form is a shell-sized caption; the login
+   window needs the height for the form itself. */
+.wx-login .wx-modal .wx-hint {
+  display: none;
+}
+
+.wx-login__help-text {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--wx-text-secondary);
 }
 
 /* ---------- Rich text (TL entities, design doc §8.3) ---------- */

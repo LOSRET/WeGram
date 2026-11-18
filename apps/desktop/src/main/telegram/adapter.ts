@@ -55,6 +55,13 @@ export interface TelegramAdapter {
   submitPhone(phone: string): Promise<AuthState>
   submitCode(code: string): Promise<AuthState>
   submitPassword(password: string): Promise<AuthState>
+  /** Requests QR-code login; the `waitQr` state arrives through the event stream. */
+  requestQrCode(): Promise<AuthState>
+  /**
+   * Cancels a pending QR confirmation and rebuilds the auth client. TDLib has
+   * no cancel call, so switching back to the phone form needs a fresh client.
+   */
+  restartAuth(): Promise<AuthState>
   logout(): Promise<void>
   me(): Promise<Self>
 

@@ -5,6 +5,7 @@ import { AppError } from '@wegram/protocol'
 import type { AppInfo, ProxyConfig, ViewerItem } from '@wegram/protocol'
 import { app, BrowserWindow, clipboard, dialog, nativeImage, shell } from 'electron'
 
+import { closeLoginWindow } from '../login-window'
 import { resolveProxySecrets, toProxyView, toStoredProxy } from '../proxy'
 import type { SettingsStore } from '../store/settings'
 import type { UiDatabase } from '../store/ui-db'
@@ -27,6 +28,17 @@ export interface HandlerDeps {
   info: AppInfo
   /** Lets the shell repaint the native window-controls overlay on theme change. */
   onThemeChange?: (theme: 'light' | 'dark') => void
+  /**
+   * Opens the shell window and dismisses the login window. Called by the login
+   * window's 进入 button; the caller guards that authorization finished.
+   */
+  onLoginEnter: () => void
+  /**
+   * Marks that this run's sign-in was user-driven. The shell opens by itself
+   * when such a login completes; only a session restored at startup stops on
+   * the profile step (see index.ts `syncWindowsToAuth`).
+   */
+  onAuthInteraction: () => void
 }
 
 /**
@@ -39,15 +51,48 @@ export function createHandlers({
   uiDb,
   info,
   onThemeChange,
+  onLoginEnter,
+  onAuthInteraction,
 }: HandlerDeps): IpcHandlerMap {
   return {
     'app:info': () => info,
 
+    /**
+     * The login window owns the whole sign-in flow; the shell window does not
+     * exist until this lands. A stale click (authorization lost in the meantime)
+     * is refused rather than opening an empty shell.
+     */
+    'login:enter': () => {
+      if (adapter.getAuthState().kind !== 'ready') {
+        throw new AppError('auth_required', '还没有完成登录')
+      }
+      onLoginEnter()
+    },
+    'login:close': () => {
+      closeLoginWindow()
+    },
+
     'auth:state': () => adapter.getAuthState(),
-    'auth:start': (payload) => adapter.submitPhone((payload as { phone: string }).phone),
-    'auth:code': (payload) => adapter.submitCode((payload as { code: string }).code),
-    'auth:password': (payload) =>
-      adapter.submitPassword((payload as { password: string }).password),
+    'auth:start': (payload) => {
+      onAuthInteraction()
+      return adapter.submitPhone((payload as { phone: string }).phone)
+    },
+    'auth:code': (payload) => {
+      onAuthInteraction()
+      return adapter.submitCode((payload as { code: string }).code)
+    },
+    'auth:password': (payload) => {
+      onAuthInteraction()
+      return adapter.submitPassword((payload as { password: string }).password)
+    },
+    'auth:qr': () => {
+      onAuthInteraction()
+      return adapter.requestQrCode()
+    },
+    'auth:reset': () => {
+      onAuthInteraction()
+      return adapter.restartAuth()
+    },
     'auth:logout': () => adapter.logout(),
     'auth:me': () => adapter.me(),
 

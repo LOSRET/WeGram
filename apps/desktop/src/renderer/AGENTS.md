@@ -7,7 +7,11 @@ only adds what is specific to this layer.
 ## Layering
 
 ```
-App.tsx               bootstrap + the ONE place that subscribes to evt:*
+main.tsx              route by hash: plain = shell, #viewer = viewer, #login = login window
+App.tsx               shell only (auth ready) + the ONE place that subscribes to evt:*
+screens/LoginWindow.tsx  the standalone login window (QR, phone fallback, profile, sheets)
+components/QrCode.tsx    login QR: one SVG path from the qrcode matrix
+lib/qr.ts                QR matrix + path helpers (pure, unit-tested)
 store/                zustand: data defaults (initialState.ts), pure reducers, slices
 components/message-list/  virtualiser + MessageRow + Divider + the three scroll hooks
 components/chat-pane/     render tree + useChatHistory + messageActions + placeholders
@@ -90,6 +94,15 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   An unread block shorter than the viewport is clamped to the bottom on purpose — the
   divider stays visible above it, and "fixing" that with more scrolling only spins
   with the pane hidden.
+- **The login window (`#login`) must not boot the shell.** It has its own tiny
+  state (auth + theme) and only follows `evt:auth`; hydrating the zustand chat store
+  there would give one account two writers. Its 280 px modal is the shell's
+  `ProxyPanel` with the `.wx-login .wx-modal` overrides — keep those together.
+- **The QR is TDLib's link, and it cannot be cancelled.** `waitQr.link` is a
+  `tg://login?token=…` string that TDLib re-issues by itself — just re-render it;
+  never cache it as "the" QR. The phone fallback must go through `auth:reset`
+  (main restarts TDLib), not a direct `auth:start`. Keep the QR unstyled by theme:
+  a dark-on-dark code does not scan.
 - **Long panes use `components/OverlayScrollbar.tsx`**, never a native scrollbar:
   Chromium gives native bars a layout gutter, so rows re-flow when the bar
   appears. Popovers keep native thin bars on purpose.

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { statSync, writeFileSync } from 'node:fs'
 import { mkdir, stat, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
@@ -135,6 +136,8 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   private nextMessageId = 5000
   private nextFileId = 9000
   private timer: NodeJS.Timeout | null = null
+  /** Pending fake QR confirmation; the scan is simulated on this timer. */
+  private qrTimer: NodeJS.Timeout | null = null
   /** Generated avatar for the rail, so the mock exercises the real image path. */
   private selfAvatarUrl: string | null = null
 
@@ -154,6 +157,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   async stop(): Promise<void> {
     if (this.timer) clearInterval(this.timer)
     this.timer = null
+    this.clearQrTimer()
   }
 
   getAuthState(): AuthState {
@@ -198,7 +202,32 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     return this.auth
   }
 
+  /**
+   * QR login: TDLib would hand us a fresh `tg://login?token=…` link every few
+   * seconds. The mock mints one and then "scans" it after ten seconds, so the
+   * whole first-login flow (QR → shell, no profile step) can be exercised
+   * without a second device.
+   */
+  async requestQrCode(): Promise<AuthState> {
+    if (this.auth.kind !== 'waitPhoneNumber') return this.auth
+    this.setAuth({ kind: 'waitQr', link: `tg://login?token=${randomUUID()}` })
+    this.clearQrTimer()
+    this.qrTimer = setTimeout(() => {
+      this.qrTimer = null
+      this.completeLogin()
+    }, 10_000)
+    return this.auth
+  }
+
+  /** TDLib cannot cancel a QR confirmation; the mock can simply start over. */
+  async restartAuth(): Promise<AuthState> {
+    this.clearQrTimer()
+    this.setAuth({ kind: 'waitPhoneNumber' })
+    return this.auth
+  }
+
   async logout(): Promise<void> {
+    this.clearQrTimer()
     this.setAuth({ kind: 'waitPhoneNumber' })
     this.setConnection('offline')
   }
@@ -814,6 +843,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   }
 
   private completeLogin(): void {
+    this.clearQrTimer()
     this.setAuth({
       kind: 'ready',
       me: this.selfAvatarUrl ? { ...ME, avatarUrl: this.selfAvatarUrl } : ME,
@@ -826,6 +856,11 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
         chat: { ...fixture.chat },
       })),
     })
+  }
+
+  private clearQrTimer(): void {
+    if (this.qrTimer) clearTimeout(this.qrTimer)
+    this.qrTimer = null
   }
 
   private setAuth(state: AuthState): void {

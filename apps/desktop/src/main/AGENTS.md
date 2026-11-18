@@ -7,7 +7,9 @@ adds what is specific to this layer.
 ## Layering
 
 ```
-index.ts            app lifecycle, window, adapter wiring, media scheme
+index.ts            app lifecycle, main-window creation, adapter wiring, media scheme,
+                    login↔shell hand-over (syncWindowsToAuth / showMainWindow)
+login-window.ts     the frameless 280×373 login BrowserWindow (#login), close/refocus
 ipc/router.ts       per-channel zod validation, Result envelope
 ipc/handlers.ts     one handler per invoke channel
 telegram/           adapter.ts (the seam) / tdlib/ (real adapter) / mock.ts / updates.ts / events.ts
@@ -37,6 +39,11 @@ change belongs in the adapter.
 - Events are emitted as domain `AdapterEvent`s and batched by `telegram/updates.ts`
   (60 ms, monotonic `seq`). Do not push IPC events directly from the adapter.
 - Password / MTProxy secret are sealed with `safeStorage` (`security/secrets.ts`).
+- **TDLib cannot cancel a pending QR confirmation.** `auth:reset` destroys the auth
+  client and starts a new one (nothing is stored yet); the QR link arrives as repeated
+  `authorizationStateWaitOtherDeviceConfirmation` updates (`waitQr`) and must be passed
+  through as-is. A completed user-driven login opens the shell directly; only a session
+  restored at startup stops on the profile step (`syncWindowsToAuth`).
 - Packaging constraint: `tdjson.dll` cannot load from inside `app.asar`
   (`electron-builder.yml` unpacks it), and TDLib data dirs live under
   `app.getPath('userData')`, which `index.ts` pins to `%APPDATA%\WeGram`.

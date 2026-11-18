@@ -8,6 +8,7 @@ import { App } from '@renderer/App'
 import { MediaViewer } from '@renderer/components/viewer/MediaViewer'
 import { installPreviewBridge } from '@renderer/lib/preview-bridge'
 import { queryClient } from '@renderer/lib/query'
+import { LoginWindow } from '@renderer/screens/LoginWindow'
 
 // Browser preview (pnpm web): no preload script exists, so install a mock bridge.
 installPreviewBridge()
@@ -15,15 +16,23 @@ installPreviewBridge()
 const container = document.getElementById('root')
 if (!container) throw new Error('#root is missing from index.html')
 
-// The 图片和视频 window is its own window: main loads this same bundle with
-// `#viewer`, and it must not boot the chat shell (no adapter events, no store
-// hydration — only `viewer:init`).
-const isViewer = window.location.hash.startsWith('#viewer')
+// Two of the app's three windows share this bundle through the hash:
+// `#viewer` is the 图片和视频 window (only `viewer:init`), and `#login` is the
+// standalone login window (only the auth flow). Neither may boot the chat
+// shell, and the shell itself must not render a login form inside the main
+// window any more.
+const route = window.location.hash
 
 createRoot(container).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      {isViewer ? <MediaViewer /> : <App />}
+      {route.startsWith('#viewer') ? (
+        <MediaViewer />
+      ) : route.startsWith('#login') ? (
+        <LoginWindow />
+      ) : (
+        <App />
+      )}
     </QueryClientProvider>
   </StrictMode>,
 )

@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import type { AppInfo } from '@wegram/protocol'
+import type { AppInfo, AuthState } from '@wegram/protocol'
 import { app, BrowserWindow, shell } from 'electron'
 
 import { createHandlers } from './ipc/handlers'
 import { registerIpc, unregisterIpc } from './ipc/router'
+import { closeLoginWindow, createLoginWindow, getLoginWindow } from './login-window'
 import { installMediaProtocol, registerMediaScheme } from './media/protocol'
 import { storedProxyToConfig } from './proxy'
 import { parseProxyUrl } from './proxy-url'
@@ -34,6 +35,18 @@ let mainWindow: BrowserWindow | null = null
 let adapter: TelegramAdapter | null = null
 let bus: EventBus | null = null
 let uiDb: UiDatabase | null = null
+/**
+ * Set before `before-quit` stops the adapter: the stop closes the client, which
+ * emits `auth: closed`, and that must not resurrect the login window mid-quit.
+ */
+let quitting = false
+/**
+ * True once this run has asked TDLib for something the user initiated (phone,
+ * code, password, QR). A login that completes after that goes straight to the
+ * shell, like WeChat; a session restored at startup instead stops on the profile
+ * step until 进入 WeGram. See `syncWindowsToAuth`.
+ */
+let authInteracted = false
 
 loadDotEnv()
 
@@ -41,9 +54,12 @@ if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
   app.on('second-instance', () => {
-    if (!mainWindow) return
-    if (mainWindow.isMinimized()) mainWindow.restore()
-    mainWindow.focus()
+    // Whichever window the app currently lives in: the shell once the login
+    // window handed over, the login window before that.
+    const win = mainWindow ?? getLoginWindow()
+    if (!win || win.isDestroyed()) return
+    if (win.isMinimized()) win.restore()
+    win.focus()
   })
 
   void app.whenReady().then(bootstrap)
@@ -57,12 +73,13 @@ async function bootstrap(): Promise<void> {
   const store = new SettingsStore(join(userDataDir, 'settings.json'))
   store.load()
 
-  uiDb = new UiDatabase(join(userDataDir, 'ui.db'))
-  uiDb.open()
+  const db = new UiDatabase(join(userDataDir, 'ui.db'))
+  db.open()
+  uiDb = db
 
   // A viewer opened before the first theme change must still get a dark strip,
   // so seed the module with the stored theme instead of defaulting to light.
-  setViewerTheme(storedTheme(uiDb))
+  setViewerTheme(storedTheme(db))
 
   const apiId = Number(process.env.TELEGRAM_API_ID ?? 0)
   const apiHash = (process.env.TELEGRAM_API_HASH ?? '').trim()
@@ -100,6 +117,9 @@ async function bootstrap(): Promise<void> {
     },
   })
   adapter.onEvent((event) => {
+    // Windows follow authorization, not the renderer: the shell may only exist
+    // while an account is signed in (see syncWindowsToAuth).
+    if (event.type === 'auth') syncWindowsToAuth(event.state)
     if (bus) publishAdapterEvent(bus, event)
   })
 
@@ -114,16 +134,24 @@ async function bootstrap(): Promise<void> {
     createHandlers({
       adapter,
       store,
-      uiDb,
+      uiDb: db,
       info,
       onThemeChange: (theme) => {
         applyTitleBarTheme(mainWindow, theme)
         setViewerTheme(theme)
       },
+      // The login window's 进入 button: the shell takes over, the login window goes.
+      onLoginEnter: () => showMainWindow(storedTheme(db), 'after-ready'),
+      onAuthInteraction: () => {
+        authInteracted = true
+      },
     }),
   )
 
-  mainWindow = createWindow(storedTheme(uiDb))
+  // The app starts in the login window, like WeChat: an existing TDLib session
+  // lands on the profile step, a fresh one on the phone form. The shell window is
+  // only created once the reader clicks 进入 WeGram.
+  openLoginWindow()
 
   try {
     await adapter.start()
@@ -133,11 +161,75 @@ async function bootstrap(): Promise<void> {
   }
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow(storedTheme(uiDb))
+    if (BrowserWindow.getAllWindows().length === 0) openLoginWindow()
   })
 }
 
-function createWindow(theme: 'light' | 'dark'): BrowserWindow {
+/** Opens (or re-focuses) the standalone login window. */
+function openLoginWindow(): void {
+  const existing = getLoginWindow()
+  if (existing) {
+    if (existing.isMinimized()) existing.restore()
+    existing.focus()
+    return
+  }
+  createLoginWindow(storedTheme(uiDb))
+}
+
+/**
+ * Opens (or re-focuses) the shell window and dismisses the login window.
+ *
+ * The shell is created first and the login window is closed from its
+ * `ready-to-show` handler: closing the last window would trip
+ * `window-all-closed` and quit the app mid-hand-over.
+ */
+function showMainWindow(theme: 'light' | 'dark', closeLogin: 'immediate' | 'after-ready'): void {
+  const existing = mainWindow
+  if (existing && !existing.isDestroyed()) {
+    if (existing.isMinimized()) existing.restore()
+    existing.focus()
+    closeLoginWindow()
+    return
+  }
+
+  const win = createMainWindow(theme)
+  mainWindow = win
+  win.on('closed', () => {
+    if (mainWindow === win) mainWindow = null
+  })
+  if (closeLogin === 'immediate') {
+    // First sign-in: the login window must not linger on the profile step. The
+    // shell already exists (hidden), so `window-all-closed` cannot fire here.
+    closeLoginWindow()
+  } else {
+    win.once('ready-to-show', () => closeLoginWindow())
+  }
+}
+
+/**
+ * Authorization can leave `ready` without the renderer asking: TDLib may close
+ * the client, and 退出登录 is an invoke whose auth event arrives after the
+ * request. The shell cannot stay open without an account, so swap back to the
+ * login window — created first, or `window-all-closed` would quit the app in
+ * the gap.
+ */
+function syncWindowsToAuth(state: AuthState): void {
+  if (quitting) return
+  if (state.kind === 'ready') {
+    /**
+     * WeChat's rule: the sign-in itself ends in the main window, while a session
+     * restored at startup stops on the profile step (`login:enter` opens the
+     * shell). `authInteracted` is what tells the two apart.
+     */
+    if (authInteracted) showMainWindow(storedTheme(uiDb), 'immediate')
+    return
+  }
+  if (!mainWindow) return
+  openLoginWindow()
+  mainWindow.close()
+}
+
+function createMainWindow(theme: 'light' | 'dark'): BrowserWindow {
   const win = new BrowserWindow({
     width: 1000,
     height: 680,
@@ -249,6 +341,8 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
+  // The adapter stop below emits `auth: closed`; that is a teardown, not a logout.
+  quitting = true
   bus?.dispose()
   bus = null
   unregisterIpc()

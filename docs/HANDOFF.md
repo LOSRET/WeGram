@@ -21,7 +21,7 @@ Greenfield → working skeleton in three milestones:
 
 - **W1** Electron shell, `packages/protocol` IPC contract, mock adapter, real TDLib
   adapter with manual auth state machine, SOCKS5/MTProxy proxy support, WeChat-style
-  login screen + three-column shell.
+  standalone login window + three-column shell.
 - **W2** virtualised message list, anchored history paging, send / reply / edit /
   delete / forward, per-chat drafts, `ui.db` (drafts, theme, scroll-anchor columns).
 - **W3 main body** media send/receive (photo + document with upload/download progress),
@@ -29,6 +29,18 @@ Greenfield → working skeleton in three milestones:
   (WebP/TGS/WebM), a sticker picker, TL entity rendering, day separators, the unread
   divider, read receipts, and a typing indicator that expires. Mock fixtures now carry
   real generated PNG/WebP/TGS media, so every renderer path is exercised offline.
+- **Login window (W3 addendum, 2026-11-18; QR login the same day)**: sign-in is no
+  longer a page inside the shell. The app starts in its own frameless **280×373**
+  window (`main/login-window.ts` + `screens/LoginWindow.tsx`, `#login` hash) with the
+  client's self-drawn strip (WeGram / 齿轮 / ×). The first screen is the **QR code**
+  fed by TDLib (`requestQrCodeAuthentication` → `waitQr` / `tg://login?token=…`,
+  encoded locally with the approved `qrcode` dependency); **用手机号登录** falls back
+  to the phone → code → 2FA form through a client restart (`auth:reset`). A
+  user-driven sign-in ends **directly in the shell**; only a session restored at
+  startup shows the client's profile step (80 px avatar, 168×36 进入 WeGram) first.
+  A sign-out recreates the login window first so `window-all-closed` never fires
+  mid-swap. Design: `技术方案.md` §9.6; measured metrics and deltas (footer copy,
+  hand-drawn glyphs, fixed size): `UI-HANDOFF.md` §2.2 / §5 items 21–26.
 - Spike 2 (real login + session reuse) is **done and verified**; the session lives in
   `spikes/tdlib/data`.
 - **Image viewer (W3 addendum)**: a photo no longer opens an overlay inside the
@@ -95,7 +107,7 @@ screenshot, not guessed).
 - Icons: the chrome glyphs are WeChat's own vectors, extracted from `Weixin.dll`
   (2346 embedded SVGs) into the generated `components/WechatIcons.tsx` — including the
   ＋ menu's 发起群聊 / 添加朋友 / 写笔记 glyphs; the rest (compass tab, "…", scissors)
-  are hand-drawn, and the brand mark — rail 聊天 tab, login card, empty-pane watermark —
+  are hand-drawn, and the brand mark — rail 聊天 tab, login window, empty-pane watermark —
   is the Telegram roundel from Simple Icons. The name manifest in the DLL has no
   recoverable name→payload mapping — see `UI-HANDOFF.md` §3 before trying again.
 - Also fixed while testing: the login field regains focus after each step (it is
@@ -216,8 +228,10 @@ Anything that opens a chat also marks it read on the server — use it deliberat
 packages/protocol/src/       dto.ts (zod schemas + types), channels.ts (channel tables,
                              schemas, TgBridge), errors.ts (AppError), index.ts
 apps/desktop/src/main/
-  index.ts                   app lifecycle, window, theme overlay, adapter wiring,
-                             media scheme/protocol registration
+  index.ts                   app lifecycle, main-window creation, theme overlay, adapter
+                             wiring, the login↔shell hand-over (login:enter / sign-out)
+  login-window.ts            the frameless 280×373 login BrowserWindow (#login hash)
+  viewer.ts, viewer-size.ts  the 图片和视频 BrowserWindow and its measured size maths
   ipc/router.ts              per-channel zod validation, Result envelope
   ipc/handlers.ts            one handler per invoke channel (incl. native file picker)
   media/registry.ts          path → wx-media:// token registry (renderer never sees paths)
@@ -236,7 +250,11 @@ apps/desktop/src/main/
   security/secrets.ts        safeStorage seal/unseal
   preload/index.ts           window.tg.invoke / window.tg.on, channel whitelist
 apps/desktop/src/renderer/src/
-  App.tsx                    bootstrap + event subscription (one place), typing expiry
+  main.tsx                   route by hash: plain = shell, #viewer = 图片和视频, #login = login
+  App.tsx                    shell only (auth must be ready) + event subscription, typing expiry
+  screens/LoginWindow.tsx    the login window: QR screen, phone/code/2FA fallback, profile step
+  components/QrCode.tsx      login QR: one SVG path from the qrcode matrix
+  lib/qr.ts                  QR matrix/path helpers (pure, unit-tested)
   store/                     zustand, split: types.ts (AppData + action interfaces),
                              initialState.ts (DATA_DEFAULTS, the only initial state),
                              reducers.ts (pure sortChats/upsertMessage/reduceOps),
@@ -298,9 +316,17 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
   The overlay colour also has to be repainted from the main process on theme change.
   **Whatever sits under the controls must match the overlay colour** (what
   `applyTitleBarTheme` sends — currently the rail colour `#e0e0e0` / `#2d2d2e`, height
-  32 px) or the bitmap shows a seam — that is why the login screen (`wx-login::before`)
-  paints its own 32 px strip. The overlay covers only the right-hand control area, not
-  the whole strip, so the strip keeps the rest of the window looking consistent.
+  32 px) or the bitmap shows a seam. The overlay covers only the right-hand control
+  area, not the whole strip, so the strip keeps the rest of the window looking
+  consistent. The login window is a separate case: it is `frame: false`, draws its own
+  × and gear, and needs no overlay at all (design doc §9.6).
+- **A pending QR login cannot be cancelled in TDLib.** `requestQrCodeAuthentication`
+  works from `waitPhoneNumber`, and TDLib then keeps re-sending
+  `authorizationStateWaitOtherDeviceConfirmation` with a fresh
+  `tg://login?token=…` link. `setAuthenticationPhoneNumber` is refused in that state
+  and there is no cancel call, so the login window's phone fallback restarts the
+  client (`auth:reset` → `destroy` + new client). Do not replace that with a direct
+  phone submit — it fails at the TDLib boundary.
 - **The dark palette is a *lifted* grey scheme, not near-black — measured 2026-11-18.**
   Captured the running client with `PrintWindow(hwnd, dc, 2)` and took a pixel histogram
   per surface: title strip / rail **#2D2D2E**, conversation list **#3B3B3D**, chat pane
@@ -513,6 +539,8 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
    *Superseded by the WeChat UI pass*: the overlay is now 32 px and rail-coloured
    (`#e0e0e0` / `#2d2d2e`), and the same strip is 32 px — see `docs/UI-HANDOFF.md` §2.
    The dark/light verification itself still holds.
+   *Superseded again 2026-11-18*: the login flow moved into its own frameless window
+   (`main/login-window.ts`), which draws its own ×/gear and has no native overlay.
 2. ~~**`ui.db` scroll-anchor wiring**~~ — **done** with the decided UX ("restore only when
    the reader was not at the bottom"):
    - `MessageList` measures the first visible `.wx-message-slot` (id + offset relative to
@@ -576,9 +604,9 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
    matters, split a channels-only entry point.
 7. Minor: `tdlib:smoke` only checks the *first* channel of the chat list for
    `messageSenderChat`; groups with anonymous admins are not covered by a fixture.
-8. Minor: the login strip is a fixed `--wx-titlebar-h` (32 px), so the browser preview
-   (`pnpm web`) shows an empty strip above the login card too. Detecting the real overlay
-   would need `env(titlebar-area-height)`; not worth it while the strip stays harmless.
+8. Minor: the login window has no account picker. `切换账号` signs the only session out
+   and returns to the phone form; a multi-account list would need several TDLib sessions,
+   which the adapter does not model.
 9. **UI deltas vs the real client** are catalogued in `docs/UI-HANDOFF.md` §5 (composer
    toolbar loses the scissors chevron, message-row avatars still draw initials, no pin
    button, fixed 238 px list, rail sections other than 聊天 only raise a toast, dark rail
@@ -594,6 +622,11 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
 12. **Popovers keep native scrollbars** (modals, forward list, sticker grid). Only the
     two long panes use `<OverlayScrollbar>`; converting the rest is mechanical but was
     not worth the churn while the complaint was the list and the transcript.
+13. **The TDLib QR login has not been confirmed with a real phone.** The link mapping,
+    the local QR encoding, the QR-first UI and the phone fallback are verified with the
+    mock; the `requestQrCodeAuthentication` → scan → ready / 2FA chain and
+    `auth:reset`'s destroy + rebuild still need one real scan (design doc §14). The
+    stored app session was not authorized, so it could not be exercised here.
 
 ## Open questions for the product owner
 

@@ -19,6 +19,7 @@
     "@wegram/protocol": "workspace:*",
     "lottie-web": "^5.13.0",
     "prebuilt-tdlib": "0.1008070.0",
+    "qrcode": "^1.5.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "tdl": "8.1.0",
@@ -27,6 +28,7 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.14",
     "@types/node": "^22.18.8",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.1",
     "@vitejs/plugin-react": "^5.0.4",

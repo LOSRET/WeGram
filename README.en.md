@@ -24,13 +24,14 @@ You sign in with your own account and see your real chats, groups and channels. 
 | W2 | Virtualised message list, anchored history paging, send / reply / edit / delete / forward, per-chat drafts, `ui.db` | ✅ |
 | W3 | Photo and document send/receive with progress, the `wx-media://` media protocol, all three sticker formats (WebP / TGS / WebM), sticker picker, TL entity rendering, day and unread dividers, read receipts, typing indicator | ✅ |
 | W3+ | Standalone media viewer window: zoom / rotate / save for photos, playback (speed, mute, timeline) for videos | ✅ |
+| W3+ | Standalone login window: frameless 280×373, QR login via TDLib with a phone fallback, straight into the shell on first sign-in, profile step only for a restored session | ✅ |
 | — | Search (global + in-chat), pin/mute, full settings page, NSIS installer | ⏳ pending |
 
-`pnpm verify` is green: 21 test files, 195 cases. `pnpm test` covers pure modules only — no DOM, no Electron.
+`pnpm verify` is green: 25 test files, 222 cases. `pnpm test` covers pure modules only — no DOM, no Electron.
 
 ## Features
 
-**Login** Phone number, code, 2FA, with explicit error messages. Without credentials the app silently falls back to the mock adapter, so the UI opens anyway.
+**Login** Opens in its own small window, like WeChat: a QR code requested from TDLib (encoded locally, confirmed on the phone), with a 用手机号登录 fallback for phone / code / 2FA. A first sign-in goes straight to the shell; on later launches a still-authorized session stops on the profile step (avatar, name, 进入 WeGram). Without credentials the app silently falls back to the mock adapter (its QR confirms itself after 10 s), so the UI opens anyway.
 
 **Chats** Direct chats, groups and channels with unread counts, last-message preview, avatars and timestamps. The unread count is derived from the server marker, so the chat row, the floating pill and the rail badge can never disagree.
 

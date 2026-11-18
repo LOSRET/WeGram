@@ -203,6 +203,20 @@ async function handleAuthorizationState(
           : {}),
       })
       return
+    case 'authorizationStateWaitOtherDeviceConfirmation': {
+      /**
+       * QR login. TDLib re-sends this state with a fresh link every few seconds,
+       * so the login window can simply re-render the QR. The link is an external
+       * string that ends up encoded as a QR — only `tg://` links may pass.
+       */
+      const link = typeof state.link === 'string' ? state.link : ''
+      if (!link.startsWith('tg://')) {
+        deps.logger.warn('ignoring a malformed QR login link from TDLib')
+        return
+      }
+      deps.setAuth({ kind: 'waitQr', link })
+      return
+    }
     case 'authorizationStateReady': {
       deps.setConnection('online')
       deps.logger.info(`TDLib ${deps.safeVersion()} authorized, loading self`)
@@ -214,8 +228,8 @@ async function handleAuthorizationState(
       deps.setAuth({ kind: 'closed' })
       return
     default:
-      // authorizationStateLoggingOut / waitOtherDeviceConfirmation etc. keep
-      // the previous state visible; nothing actionable for the UI in W1.
+      // authorizationStateLoggingOut / waitTdlibParameters etc. keep the
+      // previous state visible; nothing actionable for the UI.
       return
   }
 }

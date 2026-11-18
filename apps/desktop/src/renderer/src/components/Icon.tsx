@@ -99,6 +99,60 @@ export function JumpToLatestIcon({ size = 14, ...rest }: IconProps) {
 }
 
 /**
+ * Login-window title strip: the gear that opens 设置 · 代理. The client's gear is a
+ * thin 1.2 px cog; the embedded-payload manifest has no name→glyph mapping (see
+ * `docs/UI-HANDOFF.md` §3), so this is a hand-drawn approximation — ring, eight
+ * teeth and the hub — at the same weight.
+ */
+export function SettingsGearIcon({ size = 14, ...rest }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.2}
+      aria-hidden="true"
+      focusable="false"
+      {...rest}
+    >
+      <circle cx="8" cy="8" r="2.15" />
+      <circle cx="8" cy="8" r="4.55" />
+      <path
+        d="M8 1.35v2.1M8 12.55v2.1M1.35 8h2.1M12.55 8h2.1M3.3 3.3l1.48 1.48M11.22 11.22l1.48 1.48M3.3 12.7l1.48-1.48M11.22 4.78l1.48-1.48"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+/**
+ * Login-window ×: the client's close glyph is a hairline cross with round caps
+ * (10.4 CSS px wide), not the system close button — the login window is frameless.
+ */
+export function CloseIcon({ size = 12, ...rest }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 12 12"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+      {...rest}
+    >
+      <path
+        d="M0.8 0.8 11.2 11.2M11.2 0.8 0.8 11.2"
+        stroke="currentColor"
+        strokeWidth={1.2}
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+/**
  * Empty-chat watermark and login mark: the Telegram paper-plane roundel from
  * Simple Icons (<https://simpleicons.org/?q=telegram>, CC0 1.0), copied verbatim
  * and drawn with `currentColor`. The plane is a hole in the disc (subtracted

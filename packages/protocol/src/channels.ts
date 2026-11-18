@@ -34,6 +34,13 @@ export const invokeChannels = [
   'auth:start',
   'auth:code',
   'auth:password',
+  /** Requests QR-code login; the answer arrives as `evt:auth` with `waitQr`. */
+  'auth:qr',
+  /**
+   * Cancels QR confirmation by restarting the TDLib client (TDLib has no cancel
+   * call), so the login window can fall back to the phone form.
+   */
+  'auth:reset',
   'auth:logout',
   'auth:me',
   'chats:list',
@@ -64,6 +71,10 @@ export const invokeChannels = [
   'proxy:set',
   'proxy:test',
   'app:info',
+  /** The login window's 进入 button: main swaps it for the shell window. */
+  'login:enter',
+  /** The login window's own × (it is frameless, so Windows draws no controls). */
+  'login:close',
   'viewer:open',
   'viewer:init',
   'viewer:save',
@@ -87,6 +98,8 @@ export const invokeSchemas = {
     request: z.object({ password: z.string().min(1) }),
     response: authStateSchema,
   },
+  'auth:qr': { request: noPayload, response: authStateSchema },
+  'auth:reset': { request: noPayload, response: authStateSchema },
   'auth:logout': { request: noPayload, response: noPayload },
   'auth:me': { request: noPayload, response: selfSchema },
   'chats:list': {
@@ -229,6 +242,8 @@ export const invokeSchemas = {
     response: proxyTestResultSchema,
   },
   'app:info': { request: noPayload, response: appInfoSchema },
+  'login:enter': { request: noPayload, response: noPayload },
+  'login:close': { request: noPayload, response: noPayload },
   /**
    * Opens (or re-targets) the standalone 图片和视频 window. The renderer sends the
    * strip it wants to page through, because it owns the transcript.

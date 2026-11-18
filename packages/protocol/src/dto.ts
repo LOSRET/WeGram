@@ -34,6 +34,12 @@ export const authStateSchema = z.discriminatedUnion('kind', [
     codeLength: z.number().int().optional(),
   }),
   z.object({ kind: z.literal('waitPassword'), hint: z.string().optional() }),
+  /**
+   * QR login: TDLib's `authorizationStateWaitOtherDeviceConfirmation`. The link is
+   * a `tg://login?token=…` URL that TDLib re-issues frequently; the login window
+   * renders it as a QR code and the mobile app confirms the sign-in.
+   */
+  z.object({ kind: z.literal('waitQr'), link: z.string() }),
   z.object({ kind: z.literal('ready'), me: selfSchema }),
   z.object({ kind: z.literal('closed') }),
 ])
