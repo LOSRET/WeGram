@@ -130,6 +130,15 @@ interface AnimatedProps {
 function TgsSticker({ url, box, label, emoji, active }: AnimatedProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const animationRef = useRef<AnimationItem | null>(null)
+  /**
+   * The newest visibility for the decode callback.
+   *
+   * A sticker whose file is already cached mounts in the same commit as the
+   * visibility measurement, and the decode resolves after the flip: reading the
+   * render-time `active` there always saw `false`, so every sticker of a chat
+   * the reader came back to stayed on its first frame.
+   */
+  const activeRef = useRef(active)
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
@@ -145,7 +154,7 @@ function TgsSticker({ url, box, label, emoji, active }: AnimatedProps) {
           animationData: data,
         })
         animationRef.current = animation
-        if (active) animation.play()
+        if (activeRef.current) animation.play()
       })
       .catch(() => {
         markTgsFailure(url)
@@ -157,11 +166,13 @@ function TgsSticker({ url, box, label, emoji, active }: AnimatedProps) {
       animationRef.current?.destroy()
       animationRef.current = null
     }
-    // `active` is intentionally not a dependency: playback is toggled below.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Loaded once per URL; visibility is applied through `activeRef` and the
+    // effect below, so `active` is not a dependency here.
   }, [url])
 
   useEffect(() => {
+    activeRef.current = active
+    // No animation yet: the decode callback applies this ref when it lands.
     const animation = animationRef.current
     if (!animation) return
     if (active) animation.play()

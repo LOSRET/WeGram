@@ -36,6 +36,14 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
 
 ## Rules that have already cost a debugging session
 
+- **A prop read inside an async decode must go through a ref.** `TgsSticker` played
+  from the lottie load callback using the render-time `active`: a sticker whose file
+  was already cached mounted in the same commit as the visibility measurement, the
+  `[active]` effect ran while `animationRef.current` was still `null` (and returned),
+  and the callback then read the stale `false`. Every animated sticker of a chat the
+  reader switched back to stayed on its first frame — only the last row, mounted a
+  frame later, ever played. The callback reads `activeRef.current` now; any future
+  "load then start" path must do the same.
 - **Never gate content visibility on `requestAnimationFrame` alone.** Electron
   throttles rAF while the window is occluded, so the pane stays invisible with
   its data loaded. Always pair a frame-based reveal with a `setTimeout` fallback.
@@ -106,6 +114,13 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   never cache it as "the" QR. The phone fallback must go through `auth:reset`
   (main restarts TDLib), not a direct `auth:start`. Keep the QR unstyled by theme:
   a dark-on-dark code does not scan.
+- **A viewer photo must be allowed to outgrow the canvas.** Tailwind's preflight
+  caps every `img` at `max-width: 100 %`, and an `img` is also a flex item (it
+  shrinks by default), so the zoomed picture stopped dead at the window width —
+  its width pinned while its height kept growing — and zoom looked broken past
+  "as big as the window". `.wx-viewer__image` therefore carries `flex: none;
+  max-width: none; max-height: none;`; any future element sized from
+  `lib/zoom.ts` needs the same reset.
 - **Long panes use `components/OverlayScrollbar.tsx`**, never a native scrollbar:
   Chromium gives native bars a layout gutter, so rows re-flow when the bar
   appears. Popovers keep native thin bars on purpose.

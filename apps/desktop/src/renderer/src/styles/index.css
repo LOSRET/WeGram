@@ -2420,9 +2420,16 @@ select {
   cursor: grabbing;
 }
 
-/* The size comes from lib/zoom.ts; max-* only applies while it is unknown. */
+/* The size comes from lib/zoom.ts; max-* only applies while it is unknown.
+   A zoomed photo must be allowed to grow past the canvas: Tailwind's preflight
+   caps every img at max-width: 100 %, and a flex item shrinks by default, so the
+   picture used to stop dead at the window edge (its width pinned, its height
+   still growing — the zoom then looked stuck). */
 .wx-viewer__image {
   display: block;
+  flex: none;
+  max-width: none;
+  max-height: none;
   object-fit: contain;
   -webkit-user-drag: none;
   will-change: transform;
