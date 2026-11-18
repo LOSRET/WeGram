@@ -184,6 +184,11 @@ export function createHandlers({
       )
     },
     'ui:getAnchor': (payload) => uiDb.getScrollAnchor((payload as { chatId: number }).chatId),
+    'ui:getRecentEmoji': () => readRecentEmoji(uiDb),
+    'ui:saveRecentEmoji': (payload) => {
+      const { emoji } = payload as { emoji: string[] }
+      uiDb.setSetting(RECENT_EMOJI_KEY, JSON.stringify(emoji.slice(0, RECENT_EMOJI_LIMIT)))
+    },
 
     'settings:get': () => ({
       theme: uiDb.getSetting('theme') === 'dark' ? ('dark' as const) : ('light' as const),
@@ -264,6 +269,31 @@ export function createHandlers({
     'viewer:close': () => {
       closeViewer()
     },
+  }
+}
+
+/**
+ * The picker's 最近使用 row. It lives in ui.db's key/value table rather than its own
+ * table because it is a single small list, and a corrupt value must never keep the
+ * picker from opening — an unreadable row simply reads as empty.
+ */
+const RECENT_EMOJI_KEY = 'emoji.recent'
+/** One row of 10 in the picker; the renderer shows the same length. */
+const RECENT_EMOJI_LIMIT = 10
+
+function readRecentEmoji(uiDb: UiDatabase): string[] {
+  const raw = uiDb.getSetting(RECENT_EMOJI_KEY)
+  if (!raw) return []
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter(
+        (item): item is string => typeof item === 'string' && item.length > 0 && item.length <= 32,
+      )
+      .slice(0, RECENT_EMOJI_LIMIT)
+  } catch {
+    return []
   }
 }
 

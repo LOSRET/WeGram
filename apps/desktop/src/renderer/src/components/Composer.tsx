@@ -1,5 +1,5 @@
 import type { Message } from '@wegram/protocol'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { loadLatestWindow } from '../lib/anchoredWindow'
 import { errorMessage, invoke } from '../lib/ipc'
@@ -14,7 +14,7 @@ import {
   ScissorsIcon,
   StickerCubeIcon,
 } from './Icon'
-import { StickerPanel } from './StickerPanel'
+import { ExpressionPicker } from './ExpressionPicker'
 
 export interface ComposerEditing {
   messageId: number
@@ -42,17 +42,19 @@ export function Composer({
 }: ComposerProps) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
-  const [stickerOpen, setStickerOpen] = useState(false)
+  const [picker, setPicker] = useState<'emoji' | 'stickers' | null>(null)
   const [attachAt, setAttachAt] = useState<{ x: number; y: number } | null>(null)
   const composingRef = useRef(false)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const draftTimer = useRef<number | null>(null)
+  /** Where the next render should put the caret after an emoji pick. */
+  const pendingCaret = useRef<number | null>(null)
 
   // Drafts are stored by the main process (§5.1) and restored per chat.
   useEffect(() => {
     let cancelled = false
     setText('')
-    setStickerOpen(false)
+    setPicker(null)
     void (async () => {
       try {
         const draft = await invoke('ui:getDraft', { chatId })
@@ -66,6 +68,16 @@ export function Composer({
       cancelled = true
     }
   }, [chatId])
+
+  useEffect(() => {
+    const caret = pendingCaret.current
+    if (caret === null) return
+    pendingCaret.current = null
+    const node = textareaRef.current
+    if (!node) return
+    node.focus()
+    node.setSelectionRange(caret, caret)
+  }, [text])
 
   useEffect(() => {
     if (!editing) return
@@ -120,7 +132,7 @@ export function Composer({
       const picked = await invoke('media:pick', { kind })
       if (picked.paths.length === 0) return
       setBusy(true)
-      setStickerOpen(false)
+      setPicker(null)
       const wasAnchored = await loadLatestWindow(chatId)
       const replyToId = replyTo?.id
       for (const filePath of picked.paths) {
@@ -142,8 +154,22 @@ export function Composer({
     }
   }
 
+  const closePicker = useCallback(() => setPicker(null), [])
+
+  /**
+   * Picking an emoji inserts at the caret and keeps the panel open, the way the
+   * client does. The textarea may have lost focus to the button, so the caret is
+   * restored after the controlled value lands (the effect below).
+   */
+  const insertEmoji = (emoji: string): void => {
+    const node = textareaRef.current
+    const start = node?.selectionStart ?? text.length
+    const end = node?.selectionEnd ?? start
+    setText((current) => current.slice(0, start) + emoji + current.slice(end))
+    pendingCaret.current = start + emoji.length
+  }
+
   const stickerSent = (): void => {
-    setStickerOpen(false)
     if (replyTo) onCancelReply()
   }
 
@@ -206,17 +232,17 @@ export function Composer({
         <div className="wx-composer__actions">
           <div className="wx-composer__tools">
             <button
-              className={`wx-tool-button${stickerOpen ? ' wx-tool-button--active' : ''}`}
-              onClick={() => setStickerOpen((open) => !open)}
+              className={`wx-tool-button${picker === 'emoji' ? ' wx-tool-button--active' : ''}`}
+              onClick={() => setPicker((current) => (current === 'emoji' ? null : 'emoji'))}
               disabled={busy || Boolean(editing)}
               title="表情"
-              aria-label="表情与贴纸"
+              aria-label="表情"
             >
               <EmojiIcon size={21} />
             </button>
             <button
-              className={`wx-tool-button${stickerOpen ? ' wx-tool-button--active' : ''}`}
-              onClick={() => setStickerOpen((open) => !open)}
+              className={`wx-tool-button${picker === 'stickers' ? ' wx-tool-button--active' : ''}`}
+              onClick={() => setPicker((current) => (current === 'stickers' ? null : 'stickers'))}
               disabled={busy || Boolean(editing)}
               title="贴纸"
               aria-label="贴纸集合"
@@ -278,8 +304,15 @@ export function Composer({
         </Popup>
       ) : null}
 
-      {stickerOpen ? (
-        <StickerPanel chatId={chatId} onSent={stickerSent} onClose={() => setStickerOpen(false)} />
+      {picker ? (
+        <ExpressionPicker
+          key={picker}
+          chatId={chatId}
+          mode={picker}
+          onPickEmoji={insertEmoji}
+          onSent={stickerSent}
+          onClose={closePicker}
+        />
       ) : null}
     </div>
   )

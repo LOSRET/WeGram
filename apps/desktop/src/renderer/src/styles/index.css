@@ -77,6 +77,10 @@
      with a lifted #454547 pill in dark mode. */
   --wx-field: #fbfbfb;
   --wx-field-line: #dedede;
+  /* Expression picker (measured on the client's 表情 panel): the #fbfbfb card
+     and the #ececec pill behind the selected tab. */
+  --wx-picker: #fbfbfb;
+  --wx-tab-active: #ececec;
   /* Disabled fills and their ink (the send button, disabled dialog buttons). */
   --wx-fill-disabled: #ececec;
   --wx-text-disabled: #b7b7b7;
@@ -150,6 +154,9 @@
   --wx-icon-strong: #b1b1b1;
   --wx-field: #454547;
   --wx-field-line: #454547;
+  /* No measured dark picker yet; it follows the shell's lifted surfaces. */
+  --wx-picker: #2f2f30;
+  --wx-tab-active: #3a3a3c;
   --wx-fill-disabled: #29292a;
   --wx-text-disabled: #6a6a6a;
   --wx-scrollbar-thumb: rgba(255, 255, 255, 0.22);
@@ -2657,96 +2664,242 @@ select {
   color: var(--wx-text-secondary);
 }
 
-/* Sticker picker: WeChat slides a grey panel above the composer, full width. */
-.wx-sticker-panel {
+/* Expression picker (表情 / 贴纸) — the client's 表情 panel.
+
+   WeChat floats a 464×464 card above the input, centred on the 表情 button; the
+   toolbar row stays visible under it and the card overhangs the conversation
+   list. Measured on WeChat 4.x at 125%: 8 px radius, #fbfbfb card, 10×44 px
+   emoji grid inset 12 px, section labels in the 12 px grey at a 22 px inset,
+   and a 45 px tab strip (44 px tabs, 5 px gaps, 14 px inset) whose selected tab
+   sits in a #ececec pill. The search tab and 下一页 are the same 44 px slots. */
+
+.wx-picker {
   position: absolute;
-  left: 6px;
-  right: 9px;
-  bottom: calc(100% - 2px);
+  /* Half of 464 px, over the 14 px inset of the first toolbar button. */
+  left: -204px;
+  /* 8 px composer padding + 1 px card border + 42 px toolbar − 3 px, which puts
+     the card 18 px above the toolbar glyph centres, exactly as measured. */
+  bottom: 48px;
   z-index: 70;
-  height: 264px;
-  padding: 8px 10px 6px;
-  border: 1px solid var(--wx-line-strong);
-  border-radius: 8px 8px 0 0;
-  border-bottom: none;
-  background: var(--wx-list);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  width: 464px;
+  height: 464px;
+  border-radius: 8px;
+  background: var(--wx-picker);
+  box-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.16),
+    0 1px 4px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
 }
 
-.wx-sticker-panel__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+/* The grid uses 1fr columns: a native bar appearing must not push the fixed
+   10-column grid past the card and clip its last emoji. */
+.wx-picker__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 12px 12px;
+  /* The client's picker shows no bar, and a native one would take 10 px off the
+     content, squeezing the 10 fixed columns and shifting the grid. Wheel and
+     keyboard scrolling are unaffected. */
+  scrollbar-width: none;
+}
+
+.wx-picker__body::-webkit-scrollbar {
+  display: none;
+}
+
+.wx-picker__label {
+  margin: 8px 0 8px 10px;
   font-size: 12px;
+  line-height: 20px;
   color: var(--wx-text-secondary);
 }
 
-.wx-sticker-panel__sets {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-  flex: 0 0 auto;
+.wx-picker__body > .wx-picker__label:first-child {
+  margin-top: 0;
 }
 
-.wx-sticker-panel__set {
-  width: 34px;
-  height: 34px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  padding: 2px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-}
-
-.wx-sticker-panel__set--active {
-  border-color: var(--wx-brand);
-  background: var(--wx-brand-weak);
-}
-
-.wx-sticker-panel__grid {
+.wx-picker__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
-  gap: 6px;
-  overflow-y: auto;
-  min-height: 0;
-  flex: 1;
+  grid-template-columns: repeat(10, 1fr);
 }
 
-.wx-sticker-panel__item {
+.wx-picker__emoji {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 72px;
+  width: 100%;
+  height: 44px;
+  padding: 0;
   border: none;
-  border-radius: 6px;
+  border-radius: 5px;
   background: transparent;
-  padding: 4px;
+  font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif;
+  /* The client paints 24 px emoji art; a 24 px color glyph measures the same. */
+  font-size: 24px;
+  line-height: 1;
 }
 
-.wx-sticker-panel__item:hover {
+.wx-picker__emoji:hover {
   background: var(--wx-row-hover);
 }
 
-.wx-sticker-panel__loading,
-.wx-sticker-panel__empty {
+/* 4×104 px sticker cells fill the same content width as the emoji grid. */
+.wx-picker__stickers {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.wx-picker__sticker {
   display: flex;
-  flex: 1;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  width: 100%;
+  height: 104px;
+  padding: 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+}
+
+.wx-picker__sticker:hover {
+  background: var(--wx-row-hover);
+}
+
+.wx-picker__tabs {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 45px;
+  padding: 0 14px;
+  overflow: hidden;
+}
+
+.wx-picker__tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 36px;
+  flex: 0 0 44px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--wx-icon);
+}
+
+/* The client's selected/hovered tab is a 32×32 pill inside the 44 px slot. */
+.wx-picker__tab::before {
+  content: '';
+  position: absolute;
+  inset: 2px 6px;
+  border-radius: 7px;
+  background: transparent;
+}
+
+.wx-picker__tab:hover::before {
+  background: var(--wx-row-hover);
+}
+
+.wx-picker__tab--active {
+  color: var(--wx-text);
+}
+
+.wx-picker__tab--active::before {
+  background: var(--wx-tab-active);
+}
+
+.wx-picker__tab > * {
+  position: relative;
+  z-index: 1;
+}
+
+.wx-picker__tab--set {
+  padding: 3px;
+}
+
+.wx-picker__tab-text {
+  font-size: 11px;
   color: var(--wx-text-secondary);
 }
 
-.wx-sticker-panel__error {
+.wx-picker__next {
+  transform: rotate(-90deg);
+}
+
+.wx-picker__search {
+  display: flex;
+  flex-direction: column;
+}
+
+.wx-picker__hint {
+  margin: 12px 10px 0;
   font-size: 12px;
+  line-height: 1.7;
+  color: var(--wx-text-tertiary);
+}
+
+.wx-picker__set-hits {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wx-picker__set-hit {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 52px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+}
+
+.wx-picker__set-hit:hover {
+  background: var(--wx-row-hover);
+}
+
+.wx-picker__set-hit-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  font-size: 11px;
+  color: var(--wx-text-secondary);
+}
+
+.wx-picker__set-hit-title {
+  font-size: 13px;
+  color: var(--wx-text);
+}
+
+.wx-picker__state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 340px;
+  padding: 0 16px;
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: center;
+  color: var(--wx-text-secondary);
+}
+
+.wx-picker__error {
+  margin: 0 10px 8px;
+  font-size: 12px;
+  line-height: 1.5;
   color: var(--wx-danger);
-  line-height: 1.4;
 }
 
 /* ---------- Dev-only acceptance panel ---------- */

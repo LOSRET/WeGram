@@ -295,6 +295,8 @@ function applyPreviewRead(chatId: number, upTo: number | null): void {
 
 const drafts: Record<number, string> = {}
 const anchors: Record<number, { messageId: number; offset: number }> = {}
+/** The picker's 最近使用 row; the shell keeps it in ui.db. */
+let recentEmoji: string[] = []
 
 function msg(
   chatId: number,
@@ -587,6 +589,15 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       const messageId = store.messageId as number | null
       if (messageId === null) delete anchors[store.chatId]
       else anchors[store.chatId] = { messageId, offset: Number(store.offset ?? 0) }
+      return undefined
+    }
+    case 'ui:getRecentEmoji':
+      return recentEmoji
+    case 'ui:saveRecentEmoji': {
+      const list: unknown = store.emoji
+      recentEmoji = Array.isArray(list)
+        ? list.filter((item): item is string => typeof item === 'string').slice(0, 10)
+        : []
       return undefined
     }
     case 'settings:get':

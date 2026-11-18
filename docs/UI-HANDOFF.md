@@ -22,6 +22,9 @@ listed in "Known deltas" is a deliberate, documented difference.
 | `renderer/src/components/ChatPane.tsx` | 46 px header (title, typing, call/… buttons), watermark empty state, chat-info popover. |
 | `renderer/src/components/MessageList.tsx` | Bubbles, real sender photos on both sides (own avatar on the right; `senderAvatarUrl`, `evt:avatars`, `Self.avatarUrl`), hover-only timestamp/read receipt, day + unread separators. |
 | `renderer/src/components/Composer.tsx` | Bordered input card, toolbar under the text, attach menu, send button inside the card. |
+| `renderer/src/components/ExpressionPicker.tsx` | The composer's 表情/贴纸 panel: the client's 464 px card with 最近使用, the 10-column 所有表情 grid, a 搜索 tab and one tab per installed sticker set (with 下一页 paging). Picking an emoji inserts it at the caret; clicking a sticker sends it. |
+| `renderer/src/lib/emoji.ts` | The Unicode emoji catalogue with Chinese names/keywords, search and the recent-row merge (pure, unit-tested). |
+| `renderer/src/lib/pickerTabs.ts` | Tab-strip capacity/paging maths for the picker (pure, unit-tested). |
 | `renderer/src/components/ContextMenu.tsx` | Exports `Popup` (positioned, closes on Escape/outside click) plus the message menu. |
 | `renderer/src/components/AppMenu.tsx` | The rail "≡" menu: settings, theme, sign out, adapter caption. |
 | `renderer/src/components/PlusMenu.tsx` | The list header's "+" card: 发起群聊 / 添加朋友 / 写笔记 with their payload glyphs (all three toast — none is in the protocol). |
@@ -61,6 +64,7 @@ sat at (276,105)–(1145,656) in that screenshot space.
 | conversation list | `#e7e7e9` | `#3b3b3d` |
 | chat pane | `#fbfbfb` | `#1e1e1f` |
 | composer card | `#fcfcfc` | `#1e1e1f` + 1 px `#2f2f30` border |
+| 表情 panel / selected tab pill | `#fbfbfb` / `#ececec` | `#2f2f30` / `#3a3a3c` (inferred) |
 | selected row | `#15ad70` | `#0da869` |
 | incoming bubble | `#eeeef0` | `#2f2f30` |
 | outgoing bubble | `#95ec69` | `#35d28d` |
@@ -173,6 +177,42 @@ settings. **A user-driven sign-in ends in the shell; only a session restored at
 startup shows the profile step** (WeChat's rule). Tokens are the `--wx-login-*`
 block; code is `main/login-window.ts`, `screens/LoginWindow.tsx`,
 `components/QrCode.tsx` and `lib/qr.ts` (`#login` hash of the same bundle).
+
+### 2.3 The 表情 panel (added 2026-11-19)
+
+Measured on the same client (screenshot space, same ×1.1245 conversion):
+
+- **Card ≈464 × 464**, radius 8, `#fbfbfb`, no border, soft shadow. It floats above
+  the input, **centred on the 表情 toolbar button**, with its bottom edge 18 px above
+  the toolbar glyph centres (so it overlaps the input area but leaves the toolbar row
+  visible). Because it follows the button, it **overhangs the conversation list** by
+  ~200 px on the 1000 px window — the client does the same.
+- Section labels **12 px `#9a9a9a`**, 22 px from the card's edge; 20 px above the
+  first row, 8 px between a label and its grid. 最近使用 is one row of the same grid;
+  所有表情 follows it.
+- Emoji grid **10 columns × 44 px**, 12 px side inset; the art measures **24 px**.
+- Tab strip **45 px** tall, 14 px inset, 5 px gaps, **44 px slots**; the selected pill is
+  **32 × 32**, radius 7, `#ececec`. Order: **搜索 / 表情 / installed sets / 下一页**.
+  With 搜索 + 表情 fixed, a strip without the arrow fits seven sets; when it overflows,
+  each page shows six so 下一页 can take the ninth slot (`lib/pickerTabs.ts`).
+- The client shows **no scrollbar** in the card. The body hides the native one, and the
+  grid columns are `1fr` so a bar appearing could never clip the tenth column.
+
+Dark has no measured counterpart for the card; it follows the shell's lifted
+surfaces (`#2f2f30` card, `#3a3a3c` pill), which is what `--wx-picker` /
+`--wx-tab-active` carry.
+
+What we built: `ExpressionPicker.tsx` + `lib/emoji.ts`. Emoji are real Unicode
+characters (a Telegram message carries text, not WeChat's closed emoticon set), so the
+grid paints the same glyph the transcript will. 最近使用 persists in
+`ui.db` → `app_settings['emoji.recent']` through `ui:getRecentEmoji` /
+`ui:saveRecentEmoji`. Sticker sets come from `stickers:sets`; a set's stickers are
+fetched by `stickers:set` only when its tab is opened and then cached for the life of
+the panel.
+
+Missing against the client, on purpose: the **自定义表情** (heart) tab. Favourites are
+TDLib custom-emoji sets, whose messages are custom-emoji *entities* rather than
+stickers; the protocol has no send path for them yet, so the tab would be dead.
 
 ---
 
@@ -323,10 +363,10 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
 
 1. **Composer toolbar**: ours now has the client's five buttons in order — 表情, 贴纸
    (cube), 文件夹, 剪刀 + chevron, 麦克风 — all from payloads. The smiley and the cube
-   both open the sticker panel because there is no emoji picker yet; folder opens a
-   photo/file menu, scissors and mic show a "not wired" toast. The client's separate
-   right-hand "语音输入" circle is **deliberately left out** — the send button sits
-   right after the toolbar.
+   open the shared expression panel on the 表情 / first sticker-set tab respectively
+   (§2.3); folder opens a photo/file menu, scissors and mic show a "not wired" toast.
+   The client's separate right-hand "语音输入" circle is **deliberately left out** —
+   the send button sits right after the toolbar.
 2. **Avatars are real where the protocol carries them, initials elsewhere.** The rail
    avatar, every chat row and now **every message row** load the account's/profile photo
    through `wx-media://` (`Self.avatarUrl`, `ChatSummary.avatarUrl`,

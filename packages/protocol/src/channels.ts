@@ -74,6 +74,9 @@ export const invokeChannels = [
   'ui:getDraft',
   'ui:saveAnchor',
   'ui:getAnchor',
+  /** Emoji the reader picked recently, newest first (the picker's 最近使用 row). */
+  'ui:getRecentEmoji',
+  'ui:saveRecentEmoji',
   'settings:get',
   'settings:set',
   'proxy:get',
@@ -264,6 +267,11 @@ export const invokeSchemas = {
   'ui:getAnchor': {
     request: z.object({ chatId: z.number().int() }),
     response: scrollAnchorSchema.nullable(),
+  },
+  'ui:getRecentEmoji': { request: noPayload, response: z.array(z.string()) },
+  'ui:saveRecentEmoji': {
+    request: z.object({ emoji: z.array(z.string().min(1).max(32)).max(24) }),
+    response: noPayload,
   },
   'settings:get': { request: noPayload, response: appSettingsSchema },
   'settings:set': {
