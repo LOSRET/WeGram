@@ -136,6 +136,30 @@ describe('mapMessage', () => {
     expect(message.text).toBe('[暂不支持的消息]')
   })
 
+  it('keeps the album id of a media group item and drops TDLib\'s "0"', async () => {
+    const inAlbum = await mapMessage(makeContext(), 7, {
+      id: 5,
+      date: 10,
+      sender_id: { _: 'messageSenderUser', user_id: 42 },
+      // int64 arrives as a string; the value is over 2^53 on purpose.
+      media_album_id: '1234567890123456789',
+      content: {
+        _: 'messagePhoto',
+        photo: { sizes: [{ width: 10, height: 10, photo: { id: 6 } }] },
+      },
+    })
+    expect(inAlbum.albumId).toBe('1234567890123456789')
+
+    const single = await mapMessage(makeContext(), 7, {
+      id: 6,
+      date: 11,
+      sender_id: { _: 'messageSenderUser', user_id: 42 },
+      media_album_id: '0',
+      content: { _: 'messageText', text: { text: 'hi' } },
+    })
+    expect(single).not.toHaveProperty('albumId')
+  })
+
   it('keeps caption entities on media messages', async () => {
     const message = await mapMessage(makeContext(), 9, {
       id: 4,

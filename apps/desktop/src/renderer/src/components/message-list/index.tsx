@@ -12,6 +12,7 @@ import { OverlayScrollbar } from '../OverlayScrollbar'
 import { DaySeparator, UnreadDivider } from './Divider'
 import { MessageRow } from './MessageRow'
 import { buildMessageMenuItems } from './menu'
+import { findRowIndex, groupMessages } from './rows'
 import { senderAvatarUrl } from './senderAvatar'
 import { messagesById, pickSeenUpTo } from './seen'
 import { countUnreadBelow } from './unreadBelow'
@@ -76,6 +77,10 @@ interface MenuState {
  *
  * Read `scroller.ts` before writing any `scrollTop` here: a programmatic scroll
  * must be followed by a scroll event, or the virtualizer paints the wrong slice.
+ *
+ * The virtualiser counts **rows**, not messages: an album is one row of several
+ * messages (design doc §8.6). Every "message index" the rest of this file keeps
+ * (unread divider, seen marker, pill) is therefore translated from a row index.
  */
 export function MessageList({
   chat,
@@ -83,8 +88,7 @@ export function MessageList({
   hasMore,
   hasNewer,
   loadingOlder,
-  landing,
-  unreadMarker,
+
   onSeenUpToChange,
   onLoadOlder,
   onLoadNewer,
@@ -119,13 +123,32 @@ export function MessageList({
     [auth],
   )
 
+  /**
+   * Albums folded into rows (design doc §8.6). Derived, never stored: a page that
+   * arrives later changes the grouping by itself.
+   */
+  const rows = useMemo(() => groupMessages(messages), [messages])
+  /**
+   * Row index → index of that row's *last* message, i.e. the highest id the reader
+   * has seen when the row came on screen. The pill and the read marker work in
+   * message indexes, so this is the one translation table between the two.
+   */
+  const lastMessageIndexOfRow = useMemo(() => {
+    let offset = 0
+    return rows.map((row) => {
+      offset += row.messages.length
+      return offset - 1
+    })
+  }, [rows])
+
   // Captured once per mounted chat: the divider must not jump as the read marker
   // moves after the first `messages:read`. Stored as an id, not an index, because
   // prepending older messages shifts indexes.
   const [unreadMessageId] = useState<number | null>(() => findUnreadMessage(messages, unreadMarker))
-  const unreadIndex = unreadMessageId
-    ? messages.findIndex((message) => message.id === unreadMessageId)
-    : -1
+  const unreadRowIndex = useMemo(
+    () => (unreadMessageId === null ? -1 : findRowIndex(rows, unreadMessageId)),
+    [rows, unreadMessageId],
+  )
 
   /** Reply quotes are looked up per rendered row — build the index once per page. */
   const byId = useMemo(() => messagesById(messages), [messages])
@@ -140,16 +163,16 @@ export function MessageList({
   })
 
   const virtualizer = useVirtualizer({
-    count: messages.length,
+    count: rows.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => 68,
     overscan: 10,
-    getItemKey: (index) => messages[index]?.id ?? index,
+    getItemKey: (index) => rows[index]?.key ?? index,
   })
 
   useInitialPosition({
     scrollRef,
-    messages,
+    rows,
     landing,
     flags,
     virtualizer,
@@ -263,15 +286,22 @@ export function MessageList({
        */
       sizerOffset: sizer.getBoundingClientRect().top - scroller.getBoundingClientRect().top,
       viewportHeight: scroller.clientHeight,
-      idAt: (index) => messages[index]?.id,
+      // The row's last message is the newest thing it shows: an album on screen is
+      // already read up to its last item.
+      idAt: (index) => {
+        const items = rows[index]?.messages
+        return items?.[items.length - 1]?.id
+      },
     })
 
-    setSeenIndex((previous) => (previous === newestIndex ? previous : newestIndex))
+    // The pill and the read marker count messages; the virtualiser counts rows.
+    const seenMessageIndex = newestIndex >= 0 ? (lastMessageIndexOfRow[newestIndex] ?? -1) : -1
+    setSeenIndex((previous) => (previous === seenMessageIndex ? previous : seenMessageIndex))
     if (newestId !== seenUpToRef.current) {
       seenUpToRef.current = newestId
       onSeenUpToChange(newestId)
     }
-  }, [messages, onSeenUpToChange, scrollRef, contentRef, virtualizer])
+  }, [rows, lastMessageIndexOfRow, onSeenUpToChange, scrollRef, contentRef, virtualizer])
 
   // Runs after every commit, so a row that grew (`measureElement`, an image
   // finishing) is covered as well: geometry decides, not the scroll event.
@@ -308,30 +338,35 @@ export function MessageList({
           style={{ height: virtualizer.getTotalSize() }}
         >
           {virtualizer.getVirtualItems().map((virtualItem) => {
-            const message = messages[virtualItem.index]
-            if (!message) return null
-            const previous = messages[virtualItem.index - 1]
-            const newDay = !previous || !isSameDay(previous.date, message.date)
+            const row = rows[virtualItem.index]
+            if (!row) return null
+            const first = row.messages[0]
+            const last = row.messages[row.messages.length - 1]
+            if (!first || !last) return null
+            const previousRow = rows[virtualItem.index - 1]
+            const previousLast = previousRow?.messages[previousRow.messages.length - 1]
+            const newDay = !previousLast || !isSameDay(previousLast.date, first.date)
             // A map, not a `find` per row: this ran once per visible row on every
             // render, i.e. O(visible x transcript).
-            const repliedTo = message.replyToId ? (byId.get(message.replyToId) ?? null) : null
+            const repliedTo = first.replyToId ? (byId.get(first.replyToId) ?? null) : null
             return (
               <div
                 key={virtualItem.key}
                 data-index={virtualItem.index}
-                data-message-id={message.id}
+                data-message-id={first.id}
+                data-row-key={row.key}
                 ref={virtualizer.measureElement}
                 className="wx-message-slot"
                 style={{ transform: `translateY(${virtualItem.start}px)` }}
               >
-                {virtualItem.index === unreadIndex ? <UnreadDivider /> : null}
-                {newDay ? <DaySeparator seconds={message.date} /> : null}
+                {virtualItem.index === unreadRowIndex ? <UnreadDivider /> : null}
+                {newDay ? <DaySeparator seconds={first.date} /> : null}
                 <MessageRow
                   chat={chat}
-                  message={message}
+                  messages={row.messages}
                   repliedTo={repliedTo}
                   self={self}
-                  avatarUrl={senderAvatarUrl(message, chat, self, userAvatars)}
+                  avatarUrl={senderAvatarUrl(first, chat, self, userAvatars)}
                   readOutboxMaxId={chat.lastReadOutboxMessageId ?? 0}
                   onOpenMenu={openMenu}
                 />

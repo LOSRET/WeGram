@@ -5,11 +5,16 @@ import { avatarColor, formatMessageTime, initials, messagePreview } from '../../
 import { MediaBubble } from '../MediaBubble'
 import { RichText } from '../RichText'
 import { StickerRenderer } from '../StickerRenderer'
+import { AlbumBubble } from './AlbumBubble'
 import { isEmojiOnly } from './emoji'
 
 export interface MessageRowProps {
   chat: ChatSummary
-  message: Message
+  /**
+   * One message, or the consecutive items of one Telegram album (design doc §8.6).
+   * The row draws one avatar, one sender line and one meta line for the group.
+   */
+  messages: Message[]
   repliedTo: Message | null
   /** Identity of the signed-in account, for the avatar on our own messages. */
   self: { id: number; name: string; avatarUrl: string | undefined }
@@ -28,6 +33,17 @@ export interface MessageRowProps {
 }
 
 /**
+ * `groupMessages` rebuilds every row's array whenever the transcript grows, so the
+ * default shallow comparison would re-render every visible row on each arrival
+ * (the list re-renders on every scroll measurement). Compare the messages by
+ * identity instead: the store keeps untouched message objects.
+ */
+function sameRow(previous: readonly Message[], next: readonly Message[]): boolean {
+  if (previous.length !== next.length) return false
+  return previous.every((message, index) => message === next[index])
+}
+
+/**
  * One transcript row: avatar, sender line, reply quote, media/text/sticker body,
  * the time/edit/read meta line and the hover "⋯" button.
  *
@@ -37,120 +53,142 @@ export interface MessageRowProps {
  * as rows pass the fold), and without this every row in the window re-rendered with
  * it. Its props are kept referentially stable by the caller for exactly this.
  */
-export const MessageRow = memo(function MessageRow({
-  chat,
-  message,
-  repliedTo,
-  self,
-  avatarUrl,
-  readOutboxMaxId,
-  onOpenMenu,
-}: MessageRowProps) {
-  if (message.kind === 'service') {
-    return <div className="wx-service">{message.text || '系统消息'}</div>
-  }
+export const MessageRow = memo(
+  function MessageRow({
+    chat,
+    messages,
+    repliedTo,
+    self,
+    avatarUrl,
+    readOutboxMaxId,
+    onOpenMenu,
+  }: MessageRowProps) {
+    const first = messages[0]
+    const last = messages[messages.length - 1]
+    if (!first || !last) return null
 
-  const showSender = !message.outgoing && chat.kind !== 'private'
-  const media = message.media
-  const mediaKind =
-    message.kind === 'photo' ||
-    message.kind === 'video' ||
-    message.kind === 'file' ||
-    message.kind === 'voice'
-      ? message.kind
-      : null
-  const isSticker = message.kind === 'sticker' && media
-  const bigEmoji = message.kind === 'text' && !mediaKind && isEmojiOnly(message.text)
+    if (first.kind === 'service') {
+      return <div className="wx-service">{first.text || '系统消息'}</div>
+    }
 
-  const openMenu = (event: MouseEvent): void => {
-    event.preventDefault()
-    onOpenMenu(message, event.clientX, event.clientY)
-  }
+    // An album is a row of its own kind: the bubble is transparent, the grid draws
+    // the media, and the group shares one meta line. A lone album item (the sibling
+    // has not been paged in, or was deleted) still renders as a normal bubble.
+    const album = messages.length > 1
+    const media = first.media
+    const mediaKind =
+      first.kind === 'photo' ||
+      first.kind === 'video' ||
+      first.kind === 'file' ||
+      first.kind === 'voice'
+        ? first.kind
+        : null
+    const isSticker = !album && first.kind === 'sticker' && Boolean(media)
+    const bigEmoji = !album && first.kind === 'text' && !mediaKind && isEmojiOnly(first.text)
+    // Telegram puts an album's caption on one of its items (normally the first).
+    const caption = messages.find((message) => message.text) ?? null
+    const showSender = !first.outgoing && chat.kind !== 'private'
 
-  const readReceipt = message.outgoing
-    ? readOutboxMaxId >= message.id
-      ? ' · 已读'
-      : ' · 未读'
-    : ''
+    const openMenu = (event: MouseEvent): void => {
+      event.preventDefault()
+      onOpenMenu(first, event.clientX, event.clientY)
+    }
 
-  return (
-    <div className={`wx-message-row${message.outgoing ? ' wx-message-row--self' : ''}`}>
-      <div
-        className="wx-avatar wx-avatar--small"
-        style={
-          avatarUrl
-            ? undefined
-            : {
-                background: avatarColor(
-                  message.outgoing
-                    ? (self.id ?? 1000)
-                    : message.senderChatId || message.senderId || chat.id,
-                ),
-              }
-        }
-      >
-        {avatarUrl ? (
-          <img className="wx-avatar__img" src={avatarUrl} alt="" draggable={false} />
-        ) : (
-          initials(message.outgoing ? self.name : message.senderName)
-        )}
+    const readReceipt = last.outgoing ? (readOutboxMaxId >= last.id ? ' · 已读' : ' · 未读') : ''
+
+    return (
+      <div className={`wx-message-row${first.outgoing ? ' wx-message-row--self' : ''}`}>
+        <div
+          className="wx-avatar wx-avatar--small"
+          style={
+            avatarUrl
+              ? undefined
+              : {
+                  background: avatarColor(
+                    first.outgoing
+                      ? (self.id ?? 1000)
+                      : first.senderChatId || first.senderId || chat.id,
+                  ),
+                }
+          }
+        >
+          {avatarUrl ? (
+            <img className="wx-avatar__img" src={avatarUrl} alt="" draggable={false} />
+          ) : (
+            initials(first.outgoing ? self.name : first.senderName)
+          )}
+        </div>
+
+        <div className={`wx-message-stack${first.outgoing ? ' wx-message-stack--self' : ''}`}>
+          {showSender && first.senderName && first.senderName !== self.name ? (
+            <span className="wx-sender">{first.senderName}</span>
+          ) : null}
+          {isSticker && media ? (
+            <div className="wx-sticker-wrap" onContextMenu={openMenu}>
+              <StickerRenderer media={media} size={140} />
+            </div>
+          ) : bigEmoji ? (
+            // Emoji-only message: no bubble, large glyph, like WeChat big emoji.
+            <div className="wx-big-emoji" onContextMenu={openMenu}>
+              <RichText text={first.text} entities={first.entities} />
+            </div>
+          ) : (
+            <div
+              className={`wx-bubble${first.outgoing ? ' wx-bubble--self' : ''}${
+                album
+                  ? ' wx-bubble--media wx-bubble--album'
+                  : mediaKind
+                    ? ` wx-bubble--media wx-bubble--${mediaKind}`
+                    : ''
+              }`}
+              onContextMenu={openMenu}
+            >
+              {repliedTo ? (
+                <div className="wx-quote">
+                  {repliedTo.senderName}：{messagePreview(repliedTo)}
+                </div>
+              ) : null}
+              {album ? (
+                <AlbumBubble chatId={chat.id} messages={messages} />
+              ) : mediaKind && media ? (
+                <MediaBubble media={media} kind={mediaKind} chatId={chat.id} messageId={first.id} />
+              ) : null}
+              {caption ? (
+                <div className={mediaKind || album ? 'wx-caption' : undefined}>
+                  <RichText text={caption.text} entities={caption.entities} />
+                </div>
+              ) : null}
+              {!album && !mediaKind && !first.text ? (
+                <span className="wx-bubble__empty">[不支持的消息]</span>
+              ) : null}
+            </div>
+          )}
+          <span className="wx-message__meta">
+            {formatMessageTime(last.date)}
+            {last.edited ? ' · 已编辑' : ''}
+            {readReceipt}
+          </span>
+        </div>
+
+        <button
+          className="wx-message-more"
+          title="更多"
+          onClick={(event) => {
+            const rect = event.currentTarget.getBoundingClientRect()
+            onOpenMenu(first, rect.left, rect.bottom + 4)
+          }}
+        >
+          ⋯
+        </button>
       </div>
-
-      <div className={`wx-message-stack${message.outgoing ? ' wx-message-stack--self' : ''}`}>
-        {showSender && message.senderName && message.senderName !== self.name ? (
-          <span className="wx-sender">{message.senderName}</span>
-        ) : null}
-        {isSticker ? (
-          <div className="wx-sticker-wrap" onContextMenu={openMenu}>
-            <StickerRenderer media={media!} size={140} />
-          </div>
-        ) : bigEmoji ? (
-          // Emoji-only message: no bubble, large glyph, like WeChat big emoji.
-          <div className="wx-big-emoji" onContextMenu={openMenu}>
-            <RichText text={message.text} entities={message.entities} />
-          </div>
-        ) : (
-          <div
-            className={`wx-bubble${message.outgoing ? ' wx-bubble--self' : ''}${
-              mediaKind ? ` wx-bubble--media wx-bubble--${mediaKind}` : ''
-            }`}
-            onContextMenu={openMenu}
-          >
-            {repliedTo ? (
-              <div className="wx-quote">
-                {repliedTo.senderName}：{messagePreview(repliedTo)}
-              </div>
-            ) : null}
-            {mediaKind && media ? (
-              <MediaBubble media={media} kind={mediaKind} chatId={chat.id} messageId={message.id} />
-            ) : null}
-            {message.text ? (
-              <div className={mediaKind ? 'wx-caption' : undefined}>
-                <RichText text={message.text} entities={message.entities} />
-              </div>
-            ) : null}
-            {!mediaKind && !message.text ? (
-              <span className="wx-bubble__empty">[不支持的消息]</span>
-            ) : null}
-          </div>
-        )}
-        <span className="wx-message__meta">
-          {formatMessageTime(message.date)}
-          {message.edited ? ' · 已编辑' : ''}
-          {readReceipt}
-        </span>
-      </div>
-
-      <button
-        className="wx-message-more"
-        title="更多"
-        onClick={(event) => {
-          const rect = event.currentTarget.getBoundingClientRect()
-          onOpenMenu(message, rect.left, rect.bottom + 4)
-        }}
-      >
-        ⋯
-      </button>
-    </div>
-  )
-})
+    )
+  },
+  (previous, next) =>
+    previous.chat === next.chat &&
+    previous.self === next.self &&
+    previous.avatarUrl === next.avatarUrl &&
+    previous.readOutboxMaxId === next.readOutboxMaxId &&
+    previous.repliedTo === next.repliedTo &&
+    previous.onOpenMenu === next.onOpenMenu &&
+    sameRow(previous.messages, next.messages),
+)

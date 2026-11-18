@@ -29,6 +29,7 @@ export async function mapMessage(
   if (senderUserId) ctx.prefetchUserAvatars([senderUserId])
   const content = raw.content ?? {}
   const mapped = mapContent(content)
+  const albumId = albumIdOf(raw)
   let text = mapped.text
   if (mapped.kind === 'service' && text === '') {
     text = SERVICE_CONTENT_TYPES.has(content._)
@@ -53,7 +54,20 @@ export async function mapMessage(
     text,
     ...(mapped.entities.length ? { entities: mapped.entities } : {}),
     ...(mapped.media ? { media: mapped.media } : {}),
+    ...(albumId ? { albumId } : {}),
     ...(raw.reply_to?.message_id ? { replyToId: raw.reply_to.message_id } : {}),
     ...(raw.edit_date ? { edited: true } : {}),
   }
+}
+
+/**
+ * `media_album_id` is an int64 that TDLib sends as a string, and `'0'` means "not
+ * part of an album". Kept as the raw string: the id is a group identity, not a
+ * sort key, and `Number()` would lose precision past 2^53.
+ */
+function albumIdOf(raw: TdObject): string | null {
+  const value = raw.media_album_id
+  if (value === undefined || value === null) return null
+  const albumId = String(value)
+  return albumId === '' || albumId === '0' ? null : albumId
 }

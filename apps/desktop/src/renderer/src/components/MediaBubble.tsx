@@ -14,6 +14,11 @@ interface MediaBubbleProps {
   /** Conversation and message the media belongs to; the photo viewer needs both. */
   chatId: number
   messageId: number
+  /**
+   * `album` renders the media as one cell of an album grid (design doc §8.6): the
+   * grid's CSS owns the box, so the bubble's inline size is skipped.
+   */
+  variant?: 'bubble' | 'album'
 }
 
 const MAX_PHOTO_W = 240
@@ -25,10 +30,13 @@ const MAX_PHOTO_H = 300
  * height changes on load must not move the anchored row), so the blur-up
  * thumbnail appears in place and the bubble never collapses.
  */
-export function MediaBubble({ media, kind, chatId, messageId }: MediaBubbleProps) {
-  if (kind === 'photo') return <PhotoBubble media={media} chatId={chatId} messageId={messageId} />
+export function MediaBubble({ media, kind, chatId, messageId, variant }: MediaBubbleProps) {
+  const inAlbum = variant === 'album'
+  if (kind === 'photo') {
+    return <PhotoBubble media={media} chatId={chatId} messageId={messageId} inAlbum={inAlbum} />
+  }
   if (kind === 'video') {
-    return <VideoBubble media={media} chatId={chatId} messageId={messageId} />
+    return <VideoBubble media={media} chatId={chatId} messageId={messageId} inAlbum={inAlbum} />
   }
   if (kind === 'voice') return <VoiceBubble media={media} />
   return <FileBubble media={media} />
@@ -43,10 +51,12 @@ function PhotoBubble({
   media,
   chatId,
   messageId,
+  inAlbum,
 }: {
   media: MessageMedia
   chatId: number
   messageId: number
+  inAlbum: boolean
 }) {
   const url = useMediaUrl(media, 10)
   const { ratio } = useBubbleProgress(media)
@@ -56,15 +66,14 @@ function PhotoBubble({
   const width = media.width ?? 4
   const height = media.height ?? 3
   const scale = Math.min(MAX_PHOTO_W / width, MAX_PHOTO_H / height)
-  const box = {
-    width: Math.round(width * scale),
-    height: Math.round(height * scale),
-  }
+  const box = inAlbum
+    ? undefined
+    : { width: Math.round(width * scale), height: Math.round(height * scale) }
 
   return (
     <button
       type="button"
-      className="wx-photo"
+      className={`wx-photo${inAlbum ? ' wx-photo--album' : ''}`}
       style={box}
       // The client opens the photo in its own window, not in an overlay.
       onClick={() => openPhotoViewer(chatId, messageId)}
@@ -96,10 +105,12 @@ function VideoBubble({
   media,
   chatId,
   messageId,
+  inAlbum,
 }: {
   media: MessageMedia
   chatId: number
   messageId: number
+  inAlbum: boolean
 }) {
   const url = useMediaUrl(media, 6)
   const { ratio } = useBubbleProgress(media)
@@ -107,14 +118,16 @@ function VideoBubble({
   const width = media.width ?? 16
   const height = media.height ?? 9
   const scale = Math.min(MAX_PHOTO_W / width, MAX_PHOTO_H / height)
-  const box = { width: Math.round(width * scale), height: Math.round(height * scale) }
+  const box = inAlbum
+    ? undefined
+    : { width: Math.round(width * scale), height: Math.round(height * scale) }
 
   // Like a photo, a video opens in the client's 图片和视频 window — it does not
   // play inside the bubble, and the transport lives in that window's player bar.
   return (
     <button
       type="button"
-      className="wx-video wx-video--poster"
+      className={`wx-video wx-video--poster${inAlbum ? ' wx-video--album' : ''}`}
       style={box}
       onClick={() => openVideoViewer(chatId, messageId)}
       title="播放视频"
@@ -128,7 +141,7 @@ function VideoBubble({
         />
       ) : null}
       <span className="wx-video__play" aria-hidden>
-        <PlayIcon size={34} />
+        <PlayIcon size={inAlbum ? 26 : 34} />
       </span>
       {media.duration ? (
         <span className="wx-video__duration">{formatDuration(media.duration)}</span>

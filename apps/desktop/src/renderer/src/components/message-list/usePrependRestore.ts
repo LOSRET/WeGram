@@ -1,6 +1,7 @@
 import type { Message } from '@wegram/protocol'
 import { useCallback, useEffect, type RefObject } from 'react'
 
+import { findRowElement } from './rowElement'
 import { resyncScroller } from './scroller'
 import type { ScrollFlags } from './scrollFlags'
 
@@ -46,21 +47,26 @@ export function usePrependRestore({
     return el ? { scrollHeight: el.scrollHeight, scrollTop: el.scrollTop } : null
   }
 
-  const captureAnchor = (): { id: string; offset: number } | null => {
+  /**
+   * The row key, not a message id: an album that grows by one item after a page
+   * arrives keeps its key but not its first message id, and a message anchor would
+   * then point at a node that no longer exists.
+   */
+  const captureAnchor = (): { key: string; offset: number } | null => {
     const el = scrollRef.current
     if (!el) return null
     const containerTop = el.getBoundingClientRect().top
     const slot = [...el.querySelectorAll<HTMLElement>('.wx-message-slot')].find(
       (node) => node.getBoundingClientRect().top >= containerTop + 8,
     )
-    const id = slot?.dataset['messageId']
-    if (!slot || !id) return null
-    return { id, offset: slot.getBoundingClientRect().top - containerTop }
+    const key = slot?.dataset['rowKey']
+    if (!slot || !key) return null
+    return { key, offset: slot.getBoundingClientRect().top - containerTop }
   }
 
   const restorePosition = async (
     snapshot: { scrollHeight: number; scrollTop: number },
-    anchor: { id: string; offset: number } | null,
+    anchor: { key: string; offset: number } | null,
   ): Promise<void> => {
     const el = scrollRef.current
     if (!el) return
@@ -79,7 +85,7 @@ export function usePrependRestore({
       let stable = 0
       for (let frame = 0; frame < 30 && stable < 2; frame += 1) {
         await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
-        const node = el.querySelector<HTMLElement>(`[data-message-id="${anchor.id}"]`)
+        const node = findRowElement(el, anchor.key)
         if (!node) {
           stable = 0
           continue
@@ -96,11 +102,11 @@ export function usePrependRestore({
 
       // Report the outcome for the dev acceptance panel (PerfPanel) and for
       // debugging: how far the anchored row ended up from where it started.
-      const finalNode = el.querySelector<HTMLElement>(`[data-message-id="${anchor.id}"]`)
+      const finalNode = findRowElement(el, anchor.key)
       const finalOffset = finalNode
         ? finalNode.getBoundingClientRect().top - el.getBoundingClientRect().top
         : Number.NaN
-      el.dataset['anchorId'] = anchor.id
+      el.dataset['anchorId'] = anchor.key
       el.dataset['anchorVisible'] = finalNode ? '1' : '0'
       el.dataset['anchorDelta'] = Number.isFinite(finalOffset)
         ? (finalOffset - anchor.offset).toFixed(1)

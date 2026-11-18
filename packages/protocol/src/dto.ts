@@ -206,6 +206,13 @@ export const messageSchema = z.object({
   text: z.string(),
   entities: z.array(messageEntitySchema).optional(),
   media: messageMediaSchema.optional(),
+  /**
+   * Telegram media group (album). TDLib keys a group by `message.media_album_id`,
+   * an int64 — it crosses IPC as a string, and `'0'` (not in an album) is absent.
+   * Every item of an album is still its own message; the renderer folds
+   * consecutive ones back into one bubble (design doc §8.6).
+   */
+  albumId: z.string().optional(),
   replyToId: z.number().int().optional(),
   edited: z.boolean().optional(),
 })

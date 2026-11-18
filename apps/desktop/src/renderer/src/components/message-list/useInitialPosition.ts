@@ -1,15 +1,17 @@
 import type { Virtualizer } from '@tanstack/react-virtual'
-import type { Message } from '@wegram/protocol'
 import { useEffect, useLayoutEffect, type RefObject } from 'react'
 
 import { readScrollPin } from '../../lib/scrollGeometry'
+import { findRowElement } from './rowElement'
+import { findRowIndex, type TranscriptRow } from './rows'
 import { resyncScroller } from './scroller'
 import type { ScrollFlags } from './scrollFlags'
 import type { LandingPosition } from './unread'
 
 interface UseInitialPositionParams {
   scrollRef: RefObject<HTMLDivElement | null>
-  messages: Message[]
+  /** Transcript rows, not messages: an album is one row (design doc §8.6). */
+  rows: TranscriptRow[]
   /** Where the chat opens: a saved row, the unread divider, or (null) the newest message. */
   landing: LandingPosition | null
   flags: ScrollFlags
@@ -50,7 +52,7 @@ function dividerOffset(slot: HTMLElement): number {
  */
 export function useInitialPosition({
   scrollRef,
-  messages,
+  rows,
   landing,
   flags,
   virtualizer,
@@ -66,13 +68,19 @@ export function useInitialPosition({
     flags.restoring.current = true
     unpin()
     const targetId = position.messageId
+    /** The row that holds the target message, with the key its slot carries. */
+    const findTarget = (): { index: number; key: string } | null => {
+      const index = findRowIndex(rows, targetId)
+      const row = rows[index]
+      return index < 0 || !row ? null : { index, key: row.key }
+    }
     /** Row offset to align to: the saved one, or the divider the row carries. */
     const offsetOf = (node: HTMLElement): number =>
       position.kind === 'unread' ? dividerOffset(node) : position.offset
     try {
-      let index = messages.findIndex((message) => message.id === targetId)
-      if (index < 0) return
-      virtualizer.scrollToIndex(index, { align: 'start' })
+      let target = findTarget()
+      if (!target) return
+      virtualizer.scrollToIndex(target.index, { align: 'start' })
 
       // Frame-bounded *and* time-bounded: an occluded window throttles rAF, and
       // a 40-frame loop can then take a minute.
@@ -91,12 +99,12 @@ export function useInitialPosition({
          * transcript reports as fitting even when it does not.)
          */
         if (readScrollPin(el).fits) break
-        index = messages.findIndex((message) => message.id === targetId)
-        if (index < 0) return
-        const node = el.querySelector<HTMLElement>(`[data-message-id="${targetId}"]`)
+        target = findTarget()
+        if (!target) return
+        const node = findRowElement(el, target.key)
         if (!node) {
           // Row is outside the rendered window (estimate was off): nudge again.
-          virtualizer.scrollToIndex(index, { align: 'start' })
+          virtualizer.scrollToIndex(target.index, { align: 'start' })
           stable = 0
           continue
         }
@@ -131,11 +139,11 @@ export function useInitialPosition({
   }
 
   useLayoutEffect(() => {
-    if (flags.initialised.current || messages.length === 0) return
+    if (flags.initialised.current || rows.length === 0) return
     flags.initialised.current = true
 
     const position = landing
-    if (position && messages.some((message) => message.id === position.messageId)) {
+    if (position && findRowIndex(rows, position.messageId) >= 0) {
       void restoreTo(position).finally(markReady)
       // `restoreTo` walks frames with rAF, which Chromium throttles for an
       // occluded window — without this the list would stay invisible (the
@@ -186,7 +194,7 @@ export function useInitialPosition({
     window.setTimeout(restickIfAtBottom, 400)
     // Runs once per mounted chat (the list is keyed by chat id).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages.length])
+  }, [rows.length])
 
   /**
    * Visibility must never hinge on layout timing. Whatever the positioning code
@@ -194,8 +202,8 @@ export function useInitialPosition({
    * becomes visible within a second of having messages.
    */
   useEffect(() => {
-    if (ready || messages.length === 0) return
+    if (ready || rows.length === 0) return
     const timer = window.setTimeout(markReady, 1000)
     return () => window.clearTimeout(timer)
-  }, [ready, messages.length, markReady])
+  }, [ready, rows.length, markReady])
 }

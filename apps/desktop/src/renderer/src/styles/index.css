@@ -2161,7 +2161,8 @@ select {
 
 /* A photo with a caption is image plus a separate bubble, exactly like WeChat. */
 .wx-bubble--photo .wx-caption,
-.wx-bubble--video .wx-caption {
+.wx-bubble--video .wx-caption,
+.wx-bubble--album .wx-caption {
   margin-top: 4px;
   padding: 8px 12px;
   border-radius: var(--wx-bubble-radius);
@@ -2170,7 +2171,8 @@ select {
 }
 
 .wx-bubble--photo.wx-bubble--self .wx-caption,
-.wx-bubble--video.wx-bubble--self .wx-caption {
+.wx-bubble--video.wx-bubble--self .wx-caption,
+.wx-bubble--album.wx-bubble--self .wx-caption {
   background: var(--wx-bubble-self);
 }
 
@@ -2185,6 +2187,45 @@ select {
 .wx-bubble--photo.wx-bubble--self,
 .wx-bubble--video.wx-bubble--self {
   background: transparent;
+}
+
+/* ---------- Albums (Telegram media groups, design doc §8.6) ---------- */
+
+/* The bubble is only a frame: the grid draws the media, the caption sits under it
+   like a photo's, and the row keeps one avatar / one meta line for the group. */
+.wx-bubble--album {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.wx-bubble--album.wx-bubble--self {
+  background: transparent;
+}
+
+.wx-album {
+  display: grid;
+  grid-template-columns: repeat(2, 116px);
+  gap: 3px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.wx-album__cell {
+  display: block;
+  min-width: 0;
+}
+
+.wx-album .wx-photo,
+.wx-album .wx-video {
+  width: 100%;
+  height: 116px;
+  border-radius: 0;
+}
+
+/* An odd last cell fills the row, the way Telegram's 3-up album reads. */
+.wx-album__cell:last-child:nth-child(odd) {
+  grid-column: span 2;
 }
 
 .wx-photo {

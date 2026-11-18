@@ -667,7 +667,8 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
    - **Custom emoji** entities render as their base glyph, not the sticker image. Needs
      `getCustomEmojiStickers` plus an inline sticker cache; the rendering seam
      (`RichText`'s `customEmoji` case) is already there.
-   - Media is sent immediately after the picker; no caption dialog, no album grouping,
+   - Media is sent immediately after the picker; no caption dialog and no album
+     *sending* (received albums are grouped into one bubble now, design doc §8.6),
      no drag & drop / paste. Captions are supported end-to-end in the adapter
      (`media:send` takes `caption`), just not surfaced in the UI yet.
    - Voice notes play, but there is no recording and the waveform is decorative.
