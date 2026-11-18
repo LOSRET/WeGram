@@ -225,6 +225,16 @@ phase runs the freshly built installer stub once (its `BUILD_UNINSTALLER` pass w
 `__uninstaller.exe`, which electron-builder then signs), and that child process does not survive
 this shell — the same job-object class of failure as Electron itself. It works on the runner.
 
+**Shipping the dll unpacked is not enough — the loader must be handed the unpacked path.**
+`prebuilt-tdlib.getTdjson()` resolves through `require.resolve`, so inside a packaged build it
+returns `…\app.asar\node_modules\@prebuilt-tdlib\win32-x64\tdjson.dll`. Electron redirects `fs`
+reads there (an `existsSync` check passes) but not `LoadLibrary`, so `createClient` throws
+`Dynamic Loading Error: Win32 error 126` and `bootstrap` only logs `adapter failed to start`:
+the login window spins on 正在连接 Telegram… forever and TDLib never even opens
+`userData/tdlib` (measured on the installed 0.1.1 build). `tdlib/client.ts` →
+`resolveTdjsonPath()` maps the path onto `app.asar.unpacked`; with it the same packaged exe logs
+`TDLib client created` and `TDLib 1.8.70 ready for phone login`.
+
 Reading and driving the real renderer over CDP is what produced the numbers above. The
 helper is `.cache/cdp-eval.mjs` (gitignored; ~30 lines: read
 `http://127.0.0.1:9224/json`, open the page's `webSocketDebuggerUrl`, send one
