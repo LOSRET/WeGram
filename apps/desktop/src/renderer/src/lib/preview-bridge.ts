@@ -374,8 +374,9 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'chats:get':
       return chats.find((chat) => chat.id === store.chatId)
     case 'chats:open': {
+      // Reading is reported per viewport via `messages:read`; opening a chat must
+      // not mark it read (same rule as the real adapter, see tdlib/actions.ts).
       openChatId = Number(store.chatId)
-      applyPreviewRead(openChatId, null)
       return undefined
     }
     case 'messages:read': {

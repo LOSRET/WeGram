@@ -81,20 +81,24 @@ export async function listChats(
 }
 
 /**
- * Marks the conversation read.
+ * The reader opened the conversation.
  *
- * The newest id must come from `getChat` (`last_message.id`), never from a
- * history page: `getChatHistory` treats `from_message_id` as *exclusive*
- * (measured 2026-11-17), so a page anchored on the newest message ends one
- * message below it. Marking that page read left the real last message unread
- * forever — the chat list badge stayed at "1" however often the chat was
- * opened, while the official client cleared it on the first click.
+ * Opening must NOT mark it read. Reading is reported per viewport by
+ * `messages:read` (gated by the renderer's `lib/readGate.ts`, 350 ms debounce)
+ * and moves the server marker one screen at a time. Marking everything read here
+ * undid that rule on the only path that matters — a click: a group with 300
+ * unread messages went to zero before the transcript had even landed on its
+ * "以下是新消息" line, so the badge, the rail total and every other device said
+ * "read" while the reader was still looking at the unread block, and the chat
+ * reopened on a divider that no longer meant anything.
+ *
+ * What is left is the warm-up: `getChat` loads the chat into TDLib's cache, which
+ * is what the history request that follows reads from. (The newest id cannot be
+ * taken from a history page in any case: `getChatHistory` treats
+ * `from_message_id` as *exclusive*, measured 2026-11-17.)
  */
 export async function openChat(deps: ActionDeps, chatId: number): Promise<void> {
-  const chat = await deps.invoke({ _: 'getChat', chat_id: chatId })
-  const lastId: number | undefined = chat?.last_message?.id
-  if (!lastId) return
-  await markRead(deps, { chatId, upToMessageId: lastId })
+  await deps.invoke({ _: 'getChat', chat_id: chatId })
 }
 
 /**

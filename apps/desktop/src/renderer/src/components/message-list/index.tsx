@@ -99,8 +99,8 @@ export function MessageList({
   )
 
   // Captured once per mounted chat: the divider must not jump as the read marker
-  // moves after `chats:open`. Stored as an id, not an index, because prepending
-  // older messages shifts indexes.
+  // moves after the first `messages:read`. Stored as an id, not an index, because
+  // prepending older messages shifts indexes.
   const [unreadMessageId] = useState<number | null>(() => findUnreadMessage(messages, unreadMarker))
   const unreadIndex = unreadMessageId
     ? messages.findIndex((message) => message.id === unreadMessageId)

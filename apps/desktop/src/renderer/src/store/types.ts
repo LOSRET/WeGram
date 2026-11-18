@@ -24,9 +24,9 @@ export interface FileProgress {
 }
 
 /**
- * Snapshot of what was unread when the chat was opened, captured *before*
- * `chats:open` marks it read — otherwise the unread divider would vanish on the
- * first paint.
+ * Snapshot of what was unread when the chat was opened, captured *before* the
+ * read marker can move — otherwise the unread divider would vanish on the first
+ * paint.
  */
 export interface UnreadMarker {
   lastReadInboxMessageId: number | null

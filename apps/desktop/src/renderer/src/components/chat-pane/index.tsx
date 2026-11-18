@@ -72,9 +72,9 @@ export function ChatPane() {
    * server's unread count — and with it the chat row and the rail badge — falls as
    * they scroll through the new messages instead of only when they hit the bottom.
    *
-   * `messages:read` is idempotent and TDLib's marker is monotonic, so the snapshot
-   * taken by `chats:open`, a burst of scroll positions and this effect may all
-   * overlap. The delay coalesces a burst of arrivals into one call.
+   * `messages:read` is idempotent and TDLib's marker is monotonic, so the unread
+   * snapshot taken when the chat opened, a burst of scroll positions and this
+   * effect may all overlap. The delay coalesces a burst of arrivals into one call.
    *
    * The gate is `mayMarkRead` (`lib/readGate.ts`): a message that never appeared
    * on screen must not be reported as read, however far the marker could move.

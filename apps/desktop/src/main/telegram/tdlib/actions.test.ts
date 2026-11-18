@@ -43,24 +43,19 @@ function rawMessage(id: number, text: string): TdObject {
 }
 
 describe('openChat', () => {
-  it('marks the chat read up to the last message the server knows', async () => {
+  it('loads the chat without marking it read', async () => {
     const { deps, calls } = makeDeps((method) =>
       method._ === 'getChat' ? { id: 1, last_message: { id: 900, date: 1 } } : null,
     )
 
     await openChat(deps, 1)
 
-    // The newest id must come from `getChat`, not from a history page: the page
-    // ends one message below the newest (from_message_id is exclusive).
-    expect(calls.map((call) => call._)).toEqual(['getChat', 'viewMessages'])
-    expect(calls[1]).toMatchObject({ chat_id: 1, message_ids: [900], force_read: true })
-  })
-
-  it('does not send a read request for a chat without messages', async () => {
-    const { deps, calls } = makeDeps(() => ({ id: 2, last_message: null }))
-
-    await openChat(deps, 2)
-
+    /**
+     * Reading is reported per viewport by the renderer (`messages:read`). A read
+     * request here zeroed a 300-unread group on the click, before the transcript
+     * had landed on its "以下是新消息" line — the badge, the rail total and the
+     * reader's other devices all said "read" while the unread block was on screen.
+     */
     expect(calls.map((call) => call._)).toEqual(['getChat'])
   })
 })

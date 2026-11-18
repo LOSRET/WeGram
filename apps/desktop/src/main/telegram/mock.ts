@@ -222,7 +222,9 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   }
 
   async openChat(chatId: number): Promise<void> {
-    this.applyRead(chatId)
+    // Opening does not consume the unread messages: the renderer reports
+    // `messages:read` per viewport (see `tdlib/actions.openChat`).
+    this.requireFixture(chatId)
   }
 
   async history(input: {

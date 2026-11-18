@@ -68,8 +68,8 @@ export function MainShell() {
       return
     }
 
-    // Snapshot before `chats:open` reports the chat as read, or the unread
-    // divider would disappear before the list ever mounts.
+    // Snapshot before our own first `messages:read` can move the marker, or the
+    // unread divider would disappear before the list ever mounts.
     store.setUnreadMarker(
       chat.id,
       chat.unread > 0

@@ -87,8 +87,9 @@ async function readFirstPage(
   signal.throwIfAborted()
 
   /**
-   * The unread snapshot `MainShell` took before `chats:open` reported the chat as
-   * read. It is the only source of the read boundary.
+   * The unread snapshot `MainShell` took when the reader clicked the chat, before
+   * any `messages:read` could move the marker. It is the only source of the read
+   * boundary.
    */
   const marker = useAppStore.getState().unreadMarkers[chatId] ?? null
   /**
