@@ -33,11 +33,13 @@ describe('stripWindow', () => {
     })
   })
 
-  it('shows both arrows on a middle page', () => {
-    // 2 fixed + 16 sets = 18 tabs -> three windows: 0..7, 7..14, 10..17.
+  it('shows seven tabs between two arrows on a middle page', () => {
+    // 2 fixed + 16 sets = 18 tabs -> three windows: 0..7, 8..14, 10..17.
+    // The middle window must reserve one slot for EACH arrow: eight tabs plus
+    // two arrows would be ten slots and clip 下一页 outside the strip.
     expect(stripWindow(18, 1)).toEqual({
-      start: 7,
-      count: 8,
+      start: 8,
+      count: 7,
       hasLeft: true,
       hasRight: true,
       pageCount: 3,
@@ -49,6 +51,12 @@ describe('stripWindow', () => {
       hasRight: false,
       pageCount: 3,
     })
+  })
+
+  it('keeps a two-page row to a single edge arrow at each end', () => {
+    // 14 sets + the two fixed tabs: first 8 tabs, then 上一页 + the last 8.
+    expect(stripWindow(16, 0)).toMatchObject({ start: 0, count: 8, hasRight: true })
+    expect(stripWindow(16, 1)).toMatchObject({ start: 8, count: 8, hasLeft: true, hasRight: false })
   })
 
   it('never offers a right arrow past the final window', () => {
@@ -68,8 +76,6 @@ describe('stripWindow', () => {
 describe('pageForIndex', () => {
   it('finds the window that contains a scrolled-off set', () => {
     expect(pageForIndex(18, 0)).toBe(0)
-    // Index 7 is still on the first window (tabs 0..7); the first scrolled-off
-    // tab is index 8.
     expect(pageForIndex(18, 7)).toBe(0)
     expect(pageForIndex(18, 8)).toBe(1)
     expect(pageForIndex(18, 17)).toBe(2)

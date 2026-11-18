@@ -214,6 +214,14 @@ grid paints the same glyph the transcript will. 最近使用 persists in
 fetched by `stickers:set` only when its tab is opened and then cached for the life of
 the panel.
 
+**The installed list arrives in two steps.** TDLib answers
+`getInstalledStickerSets` from its local cache first and reloads from the server
+later (measured on the real account: 14 cached sets on a cold start, 192 about a
+minute later, with `updateInstalledStickerSets` at the switch). The adapter now
+emits `stickerSets`, which crosses IPC as `evt:stickerSets` and bumps
+`stickerSetsVersion`; the picker refetches on that bump. Without it the panel kept
+the 14-set cache for the whole session, which looked like "one page and the end".
+
 Missing against the client, on purpose: the **自定义表情** (heart) tab. Favourites are
 TDLib custom-emoji sets, whose messages are custom-emoji *entities* rather than
 stickers; the protocol has no send path for them yet, so the tab would be dead.

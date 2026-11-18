@@ -6,4 +6,7 @@ export const createUiSlice: SliceCreator<UiActions> = (set) => ({
 
   setToast: (toast) => set({ toast }),
   setError: (error) => set({ error }),
+
+  noteStickerSetsChanged: () =>
+    set((state) => ({ stickerSetsVersion: state.stickerSetsVersion + 1 })),
 })

@@ -117,6 +117,15 @@ export function createUpdateHandler(deps: UpdateDeps): (update: TdObject) => Pro
         // Read receipts for our own messages: last_read_outbox_message_id moves.
         await emitChatUpsert(deps, update.chat_id)
         return
+      /**
+       * TDLib answers `getInstalledStickerSets` from its local cache first and
+       * replaces the list once the server copy arrives (measured: 14 cached sets,
+       * then 192 a minute later). The picker has to refetch on this update or it
+       * keeps the partial list for the rest of the session.
+       */
+      case 'updateInstalledStickerSets':
+        if (update.sticker_type?._ === 'stickerTypeRegular') deps.emit({ type: 'stickerSets' })
+        return
       case 'updateChatPosition':
       case 'updateNewChat':
         await emitChatUpsert(deps, update.chat?.id ?? update.chat_id)

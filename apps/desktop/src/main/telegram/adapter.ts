@@ -28,6 +28,8 @@ export type AdapterEvent =
   | { type: 'messages'; chatId: number; ops: MessageOp[] }
   | { type: 'avatars'; avatars: UserAvatar[] }
   | { type: 'typing'; chatId: number; userId: number; action: string; until: number }
+  /** TDLib reloaded the installed sticker sets (cache first, then server). */
+  | { type: 'stickerSets' }
   | {
       type: 'file'
       fileId: number

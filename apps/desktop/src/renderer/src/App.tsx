@@ -149,6 +149,10 @@ export function App() {
           payload.url,
         )
       }),
+      window.tg.on('evt:stickerSets', (event) => {
+        track(event.seq)
+        store.noteStickerSetsChanged()
+      }),
       window.tg.on('evt:error', (event) => {
         track(event.seq)
         store.setError(event.payload.message)

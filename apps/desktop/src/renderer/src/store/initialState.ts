@@ -28,4 +28,5 @@ export const DATA_DEFAULTS: AppData = {
   mediaProgress: {},
   userAvatars: {},
   unreadMarkers: {},
+  stickerSetsVersion: 0,
 }

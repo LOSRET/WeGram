@@ -64,19 +64,29 @@ export function ExpressionPicker({
   const [setLoading, setSetLoading] = useState(false)
   const [setError, setSetError] = useState<string | null>(null)
 
+  const stickerSetsVersion = useAppStore((state) => state.stickerSetsVersion)
   const panelRef = useRef<HTMLDivElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const recentRef = useRef<string[]>([])
   const setCache = useRef(new Map<string, StickerSet>())
   const autoOpened = useRef(false)
 
-  // Installed sets feed the tab strip; the emoji tab works without them.
+  /**
+   * Installed sets feed the tab strip; the emoji tab works without them.
+   *
+   * The first answer can be TDLib's pre-sync local cache (a dozen sets instead
+   * of the account's full list), so this also refetches when
+   * `updateInstalledStickerSets` lands — see `evt:stickerSets`.
+   */
   useEffect(() => {
     let cancelled = false
     void (async () => {
       try {
         const result = await invoke('stickers:sets')
-        if (!cancelled) setSets(result)
+        if (!cancelled) {
+          setSets(result)
+          setSetsError(null)
+        }
       } catch (cause) {
         if (!cancelled) setSetsError(errorMessage(cause))
       } finally {
@@ -86,7 +96,7 @@ export function ExpressionPicker({
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [stickerSetsVersion])
 
   // The 贴纸 toolbar button opens the first installed set once the list arrives;
   // switching to 表情 afterwards must not be undone by this effect.

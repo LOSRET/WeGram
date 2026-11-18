@@ -336,6 +336,8 @@ export const eventChannels = [
   'evt:avatars',
   'evt:typing',
   'evt:file',
+  /** TDLib reloaded the installed sticker sets; the picker refetches them. */
+  'evt:stickerSets',
   'evt:error',
 ] as const
 
@@ -367,6 +369,7 @@ export const eventSchemas = {
       completed: z.boolean().optional(),
     }),
   ),
+  'evt:stickerSets': envelope(z.object({})),
   'evt:error': envelope(appErrorSchema),
 } satisfies Record<EventChannel, z.ZodType>
 

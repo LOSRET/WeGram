@@ -75,6 +75,11 @@ export interface AppData {
    */
   userAvatars: Record<number, string>
   unreadMarkers: Record<number, UnreadMarker | null>
+  /**
+   * Bumped when TDLib reloads the installed sticker sets; the picker refetches
+   * on the change because the first answer can be the pre-sync local cache.
+   */
+  stickerSetsVersion: number
 }
 
 export interface AuthActions {
@@ -118,6 +123,7 @@ export interface UiActions {
   setTyping: (chatId: number, active: boolean) => void
   setToast: (message: string | null) => void
   setError: (message: string | null) => void
+  noteStickerSetsChanged: () => void
 }
 
 export interface AppState

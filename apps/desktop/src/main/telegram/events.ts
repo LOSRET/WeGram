@@ -27,6 +27,9 @@ export function publishAdapterEvent(bus: EventBus, event: AdapterEvent): void {
         until: event.until,
       })
       return
+    case 'stickerSets':
+      bus.publish('evt:stickerSets', {})
+      return
     case 'file':
       bus.publish('evt:file', {
         fileId: event.fileId,
