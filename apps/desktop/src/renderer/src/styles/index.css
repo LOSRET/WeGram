@@ -1071,6 +1071,73 @@ select {
   background: var(--wx-pane);
 }
 
+/* ---------- Channel bar ----------
+   A channel swaps the composer for WeChat's 服务号 card: the same bordered card
+   language, a menu row in the middle and the keyboard switch at the right end
+   (measured on the client: card ≈ 66 px tall at 1.2x, glyphs 20 px, the item row
+   centred in the space left of the switch). */
+
+.wx-channel-bar {
+  padding: 0 9px 8px 6px;
+  background: var(--wx-pane);
+  user-select: none;
+}
+
+.wx-channel-bar__card {
+  display: flex;
+  align-items: center;
+  height: 54px;
+  padding: 0 6px 0 10px;
+  border: 1px solid var(--wx-line);
+  border-radius: 8px;
+  background: var(--wx-card);
+}
+
+.wx-channel-bar__menu {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.wx-channel-bar__item {
+  height: 36px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  font-size: 14px;
+  color: var(--wx-text);
+}
+
+.wx-channel-bar__item:hover:not(:disabled) {
+  background: var(--wx-row-hover);
+}
+
+.wx-channel-bar__item:disabled {
+  color: var(--wx-text-disabled);
+}
+
+/* The keyboard switch: the glyph is the circle, so this button draws no ring. */
+.wx-channel-bar__keyboard {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-left: auto;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wx-icon);
+}
+
+.wx-channel-bar__keyboard:hover {
+  background: var(--wx-row-hover);
+  color: var(--wx-text);
+}
+
 .wx-composer__card {
   display: flex;
   flex-direction: column;

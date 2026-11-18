@@ -9,6 +9,7 @@ import { Composer } from '../Composer'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { ForwardDialog } from '../ForwardDialog'
 import { MessageList } from '../message-list'
+import { ChannelBar } from './ChannelBar'
 import { ChatHeader } from './ChatHeader'
 import { ChatInfoPopover } from './ChatInfoPopover'
 import {
@@ -59,6 +60,16 @@ export function ChatPane() {
   const [deleting, setDeleting] = useState<Message | null>(null)
   /** Chat-info popover (the "…" button in the header). */
   const [infoAt, setInfoAt] = useState<{ x: number; y: number } | null>(null)
+  /**
+   * Channels: whether this account may post there. Asked once per chat and kept
+   * for the session — switching back must not let the keyboard button flicker
+   * through a round trip.
+   */
+  const [postRights, setPostRights] = useState<Record<number, boolean>>({})
+  /** The channel whose composer was opened from the bar's keyboard switch. */
+  const [channelInputChatId, setChannelInputChatId] = useState<number | null>(null)
+  /** A mute call is in flight, so the bar cannot be double-toggled. */
+  const [muteBusy, setMuteBusy] = useState(false)
 
   const {
     pendingLanding,
@@ -137,6 +148,48 @@ export function ChatPane() {
   const editingForChat = editing && editing.chatId === activeChatId ? editing : null
   const typing = activeChatId ? Boolean(typingByChat[activeChatId]) : false
 
+  const isChannel = chat?.kind === 'channel'
+
+  /**
+   * Channel posting is an administrator right, and only the main process can ask
+   * TDLib for it (it is not on the chat summary). Groups and private chats skip
+   * the round trip entirely: they always keep the composer.
+   */
+  useEffect(() => {
+    if (activeChatId === null || !isChannel) return
+    if (postRights[activeChatId] !== undefined) return
+    let cancelled = false
+    void invoke('chats:canPost', { chatId: activeChatId })
+      .then((allowed) => {
+        if (!cancelled) setPostRights((current) => ({ ...current, [activeChatId]: allowed }))
+      })
+      .catch(() => {
+        // Kept unknown on purpose: a failed lookup retries the next time the
+        // channel opens, and the bar simply stays without the keyboard.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [activeChatId, isChannel, postRights])
+
+  const canPost = !isChannel || (activeChatId !== null && postRights[activeChatId] === true)
+  /** A channel's composer is closed until the bar's keyboard button opens it. */
+  const channelInputOpen = isChannel && channelInputChatId === activeChatId
+
+  const toggleMute = useCallback(async (): Promise<void> => {
+    if (!chat || muteBusy) return
+    setMuteBusy(true)
+    try {
+      const updated = await invoke('chats:setMuted', { chatId: chat.id, muted: !chat.muted })
+      useAppStore.getState().applyChatOps([{ op: 'upsert', chat: updated }])
+      useAppStore.getState().setToast(updated.muted ? '已静音' : '已取消静音')
+    } catch (error) {
+      useAppStore.getState().setError(errorMessage(error))
+    } finally {
+      setMuteBusy(false)
+    }
+  }, [chat, muteBusy])
+
   if (!chat || !activeChatId) return <NoChatPlaceholder />
 
   const actions = createMessageActions(activeChatId)
@@ -171,7 +224,13 @@ export function ChatPane() {
             setSeen(messageId === null ? null : { chatId: activeChatId, messageId })
           }
           onLoadOlder={loadOlder}
-          onReply={(message) => useAppStore.getState().setReplyTo(activeChatId, message.id)}
+          canReply={canPost}
+          onReply={(message) => {
+            useAppStore.getState().setReplyTo(activeChatId, message.id)
+            // A channel replies through its composer, which the bar keeps closed
+            // until the keyboard switch is pressed.
+            if (isChannel) setChannelInputChatId(activeChatId)
+          }}
           onEdit={(message) =>
             useAppStore
               .getState()
@@ -183,15 +242,30 @@ export function ChatPane() {
         />
       )}
 
-      <Composer
-        chatId={activeChatId}
-        replyTo={replyTo}
-        editing={editingForChat}
-        onSend={actions.send}
-        onSaveEdit={actions.saveEdit}
-        onCancelReply={() => useAppStore.getState().setReplyTo(activeChatId, null)}
-        onCancelEdit={() => useAppStore.getState().setEditing(null)}
-      />
+      {!isChannel || (canPost && channelInputOpen) ? (
+        <Composer
+          chatId={activeChatId}
+          replyTo={replyTo}
+          editing={editingForChat}
+          onSend={actions.send}
+          onSaveEdit={actions.saveEdit}
+          onCancelReply={() => useAppStore.getState().setReplyTo(activeChatId, null)}
+          onCancelEdit={() => useAppStore.getState().setEditing(null)}
+          {...(isChannel ? { onCollapse: () => setChannelInputChatId(null) } : {})}
+        />
+      ) : (
+        // A channel's bottom edge is WeChat's 服务号 card instead of a composer:
+        // 静音 always, and the keyboard switch only when posting is allowed.
+        <ChannelBar
+          muted={chat.muted}
+          canPost={canPost}
+          busy={muteBusy}
+          onToggleMute={() => {
+            void toggleMute()
+          }}
+          onOpenInput={() => setChannelInputChatId(activeChatId)}
+        />
+      )}
 
       {forwarding ? (
         <ForwardDialog

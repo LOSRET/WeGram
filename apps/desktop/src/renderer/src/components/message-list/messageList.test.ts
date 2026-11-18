@@ -184,6 +184,11 @@ describe('buildMessageMenuItems', () => {
     expect(labels(message(1, { outgoing: false }))).not.toContain('编辑')
   })
 
+  it('drops reply where there is no composer to reply into (a channel)', () => {
+    const items = buildMessageMenuItems(message(1), handlers, { canReply: false })
+    expect(items.map((item) => item.label)).toEqual(['复制', '转发', '删除'])
+  })
+
   it('marks delete as the dangerous item', () => {
     const remove = buildMessageMenuItems(message(1), handlers).find((item) => item.label === '删除')
     expect(remove?.danger).toBe(true)

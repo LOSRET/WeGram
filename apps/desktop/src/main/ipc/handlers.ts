@@ -99,6 +99,11 @@ export function createHandlers({
     'chats:list': (payload) => adapter.listChats(payload as { limit: number; offset: number }),
     'chats:get': (payload) => adapter.getChat((payload as { chatId: number }).chatId),
     'chats:open': (payload) => adapter.openChat((payload as { chatId: number }).chatId),
+    'chats:canPost': (payload) => adapter.canPost((payload as { chatId: number }).chatId),
+    'chats:setMuted': (payload) => {
+      const { chatId, muted } = payload as { chatId: number; muted: boolean }
+      return adapter.setChatMuted(chatId, muted)
+    },
 
     'messages:history': (payload) =>
       adapter.history(payload as { chatId: number; fromMessageId?: number; limit: number }),

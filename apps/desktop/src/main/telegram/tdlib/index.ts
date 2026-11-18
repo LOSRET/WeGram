@@ -305,6 +305,17 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     return actions.openChat(this.actionDeps, chatId)
   }
 
+  async canPost(chatId: number): Promise<boolean> {
+    return actions.canPost(
+      { invoke: (method) => this.invoke(method), getSelfUserId: () => this.selfUserId },
+      chatId,
+    )
+  }
+
+  async setChatMuted(chatId: number, muted: boolean): Promise<ChatSummary> {
+    return actions.setChatMuted(this.actionDeps, chatId, muted)
+  }
+
   async history(input: {
     chatId: number
     fromMessageId?: number

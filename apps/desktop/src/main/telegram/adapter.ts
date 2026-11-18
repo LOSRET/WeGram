@@ -72,6 +72,14 @@ export interface TelegramAdapter {
   listChats(input: { limit: number; offset: number }): Promise<ChatSummary[]>
   getChat(chatId: number): Promise<ChatSummary>
   openChat(chatId: number): Promise<void>
+  /**
+   * Whether this account may post in the chat. Channels are the only kind the UI
+   * asks about: posting there is an administrator right, so a channel without it
+   * is rendered read-only and never offers a composer.
+   */
+  canPost(chatId: number): Promise<boolean>
+  /** Mutes / unmutes a chat and answers the refreshed summary. */
+  setChatMuted(chatId: number, muted: boolean): Promise<ChatSummary>
 
   history(input: {
     chatId: number

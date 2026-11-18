@@ -150,6 +150,18 @@ const chats: ChatSummary[] = [
     lastMessageAt: now() - 36000,
   },
   {
+    id: 6,
+    title: 'WeGram 频道',
+    kind: 'channel',
+    unread: 0,
+    pinned: false,
+    muted: false,
+    lastMessageText: '其余频道只显示静音和只读提示',
+    lastMessageAt: now() - 5400,
+    lastReadInboxMessageId: 602,
+    lastReadOutboxMessageId: 0,
+  },
+  {
     id: 99,
     title: '性能测试群 · 5000 条',
     kind: 'group',
@@ -273,6 +285,30 @@ const messagesByChat: Record<number, Message[]> = {
       text: '频道消息：发送者是频道本身',
     },
   ],
+  6: [
+    {
+      id: 601,
+      chatId: 6,
+      senderId: 0,
+      senderChatId: 6,
+      senderName: 'WeGram 频道',
+      outgoing: false,
+      date: now() - 7200,
+      kind: 'text',
+      text: '这个频道由我管理：底栏有键盘按钮，可以直接发消息。',
+    },
+    {
+      id: 602,
+      chatId: 6,
+      senderId: 0,
+      senderChatId: 6,
+      senderName: 'WeGram 频道',
+      outgoing: false,
+      date: now() - 5400,
+      kind: 'text',
+      text: '其余频道只显示静音和只读提示',
+    },
+  ],
   99: perfMessages,
 }
 
@@ -381,6 +417,9 @@ function media(fileId: number, extra: Partial<MessageMedia> = {}): MessageMedia 
   }
 }
 
+/** Channels the preview account may post in (TDLib: an administrator right). */
+const channelPostRights: Record<number, boolean> = { 6: true }
+
 let nextId = 9000
 /** The chat the UI last opened; the dev injector below delivers arrivals into it. */
 let openChatId: number | null = null
@@ -450,6 +489,17 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       // not mark it read (same rule as the real adapter, see tdlib/actions.ts).
       openChatId = Number(store.chatId)
       return undefined
+    }
+    case 'chats:canPost': {
+      const chat = chats.find((item) => item.id === store.chatId)
+      return chat?.kind === 'channel' ? Boolean(channelPostRights[chat.id]) : true
+    }
+    case 'chats:setMuted': {
+      const chat = chats.find((item) => item.id === store.chatId)
+      if (!chat) throw { code: 'internal', message: 'unknown preview chat' }
+      chat.muted = Boolean(store.muted)
+      emit('evt:chats', { ops: [{ op: 'upsert', chat: { ...chat } }] })
+      return { ...chat }
     }
     case 'messages:read': {
       const upTo = Number(store.upToMessageId)

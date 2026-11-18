@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { history, historyAround, historyNewer, openChat } from './actions'
-import type { ActionDeps } from './actions'
+import { canPost, history, historyAround, historyNewer, openChat, setChatMuted } from './actions'
+import type { ActionDeps, PostPermissionDeps } from './actions'
 import type { TdObject } from './client'
 import type { MapperContext } from './map/context'
 
@@ -120,6 +120,117 @@ describe('historyNewer', () => {
     expect(calls.find((call) => call._ === 'getChatHistory')).toMatchObject({
       from_message_id: 1002,
       offset: -2,
+    })
+  })
+})
+
+describe('canPost', () => {
+  function permissionDeps(
+    type: TdObject,
+    status: TdObject | null,
+    selfUserId: number | null = 7,
+  ): { deps: PostPermissionDeps; calls: TdObject[] } {
+    const calls: TdObject[] = []
+    return {
+      calls,
+      deps: {
+        invoke: async (method) => {
+          calls.push(method)
+          if (method._ === 'getChat') return { id: 5, type }
+          if (method._ === 'getChatMember') return { status }
+          throw new Error(`unexpected ${String(method._)}`)
+        },
+        getSelfUserId: () => selfUserId,
+      },
+    }
+  }
+
+  const channel = { _: 'chatTypeSupergroup', is_channel: true }
+
+  it('lets the channel creator post', async () => {
+    const { deps } = permissionDeps(channel, { _: 'chatMemberStatusCreator' })
+    await expect(canPost(deps, 5)).resolves.toBe(true)
+  })
+
+  it('follows can_post_messages for an administrator', async () => {
+    const allowed = permissionDeps(channel, {
+      _: 'chatMemberStatusAdministrator',
+      rights: { can_post_messages: true },
+    })
+    const denied = permissionDeps(channel, {
+      _: 'chatMemberStatusAdministrator',
+      rights: { can_post_messages: false },
+    })
+
+    await expect(canPost(allowed.deps, 5)).resolves.toBe(true)
+    await expect(canPost(denied.deps, 5)).resolves.toBe(false)
+  })
+
+  it('keeps a plain subscriber channel read-only', async () => {
+    const { deps } = permissionDeps(channel, { _: 'chatMemberStatusMember' })
+    await expect(canPost(deps, 5)).resolves.toBe(false)
+  })
+
+  it('does not gate groups and private chats', async () => {
+    const { deps, calls } = permissionDeps({ _: 'chatTypeSupergroup', is_channel: false }, null)
+    await expect(canPost(deps, 5)).resolves.toBe(true)
+    // Only the chat itself is read: no member lookup for a composer that is always there.
+    expect(calls.map((call) => call._)).toEqual(['getChat'])
+  })
+
+  it('answers false before the account id is known', async () => {
+    const { deps, calls } = permissionDeps(channel, null, null)
+    await expect(canPost(deps, 5)).resolves.toBe(false)
+    expect(calls).toEqual([])
+  })
+})
+
+describe('setChatMuted', () => {
+  it('changes only the mute fields and answers the refreshed chat', async () => {
+    const settings = {
+      _: 'chatNotificationSettings',
+      use_default_mute_for: true,
+      mute_for: 0,
+      use_default_sound: false,
+      sound_id: '42',
+      use_default_show_preview: false,
+      show_preview: false,
+      use_default_disable_pinned_message_notifications: true,
+      disable_pinned_message_notifications: false,
+      use_default_disable_mention_notifications: true,
+      disable_mention_notifications: false,
+    }
+    // TDLib answers the next `getChat` with the settings it was given, so the
+    // fake has to store them too or the refreshed summary cannot show the mute.
+    const stored: Record<string, unknown> = { ...settings }
+    const { deps, calls } = makeDeps((method) => {
+      if (method._ === 'getChat') {
+        return {
+          id: 5,
+          title: 'Channel',
+          type: { _: 'chatTypeSupergroup', is_channel: true },
+          notification_settings: stored,
+          unread_count: 0,
+        }
+      }
+      if (method._ === 'setChatNotificationSettings') {
+        Object.assign(stored, method.notification_settings)
+        return { _: 'ok' }
+      }
+      throw new Error(`unexpected ${String(method._)}`)
+    })
+
+    const chat = await setChatMuted(deps, 5, true)
+
+    expect(chat.muted).toBe(true)
+    const call = calls.find((item) => item._ === 'setChatNotificationSettings')
+    expect(call?.notification_settings).toMatchObject({
+      use_default_mute_for: false,
+      mute_for: 2_147_483_647,
+      // Everything else is carried over: toggling mute must not reset sounds or previews.
+      sound_id: '42',
+      show_preview: false,
+      use_default_sound: false,
     })
   })
 })

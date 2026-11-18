@@ -76,6 +76,8 @@ const MOCK_AVATAR_COLORS: readonly (readonly [
 interface Fixture {
   chat: ChatSummary
   messages: Message[]
+  /** Channels only: whether this account may post there (TDLib: admin right). */
+  canPost?: boolean
 }
 
 interface MockFile {
@@ -262,6 +264,19 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     // Opening does not consume the unread messages: the renderer reports
     // `messages:read` per viewport (see `tdlib/actions.openChat`).
     this.requireFixture(chatId)
+  }
+
+  async canPost(chatId: number): Promise<boolean> {
+    const fixture = this.requireFixture(chatId)
+    // Groups and private chats keep the composer; only channels gate on rights.
+    return fixture.chat.kind === 'channel' ? Boolean(fixture.canPost) : true
+  }
+
+  async setChatMuted(chatId: number, muted: boolean): Promise<ChatSummary> {
+    const fixture = this.requireFixture(chatId)
+    fixture.chat.muted = muted
+    this.emit({ type: 'chats', ops: [{ op: 'upsert', chat: { ...fixture.chat } }] })
+    return { ...fixture.chat }
   }
 
   async history(input: {
@@ -852,6 +867,48 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
           date: at(600),
           kind: 'text',
           text: '频道消息：发送者是频道本身',
+        },
+      ],
+    })
+
+    // A channel this account *does* manage: the bar shows the keyboard switch and
+    // the composer opens from it. Chat 5 above is the read-only case.
+    this.fixtures.set(6, {
+      chat: {
+        id: 6,
+        title: 'WeGram 频道',
+        kind: 'channel',
+        unread: 0,
+        pinned: false,
+        muted: false,
+        lastMessageText: '其余频道只显示静音和只读提示',
+        lastMessageAt: at(90),
+        lastReadInboxMessageId: 602,
+        lastReadOutboxMessageId: 0,
+      },
+      canPost: true,
+      messages: [
+        {
+          id: 601,
+          chatId: 6,
+          senderId: 0,
+          senderChatId: 6,
+          senderName: 'WeGram 频道',
+          outgoing: false,
+          date: at(120),
+          kind: 'text',
+          text: '这个频道由我管理：底栏有键盘按钮，可以直接发消息。',
+        },
+        {
+          id: 602,
+          chatId: 6,
+          senderId: 0,
+          senderChatId: 6,
+          senderName: 'WeGram 频道',
+          outgoing: false,
+          date: at(90),
+          kind: 'text',
+          text: '其余频道只显示静音和只读提示',
         },
       ],
     })

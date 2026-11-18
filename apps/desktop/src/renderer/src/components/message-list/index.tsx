@@ -44,6 +44,11 @@ export interface MessageListProps {
   onLoadNewer: () => void
   /** Replaces an anchored window with the newest page and scrolls to its end. */
   onReturnToLatest: () => Promise<void>
+  /**
+   * Whether a reply can be typed at all: a read-only channel has no composer, so
+   * its menu must not offer 回复.
+   */
+  canReply: boolean
   onReply: (message: Message) => void
   onEdit: (message: Message) => void
   onDelete: (message: Message) => void
@@ -84,6 +89,7 @@ export function MessageList({
   onLoadOlder,
   onLoadNewer,
   onReturnToLatest,
+  canReply,
   onReply,
   onEdit,
   onDelete,
@@ -364,13 +370,11 @@ export function MessageList({
         <ContextMenu
           x={menu.x}
           y={menu.y}
-          items={buildMessageMenuItems(menu.message, {
-            onReply,
-            onCopy,
-            onForward,
-            onEdit,
-            onDelete,
-          })}
+          items={buildMessageMenuItems(
+            menu.message,
+            { onReply, onCopy, onForward, onEdit, onDelete },
+            { canReply },
+          )}
           onClose={() => setMenu(null)}
         />
       ) : null}

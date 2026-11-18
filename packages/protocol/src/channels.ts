@@ -47,6 +47,13 @@ export const invokeChannels = [
   'chats:list',
   'chats:get',
   'chats:open',
+  /**
+   * Whether this account may post in the chat. Only channels ask: posting there
+   * is an administrator right, so the composer is offered only when it holds.
+   */
+  'chats:canPost',
+  /** 静音 / 取消静音 for the channel bar; answers the refreshed summary. */
+  'chats:setMuted',
   'messages:history',
   /**
    * One window centred on a message, for a reading position or unread boundary
@@ -123,6 +130,11 @@ export const invokeSchemas = {
   },
   'chats:get': { request: z.object({ chatId: z.number().int() }), response: chatSummarySchema },
   'chats:open': { request: z.object({ chatId: z.number().int() }), response: noPayload },
+  'chats:canPost': { request: z.object({ chatId: z.number().int() }), response: z.boolean() },
+  'chats:setMuted': {
+    request: z.object({ chatId: z.number().int(), muted: z.boolean() }),
+    response: chatSummarySchema,
+  },
   'messages:history': {
     request: z.object({
       chatId: z.number().int(),

@@ -29,6 +29,11 @@ interface ComposerProps {
   onSaveEdit: (messageId: number, text: string) => Promise<void>
   onCancelReply: () => void
   onCancelEdit: () => void
+  /**
+   * Channels only: hides the composer again and puts the channel bar back, the
+   * way the 服务号 card swaps places with the input.
+   */
+  onCollapse?: () => void
 }
 
 export function Composer({
@@ -39,6 +44,7 @@ export function Composer({
   onSaveEdit,
   onCancelReply,
   onCancelEdit,
+  onCollapse,
 }: ComposerProps) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
@@ -281,6 +287,16 @@ export function Composer({
             >
               <MicIcon size={20} />
             </button>
+            {onCollapse ? (
+              <button
+                className="wx-tool-button"
+                onClick={onCollapse}
+                title="收起输入框"
+                aria-label="收起输入框"
+              >
+                <ChevronDownIcon size={18} />
+              </button>
+            ) : null}
           </div>
 
           <button
