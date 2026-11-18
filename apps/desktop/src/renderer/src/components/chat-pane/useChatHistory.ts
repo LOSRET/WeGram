@@ -2,19 +2,13 @@ import { useQuery } from '@tanstack/react-query'
 import type { Message } from '@wegram/protocol'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { emptyPageIsHistory } from '../../lib/history'
+import { HISTORY_PAGE_SIZE, emptyPageIsHistory } from '../../lib/history'
 import { errorMessage, invoke } from '../../lib/ipc'
 import { useAppStore } from '../../store/useAppStore'
 import { pickPagingTarget, resolveLanding, type LandingPosition } from '../message-list/unread'
 
-/** How many extra pages may be fetched to reach a saved reading position. */
-const MAX_RESTORE_PAGES = 6
-/** How many extra pages may be fetched to reach the unread divider (deep unread). */
-const MAX_UNREAD_PAGES = 8
-/** Give up paging back (and land at the bottom) after this long. */
-const RESTORE_BUDGET_MS = 10_000
-/** Page size for the first page and for every "older" page. */
-const PAGE_SIZE = 50
+/** Messages kept on each side of a message when a window is loaded around it. */
+const AROUND_CONTEXT = 25
 /** An empty first page is usually a cold TDLib cache: ask again before caching it. */
 const EMPTY_PAGE_RETRIES = 3
 const EMPTY_PAGE_RETRY_DELAY_MS = 800
@@ -40,9 +34,13 @@ export interface ChatHistoryState {
   /** The first page is still in flight; the pane shows its loading state while empty. */
   loadingHistory: boolean
   loadingOlder: boolean
+  /** The loaded window stops short of the newest message (anchored by a deep row). */
+  hasNewer: boolean
   /** Empty-state "reload" button: re-runs the first-page fetch. */
   reload: () => void
   loadOlder: () => Promise<void>
+  /** Extends an anchored window down; call it when the reader nears its end. */
+  loadNewer: () => Promise<void>
 }
 
 /** What one first-page fetch produced, cached by react-query per chat. */
@@ -50,6 +48,7 @@ interface FirstPage {
   chatId: number
   messages: Message[]
   hasMore: boolean
+  hasNewer: boolean
   landing: LandingPosition | null
 }
 
@@ -72,8 +71,14 @@ class ColdCacheError extends Error {
  * The whole first-page flow, in the order it has to happen:
  *   1. resolve the stored anchor (`ui:getAnchor`) — before the list may mount,
  *   2. fetch the first page (an empty answer the chat list contradicts throws),
- *   3. page back until the landing message is loaded, within a budget,
+ *   3. if the landing row is older than that page, load a window *around it*,
  *   4. hand the page to the store, which replays any ops that arrived meanwhile.
+ *
+ * Step 3 used to page back from the newest message, six pages at a time. That
+ * capped how deep a reading position could be (300 messages) and made the chat
+ * open at the bottom once the budget ran out. A message at 5 000 messages up is
+ * now one `messages:around` call away — but the window then does not reach the
+ * newest message, which `hasNewer` carries to the list.
  *
  * It runs inside the query function, so react-query owns retries, cancellation and
  * the pending flags instead of a hand-written state machine.
@@ -101,7 +106,7 @@ async function readFirstPage(
    */
   const target = pickPagingTarget(anchor, marker)
 
-  const first = await invoke('messages:history', { chatId, limit: PAGE_SIZE })
+  const first = await invoke('messages:history', { chatId, limit: HISTORY_PAGE_SIZE })
   signal.throwIfAborted()
 
   /**
@@ -114,58 +119,70 @@ async function readFirstPage(
 
   let messages = first.messages
   let hasMore = first.hasMore
-  const deadline = Date.now() + RESTORE_BUDGET_MS
+  let hasNewer = false
+  /** The around request itself failed (not "the row is gone"). */
+  let aroundFailed = false
   const oldest = messages[0]
-  if (target !== null && oldest !== undefined && oldest.id > target.messageId) onRestoring()
-  // Unread pages get a larger budget than a saved anchor: a chat with 300 unread
-  // messages is normal, a reading position 300 messages up is not.
-  const pageBudget = target?.kind === 'unread' ? MAX_UNREAD_PAGES : MAX_RESTORE_PAGES
-  for (
-    let pages = 0;
-    target !== null &&
-    hasMore &&
-    messages[0] !== undefined &&
-    messages[0].id > target.messageId &&
-    pages < pageBudget &&
-    Date.now() < deadline;
-    pages += 1
-  ) {
-    const from = messages[0]
-    if (!from) break
-    const older = await invoke('messages:history', {
-      chatId,
-      fromMessageId: from.id,
-      limit: PAGE_SIZE,
-    })
+  if (target !== null && oldest !== undefined && oldest.id > target.messageId) {
+    onRestoring()
+    let around: { messages: Message[]; hasMore: boolean; hasNewer: boolean } | null = null
+    try {
+      around = await invoke('messages:around', {
+        chatId,
+        messageId: target.messageId,
+        limit: AROUND_CONTEXT,
+      })
+    } catch (error) {
+      // A failed window fetch must not blank the transcript: the newest page is
+      // still a usable answer and the query keeps its retry for a cold fetch.
+      if (signal.aborted) throw error
+      around = null
+      aroundFailed = true
+    }
     signal.throwIfAborted()
-    messages = [...older.messages, ...messages]
-    hasMore = older.hasMore
+    if (around !== null) {
+      messages = around.messages
+      hasMore = around.hasMore
+      hasNewer = around.hasNewer
+    }
   }
 
-  const landing = resolveLanding(messages, marker, anchor)
+  let landing = resolveLanding(messages, marker, anchor)
+  if (target !== null && landing === null) {
+    // The row we paged for is gone (deleted, or the window came back without it).
+    // The newest page is the only honest fallback; opening on an arbitrary row
+    // would be worse than opening at the bottom.
+    messages = first.messages
+    hasMore = first.hasMore
+    hasNewer = false
+    landing = resolveLanding(messages, marker, anchor)
+  }
   signal.throwIfAborted()
 
   // Past this line the fetch is committed: an aborted query must not leave a page
   // in the store that nobody asked for any more.
-  useAppStore.getState().setHistory(chatId, messages, hasMore)
+  useAppStore.getState().setHistory(chatId, messages, hasMore, hasNewer)
   /**
-   * A saved position we actually paged for and still could not reach (deeper than
-   * the budget, or deleted): drop it, so the next open stays instant instead of
-   * paging back again for nothing. An anchor that lost to the unread divider is
-   * *not* dropped — it was never the target, and it is still a valid place to
-   * return to once the chat has no unread messages.
+   * A saved position we actually paged for and still could not reach (deleted):
+   * drop it, so the next open stays instant instead of paging back again for
+   * nothing. An anchor that lost to the unread divider is *not* dropped — it was
+   * never the target, and it is still a valid place to return to once the chat has
+   * no unread messages.
    */
   const anchorFound = anchor ? messages.some((message) => message.id === anchor.messageId) : false
-  if (target?.kind === 'anchor' && !anchorFound) {
+  // A failed around request proves nothing about the row: keep the anchor so the
+  // next open can try again. Only a window that came back without it (deleted)
+  // justifies dropping the saved position.
+  if (target?.kind === 'anchor' && !anchorFound && !aroundFailed) {
     void invoke('ui:saveAnchor', { chatId, messageId: null, offset: 0 }).catch(() => undefined)
   }
 
-  return { chatId, messages, hasMore, landing }
+  return { chatId, messages, hasMore, hasNewer, landing }
 }
 
 /**
  * Owns the transcript's data lifecycle for the active chat: the first page, the
- * paging needed to reach a saved reading position, and older-page fetching.
+ * window around a deep landing row, and older/newer pages.
  *
  * React-query owns the request (key per chat, retries, cancellation, pending
  * flags); the store stays the single source of truth for the message list, so the
@@ -285,6 +302,9 @@ export function useChatHistory(activeChatId: number | null): ChatHistoryState {
   const messageCount = useAppStore((state) =>
     activeChatId === null ? 0 : (state.messagesByChat[activeChatId]?.length ?? 0),
   )
+  const hasNewer = useAppStore((state) =>
+    activeChatId === null ? false : state.hasNewerByChat[activeChatId] === true,
+  )
   const hadRowsFor = useRef<number | null>(null)
   /**
    * A transcript that had rows and now has none was not emptied by the reader, so
@@ -319,7 +339,7 @@ export function useChatHistory(activeChatId: number | null): ChatHistoryState {
   }, [refetch])
 
   const loadOlder = useCallback(async (): Promise<void> => {
-    if (!activeChatId) return
+    if (activeChatId === null) return
     const oldest = (useAppStore.getState().messagesByChat[activeChatId] ?? [])[0]
     if (!oldest) return
 
@@ -328,7 +348,7 @@ export function useChatHistory(activeChatId: number | null): ChatHistoryState {
       const older = await invoke('messages:history', {
         chatId: activeChatId,
         fromMessageId: oldest.id,
-        limit: PAGE_SIZE,
+        limit: HISTORY_PAGE_SIZE,
       })
       useAppStore.getState().prependHistory(activeChatId, older.messages, older.hasMore)
     } catch (error) {
@@ -338,13 +358,39 @@ export function useChatHistory(activeChatId: number | null): ChatHistoryState {
     }
   }, [activeChatId])
 
+  /** One ref at a time: the scroll handler can fire many times at the edge. */
+  const loadingNewerRef = useRef(false)
+  const loadNewer = useCallback(async (): Promise<void> => {
+    if (activeChatId === null || loadingNewerRef.current) return
+    const store = useAppStore.getState()
+    if (store.hasNewerByChat[activeChatId] !== true) return
+    const last = (store.messagesByChat[activeChatId] ?? []).at(-1)
+    if (!last) return
+
+    loadingNewerRef.current = true
+    try {
+      const newer = await invoke('messages:newer', {
+        chatId: activeChatId,
+        fromMessageId: last.id,
+        limit: HISTORY_PAGE_SIZE,
+      })
+      useAppStore.getState().appendNewer(activeChatId, newer.messages, newer.hasNewer)
+    } catch (error) {
+      useAppStore.getState().setError(errorMessage(error))
+    } finally {
+      loadingNewerRef.current = false
+    }
+  }, [activeChatId])
+
   return {
     pendingLanding,
     anchorKnown,
     restoring,
     loadingHistory: needsFetch && (history.isPending || history.isFetching),
     loadingOlder,
+    hasNewer,
     reload,
     loadOlder,
+    loadNewer,
   }
 }

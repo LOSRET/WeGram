@@ -1,5 +1,8 @@
 import type { Message } from '@wegram/protocol'
 
+/** One transcript page: the first page, every older page and every newer page. */
+export const HISTORY_PAGE_SIZE = 50
+
 /**
  * The one rule behind "may this empty page be cached as the chat's history".
  *

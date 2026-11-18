@@ -1,7 +1,8 @@
 import type { Message } from '@wegram/protocol'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
-import { invoke } from '../../lib/ipc'
+import { loadLatestWindow } from '../../lib/anchoredWindow'
+import { errorMessage, invoke } from '../../lib/ipc'
 import { mayMarkRead } from '../../lib/readGate'
 import { useAppStore } from '../../store/useAppStore'
 import { Composer } from '../Composer'
@@ -59,8 +60,17 @@ export function ChatPane() {
   /** Chat-info popover (the "…" button in the header). */
   const [infoAt, setInfoAt] = useState<{ x: number; y: number } | null>(null)
 
-  const { pendingLanding, anchorKnown, restoring, loadingHistory, loadingOlder, reload, loadOlder } =
-    useChatHistory(activeChatId)
+  const {
+    pendingLanding,
+    anchorKnown,
+    restoring,
+    loadingHistory,
+    loadingOlder,
+    hasNewer,
+    reload,
+    loadOlder,
+    loadNewer,
+  } = useChatHistory(activeChatId)
 
   const chat = chats.find((item) => item.id === activeChatId) ?? null
   const messages = activeChatId ? (messagesByChat[activeChatId] ?? []) : []
@@ -105,6 +115,23 @@ export function ChatPane() {
     }
   }, [activeChatId, seenUpToMessageId])
 
+  /**
+   * "跳转到最新消息": replace an anchored window with the newest page (a no-op
+   * when it already reaches the newest message), then let the list scroll to its
+   * end through the per-chat jump signal. A failed reload does not scroll: the
+   * reader gets the error bar and stays where they were.
+   */
+  const returnToLatest = useCallback(async (): Promise<void> => {
+    if (activeChatId === null) return
+    try {
+      await loadLatestWindow(activeChatId)
+    } catch (error) {
+      useAppStore.getState().setError(errorMessage(error))
+      return
+    }
+    useAppStore.getState().requestJumpToLatest(activeChatId)
+  }, [activeChatId])
+
   const replyToId = activeChatId ? (replyToByChat[activeChatId] ?? null) : null
   const replyTo = replyToId ? (messages.find((item) => item.id === replyToId) ?? null) : null
   const editingForChat = editing && editing.chatId === activeChatId ? editing : null
@@ -130,7 +157,12 @@ export function ChatPane() {
           chat={chat}
           messages={messages}
           hasMore={Boolean(hasMoreByChat[activeChatId])}
+          hasNewer={hasNewer}
           loadingOlder={loadingOlder}
+          onLoadNewer={() => {
+            void loadNewer()
+          }}
+          onReturnToLatest={returnToLatest}
           landing={pendingLanding?.chatId === activeChatId ? pendingLanding.position : null}
           unreadMarker={
             unreadMarkers[activeChatId]?.unread ? (unreadMarkers[activeChatId] ?? null) : null

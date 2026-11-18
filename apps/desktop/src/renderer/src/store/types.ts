@@ -51,6 +51,15 @@ export interface AppData {
   pendingOps: Record<number, MessageOp[]>
   /** true when older messages may still exist on the server */
   hasMoreByChat: Record<number, boolean>
+  /**
+   * true when the loaded window does not reach the newest message. The reader
+   * landed on an old row (saved position or deep unread) and the window was
+   * loaded around it; new arrivals are queued instead of being spliced into the
+   * gap, and the list appends pages forward as the reader scrolls down.
+   */
+  hasNewerByChat: Record<number, boolean>
+  /** Per-chat request to scroll to the newest message after a window reload. */
+  jumpToLatest: { chatId: number; tick: number } | null
   replyToByChat: Record<number, number | null>
   typingByChat: Record<number, boolean>
   editing: EditingState | null
@@ -84,9 +93,13 @@ export interface ChatActions {
 }
 
 export interface MessageActions {
-  setHistory: (chatId: number, messages: Message[], hasMore: boolean) => void
+  setHistory: (chatId: number, messages: Message[], hasMore: boolean, hasNewer?: boolean) => void
   prependHistory: (chatId: number, messages: Message[], hasMore: boolean) => void
+  /** Extends an anchored window downward, keeping any ops that are still ahead. */
+  appendNewer: (chatId: number, messages: Message[], hasNewer: boolean) => void
   applyMessageOps: (chatId: number, ops: MessageOp[]) => void
+  /** Ask the list to scroll to the newest message (after a latest-window reload). */
+  requestJumpToLatest: (chatId: number) => void
   setReplyTo: (chatId: number, messageId: number | null) => void
   setEditing: (editing: EditingState | null) => void
   setUnreadMarker: (chatId: number, marker: UnreadMarker | null) => void

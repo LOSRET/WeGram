@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { history, openChat } from './actions'
+import { history, historyAround, historyNewer, openChat } from './actions'
 import type { ActionDeps } from './actions'
 import type { TdObject } from './client'
 import type { MapperContext } from './map/context'
@@ -59,6 +59,68 @@ describe('openChat', () => {
      * reader's other devices all said "read" while the unread block was on screen.
      */
     expect(calls.map((call) => call._)).toEqual(['getChat'])
+  })
+})
+
+describe('historyAround', () => {
+  it('merges older rows, the anchor and newer rows into one contiguous window', async () => {
+    const { deps, calls } = makeDeps((method) => {
+      if (method._ === 'getChat') return { id: 1, last_message: { id: 1005, date: 1 } }
+      if (method._ === 'getMessage') return rawMessage(1000, 'anchor')
+      if (method._ === 'getChatHistory') {
+        return method.offset === 0
+          ? { messages: [rawMessage(999, 'older'), rawMessage(998, 'oldest')] }
+          : { messages: [rawMessage(1002, 'newer'), rawMessage(1001, 'newer-1')] }
+      }
+      throw new Error(`unexpected ${String(method._)}`)
+    })
+
+    const page = await historyAround(deps, { chatId: 1, messageId: 1000, limit: 2 })
+
+    expect(page.messages.map((message) => message.id)).toEqual([998, 999, 1000, 1001, 1002])
+    expect(page.hasNewer).toBe(true)
+    // The newer half must use a negative offset; offset 0 means "older than".
+    expect(calls.find((call) => call._ === 'getChatHistory' && call.offset === -2)).toMatchObject({
+      from_message_id: 1000,
+      limit: 2,
+    })
+  })
+
+  it('reports hasNewer=false when the window reaches the newest message', async () => {
+    const { deps } = makeDeps((method) => {
+      if (method._ === 'getChat') return { id: 1, last_message: { id: 1002, date: 1 } }
+      if (method._ === 'getMessage') return rawMessage(1000, 'anchor')
+      if (method._ === 'getChatHistory') {
+        return method.offset === 0
+          ? { messages: [rawMessage(999, 'older')] }
+          : { messages: [rawMessage(1002, 'newest'), rawMessage(1001, 'newer')] }
+      }
+      throw new Error(`unexpected ${String(method._)}`)
+    })
+
+    const page = await historyAround(deps, { chatId: 1, messageId: 1000, limit: 2 })
+    expect(page.hasNewer).toBe(false)
+  })
+})
+
+describe('historyNewer', () => {
+  it('asks for messages newer than the window tail and keeps only those', async () => {
+    const { deps, calls } = makeDeps((method) => {
+      if (method._ === 'getChat') return { id: 1, last_message: { id: 1005, date: 1 } }
+      if (method._ === 'getChatHistory') {
+        return { messages: [rawMessage(1004, 'n2'), rawMessage(1003, 'n1')] }
+      }
+      throw new Error(`unexpected ${String(method._)}`)
+    })
+
+    const page = await historyNewer(deps, { chatId: 1, fromMessageId: 1002, limit: 2 })
+
+    expect(page.messages.map((message) => message.id)).toEqual([1003, 1004])
+    expect(page.hasNewer).toBe(true)
+    expect(calls.find((call) => call._ === 'getChatHistory')).toMatchObject({
+      from_message_id: 1002,
+      offset: -2,
+    })
   })
 })
 

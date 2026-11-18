@@ -76,6 +76,22 @@ export interface TelegramAdapter {
     fromMessageId?: number
     limit: number
   }): Promise<{ messages: Message[]; hasMore: boolean }>
+  /**
+   * A window centred on one message. Used instead of paging back from the newest
+   * page when the target (a saved reading position or the unread boundary) is
+   * deep: it reaches the row in one round trip instead of walking the gap.
+   */
+  historyAround(input: {
+    chatId: number
+    messageId: number
+    limit: number
+  }): Promise<{ messages: Message[]; hasMore: boolean; hasNewer: boolean }>
+  /** One page below an anchored window that does not reach the newest message. */
+  historyNewer(input: {
+    chatId: number
+    fromMessageId: number
+    limit: number
+  }): Promise<{ messages: Message[]; hasNewer: boolean }>
   sendText(input: {
     chatId: number
     text: string

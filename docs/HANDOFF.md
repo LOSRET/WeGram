@@ -632,10 +632,17 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
    exact row, a full app restart restores it from `ui.db`, a seeded deep anchor (#4771,
    4 pages behind) paged back automatically, and scrolling to the bottom cleared the row
    (`scroll_anchor_id = NULL`).
-   Limitation worth knowing: an anchor further back than that budget is unreachable
-   (history is fetched by paging, not from an anchor), so the chat opens at the bottom and
-   the anchor is dropped. Fixing that properly needs a "load around message" fetch, which
-   is a W4 jump-to-message feature.
+   **Load-around (2026-11-18, replaces the page budget)**: when the saved row or the
+   unread boundary is older than the newest page, `useChatHistory` asks for a window
+   *around* it (`messages:around`): the adapter merges an older page (the existing
+   top-up pager), `getMessage` for the anchor (getChatHistory is exclusive) and a
+   *negative-offset* `getChatHistory` for the newer half (Spike 2 §2.3). The window
+   therefore stops short of the newest message; `hasNewer` says so. Live arrivals are
+   queued instead of spliced under the window's last row, reaching the window end
+   appends `messages:newer`, and the buoy / every send path replace the window with
+   the newest page before acting. The 6-page / 10 s budget and its "anchor is dropped,
+   chat opens at the bottom" failure are gone. Unit-tested (actions, reducers, store);
+   the real-account pass for a 5 000-message-deep anchor is still pending.
 3. ~~**W3 scope**: media send/receive, sticker renderer, day separators, unread
    divider, sticker panel.~~ **Main body done**; what is left from W3 and what W3
    deliberately did not include:

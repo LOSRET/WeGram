@@ -1,6 +1,7 @@
 import type { Message, Sticker, StickerSet, StickerSetSummary } from '@wegram/protocol'
 import { useEffect, useState } from 'react'
 
+import { loadLatestWindow } from '../lib/anchoredWindow'
 import { errorMessage, invoke } from '../lib/ipc'
 import { useAppStore } from '../store/useAppStore'
 import { StickerRenderer } from './StickerRenderer'
@@ -77,8 +78,12 @@ export function StickerPanel({ chatId, onSent, onClose }: StickerPanelProps) {
 
   const send = async (sticker: Sticker): Promise<void> => {
     try {
+      // An anchored window cannot take the new row in place; return to the
+      // newest page first so the message lands where it will be visible.
+      const wasAnchored = await loadLatestWindow(chatId)
       const result = await invoke('messages:sendSticker', { chatId, fileId: sticker.fileId })
       useAppStore.getState().applyMessageOps(chatId, [{ op: 'new', message: result.message }])
+      if (wasAnchored) useAppStore.getState().requestJumpToLatest(chatId)
       onSent(result.message)
     } catch (cause) {
       setError(errorMessage(cause))

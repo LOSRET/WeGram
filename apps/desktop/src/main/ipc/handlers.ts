@@ -102,6 +102,10 @@ export function createHandlers({
 
     'messages:history': (payload) =>
       adapter.history(payload as { chatId: number; fromMessageId?: number; limit: number }),
+    'messages:around': (payload) =>
+      adapter.historyAround(payload as { chatId: number; messageId: number; limit: number }),
+    'messages:newer': (payload) =>
+      adapter.historyNewer(payload as { chatId: number; fromMessageId: number; limit: number }),
     'messages:send': (payload) =>
       adapter.sendText(payload as { chatId: number; text: string; replyTo?: number }),
     'messages:edit': (payload) =>

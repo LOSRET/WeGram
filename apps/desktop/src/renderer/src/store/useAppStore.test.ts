@@ -101,6 +101,73 @@ describe('setHistory', () => {
   })
 })
 
+describe('anchored windows', () => {
+  it('replays only the ops inside a window that stops short of the newest message', () => {
+    const store = useAppStore.getState()
+    store.applyMessageOps(CHAT_ID, [newOp(2), newOp(9)])
+
+    useAppStore.getState().setHistory(CHAT_ID, [message(1), message(2)], true, true)
+
+    const state = useAppStore.getState()
+    expect(state.messagesByChat[CHAT_ID]?.map((item) => item.id)).toEqual([1, 2])
+    // 9 is beyond the window: it must not be spliced under row 2.
+    expect(state.pendingOps[CHAT_ID]?.map((op) => (op.op === 'new' ? op.message.id : 0))).toEqual([
+      9,
+    ])
+    expect(state.hasNewerByChat[CHAT_ID]).toBe(true)
+  })
+
+  it('holds live arrivals until the window reaches them, then appends them', () => {
+    const store = useAppStore.getState()
+    store.setHistory(CHAT_ID, [message(1), message(2)], false, true)
+    store.applyMessageOps(CHAT_ID, [newOp(5)])
+
+    expect(useAppStore.getState().messagesByChat[CHAT_ID]?.map((item) => item.id)).toEqual([1, 2])
+    expect(useAppStore.getState().pendingOps[CHAT_ID]).toHaveLength(1)
+
+    useAppStore.getState().appendNewer(CHAT_ID, [message(3), message(4)], true)
+    expect(useAppStore.getState().messagesByChat[CHAT_ID]?.map((item) => item.id)).toEqual([
+      1, 2, 3, 4,
+    ])
+    expect(useAppStore.getState().pendingOps[CHAT_ID]).toHaveLength(1)
+
+    useAppStore.getState().appendNewer(CHAT_ID, [message(5)], false)
+    const state = useAppStore.getState()
+    expect(state.messagesByChat[CHAT_ID]?.map((item) => item.id)).toEqual([1, 2, 3, 4, 5])
+    expect(state.pendingOps[CHAT_ID]).toBeUndefined()
+    expect(state.hasNewerByChat[CHAT_ID]).toBe(false)
+  })
+
+  it('applies a queued live arrival when the window finally reaches latest', () => {
+    const store = useAppStore.getState()
+    store.setHistory(CHAT_ID, [message(1), message(2)], false, true)
+    // Arrived while the window was anchored, so it was held back.
+    store.applyMessageOps(CHAT_ID, [newOp(4)])
+
+    useAppStore.getState().appendNewer(CHAT_ID, [message(3)], false)
+
+    const state = useAppStore.getState()
+    expect(state.messagesByChat[CHAT_ID]?.map((item) => item.id)).toEqual([1, 2, 3, 4])
+    expect(state.pendingOps[CHAT_ID]).toBeUndefined()
+    expect(state.hasNewerByChat[CHAT_ID]).toBe(false)
+  })
+
+  it('still applies deletes while anchored', () => {
+    const store = useAppStore.getState()
+    store.setHistory(CHAT_ID, [message(1), message(2)], false, true)
+    store.applyMessageOps(CHAT_ID, [{ op: 'delete', chatId: CHAT_ID, messageIds: [1] }])
+    expect(useAppStore.getState().messagesByChat[CHAT_ID]?.map((item) => item.id)).toEqual([2])
+  })
+
+  it('bumps a per-chat jump signal for the list to consume', () => {
+    useAppStore.getState().requestJumpToLatest(CHAT_ID)
+    const first = useAppStore.getState().jumpToLatest
+    expect(first).toMatchObject({ chatId: CHAT_ID, tick: 1 })
+    useAppStore.getState().requestJumpToLatest(CHAT_ID)
+    expect(useAppStore.getState().jumpToLatest?.tick).toBe(2)
+  })
+})
+
 describe('prependHistory', () => {
   it('prepends older messages and skips ids that are already there', () => {
     const store = useAppStore.getState()

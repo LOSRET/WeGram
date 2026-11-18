@@ -1,6 +1,7 @@
 import type { Message } from '@wegram/protocol'
 import { useEffect, useRef, useState } from 'react'
 
+import { loadLatestWindow } from '../lib/anchoredWindow'
 import { errorMessage, invoke } from '../lib/ipc'
 import { messagePreview } from '../lib/format'
 import { useAppStore } from '../store/useAppStore'
@@ -120,6 +121,7 @@ export function Composer({
       if (picked.paths.length === 0) return
       setBusy(true)
       setStickerOpen(false)
+      const wasAnchored = await loadLatestWindow(chatId)
       const replyToId = replyTo?.id
       for (const filePath of picked.paths) {
         const result = await invoke('media:send', {
@@ -131,6 +133,7 @@ export function Composer({
         useAppStore.getState().applyMessageOps(chatId, [{ op: 'new', message: result.message }])
       }
       if (replyToId !== undefined) onCancelReply()
+      if (wasAnchored) useAppStore.getState().requestJumpToLatest(chatId)
       useAppStore.getState().setToast(kind === 'photo' ? '已发送图片' : '已发送文件')
     } catch (error) {
       useAppStore.getState().setError(errorMessage(error))

@@ -4,9 +4,11 @@ import { describe, expect, it } from 'vitest'
 import {
   EMPTY_MESSAGES,
   PENDING_OPS_LIMIT,
+  appendNewerMessages,
   hasReplayableOps,
   reduceOps,
   sortChats,
+  splitOpsForWindow,
 } from './reducers'
 
 function message(id: number, overrides: Partial<Message> = {}): Message {
@@ -117,6 +119,44 @@ describe('hasReplayableOps', () => {
   it('keeps a batch that carries anything else', () => {
     expect(hasReplayableOps([readOp(), newOp(9)])).toBe(true)
     expect(hasReplayableOps([deleteOp(1)])).toBe(true)
+  })
+})
+
+describe('splitOpsForWindow', () => {
+  const window = [message(10), message(11), message(12)]
+
+  it('applies rows inside the window and defers rows beyond its newest id', () => {
+    const { applicable, deferred } = splitOpsForWindow(window, [newOp(11), newOp(13), deleteOp(10)])
+    expect(applicable.map((op) => (op.op === 'new' ? op.message.id : op.op))).toEqual([
+      11,
+      'delete',
+    ])
+    // Splicing 13 under 12 would hide every message between them.
+    expect(deferred.map((op) => (op.op === 'new' ? op.message.id : op.op))).toEqual([13])
+  })
+
+  it('drops rows older than the window instead of appending them at the end', () => {
+    const { applicable, deferred } = splitOpsForWindow(window, [newOp(9), newOp(13)])
+    expect(applicable).toHaveLength(0)
+    expect(deferred).toHaveLength(1)
+  })
+
+  it('always applies id-only ops, which cannot invent a row', () => {
+    const edit: MessageOp = { op: 'edit', chatId: 1, messageId: 11, text: 'x' }
+    const { applicable } = splitOpsForWindow(window, [edit, readOp()])
+    expect(applicable).toHaveLength(2)
+  })
+})
+
+describe('appendNewerMessages', () => {
+  it('appends only ids newer than the current tail, de-duplicated and ascending', () => {
+    const list = appendNewerMessages([message(1), message(2)], [message(4), message(2), message(3)])
+    expect(list.map((item) => item.id)).toEqual([1, 2, 3, 4])
+  })
+
+  it('returns the same list when nothing is newer', () => {
+    const before = [message(1), message(2)]
+    expect(appendNewerMessages(before, [message(1)])).toBe(before)
   })
 })
 

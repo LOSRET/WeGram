@@ -29,7 +29,10 @@ The login is its **own window**, like WeChat's: a frameless 280×373 `BrowserWin
 
 Still deferred: search (global + in-chat), pinning/mute controls, settings page. Release packaging lives in `.github/workflows/release.yml` (tag → NSIS installer → GitHub Release), proven by `v0.1.0`; the installer itself has never been installed or code-signed.
 `ui.db` reading positions (`scroll_anchor_id`/`scroll_offset`) are wired: MessageList writes them,
-ChatPane restores them when the reader was not at the bottom.
+ChatPane restores them when the reader was not at the bottom. A row older than the
+newest page is loaded *around* itself (`messages:around`), and a window that stops
+short of the latest message (`hasNewer`) is extended with `messages:newer` instead of
+splicing live arrivals into a gap.
 
 W1 is verified by `pnpm typecheck`, `pnpm build` and the browser preview (`pnpm web`). The Electron window has also been exercised end-to-end on this machine, but only when launched detached and with `--no-sandbox` (both are environment workarounds — see Environment quirks).
 

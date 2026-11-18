@@ -275,6 +275,37 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     return { messages: slice.map((m) => ({ ...m })), hasMore: upper.length > slice.length }
   }
 
+  async historyAround(input: {
+    chatId: number
+    messageId: number
+    limit: number
+  }): Promise<{ messages: Message[]; hasMore: boolean; hasNewer: boolean }> {
+    const all = this.requireFixture(input.chatId).messages
+    const found = all.findIndex((message) => message.id === input.messageId)
+    const center = found >= 0 ? found : all.findIndex((message) => message.id > input.messageId)
+    if (center < 0) return { messages: [], hasMore: true, hasNewer: false }
+    const start = Math.max(0, center - input.limit)
+    const end = Math.min(all.length, center + input.limit + 1)
+    return {
+      messages: all.slice(start, end).map((message) => ({ ...message })),
+      hasMore: start > 0,
+      hasNewer: end < all.length,
+    }
+  }
+
+  async historyNewer(input: {
+    chatId: number
+    fromMessageId: number
+    limit: number
+  }): Promise<{ messages: Message[]; hasNewer: boolean }> {
+    const all = this.requireFixture(input.chatId).messages
+    const newer = all.filter((message) => message.id > input.fromMessageId)
+    return {
+      messages: newer.slice(0, input.limit).map((message) => ({ ...message })),
+      hasNewer: newer.length > input.limit,
+    }
+  }
+
   async sendText(input: {
     chatId: number
     text: string
@@ -914,6 +945,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
         chat: { ...fixture.chat },
       })),
     })
+    this.scheduleLateAvatar()
   }
 
   private clearQrTimer(): void {
@@ -976,7 +1008,6 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
       action: 'typing',
       until: Date.now() + 3000,
     })
-    this.scheduleLateAvatar()
   }
 }
 

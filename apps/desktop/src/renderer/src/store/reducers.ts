@@ -74,3 +74,47 @@ export function reduceOps(
 export function hasReplayableOps(ops: MessageOp[]): boolean {
   return ops.some((op) => op.op !== 'read')
 }
+
+/**
+ * Split ops for a window that does not reach the newest message.
+ *
+ * An anchored window knows two ids: the oldest and the newest loaded row. Ops
+ * for a row inside that range apply as usual. A *newer* row cannot be spliced on
+ * yet — that would draw it directly under the window's last row and leave a
+ * silent gap in the transcript — so it is deferred until the window reaches it.
+ * A row older than the window belongs to a page nobody loaded and is dropped:
+ * paging up will fetch it with its neighbours.
+ *
+ * Id-only ops (edit, delete, read) always apply: they cannot invent a row.
+ */
+export function splitOpsForWindow(
+  list: Message[],
+  ops: MessageOp[],
+): { applicable: MessageOp[]; deferred: MessageOp[] } {
+  const firstId = list[0]?.id ?? 0
+  const lastId = list[list.length - 1]?.id ?? 0
+  const applicable: MessageOp[] = []
+  const deferred: MessageOp[] = []
+  for (const op of ops) {
+    if (op.op === 'new' || op.op === 'replace') {
+      if (op.message.id > lastId) {
+        deferred.push(op)
+      } else if (op.message.id >= firstId) {
+        applicable.push(op)
+      }
+      continue
+    }
+    applicable.push(op)
+  }
+  return { applicable, deferred }
+}
+
+/** De-duplicating append for an anchored window; ids can only grow. */
+export function appendNewerMessages(list: Message[], messages: Message[]): Message[] {
+  const lastId = list.at(-1)?.id ?? 0
+  const seen = new Set(list.map((message) => message.id))
+  const added = messages
+    .filter((message) => message.id > lastId && !seen.has(message.id))
+    .sort((a, b) => a.id - b.id)
+  return added.length > 0 ? [...list, ...added] : list
+}

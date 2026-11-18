@@ -313,6 +313,22 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     return actions.history(this.actionDeps, input)
   }
 
+  async historyAround(input: {
+    chatId: number
+    messageId: number
+    limit: number
+  }): Promise<{ messages: Message[]; hasMore: boolean; hasNewer: boolean }> {
+    return actions.historyAround(this.actionDeps, input)
+  }
+
+  async historyNewer(input: {
+    chatId: number
+    fromMessageId: number
+    limit: number
+  }): Promise<{ messages: Message[]; hasNewer: boolean }> {
+    return actions.historyNewer(this.actionDeps, input)
+  }
+
   async sendText(input: {
     chatId: number
     text: string

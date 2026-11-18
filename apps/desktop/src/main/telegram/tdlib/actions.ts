@@ -206,6 +206,129 @@ export async function history(
   return { messages: mapped, hasMore: !exhausted && mapped.length > 0 }
 }
 
+/** One side of an around window; the protocol caps it at 50 as well. */
+const AROUND_LIMIT = 50
+
+/** Newest message id the chat knows about, or 0 when it has no messages yet. */
+async function newestMessageId(deps: Pick<ActionDeps, 'invoke'>, chatId: number): Promise<number> {
+  const chat = await deps.invoke({ _: 'getChat', chat_id: chatId })
+  return Number(chat?.last_message?.id ?? 0)
+}
+
+/** Raw messages -> mapped, ascending, de-duplicated by id. */
+async function mapRawPage(
+  deps: Pick<ActionDeps, 'invoke' | 'mapper'>,
+  chatId: number,
+  rawMessages: TdObject[] | undefined,
+): Promise<Message[]> {
+  const byId = new Map<number, TdObject>()
+  for (const raw of rawMessages ?? []) {
+    const id = Number(raw.id)
+    if (Number.isFinite(id)) byId.set(id, raw)
+  }
+  const ordered = [...byId.values()].sort((a, b) => Number(a.id) - Number(b.id))
+  return Promise.all(ordered.map((raw) => mapMessage(deps.mapper, chatId, raw)))
+}
+
+/**
+ * A contiguous window centred on one message, for a reading position or an
+ * unread boundary that is older than the newest page.
+ *
+ * This is what makes a deep position reachable without walking the gap first:
+ * messages:history can only page back from the newest message, so restoring a
+ * position 5 000 messages up used to cost fifty round trips (the renderer gave
+ * up after six pages). Two requests are enough here:
+ *
+ *  - older: history() (the robust top-up pager) anchored on the message;
+ *  - newer: getChatHistory with a *negative* offset, which returns messages
+ *    newer than the anchor (measured in Spike 2, RESULTS.md #2.3);
+ *  - the anchor itself: getChatHistory is exclusive, so getMessage supplies it.
+ *
+ * hasNewer means the window does not reach the newest message; the renderer
+ * then appends via messages:newer as the reader scrolls down instead of
+ * pretending the window ends at the latest message.
+ */
+export async function historyAround(
+  deps: ActionDeps,
+  input: { chatId: number; messageId: number; limit: number },
+): Promise<{ messages: Message[]; hasMore: boolean; hasNewer: boolean }> {
+  const size = Math.min(Math.max(input.limit, 1), AROUND_LIMIT)
+  const [lastId, older] = await Promise.all([
+    newestMessageId(deps, input.chatId),
+    history(deps, {
+      chatId: input.chatId,
+      fromMessageId: input.messageId,
+      limit: size,
+    }),
+  ])
+
+  const newerResponse = await deps.invoke({
+    _: 'getChatHistory',
+    chat_id: input.chatId,
+    from_message_id: input.messageId,
+    offset: -size,
+    limit: size,
+    only_local: false,
+  })
+  const rawNewer = (Array.isArray(newerResponse.messages) ? newerResponse.messages : []).filter(
+    (raw: TdObject) => Number(raw.id) > input.messageId,
+  )
+  const newer = await mapRawPage(deps, input.chatId, rawNewer)
+
+  let anchor: Message | null = null
+  try {
+    const raw = await deps.invoke({
+      _: 'getMessage',
+      chat_id: input.chatId,
+      message_id: input.messageId,
+    })
+    if (raw && raw._ !== 'error' && Number(raw.id) === input.messageId) {
+      anchor = await mapMessage(deps.mapper, input.chatId, raw)
+    }
+  } catch {
+    // A deleted anchor is normal: the window still carries its neighbours.
+  }
+
+  const byId = new Map<number, Message>()
+  for (const message of older.messages) byId.set(message.id, message)
+  if (anchor) byId.set(anchor.id, anchor)
+  for (const message of newer) byId.set(message.id, message)
+  const messages = [...byId.values()].sort((a, b) => a.id - b.id)
+  const newest = messages.at(-1)?.id ?? 0
+  return {
+    messages,
+    hasMore: older.hasMore,
+    hasNewer: lastId > 0 && newest < lastId,
+  }
+}
+
+/**
+ * The page immediately below an anchored window. Needed because an around
+ * window does not reach the newest message; the reader scrolls down and the
+ * transcript extends instead of jumping.
+ */
+export async function historyNewer(
+  deps: ActionDeps,
+  input: { chatId: number; fromMessageId: number; limit: number },
+): Promise<{ messages: Message[]; hasNewer: boolean }> {
+  const size = Math.min(Math.max(input.limit, 1), 100)
+  const lastId = await newestMessageId(deps, input.chatId)
+  const response = await deps.invoke({
+    _: 'getChatHistory',
+    chat_id: input.chatId,
+    from_message_id: input.fromMessageId,
+    offset: -size,
+    limit: size,
+    only_local: false,
+  })
+  const rawNewer = (Array.isArray(response.messages) ? response.messages : []).filter(
+    (raw: TdObject) => Number(raw.id) > input.fromMessageId,
+  )
+  const messages = await mapRawPage(deps, input.chatId, rawNewer)
+  const newest = messages.at(-1)?.id ?? input.fromMessageId
+  return { messages, hasNewer: lastId > 0 && newest < lastId }
+}
+
 export async function sendText(
   deps: ActionDeps,
   input: { chatId: number; text: string; replyTo?: number },

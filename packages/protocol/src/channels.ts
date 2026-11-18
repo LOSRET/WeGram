@@ -48,6 +48,14 @@ export const invokeChannels = [
   'chats:get',
   'chats:open',
   'messages:history',
+  /**
+   * One window centred on a message, for a reading position or unread boundary
+   * older than the newest page. Unlike paging back from the newest message this
+   * does not need to walk the gap, so a deep position stays reachable.
+   */
+  'messages:around',
+  /** One page below a window that does not reach the newest message. */
+  'messages:newer',
   'messages:send',
   'messages:edit',
   'messages:delete',
@@ -119,6 +127,32 @@ export const invokeSchemas = {
       limit: z.number().int().positive().max(100),
     }),
     response: z.object({ messages: z.array(messageSchema), hasMore: z.boolean() }),
+  },
+  'messages:around': {
+    request: z.object({
+      chatId: z.number().int(),
+      messageId: z.number().int(),
+      /** Messages kept on each side of `messageId`; the window is at most twice this. */
+      limit: z.number().int().positive().max(50),
+    }),
+    /**
+     * `hasMore` means older messages may exist, `hasNewer` that the window does
+     * not reach the newest message. A window that reaches the newest one is a
+     * normal transcript window again.
+     */
+    response: z.object({
+      messages: z.array(messageSchema),
+      hasMore: z.boolean(),
+      hasNewer: z.boolean(),
+    }),
+  },
+  'messages:newer': {
+    request: z.object({
+      chatId: z.number().int(),
+      fromMessageId: z.number().int(),
+      limit: z.number().int().positive().max(100),
+    }),
+    response: z.object({ messages: z.array(messageSchema), hasNewer: z.boolean() }),
   },
   'messages:send': {
     request: z.object({

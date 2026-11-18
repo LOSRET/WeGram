@@ -20,11 +20,14 @@ import { findUnreadMessage, type LandingPosition } from './unread'
 import { useAnchorSave } from './useAnchorSave'
 import { useInitialPosition } from './useInitialPosition'
 import { usePrependRestore } from './usePrependRestore'
+import { resyncScroller } from './scroller'
 
 export interface MessageListProps {
   chat: ChatSummary
   messages: Message[]
   hasMore: boolean
+  /** The window stops short of the newest message; scroll down or jump to extend it. */
+  hasNewer: boolean
   loadingOlder: boolean
   /** Where the chat opens: saved row, unread divider, or (null) the newest message. */
   landing: LandingPosition | null
@@ -37,6 +40,10 @@ export interface MessageListProps {
   /** What was unread when the chat was opened, for the "以下是新消息" divider. */
   unreadMarker: UnreadMarker | null
   onLoadOlder: () => Promise<void>
+  /** Extends an anchored window when the reader reaches its end. */
+  onLoadNewer: () => void
+  /** Replaces an anchored window with the newest page and scrolls to its end. */
+  onReturnToLatest: () => Promise<void>
   onReply: (message: Message) => void
   onEdit: (message: Message) => void
   onDelete: (message: Message) => void
@@ -69,11 +76,14 @@ export function MessageList({
   chat,
   messages,
   hasMore,
+  hasNewer,
   loadingOlder,
   landing,
   unreadMarker,
   onSeenUpToChange,
   onLoadOlder,
+  onLoadNewer,
+  onReturnToLatest,
   onReply,
   onEdit,
   onDelete,
@@ -144,7 +154,12 @@ export function MessageList({
     syncPin,
   })
 
-  const { scheduleAnchorSave, savePosition } = useAnchorSave({ chatId: chat.id, scrollRef, flags })
+  const { scheduleAnchorSave, savePosition } = useAnchorSave({
+    chatId: chat.id,
+    scrollRef,
+    flags,
+    anchoredWindow: hasNewer,
+  })
 
   /**
    * The landing has to survive the reader leaving without scrolling.
@@ -161,14 +176,42 @@ export function MessageList({
   useEffect(() => {
     if (!ready || landing === null || flags.restoring.current) return
     if (landing.kind === 'unread') {
-      if (atBottom) scheduleAnchorSave()
+      // "At the bottom" must mean the chat's bottom: an anchored window's end is
+      // an arbitrary old row, and storing `null` there would discard the position.
+      if (!hasNewer && atBottom) scheduleAnchorSave()
       else savePosition({ messageId: landing.messageId, offset: 0 })
       return
     }
-    if (!atBottom) return
+    if (hasNewer || !atBottom) return
     scheduleAnchorSave()
     // `flags` itself is a fresh object per render; the ref inside it is stable.
-  }, [ready, atBottom, landing, scheduleAnchorSave, savePosition, flags.restoring])
+  }, [ready, atBottom, hasNewer, landing, scheduleAnchorSave, savePosition, flags.restoring])
+
+  /**
+   * A latest-window reload replaces every row, so the viewport has to follow it to
+   * the end. The signal is per chat and consumed by a mount-time ref: a tick meant
+   * for another conversation must not move this one when it is mounted later.
+   */
+  const jumpToLatest = useAppStore((state) => state.jumpToLatest)
+  const consumedJumpTick = useRef(jumpToLatest?.tick ?? 0)
+  useEffect(() => {
+    if (!jumpToLatest || jumpToLatest.chatId !== chat.id) return
+    if (jumpToLatest.tick === consumedJumpTick.current) return
+    consumedJumpTick.current = jumpToLatest.tick
+    const land = (): void => {
+      virtualizer.scrollToEnd()
+      scrollToBottom()
+      resyncScroller(scrollRef.current)
+    }
+    const frame = requestAnimationFrame(land)
+    // rAF is throttled for an occluded window (see useInitialPosition); the timer
+    // is the net that still lands the scroll.
+    const timer = window.setTimeout(land, 80)
+    return () => {
+      cancelAnimationFrame(frame)
+      window.clearTimeout(timer)
+    }
+  }, [jumpToLatest, chat.id, virtualizer, scrollToBottom])
 
   const { loadOlder } = usePrependRestore({
     scrollRef,
@@ -241,7 +284,13 @@ export function MessageList({
         className={`wx-messages${ready ? '' : ' wx-messages--pending'}`}
         ref={scrollRef}
         onScroll={(event) => {
-          if (event.currentTarget.scrollTop < 160) void loadOlder()
+          const el = event.currentTarget
+          if (el.scrollTop < 160) void loadOlder()
+          // The end of an anchored window is not the chat's end: keep reading
+          // forward by appending the next page instead of stopping there.
+          if (hasNewer && el.scrollHeight - el.scrollTop - el.clientHeight < 160) {
+            onLoadNewer()
+          }
           measureViewport()
           scheduleAnchorSave()
         }}
@@ -297,10 +346,17 @@ export function MessageList({
         the wording — and it counts the arrivals still below the viewport, never
         the ones already read.
       */}
-      {ready && !atBottom ? (
-        <button className="wx-buoy" onClick={() => scrollToBottom(true)}>
+      {ready && (!atBottom || hasNewer) ? (
+        <button
+          className="wx-buoy"
+          onClick={() => {
+            // The handler reloads the newest page when needed and always asks
+            // the list to scroll through the per-chat jump signal.
+            void onReturnToLatest()
+          }}
+        >
           <JumpToLatestIcon className="wx-buoy__icon" />
-          <span>{buoy > 0 ? `${buoy} 条新消息` : '跳转到最新消息'}</span>
+          <span>{hasNewer || buoy === 0 ? '跳转到最新消息' : `${buoy} 条新消息`}</span>
         </button>
       ) : null}
 

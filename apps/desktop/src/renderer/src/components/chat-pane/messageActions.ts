@@ -1,5 +1,6 @@
 import type { Message } from '@wegram/protocol'
 
+import { loadLatestWindow } from '../../lib/anchoredWindow'
 import { errorMessage, invoke } from '../../lib/ipc'
 import { useAppStore } from '../../store/useAppStore'
 
@@ -22,6 +23,13 @@ export interface MessageActions {
 export function createMessageActions(activeChatId: number): MessageActions {
   return {
     send: async (text, replyToMessageId) => {
+      /**
+       * An anchored window cannot show the new message in place (it would sit
+       * directly under a row months older). Return to the newest page first, then
+       * send; the jump is requested after the message is in the store so the
+       * scroll lands on it rather than on the previous tail.
+       */
+      const wasAnchored = await loadLatestWindow(activeChatId)
       const result = await invoke('messages:send', {
         chatId: activeChatId,
         text,
@@ -30,6 +38,7 @@ export function createMessageActions(activeChatId: number): MessageActions {
       const store = useAppStore.getState()
       store.applyMessageOps(activeChatId, [{ op: 'new', message: result.message }])
       store.setReplyTo(activeChatId, null)
+      if (wasAnchored) store.requestJumpToLatest(activeChatId)
     },
 
     saveEdit: async (messageId, text) => {

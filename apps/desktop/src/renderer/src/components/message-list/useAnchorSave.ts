@@ -18,6 +18,12 @@ interface UseAnchorSaveParams {
   chatId: number
   scrollRef: RefObject<HTMLDivElement | null>
   flags: ScrollFlags
+  /**
+   * The loaded window stops short of the newest message. Reaching its end is not
+   * "the reader is at the bottom": storing `messageId: null` would make the next
+   * open land on the newest message and silently throw the reading position away.
+   */
+  anchoredWindow: boolean
 }
 
 /**
@@ -33,7 +39,7 @@ interface UseAnchorSaveParams {
  *     the common case while reading, so that dropped most saves. Only our own
  *     programmatic moves (`restoring`/`programmatic`) suppress it now.
  */
-export function useAnchorSave({ chatId, scrollRef, flags }: UseAnchorSaveParams): {
+export function useAnchorSave({ chatId, scrollRef, flags, anchoredWindow }: UseAnchorSaveParams): {
   scheduleAnchorSave: () => void
   /** Write a known position immediately — for landings the geometry cannot measure. */
   savePosition: (anchor: Anchor) => void
@@ -49,7 +55,8 @@ export function useAnchorSave({ chatId, scrollRef, flags }: UseAnchorSaveParams)
     // At (or within a hair of) the bottom: no anchor at all is the two-in-one
     // "read to the end" flag — reopening lands on the newest message. The rule is
     // shared with the pin state (`lib/scrollGeometry`) so the two cannot drift.
-    if (readScrollPin(el).pinned) return { messageId: null, offset: 0 }
+    // An anchored window's end is *not* the chat's end, so it still needs a row.
+    if (!anchoredWindow && readScrollPin(el).pinned) return { messageId: null, offset: 0 }
     const containerTop = el.getBoundingClientRect().top
     const slot = [...el.querySelectorAll<HTMLElement>('.wx-message-slot')].find(
       (node) => node.getBoundingClientRect().bottom > containerTop + 4,
@@ -60,7 +67,7 @@ export function useAnchorSave({ chatId, scrollRef, flags }: UseAnchorSaveParams)
       messageId: Number(id),
       offset: Math.round(slot.getBoundingClientRect().top - containerTop),
     }
-  }, [scrollRef])
+  }, [scrollRef, anchoredWindow])
 
   const writeAnchor = useCallback(
     (anchor: Anchor): void => {
@@ -109,6 +116,19 @@ export function useAnchorSave({ chatId, scrollRef, flags }: UseAnchorSaveParams)
     },
     [writeAnchor],
   )
+
+  /**
+   * The window was replaced by the newest page (jump to latest / send). The last
+   * measurement belongs to the old, deep window; leaving now must not write that
+   * row back, or the next open would restore a position the reader already left.
+   * The landing effect writes the new bottom as soon as the list is at it.
+   */
+  const wasAnchoredRef = useRef(anchoredWindow)
+  useEffect(() => {
+    if (wasAnchoredRef.current === anchoredWindow) return
+    wasAnchoredRef.current = anchoredWindow
+    if (!anchoredWindow) latestAnchorRef.current = null
+  }, [anchoredWindow])
 
   // Leaving the chat (or quitting): write whatever the last scroll measured.
   // Deliberately does not re-measure — see the note above.

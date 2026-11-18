@@ -17,6 +17,8 @@ export const DATA_DEFAULTS: AppData = {
   messagesByChat: {},
   pendingOps: {},
   hasMoreByChat: {},
+  hasNewerByChat: {},
+  jumpToLatest: null,
   replyToByChat: {},
   typingByChat: {},
   editing: null,

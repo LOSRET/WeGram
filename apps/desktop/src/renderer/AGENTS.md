@@ -88,12 +88,15 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   kept every badge and the rail total lit until the last pixel.
 - **Where a chat opens is decided before the list mounts** (`useChatHistory` →
   `resolveLanding`): the saved row if it sits at/after the read boundary, else the
-  unread divider (line at the viewport top), else the newest message. The first page
-  must contain that row, so a chat with unread mail pages back to
-  `lastReadInboxMessageId` first; the list captures its position once, on first paint.
-  An unread block shorter than the viewport is clamped to the bottom on purpose — the
-  divider stays visible above it, and "fixing" that with more scrolling only spins
-  with the pane hidden.
+  unread divider (line at the viewport top), else the newest message. When that row is
+  older than the newest page, the window is loaded *around* it (`messages:around`)
+  instead of paging back from the newest message, so a deep position is one request
+  away and the old 6-page budget is gone. Such a window can stop short of the newest
+  message (`hasNewer`): live arrivals are queued, scrolling to the window end appends
+  `messages:newer`, and sending / the buoy reload the newest page. The list captures
+  its position once, on first paint. An unread block shorter than the viewport is
+  clamped to the bottom on purpose — the divider stays visible above it, and "fixing"
+  that with more scrolling only spins with the pane hidden.
 - **The login window (`#login`) must not boot the shell.** It has its own tiny
   state (auth + theme) and only follows `evt:auth`; hydrating the zustand chat store
   there would give one account two writers. Its 280 px modal is the shell's

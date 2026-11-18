@@ -462,6 +462,28 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       const page = older.slice(Math.max(0, older.length - limit))
       return { messages: page, hasMore: older.length > page.length }
     }
+    case 'messages:around': {
+      const all = messagesByChat[store.chatId] ?? []
+      const messageId = Number(store.messageId)
+      const limit = Number(store.limit ?? 25)
+      const found = all.findIndex((item) => item.id === messageId)
+      const center = found >= 0 ? found : all.findIndex((item) => item.id > messageId)
+      if (center < 0) return { messages: [], hasMore: true, hasNewer: false }
+      const start = Math.max(0, center - limit)
+      const end = Math.min(all.length, center + limit + 1)
+      return {
+        messages: all.slice(start, end),
+        hasMore: start > 0,
+        hasNewer: end < all.length,
+      }
+    }
+    case 'messages:newer': {
+      const all = messagesByChat[store.chatId] ?? []
+      const fromId = Number(store.fromMessageId)
+      const limit = Number(store.limit ?? 50)
+      const newer = all.filter((item) => item.id > fromId)
+      return { messages: newer.slice(0, limit), hasNewer: newer.length > limit }
+    }
     case 'messages:send': {
       const list = messagesByChat[store.chatId] ?? []
       const message = msg(store.chatId, nextId++, String(store.text), true, 0)
