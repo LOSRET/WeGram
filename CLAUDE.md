@@ -27,7 +27,7 @@ The login is its **own window**, like WeChat's: a frameless 280×373 `BrowserWin
 
 `ui.db` uses the built-in `node:sqlite` (Electron 38 ships Node 22.22) instead of better-sqlite3, so there is no native module to rebuild for the Electron ABI. All SQL is confined to `apps/desktop/src/main/store/ui-db.ts`; `settings.json` keeps only the proxy config because it carries a sealed secret.
 
-Still deferred: search (global + in-chat), pinning/mute controls, settings page, packaging.
+Still deferred: search (global + in-chat), pinning/mute controls, settings page. Release packaging lives in `.github/workflows/release.yml` (tag → installer → GitHub Release); the NSIS installer itself has not been produced yet.
 `ui.db` reading positions (`scroll_anchor_id`/`scroll_offset`) are wired: MessageList writes them,
 ChatPane restores them when the reader was not at the bottom.
 
