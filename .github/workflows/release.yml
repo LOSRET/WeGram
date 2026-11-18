@@ -68,7 +68,23 @@ jobs:
       - name: Verify (lint -> typecheck -> test -> build)
         run: pnpm verify
 
+      # The installer carries this deployment's own api_id/api_hash (inlined into the
+      # main bundle by electron.vite.config.ts). Without them the packaged app refuses
+      # to start, so fail here instead of after a four-minute build.
+      - name: Check the API credentials are configured
+        env:
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+        run: |
+          if (-not $env:TELEGRAM_API_ID -or -not $env:TELEGRAM_API_HASH) {
+            throw 'Repository secrets TELEGRAM_API_ID and TELEGRAM_API_HASH are required.'
+          }
+          Write-Host "Packaging with api_id $env:TELEGRAM_API_ID"
+
       - name: Package the installer
+        env:
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
         run: pnpm --filter @wegram/desktop package:win
 
       - name: Upload the installer as a workflow artifact

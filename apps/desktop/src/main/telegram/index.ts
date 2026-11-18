@@ -11,13 +11,19 @@ export interface CreateAdapterOptions {
   apiHash?: string
   userDataDir: string
   initialProxy: ProxyConfig | null
+  /**
+   * Development only. A packaged build refuses to start without credentials
+   * (`main/index.ts`), so it also ignores `WEGRAM_ADAPTER=mock`: a release artifact
+   * must never show the fixture data set.
+   */
+  allowMock: boolean
 }
 
 /**
  * Chooses the protocol implementation.
  *
- * Without credentials the mock adapter runs, which is what lets the whole UI be
- * developed and demoed before Spike 2 (real login) is executed. Sessions live
+ * Without credentials the mock adapter runs in development, which is what lets the
+ * whole UI be developed and demoed without touching the real account. Sessions live
  * under `userData/tdlib/<accountId>/`; v1 has exactly one account but the path
  * already has the shape multi-account will need (design doc §15).
  */
@@ -28,7 +34,7 @@ export function createAdapter(options: CreateAdapterOptions): TelegramAdapter {
   // WEGRAM_ADAPTER=mock forces the fake adapter even when credentials exist:
   // needed for UI work and demos that must not touch the real account.
   const forced = process.env['WEGRAM_ADAPTER']?.trim().toLowerCase()
-  if (forced === 'mock') return mock()
+  if (options.allowMock && forced === 'mock') return mock()
 
   if (options.apiId && options.apiHash) {
     // Dev escape hatch: point the app at an already-authorized session (for
@@ -43,6 +49,12 @@ export function createAdapter(options: CreateAdapterOptions): TelegramAdapter {
       filesDirectory: join(sessionDir, 'files'),
       initialProxy: options.initialProxy,
     })
+  }
+
+  if (!options.allowMock) {
+    // bootstrap() already refused to start; reaching this point means a guard was
+    // bypassed, and quietly shipping fixtures would hide that.
+    throw new Error('no Telegram API credentials: a packaged build cannot run the mock adapter')
   }
   return mock()
 }

@@ -2,8 +2,9 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import type { AppInfo, AuthState } from '@wegram/protocol'
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, dialog, shell } from 'electron'
 
+import { parseApiCredentials } from './credentials'
 import { createHandlers } from './ipc/handlers'
 import { registerIpc, unregisterIpc } from './ipc/router'
 import { closeLoginWindow, createLoginWindow, getLoginWindow } from './login-window'
@@ -81,8 +82,23 @@ async function bootstrap(): Promise<void> {
   // so seed the module with the stored theme instead of defaulting to light.
   setViewerTheme(storedTheme(db))
 
-  const apiId = Number(process.env.TELEGRAM_API_ID ?? 0)
-  const apiHash = (process.env.TELEGRAM_API_HASH ?? '').trim()
+  // Credentials come from the environment (.env in development) and, for a release
+  // artifact, from the value the build inlined (electron.vite.config.ts).
+  const builtIn = parseApiCredentials(__WEGRAM_API_CREDENTIALS__)
+  const apiId = Number(process.env.TELEGRAM_API_ID ?? 0) || builtIn?.apiId || 0
+  const apiHash = (process.env.TELEGRAM_API_HASH ?? '').trim() || builtIn?.apiHash || ''
+
+  // A packaged build must never present the fake data set: without credentials it is
+  // a broken artifact (CI checks its secrets before packaging), and fixtures that look
+  // like a working Telegram are worse than refusing to start.
+  if ((apiId <= 0 || !apiHash) && !isDev) {
+    dialog.showErrorBox(
+      'WeGram 无法连接 Telegram',
+      '这个安装包没有内置 TELEGRAM_API_ID / TELEGRAM_API_HASH。\n请用仓库 secrets 重新打包（见 .github/workflows/release.yml）。',
+    )
+    app.quit()
+    return
+  }
 
   // Stored settings win; the env var is a dev convenience so a fresh profile can
   // reach Telegram without clicking through the proxy dialog first.
@@ -107,6 +123,7 @@ async function bootstrap(): Promise<void> {
     ...(apiHash ? { apiHash } : {}),
     userDataDir,
     initialProxy,
+    allowMock: isDev,
   })
 
   bus = new EventBus({

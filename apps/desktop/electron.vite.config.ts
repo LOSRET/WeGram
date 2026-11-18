@@ -12,9 +12,24 @@ const shared = {
   resolve: { alias: protocolAlias },
 }
 
+/**
+ * A release artifact carries the deployment's own my.telegram.org credentials. They
+ * are not user secrets — every official client ships its own — but they must never be
+ * committed, so they are inlined from the environment and into the main bundle only.
+ * Release CI supplies them from repository secrets; a source build inlines `""` and
+ * the app falls back to the mock adapter (dev) or refuses to start (packaged).
+ */
+function apiCredentials(): string {
+  const apiId = Number(process.env['TELEGRAM_API_ID'] ?? 0)
+  const apiHash = (process.env['TELEGRAM_API_HASH'] ?? '').trim()
+  if (!Number.isInteger(apiId) || apiId <= 0 || !apiHash) return JSON.stringify('')
+  return JSON.stringify(JSON.stringify({ apiId, apiHash }))
+}
+
 export default defineConfig({
   main: {
     ...shared,
+    define: { __WEGRAM_API_CREDENTIALS__: apiCredentials() },
     plugins: [externalizeDepsPlugin({ exclude: ['@wegram/protocol'] })],
     build: {
       rollupOptions: {
