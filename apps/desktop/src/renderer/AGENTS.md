@@ -17,6 +17,7 @@ lib/format.ts         time / preview / avatar helpers (pure, unit-tested)
 lib/entities.ts       TL entity → text segments (pure, unit-tested)
 lib/useAnchoredScroll.ts  ready gate, stick-to-bottom, resize compensation
 lib/scrollGeometry.ts (pure, unit-tested) the ONE "is the reader at the bottom" rule
+lib/jumpSettle.ts    (pure, unit-tested) "has the jump to the newest message landed?"
 lib/history.ts       (pure, unit-tested) the ONE "may this empty page be cached" rule
 lib/media.ts          one-download-per-file dedupe
 lib/viewer.ts         which messages become one viewer strip (pure, unit-tested)
@@ -65,6 +66,15 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   the chat row badge and the rail total therefore come from the same server marker and
   cannot disagree; counting arrivals (or `messages.length` deltas, which a prepended page
   inflates) made the pill shout "6 条新消息" over messages the reader had read.
+- **"跳转到最新消息" owns its move until it lands.** Chromium cancels a programmatic
+  smooth scroll the moment the scroll *range* changes, and the virtualiser changes it on
+  every row it measures during the move: the pill used to glide a few thousand pixels
+  and stop there, with the pin already dropped by the mid-flight scroll events and the
+  buoy gone (measured: 32 320px of content, landed at 11 486). `useAnchoredScroll`
+  therefore holds `movingRef` for the whole move (no pin re-derivation from the way
+  down, no `ResizeObserver` glue halfway) and finishes it with a timer net —
+  `lib/jumpSettle.ts` decides "still moving / stalled / out of time" — while a wheel,
+  drag or key ends the move instead of fighting the reader.
 - **The read marker follows the viewport, not the bottom.** `MessageList` reports
   `onSeenUpToChange` (the newest row whose top edge is inside the viewport) and
   `ChatPane` sends `messages:read` up to it, still gated by `lib/readGate.ts`
