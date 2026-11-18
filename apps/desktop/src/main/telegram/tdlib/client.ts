@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs'
+
 import { getTdjson } from 'prebuilt-tdlib'
 import { configure } from 'tdl'
 
@@ -20,10 +22,22 @@ export interface TdClientLike {
 
 let tdlibConfigured = false
 
+/**
+ * `prebuilt-tdlib` resolves tdjson with `require.resolve`, which in a packaged
+ * build points *inside* `app.asar`. Electron redirects `fs` reads for us but not
+ * `LoadLibrary`, so TDLib's addon fails with "Dynamic Loading Error: Win32 error
+ * 126" (module not found) and `createClient` throws. electron-builder keeps the
+ * dll in `app.asar.unpacked` (`electron-builder.yml`), so load that copy.
+ */
+export function resolveTdjsonPath(tdjson: string): string {
+  const unpacked = tdjson.replace(/app\.asar([\\/])/, 'app.asar.unpacked$1')
+  return unpacked !== tdjson && existsSync(unpacked) ? unpacked : tdjson
+}
+
 /** Loads tdjson once per process; the app and the smoke script both come here. */
 export function configureTdlib(logger: Logger): void {
   if (tdlibConfigured) return
-  configure({ tdjson: getTdjson(), verbosityLevel: 1 })
+  configure({ tdjson: resolveTdjsonPath(getTdjson()), verbosityLevel: 1 })
   tdlibConfigured = true
   logger.info('TDLib configured with prebuilt tdjson')
 }
