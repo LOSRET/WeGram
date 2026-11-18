@@ -24,7 +24,13 @@ describe('mapChat', () => {
       type: { _: 'chatTypeSupergroup', is_channel: false },
       unread_count: 3,
       positions: [{ list: { _: 'chatListMain' }, is_pinned: true }],
-      notification_settings: { is_muted: true },
+      // TDLib has no `is_muted`: a chat mute is a countdown, and the scope
+      // default only applies while `use_default_mute_for` is set.
+      notification_settings: {
+        _: 'chatNotificationSettings',
+        use_default_mute_for: false,
+        mute_for: 3600,
+      },
       last_read_inbox_message_id: 10,
       last_read_outbox_message_id: 12,
       last_message: {
@@ -46,6 +52,30 @@ describe('mapChat', () => {
       lastMessageText: 'last words',
       lastMessageAt: 1_700_000_000,
     })
+  })
+
+  it('treats a zero countdown and an inherited default as unmuted', () => {
+    const open = mapChat(makeContext(), {
+      id: 3,
+      type: { _: 'chatTypeSupergroup', is_channel: false },
+      notification_settings: {
+        _: 'chatNotificationSettings',
+        use_default_mute_for: false,
+        mute_for: 0,
+      },
+    })
+    const inherited = mapChat(makeContext(), {
+      id: 4,
+      type: { _: 'chatTypeSupergroup', is_channel: false },
+      notification_settings: {
+        _: 'chatNotificationSettings',
+        use_default_mute_for: true,
+        mute_for: 0,
+      },
+    })
+
+    expect(open.muted).toBe(false)
+    expect(inherited.muted).toBe(false)
   })
 
   it('remembers the title for later sender resolution', () => {
