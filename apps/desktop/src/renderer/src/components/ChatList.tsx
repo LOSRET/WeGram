@@ -56,11 +56,9 @@ const ChatRow = memo(function ChatRow({ chat, active, onSelect }: ChatRowProps) 
         <div className="wx-chat-item__row">
           <span className="wx-chat-item__preview">{chat.lastMessageText ?? ''}</span>
           {chat.unread > 0 ? (
-            chat.muted ? (
-              <span className="wx-badge wx-badge--muted">•</span>
-            ) : (
-              <span className="wx-badge">{chat.unread > 99 ? '99+' : chat.unread}</span>
-            )
+            <span className={`wx-badge${chat.muted ? ' wx-badge--muted' : ''}`}>
+              {chat.unread > 99 ? '99+' : chat.unread}
+            </span>
           ) : null}
         </div>
       </div>

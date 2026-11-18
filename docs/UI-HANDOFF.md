@@ -21,7 +21,7 @@ listed in "Known deltas" is a deliberate, documented difference.
 | `renderer/src/components/OverlayScrollbar.tsx` | WeChat's floating scrollbar: a 6 px translucent pill drawn over the rows (hover/scroll/drag), so long lists get no layout gutter and nothing re-flows when it appears. Used by the chat list and the transcript. |
 | `renderer/src/components/ChatPane.tsx` | 46 px header (title, typing, call/… buttons), watermark empty state, chat-info popover. |
 | `renderer/src/components/MessageList.tsx` | Bubbles, real sender photos on both sides (own avatar on the right; `senderAvatarUrl`, `evt:avatars`, `Self.avatarUrl`), hover-only timestamp/read receipt, day + unread separators. |
-| `renderer/src/components/Composer.tsx` | Bordered input card, toolbar under the text, attach menu, send button inside the card. A channel manages it through `onCollapse` (the toolbar's chevron puts the channel bar back). |
+| `renderer/src/components/Composer.tsx` | Bordered input card, toolbar under the text, attach menu, send button inside the card. A channel manages it through `onCollapse`: the channel composer shows a labelled 收起 button next to 发送 that puts the 服务号 bar back. |
 | `renderer/src/components/chat-pane/ChannelBar.tsx` | A channel's bottom edge instead of the composer: WeChat's 服务号 card — 静音 always, plus the keyboard switch on the right when `chats:canPost` says this account may post (the switch swaps the card for the composer). A read-only channel keeps only 静音, and its message menu has no 回复. |
 | `renderer/src/components/ExpressionPicker.tsx` | The composer's 表情/贴纸 panel: the client's 464 px card with 最近使用, the 10-column 所有表情 grid, a 搜索 tab and one tab per installed sticker set (with 下一页 paging). Picking an emoji inserts it at the caret; clicking a sticker sends it. |
 | `renderer/src/lib/emoji.ts` | The Unicode emoji catalogue with Chinese names/keywords, search and the recent-row merge (pure, unit-tested). |
@@ -98,7 +98,7 @@ search placeholder all sample #7B7B80.
 | transcript inset | 22 px on **both** sides — the client measures 21–25 px, symmetric; the outgoing column used to sit 8 px from the edge. The 跳转到最新消息 pill shares this inset, so it lines up with the outgoing avatars |
 | bubble | `padding: 8px 12px`, radius 6, font 14 px/1.45, max-width `min(560px, 66%)` |
 | composer card | radius 8, 1 px `#ececec` border, margins 6/9 px; input min-height 84; toolbar 42 |
-| channel bar (服务号 card) | card 54 px tall, radius 8, 1 px border, same 6/9 px margins; menu item 14 px in a 36 px hit box; keyboard glyph 20 px in a 36 px square. Reference (a 服务号 chat at this screenshot's scale): card ≈ 66 px tall, item text ≈ 17 px, glyph 20 px, the item row centred in the space left of the switch; no divider before the switch |
+| channel bar (服务号 card) | card 54 px tall, radius 8, 1 px border, same 6/9 px margins; each menu item is a full-height equal-width segment (the whole segment is the hit target and its highlight fills the card edge to edge), keyboard glyph 20 px in a 46 px right strip. Reference (a 服务号 chat at this screenshot's scale): card ≈ 66 px tall, item text ≈ 17 px, glyph 20 px, the three items split the space left of the switch evenly; no divider before the switch |
 | send button | 72×30, radius 4; disabled `#ececec` on tertiary text, enabled brand green |
 | day separator | 12 px centred, no pill; message meta 11 px, hover-only |
 | popup card | fill `#fafafa`, 6 px radius, 5 px padding; the ＋ card is 143×144 with 45 px rows |

@@ -287,17 +287,21 @@ export function Composer({
             >
               <MicIcon size={20} />
             </button>
-            {onCollapse ? (
-              <button
-                className="wx-tool-button"
-                onClick={onCollapse}
-                title="收起输入框"
-                aria-label="收起输入框"
-              >
-                <ChevronDownIcon size={18} />
-              </button>
-            ) : null}
           </div>
+
+          {onCollapse ? (
+            // The channel composer's way back to the 服务号 bar. Labelled, because
+            // an icon alone sat in the tool row and nobody found the way out.
+            <button
+              className="wx-composer__collapse"
+              onClick={onCollapse}
+              title="收起输入框，回到频道菜单"
+              aria-label="收起输入框"
+            >
+              <ChevronDownIcon size={15} />
+              收起
+            </button>
+          ) : null}
 
           <button
             className={`wx-send-button${ready ? ' wx-send-button--ready' : ''}`}

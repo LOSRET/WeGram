@@ -49,6 +49,8 @@
   --wx-warning: #ffc300;
   --wx-muted-dot: #b2b2b2;
   --wx-badge: #fa5151;
+  /* A muted chat keeps the count: same badge shape, grey instead of red. */
+  --wx-badge-muted: #b2b2b2;
 
   /* Overlay scrollbar: WeChat floats a translucent pill over the rows. */
   --wx-scrollbar-thumb: rgba(0, 0, 0, 0.22);
@@ -142,6 +144,8 @@
   /* The client uses the same #7B7B80 for day labels, timestamps and the search
      placeholder in dark mode; there is no third, lighter grey. */
   --wx-text-tertiary: #7b7b80;
+  /* Muted unread badge: grey instead of the light theme's red. */
+  --wx-badge-muted: #5c5c5e;
   --wx-line: #2f2f30;
   --wx-line-strong: #3a3a3c;
   /* No divider under the pane header in dark mode — it is one flat surface. */
@@ -697,18 +701,15 @@ select {
   background: rgba(0, 0, 0, 0.28);
 }
 
+/* 免打扰 chats still say how much is waiting; only the fill turns grey, so the
+   count stays where the reader looks for it. The selected row darkens its
+   badges like the red one. */
 .wx-badge--muted {
-  background: transparent;
-  color: var(--wx-text-tertiary);
-  font-size: 14px;
-  line-height: 1;
-  padding: 0;
-  min-width: 0;
-  height: auto;
+  background: var(--wx-badge-muted);
 }
 
 .wx-chat-item--active .wx-badge--muted {
-  color: rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.28);
 }
 
 /* ---------- Chat pane ---------- */
@@ -1103,9 +1104,11 @@ select {
 
 .wx-channel-bar__card {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   height: 54px;
-  padding: 0 6px 0 10px;
+  /* The segment highlight fills the card edge to edge; clipping keeps it inside
+     the rounded corners. */
+  overflow: hidden;
   border: 1px solid var(--wx-line);
   border-radius: 8px;
   background: var(--wx-card);
@@ -1114,22 +1117,25 @@ select {
 .wx-channel-bar__menu {
   display: flex;
   flex: 1;
-  align-items: center;
-  justify-content: center;
   min-width: 0;
 }
 
+/* One item is one whole segment: the client's menu is tapped by region, not by
+   text, so the hit target is the item's full share of the card — the highlight
+   runs from the top border to the bottom one. */
 .wx-channel-bar__item {
-  height: 36px;
+  flex: 1 1 0;
+  min-width: 0;
   padding: 0 16px;
   border: none;
-  border-radius: 5px;
+  border-radius: 0;
   background: transparent;
   font-size: 14px;
   color: var(--wx-text);
 }
 
-.wx-channel-bar__item:hover:not(:disabled) {
+.wx-channel-bar__item:hover:not(:disabled),
+.wx-channel-bar__item:active:not(:disabled) {
   background: var(--wx-row-hover);
 }
 
@@ -1137,21 +1143,21 @@ select {
   color: var(--wx-text-disabled);
 }
 
-/* The keyboard switch: the glyph is the circle, so this button draws no ring. */
+/* The keyboard switch: the whole right strip is the hit target, like the menu
+   segments. The glyph is the circle, so this button draws no ring itself. */
 .wx-channel-bar__keyboard {
   display: inline-flex;
+  flex: 0 0 46px;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  margin-left: auto;
   border: none;
-  border-radius: 6px;
+  border-radius: 0;
   background: transparent;
   color: var(--wx-icon);
 }
 
-.wx-channel-bar__keyboard:hover {
+.wx-channel-bar__keyboard:hover,
+.wx-channel-bar__keyboard:active {
   background: var(--wx-row-hover);
   color: var(--wx-text);
 }
@@ -1186,6 +1192,26 @@ select {
   gap: 8px;
   height: 42px;
   padding: 0 8px 0 6px;
+}
+
+/* A channel's composer is opened from the bar's keyboard switch, so it carries
+   an explicit way back to it, right next to 发送. */
+.wx-composer__collapse {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  height: 30px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+}
+
+.wx-composer__collapse:hover {
+  background: var(--wx-row-hover);
+  color: var(--wx-text);
 }
 
 .wx-composer__tools {
