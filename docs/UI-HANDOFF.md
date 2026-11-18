@@ -201,6 +201,12 @@ Measured on the same client (screenshot space, same ×1.1245 conversion):
   `lib/pickerTabs.ts` and is unit-tested.
 - The client shows **no scrollbar** in the card. The body hides the native one, and the
   grid columns are `1fr` so a bar appearing could never clip the tenth column.
+- Every tab shows a **picture**, never a two-character label: TDLib's `getInstalledStickerSets`
+  leaves `thumbnail` null for most sets but always ships `covers` (the set's first
+  stickers), so the adapter resolves thumbnail → first sticker → `covers[0]` exactly like
+  tdesktop's `lookupThumbnailDocument`. The tab paints that sticker's **static** thumbnail
+  (a TGS/WebM pack still shows one frame at 28 px) and downloads it only when the tab is
+  on screen — the two-character fallback remains for a set whose cover TDLib has not sent yet.
 
 Dark has no measured counterpart for the card; it follows the shell's lifted
 surfaces (`#2f2f30` card, `#3a3a3c` pill), which is what `--wx-picker` /
@@ -221,6 +227,16 @@ minute later, with `updateInstalledStickerSets` at the switch). The adapter now
 emits `stickerSets`, which crosses IPC as `evt:stickerSets` and bumps
 `stickerSetsVersion`; the picker refetches on that bump. Without it the panel kept
 the 14-set cache for the whole session, which looked like "one page and the end".
+
+A set's body leads with the pack's own name in the 最近使用 label style (the strip only
+shows two characters of it) and its cells **play**: TGS through lottie-web, WebM through
+`<video>`. The static thumbnail is the first paint — a still frame while the animation
+downloads — never the artwork, because TDLib serves a WebP for an animated sticker's
+thumbnail. Only cells that are on (or within 200 px of) the screen start downloading:
+measured 24 of 120 cells on open, 40 after scrolling one screen. That gate measures
+geometry directly as well as with `IntersectionObserver`, since Electron throttles
+frame delivery while the window is occluded — the panel would otherwise sit on
+spinners forever.
 
 Missing against the client, on purpose: the **自定义表情** (heart) tab. Favourites are
 TDLib custom-emoji sets, whose messages are custom-emoji *entities* rather than

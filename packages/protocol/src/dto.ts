@@ -118,6 +118,12 @@ export const messageMediaSchema = z.object({
   height: z.number().int().optional(),
   duration: z.number().int().optional(),
   stickerFormat: z.enum(['webp', 'tgs', 'webm']).optional(),
+  /**
+   * The thumbnail's own format. TDLib serves a static image as a sticker's
+   * thumbnail even for TGS/WebM stickers, so a grid that renders the thumbnail
+   * must not reuse `stickerFormat`.
+   */
+  stickerThumbFormat: z.enum(['webp', 'tgs', 'webm']).optional(),
   /** Emoji the sticker matches, used as its alt text and in the picker. */
   stickerEmoji: z.string().optional(),
   fileName: z.string().optional(),
@@ -141,6 +147,8 @@ export const stickerSchema = z.object({
   height: z.number().int().optional(),
   /** Static WebP/JPEG preview, used for grids so animations stay cheap. */
   thumbFileId: z.number().int().optional(),
+  /** Format of `thumbFileId`; see `MessageMedia.stickerThumbFormat`. */
+  thumbFormat: stickerFormatSchema.optional(),
 })
 export type Sticker = z.infer<typeof stickerSchema>
 
@@ -148,6 +156,11 @@ export const stickerSetSummarySchema = z.object({
   /** TDLib ids are int64, so they cross IPC as strings. */
   id: z.string(),
   title: z.string(),
+  /**
+   * The tab's picture: the set's own cover when TDLib has one, else its first
+   * sticker (the installed list ships `covers`). Absent only when neither exists,
+   * and then the picker shows two characters of the title instead.
+   */
   thumbnail: stickerSchema.optional(),
 })
 export type StickerSetSummary = z.infer<typeof stickerSetSummarySchema>

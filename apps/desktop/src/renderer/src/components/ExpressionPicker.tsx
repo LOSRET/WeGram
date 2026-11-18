@@ -8,7 +8,7 @@ import { errorMessage, invoke } from '../lib/ipc'
 import { pageForIndex, stripWindow } from '../lib/pickerTabs'
 import { useAppStore } from '../store/useAppStore'
 import { StickerRenderer } from './StickerRenderer'
-import { ChevronDownIcon, EmojiIcon, SearchIcon } from './WechatIcons'
+import { ChevronDownIcon, EmojiIcon, MicIcon, SearchIcon } from './WechatIcons'
 
 interface ExpressionPickerProps {
   chatId: number
@@ -27,6 +27,9 @@ function stickerMedia(sticker: Sticker) {
   return {
     fileId: sticker.fileId,
     ...(sticker.thumbFileId ? { thumbFileId: sticker.thumbFileId } : {}),
+    // The grid shows the thumbnail, which TDLib keeps static even for animated
+    // stickers; both formats therefore travel together.
+    ...(sticker.thumbFormat ? { stickerThumbFormat: sticker.thumbFormat } : {}),
     stickerFormat: sticker.format,
     ...(sticker.emoji ? { stickerEmoji: sticker.emoji } : {}),
     ...(sticker.width ? { width: sticker.width } : {}),
@@ -110,6 +113,10 @@ export function ExpressionPicker({
   }, [mode, sets, setsLoaded, tab.kind])
 
   const activeSetId = tab.kind === 'set' ? tab.id : null
+  // The tab strip is wider than the pack name, so the body repeats it as a label —
+  // available from the summary before the set itself has landed.
+  const activeSetTitle =
+    activeSet?.title ?? sets.find((item) => item.id === activeSetId)?.title ?? ''
   useEffect(() => {
     if (!activeSetId) return
     const cached = setCache.current.get(activeSetId)
@@ -272,13 +279,25 @@ export function ExpressionPicker({
         ) : tab.kind === 'search' ? (
           <div className="wx-picker__search">
             <div className="wx-search">
-              <SearchIcon size={14} />
+              <SearchIcon size={15} />
               <input
                 autoFocus
                 value={query}
                 placeholder="搜索表情"
                 onChange={(event) => setQuery(event.target.value)}
               />
+              {/* The client's box grows a voice button while it has focus. There is
+                  no speech recognition behind it, so it stays disabled instead of
+                  being a dead control. */}
+              <button
+                type="button"
+                className="wx-search__mic"
+                disabled
+                title="语音搜索暂不支持"
+                aria-label="语音搜索暂不支持"
+              >
+                <MicIcon size={17} />
+              </button>
             </div>
             {needle ? (
               hits.emoji.length > 0 || hits.sets.length > 0 ? (
@@ -322,38 +341,39 @@ export function ExpressionPicker({
               ) : (
                 <p className="wx-picker__hint">没有找到相关表情</p>
               )
-            ) : (
-              <p className="wx-picker__hint">
-                输入表情名称搜索，例如“开心”“爱心”“红包”。表情包按名称搜索。
-              </p>
-            )}
+            ) : null}
           </div>
         ) : tab.kind === 'set' ? (
-          setLoading ? (
-            <div className="wx-picker__state">
-              <span className="wx-spinner" />
-            </div>
-          ) : (
-            <>
-              {setError ? <div className="wx-picker__error">{setError}</div> : null}
-              {activeSet && activeSet.stickers.length > 0 ? (
-                <div className="wx-picker__stickers">
-                  {activeSet.stickers.map((sticker) => (
-                    <button
-                      key={sticker.fileId}
-                      className="wx-picker__sticker"
-                      onClick={() => void send(sticker)}
-                      title={sticker.emoji ?? '贴纸'}
-                    >
-                      <StickerRenderer media={stickerMedia(sticker)} size={92} preview />
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="wx-picker__state">{setError ? '' : '这个贴纸包还是空的'}</div>
-              )}
-            </>
-          )
+          <>
+            {activeSetTitle ? (
+              <div className="wx-picker__label wx-picker__label--set">{activeSetTitle}</div>
+            ) : null}
+            {setLoading ? (
+              <div className="wx-picker__state">
+                <span className="wx-spinner" />
+              </div>
+            ) : (
+              <>
+                {setError ? <div className="wx-picker__error">{setError}</div> : null}
+                {activeSet && activeSet.stickers.length > 0 ? (
+                  <div className="wx-picker__stickers">
+                    {activeSet.stickers.map((sticker) => (
+                      <button
+                        key={sticker.fileId}
+                        className="wx-picker__sticker"
+                        onClick={() => void send(sticker)}
+                        title={sticker.emoji ?? '贴纸'}
+                      >
+                        <StickerRenderer media={stickerMedia(sticker)} size={92} />
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="wx-picker__state">{setError ? '' : '这个贴纸包还是空的'}</div>
+                )}
+              </>
+            )}
+          </>
         ) : !setsLoaded ? (
           <div className="wx-picker__state">
             <span className="wx-spinner" />

@@ -2721,6 +2721,14 @@ select {
   margin-top: 0;
 }
 
+/* A sticker set's tab leads with the pack's own name, as the client does; a long
+   name stays on one line instead of pushing the grid down. */
+.wx-picker__label--set {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .wx-picker__grid {
   display: grid;
   grid-template-columns: repeat(10, 1fr);
@@ -2839,6 +2847,48 @@ select {
 .wx-picker__search {
   display: flex;
   flex-direction: column;
+}
+
+/* The client's 搜索表情 box is taller and airier than the chat-list search it shares
+   the .wx-search class with: measured off the reference screenshot (531x43 px, four
+   CJK glyphs at ~17.8 px each, so a 1.2 capture scale) → 36 px tall, 15 px text,
+   12 px inset, 8 px between the glyph and the field. */
+.wx-picker__search .wx-search {
+  /* The base rule is written for the chat-list header, where the box is a flex item
+     in a row: there `flex: 1` stretches it horizontally. In this column container it
+     would instead stretch vertically and swallow the height, so the box sets both. */
+  flex: none;
+  height: 36px;
+  padding: 0 12px;
+  gap: 8px;
+}
+
+.wx-picker__search .wx-search input {
+  font-size: 15px;
+}
+
+/* The client's 搜索表情 box stays quiet until it is focused: the border turns green
+   and a voice button appears on the right. Nothing is behind that button here — no
+   speech recognition in the app — so it renders disabled instead of as a dead
+   control the reader could keep pressing. */
+.wx-search__mic {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--wx-text-tertiary);
+}
+
+.wx-picker__search .wx-search:focus-within .wx-search__mic {
+  display: flex;
+}
+
+.wx-search__mic:disabled {
+  cursor: default;
 }
 
 .wx-picker__hint {

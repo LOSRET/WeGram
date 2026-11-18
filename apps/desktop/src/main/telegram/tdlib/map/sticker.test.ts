@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { mapStickerFormat, mapStickerThumbnail } from './sticker'
+import { mapStickerFormat, mapStickerThumbnail, mapStickerThumbnailFormat } from './sticker'
 
 describe('mapStickerFormat', () => {
   it('maps the three sticker formats', () => {
@@ -12,6 +12,22 @@ describe('mapStickerFormat', () => {
   it('returns undefined for unknown formats so the caller can default', () => {
     expect(mapStickerFormat('stickerFormatAnimated')).toBeUndefined()
     expect(mapStickerFormat(undefined)).toBeUndefined()
+  })
+})
+
+describe('mapStickerThumbnailFormat', () => {
+  it('keeps the two animated thumbnail formats', () => {
+    expect(mapStickerThumbnailFormat('thumbnailFormatTgs')).toBe('tgs')
+    expect(mapStickerThumbnailFormat('thumbnailFormatWebm')).toBe('webm')
+    expect(mapStickerThumbnailFormat('thumbnailFormatMpeg4')).toBe('webm')
+  })
+
+  it('treats every picture format — and an unknown one — as a static image', () => {
+    expect(mapStickerThumbnailFormat('thumbnailFormatWebp')).toBe('webp')
+    expect(mapStickerThumbnailFormat('thumbnailFormatJpeg')).toBe('webp')
+    expect(mapStickerThumbnailFormat('thumbnailFormatPng')).toBe('webp')
+    expect(mapStickerThumbnailFormat('thumbnailFormatGif')).toBe('webp')
+    expect(mapStickerThumbnailFormat(undefined)).toBe('webp')
   })
 })
 

@@ -512,6 +512,21 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
 - **Sticker set ids are int64 strings in TDLib.** They cross IPC as strings; the sticker
   itself is identified by the numeric file id. `getInstalledStickerSets` only returns
   set summaries — the grid needs a second `getStickerSet` call.
+- **The installed list ships a tab icon in `covers`, not in `thumbnail`.** Measured on
+  the real account: `thumbnail` was null for 6 of the 8 visible sets and `covers` held
+  the set's first sticker every time, so the strip fell back to two characters of the
+  title. `listStickerSets`/getStickerSet now resolve the icon the way tdesktop does
+  (`StickersSet::lookupThumbnailDocument`): set thumbnail → first sticker → `covers[0]`.
+  All 192 sets had an icon afterwards.
+- **A sticker's thumbnail is not the sticker's format.** TDLib serves a static WebP as
+  `sticker.thumbnail` even for a TGS/WebM sticker (measured 2026-11-19: the TGS pack's
+  thumbnail file came back `content-type: image/webp`, the WebM pack's too), so a grid
+  that paints the thumbnail must switch on `thumbFormat` (`MessageMedia.stickerThumbFormat`);
+  reusing `stickerFormat` there sent WebP bytes through lottie-web (gzip throw → emoji
+  fallback, 38/38 cells of a TGS pack) and through `<video>` (`MEDIA_ERR_SRC_NOT_SUPPORTED`,
+  `videoWidth === 0` → blank, 120/120 cells of a WebM pack). Chat bubbles were fine because
+  they draw the full file. Static WebP packs were the only ones that ever worked in the
+  picker — that is the whole "some packs load, some don't" symptom.
 - **`updateChatAction` is a one-shot event.** It has no "stopped typing" notification you
   can rely on, so the renderer schedules an expiry timer from `until`; without it the
   header claims "对方正在输入…" forever.

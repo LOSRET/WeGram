@@ -12,9 +12,24 @@ const MAX_JSON_BYTES = 8 * 1024 * 1024
 /** TGS normally expands ~5-20×; anything past this is a decompression bomb. */
 const MAX_EXPANSION_RATIO = 80
 const CACHE_LIMIT = 24
+/** A failed URL is not retried for this long, then it is allowed one more try. */
+const FAILURE_COOLDOWN_MS = 60_000
 
 const cache = new Map<string, unknown>()
-const failures = new Set<string>()
+const failures = new Map<string, number>()
+
+/**
+ * A decode failure used to be permanent for the session, so one bad download hid
+ * that sticker until the app restarted. It is now a cooldown: repeated failures
+ * still do not hammer the disk, but a transient one heals.
+ */
+function recentlyFailed(url: string): boolean {
+  const failedAt = failures.get(url)
+  if (failedAt === undefined) return false
+  if (Date.now() - failedAt < FAILURE_COOLDOWN_MS) return true
+  failures.delete(url)
+  return false
+}
 
 export async function loadTgsAnimation(url: string): Promise<unknown> {
   const cached = cache.get(url)
@@ -24,7 +39,7 @@ export async function loadTgsAnimation(url: string): Promise<unknown> {
     cache.set(url, cached)
     return cached
   }
-  if (failures.has(url)) throw new Error('TGS previously failed to decode')
+  if (recentlyFailed(url)) throw new Error('TGS recently failed to decode')
 
   const response = await fetch(url)
   if (!response.ok) throw new Error(`TGS fetch failed: ${response.status}`)
@@ -64,5 +79,5 @@ function isLottie(value: unknown): boolean {
 }
 
 export function markTgsFailure(url: string): void {
-  failures.add(url)
+  failures.set(url, Date.now())
 }

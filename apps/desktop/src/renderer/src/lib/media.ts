@@ -32,16 +32,26 @@ export function ensureMedia(fileId: number, priority = 8): Promise<string> {
   return promise
 }
 
-/** Resolved `wx-media://` URL for a file, downloading it on first sight. */
-export function useMediaUrl(media: MessageMedia | undefined, priority = 8): string | undefined {
+/**
+ * Resolved `wx-media://` URL for a file, downloading it on first sight.
+ *
+ * `enabled` holds the download back until the caller's element is visible: a
+ * sticker set is a hundred cells but only a screenful is ever read, and asking
+ * TDLib for all hundred at once starves the request slots.
+ */
+export function useMediaUrl(
+  media: MessageMedia | undefined,
+  priority = 8,
+  enabled = true,
+): string | undefined {
   const fileId = media?.fileId ?? 0
   const stored = useAppStore((state) => (fileId ? state.mediaUrls[fileId] : undefined))
   const url = stored ?? media?.localUrl
 
   useEffect(() => {
-    if (!media || media.fileId <= 0 || url) return
+    if (!enabled || !media || media.fileId <= 0 || url) return
     void ensureMedia(media.fileId, priority).catch(() => undefined)
-  }, [media, priority, url])
+  }, [media, priority, url, enabled])
 
   return url
 }
