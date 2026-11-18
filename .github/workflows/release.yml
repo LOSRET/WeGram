@@ -1,0 +1,109 @@
+name: Release
+
+# Builds the Windows installer and publishes it as a GitHub Release.
+# Push a version tag to start: git tag v0.2.0 && git push origin v0.2.0
+#
+# Windows only for now: the product ships NSIS and @prebuilt-tdlib resolves to
+# win32-x64 (see apps/desktop/electron-builder.yml and spikes/tdlib/RESULTS.md).
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to package and publish (vX.Y.Z)'
+        required: true
+        type: string
+
+permissions:
+  contents: write # gh release create/upload needs it
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    name: Package Windows x64
+    # The NSIS build needs nsis + winCodeSign downloads and an Electron dist; 45 min is ample.
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out the tagged commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6 # no version input: packageManager in package.json wins
+
+      - name: Install Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Stamp the app version from the tag
+        id: version
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = '${{ inputs.tag || github.ref_name }}'
+          if ($tag -notmatch '^v(?<version>\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$') {
+            throw "Tag '$tag' is not vX.Y.Z: release packaging only runs for version tags."
+          }
+          $version = $Matches.version
+          # electron-builder reads the version from apps/desktop/package.json, so the tag
+          # is the single source of truth and the committed version is only a placeholder.
+          node -e 'const fs = require("fs"); const p = "apps/desktop/package.json"; const pkg = JSON.parse(fs.readFileSync(p, "utf8")); pkg.version = process.argv[1]; fs.writeFileSync(p, JSON.stringify(pkg, null, 2) + "\n");' $version
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "prerelease=$($version.Contains('-'))" >> $env:GITHUB_OUTPUT
+          Write-Host "Packaging WeGram $version from $tag"
+
+      - name: Verify (lint -> typecheck -> test -> build)
+        run: pnpm verify
+
+      - name: Package the installer
+        run: pnpm --filter @wegram/desktop package:win
+
+      - name: Upload the installer as a workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: wegram-windows-x64
+          path: |
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.blockmap
+          # An empty pattern must fail the job instead of quietly publishing nothing.
+          if-no-files-found: error
+
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+          VERSION: ${{ steps.version.outputs.version }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $assets = @(Get-ChildItem apps/desktop/release -File |
+            Where-Object { $_.Extension -in '.exe', '.blockmap' } |
+            ForEach-Object FullName)
+          if ($assets.Count -eq 0) { throw 'electron-builder produced no installer.' }
+          # Re-running a tag must refresh the assets instead of failing on an existing release.
+          gh release view $env:TAG --json tagName *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:TAG @assets --clobber
+          }
+          else {
+            $ghArgs = @('release', 'create', $env:TAG) + $assets + @(
+              '--title', "WeGram $env:VERSION",
+              '--generate-notes',
+              '--verify-tag'
+            )
+            if ($env:PRERELEASE -eq 'True') { $ghArgs += '--prerelease' }
+            gh @ghArgs
+          }
