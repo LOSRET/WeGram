@@ -8,6 +8,7 @@ import {
   formatDaySeparator,
   formatDuration,
   formatMessageTime,
+  formatPhone,
   initials,
   isSameDay,
   messagePreview,
@@ -58,6 +59,20 @@ describe('formatClock', () => {
 describe('formatMessageTime', () => {
   it('renders the message clock as HH:MM', () => {
     expect(formatMessageTime(seconds(2026, 10, 17, 23, 59))).toBe('23:59')
+  })
+})
+
+describe('formatPhone', () => {
+  it('adds the leading + Telegram omits', () => {
+    expect(formatPhone('8613800000000')).toBe('+8613800000000')
+  })
+
+  it('leaves an already international number alone', () => {
+    expect(formatPhone('+49 151 0000 0000')).toBe('+49 151 0000 0000')
+  })
+
+  it('is empty for an empty value', () => {
+    expect(formatPhone('   ')).toBe('')
   })
 })
 

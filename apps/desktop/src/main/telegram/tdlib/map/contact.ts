@@ -1,6 +1,7 @@
 import type { Contact } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
+import { dcIdFromRemoteFileId } from '../file-dc'
 import type { MapperContext } from './context'
 import { mapUser } from './user'
 
@@ -19,11 +20,17 @@ export function mapContact(ctx: MapperContext, user: TdObject): Contact {
     .filter((part): part is string => Boolean(part))
     .join(' ')
   const avatarUrl = ctx.userAvatarUrls.get(mapped.id)
+  // The picture lives on its owner's DC, and TDLib encodes that DC in the photo's
+  // persistent file id; a person without a photo has no DC to show.
+  const dcId = dcIdFromRemoteFileId(
+    user.profile_photo?.small?.remote?.id ?? user.profile_photo?.big?.remote?.id,
+  )
   return {
     userId: mapped.id,
     title: name || mapped.username || `用户 ${mapped.id}`,
     ...(mapped.username ? { username: mapped.username } : {}),
     ...(mapped.phone ? { phone: mapped.phone } : {}),
     ...(avatarUrl ? { avatarUrl } : {}),
+    ...(dcId ? { dcId } : {}),
   }
 }

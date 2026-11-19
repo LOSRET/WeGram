@@ -61,11 +61,16 @@ Greenfield → working skeleton in three milestones:
   switches the shell to the address book. The middle column carries the client's
   header stack (search, 通讯录管理 card, 新的朋友 / 公众号、服务号 / 企业微信联系人 /
   我的企业 / 联系人) and the account's Telegram contacts grouped by initial; the right
-  pane is the contact card (60 px avatar, 微信号, 朋友资料, 更多信息, 发消息 / 语音聊天 /
-  视频聊天). **Data = TDLib `getContacts` + `getUser`** (`contacts:list`), not the
+  pane is the contact card (60 px avatar, Telegram号, 朋友资料, 更多信息 —
+  手机号 / 数据中心 — and 发消息 / 语音聊天 / 视频聊天). **Data = TDLib `getContacts` + `getUser`** (`contacts:list`), not the
   chat list: a person you never wrote to has a card but no conversation, and 发消息
   creates the private chat on demand (`chats:openPrivate` → `createPrivateChat`).
   Measured on the real account: 4 contacts, 2 with a username, 3 with a phone.
+  The 数据中心 row is decoded from the profile photo's persistent file id
+  (`tdlib/file-dc.ts`): TDLib exposes no DC field, and the photo is the only DC
+  signal a client gets (Pyrogram's `user.dc_id` is the same MTProto field), so
+  the value is approximate and 未知 for someone without a photo. Phone numbers
+  arrive without the leading `+`; the card adds it (`lib/format.ts`).
   Metrics, icon provenance and the deliberate deltas: `docs/UI-HANDOFF.md` §2.4, §3,
   §5 items 27–30.
 - **Sender photos in the transcript (W3 addendum)**: group members are no longer

@@ -46,6 +46,16 @@ export function avatarColor(id: number): string {
   return AVATAR_HUES[index] ?? AVATAR_HUES[0]!
 }
 
+/**
+ * The international form of a phone number. Telegram hands the number over
+ * without the leading `+` (`8613800000000`); WeChat's card always shows it.
+ */
+export function formatPhone(phone: string): string {
+  const trimmed = phone.trim()
+  if (!trimmed) return ''
+  return trimmed.startsWith('+') ? trimmed : `+${trimmed}`
+}
+
 export function isSameDay(a: number, b: number): boolean {
   const first = new Date(a * 1000)
   const second = new Date(b * 1000)

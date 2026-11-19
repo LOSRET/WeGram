@@ -1,6 +1,6 @@
 import type { Contact } from '@wegram/protocol'
 
-import { avatarColor, initials } from '../../lib/format'
+import { avatarColor, formatPhone, initials } from '../../lib/format'
 import { useAppStore } from '../../store/useAppStore'
 import { CallOutlineIcon, MessageOutlineIcon, MoreIcon, VideoCallOutlineIcon } from '../Icon'
 
@@ -13,8 +13,8 @@ interface ContactDetailProps {
 }
 
 /**
- * WeChat's contact card: the person's photo, name and 微信号, then 朋友资料,
- * 更多信息 and the three blue actions.
+ * WeChat's contact card: the person's photo, name and Telegram号, then 朋友资料,
+ * 更多信息 (手机号 / 数据中心) and the three blue actions.
  *
  * The identity (username / phone / user id) arrives with the contact itself:
  * `contacts:list` is TDLib's address book, so the card has everything without a
@@ -24,7 +24,9 @@ interface ContactDetailProps {
 export function ContactDetail({ contact, onOpenChat, onUnavailable }: ContactDetailProps) {
   const userAvatars = useAppStore((state) => state.userAvatars)
   const avatarUrl = contact.avatarUrl ?? userAvatars[contact.userId]
-  const wxid = contact.username ? contact.username : '未设置'
+  const handle = contact.username ? contact.username : '未设置'
+  /** The photo's DC is the only DC signal a client gets; without it, say so. */
+  const dc = contact.dcId ? `DC ${contact.dcId}` : '未知'
 
   return (
     <main className="wx-contact-pane" aria-label="联系人资料">
@@ -42,7 +44,7 @@ export function ContactDetail({ contact, onOpenChat, onUnavailable }: ContactDet
           </div>
           <div className="wx-contact-detail__meta">
             <h1 className="wx-contact-detail__name">{contact.title}</h1>
-            <p className="wx-contact-detail__id">微信号： {wxid}</p>
+            <p className="wx-contact-detail__id">Telegram号： {handle}</p>
           </div>
           <button
             type="button"
@@ -74,19 +76,15 @@ export function ContactDetail({ contact, onOpenChat, onUnavailable }: ContactDet
 
         <section className="wx-contact-detail__section wx-contact-detail__section--more">
           <h2 className="wx-contact-detail__label">更多信息</h2>
-          <div className="wx-contact-detail__row">
-            <span className="wx-contact-detail__row-label">来源</span>
-            <span className="wx-contact-detail__row-value">Telegram</span>
-          </div>
           {contact.phone ? (
             <div className="wx-contact-detail__row">
               <span className="wx-contact-detail__row-label">手机号</span>
-              <span className="wx-contact-detail__row-value">{contact.phone}</span>
+              <span className="wx-contact-detail__row-value">{formatPhone(contact.phone)}</span>
             </div>
           ) : null}
           <div className="wx-contact-detail__row">
-            <span className="wx-contact-detail__row-label">用户 ID</span>
-            <span className="wx-contact-detail__row-value">{contact.userId}</span>
+            <span className="wx-contact-detail__row-label">数据中心</span>
+            <span className="wx-contact-detail__row-value">{dc}</span>
           </div>
         </section>
 

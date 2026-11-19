@@ -41,6 +41,22 @@ describe('mapContact', () => {
     })
   })
 
+  it('reads the data center from the profile photo', () => {
+    // type 1 (profile photo), DC 5, then an opaque tail — see `file-dc.ts`.
+    const contact = mapContact(context(), {
+      _: 'user',
+      id: 42,
+      first_name: 'Ada',
+      profile_photo: {
+        _: 'profilePhoto',
+        id: 7,
+        small: { _: 'file', id: 1, remote: { _: 'remoteFile', id: 'AQADBQADAQIDAQQ' } },
+        big: { _: 'file', id: 2, remote: { _: 'remoteFile', id: 'AQADBQADAQIDAQQ' } },
+      },
+    })
+    expect(contact.dcId).toBe(5)
+  })
+
   it('falls back to the username, then the id, when the name is empty', () => {
     expect(
       mapContact(context(), {

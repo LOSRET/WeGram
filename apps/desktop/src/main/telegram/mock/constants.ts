@@ -52,7 +52,7 @@ export interface Fixture {
    * Private chats only: the person's address-book identity (微信号 / phone).
    * The real adapter reads the same fields from TDLib's `getContacts` + `user`.
    */
-  contact?: { username?: string; phone?: string }
+  contact?: { username?: string; phone?: string; dcId?: number }
 }
 
 export interface MockFile {

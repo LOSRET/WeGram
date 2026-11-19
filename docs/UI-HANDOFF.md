@@ -278,8 +278,9 @@ The card's layout is exact: avatar top 91, header rule 170, 朋友资料 label 1
 更多信息 label 273, 来源 303, 添加时间 329, action icons 397 and labels 429 — all CSS px
 from the window top. Our DOM measures 91 / 170 / 191 / 219 / 273 / 301 / 367 (actions
 padding start) with the same section paddings. The one deliberate change is the second
-更多信息 row: Telegram has no 添加时间, so 用户 ID (and 手机号 when the contact
-carries one) takes its place, and 来源 says `Telegram`.
+更多信息 rows: Telegram has no 添加时间 / 来源, so 数据中心 (DC N, read from
+the profile photo — 未知 without one) and 手机号 (with the leading + Telegram
+omits) take their place.
 
 ---
 
@@ -593,12 +594,15 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
     count; 企业微信联系人 and 我的企业 have no counterpart at all but are kept to preserve
     the client's silhouette (both toast). This follows the existing "＋ menu" convention:
     the shape is faithful, the action says 还没有接入.
-30. **The contact card's 微信号 is the Telegram username.** WeChat's 微信号 / 来源 /
-    添加时间 do not exist in Telegram: the card shows `username` (or 未设置), 来源
-    `Telegram`, and 用户 ID / 手机号 from the `contacts:list` row itself. A phone number
-    appears only when TDLib exposes it (the person must be in the address book). 发消息
-    opens the private chat (`chats:openPrivate` creates it on first use) and switches
-    back to 聊天; 语音聊天 / 视频聊天 toast (no call path).
+30. **The contact card's Telegram号 is the Telegram username.** WeChat's 微信号 /
+    来源 / 添加时间 do not exist in Telegram: the card shows `username` (or 未设置),
+    数据中心 and 手机号. The DC is decoded from the profile photo's
+    persistent file id (`tdlib/file-dc.ts`) because TDLib exposes no DC field; it is
+    the DC the photo is stored on (Pyrogram documents the same trick as approximate),
+    so a person without a photo shows 未知. TDLib hands the phone number over without
+    the leading `+`; `formatPhone` adds it for display. 发消息 opens the private chat
+    (`chats:openPrivate` creates it on first use) and switches back to 聊天;
+    语音聊天 / 视频聊天 toast (no call path).
 
 ---
 

@@ -179,7 +179,7 @@ export function buildFixtures(mediaOf: MediaOf): Map<number, Fixture> {
       text(3, 301, 26, '降温了，多穿点', false),
       text(3, 302, 25, '晚上回来吃饭吗', false),
     ],
-    contact: { username: 'mama_wegram', phone: '+86 138 0000 0000' },
+    contact: { username: 'mama_wegram', phone: '+86 138 0000 0000', dcId: 4 },
   })
 
   fixtures.set(4, {
@@ -283,6 +283,7 @@ export function buildFixtures(mediaOf: MediaOf): Map<number, Fixture> {
     body: string
     username?: string
     phone?: string
+    dcId?: number
   }> = [
     {
       id: 7,
@@ -292,6 +293,7 @@ export function buildFixtures(mediaOf: MediaOf): Map<number, Fixture> {
       minutesAgo: 15,
       body: '明天图书馆见',
       username: 'ada_lovelace',
+      dcId: 5,
     },
     {
       id: 8,
@@ -301,6 +303,7 @@ export function buildFixtures(mediaOf: MediaOf): Map<number, Fixture> {
       minutesAgo: 45,
       body: 'Thanks, that works!',
       username: 'ben_carter',
+      dcId: 5,
     },
     {
       id: 9,
@@ -310,6 +313,7 @@ export function buildFixtures(mediaOf: MediaOf): Map<number, Fixture> {
       minutesAgo: 120,
       body: '周末一起吃个饭？',
       username: 'chenchen',
+      dcId: 1,
     },
     {
       id: 10,
@@ -319,6 +323,7 @@ export function buildFixtures(mediaOf: MediaOf): Map<number, Fixture> {
       minutesAgo: 240,
       body: 'Ок, договорились',
       username: 'dvolkov',
+      dcId: 4,
     },
     {
       id: 11,
@@ -329,6 +334,7 @@ export function buildFixtures(mediaOf: MediaOf): Map<number, Fixture> {
       body: '🎉',
       username: 'eva_m',
       phone: '+49 151 0000 0000',
+      dcId: 5,
     },
   ]
   for (const contact of contacts) {
@@ -350,6 +356,7 @@ export function buildFixtures(mediaOf: MediaOf): Map<number, Fixture> {
       contact: {
         ...(contact.username ? { username: contact.username } : {}),
         ...(contact.phone ? { phone: contact.phone } : {}),
+        ...(contact.dcId ? { dcId: contact.dcId } : {}),
       },
     })
   }

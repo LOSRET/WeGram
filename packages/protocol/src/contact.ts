@@ -18,10 +18,17 @@ export const contactSchema = z.object({
   userId: z.number().int(),
   /** Display name the 通讯录 sorts and groups by (first + last name). */
   title: z.string(),
-  /** The 微信号 row. */
+  /** The Telegram号 row (the account's @username). */
   username: z.string().optional(),
   phone: z.string().optional(),
   /** Profile photo, when it was already cached when the list was mapped. */
   avatarUrl: z.string().optional(),
+  /**
+   * The data center the person lives on (1–5), read from the profile photo:
+   * Telegram stores a user's picture on their own DC, which is the only DC
+   * signal a client gets. Absent when the person has no photo, or when the
+   * photo's remote id could not be read (see `tdlib/file-dc.ts`).
+   */
+  dcId: z.number().int().min(1).max(5).optional(),
 })
 export type Contact = z.infer<typeof contactSchema>

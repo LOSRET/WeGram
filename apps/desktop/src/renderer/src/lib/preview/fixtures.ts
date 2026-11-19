@@ -431,11 +431,11 @@ export const channelPostRights: Record<number, boolean> = { 6: true }
  * the preview's private-chat peers so 发消息 can open a transcript.
  */
 export const contacts: Contact[] = [
-  { userId: 21, title: 'Ada Lovelace', username: 'ada_lovelace' },
-  { userId: 22, title: 'Ben Carter', username: 'ben_carter' },
-  { userId: 23, title: '陈晨', username: 'chenchen' },
-  { userId: 24, title: 'Dmitri Volkov', username: 'dvolkov' },
-  { userId: 37, title: '妈', username: 'mama_wegram', phone: '+86 138 0000 0000' },
+  { userId: 21, title: 'Ada Lovelace', username: 'ada_lovelace', dcId: 5 },
+  { userId: 22, title: 'Ben Carter', username: 'ben_carter', dcId: 5 },
+  { userId: 23, title: '陈晨', username: 'chenchen', dcId: 1 },
+  { userId: 24, title: 'Dmitri Volkov', username: 'dvolkov', dcId: 4 },
+  { userId: 37, title: '妈', username: 'mama_wegram', phone: '8613800000000', dcId: 4 },
 ]
 
 export const info: AppInfo = {

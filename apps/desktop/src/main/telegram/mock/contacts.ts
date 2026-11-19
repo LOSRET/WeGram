@@ -20,6 +20,7 @@ export function listMockContacts(fixtures: Map<number, Fixture>): Contact[] {
       title: chat.title,
       ...(contact?.username ? { username: contact.username } : {}),
       ...(contact?.phone ? { phone: contact.phone } : {}),
+      ...(contact?.dcId ? { dcId: contact.dcId } : {}),
       ...(chat.avatarUrl ? { avatarUrl: chat.avatarUrl } : {}),
     })
   }
