@@ -4,6 +4,7 @@ import { registerMediaFile } from '../../media/registry'
 import type { Logger } from '../../util'
 import type { AdapterEvent } from '../adapter'
 import type { TdObject } from './client'
+import { asArray } from './json'
 import { mapConnectionState } from './map/chat'
 import type { MapperContext } from './map/context'
 import { isTranscriptRemoval } from './map/deletion'
@@ -100,7 +101,7 @@ export function createUpdateHandler(deps: UpdateDeps): (update: TdObject) => Pro
         return
       }
       case 'updateDeleteMessages': {
-        const messageIds: number[] = Array.isArray(update.message_ids) ? update.message_ids : []
+        const messageIds: number[] = asArray<number>(update.message_ids)
         if (messageIds.length === 0) return
         /**
          * TDLib also reports *cache evictions* here: while the app sat idle in the

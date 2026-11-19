@@ -2,6 +2,7 @@ import type { MessageMedia } from '@wegram/protocol'
 
 import { registerMediaFile } from '../../../media/registry'
 import type { TdObject } from '../client'
+import { asArray } from '../json'
 
 /**
  * Shared by the message mapper (`mapContent`) and the rich-message mapper: both
@@ -36,7 +37,7 @@ function localUrlOf(file: TdObject | undefined): string | undefined {
 
 /** A photo object (`messagePhoto.photo`, `pageBlockPhoto.photo`). */
 export function photoMedia(photo: TdObject | undefined): MessageMedia {
-  const sizes: TdObject[] = Array.isArray(photo?.sizes) ? photo.sizes : []
+  const sizes: TdObject[] = asArray(photo?.sizes)
   const display = pickLargest(sizes)
   // A small variant doubles as the bubble placeholder until the full file lands.
   const thumb = pickSmallestAtLeast(sizes, 160) ?? display

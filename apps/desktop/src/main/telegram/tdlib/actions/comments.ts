@@ -3,6 +3,7 @@ import type { Message } from '@wegram/protocol'
 
 import type { CommentAccess, CommentJoinResult, CommentTarget } from '../../adapter'
 import { resolveCommentAccess, type ChatMemberKind } from '../../comment-access'
+import { asArray } from '../json'
 import type { TdObject } from '../client'
 import { mapMessage } from '../map/message'
 import type { ActionDeps } from './deps'
@@ -35,7 +36,7 @@ export async function comments(
     offset: 0,
     limit,
   })
-  const raw: TdObject[] = Array.isArray(response?.messages) ? response.messages : []
+  const raw: TdObject[] = asArray(response?.messages)
   const fresh = raw.filter((message) => {
     const id = Number(message.id)
     if (!Number.isFinite(id)) return false

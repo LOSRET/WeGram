@@ -1,11 +1,12 @@
 import type { ChatSummary, ConnectionState } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
+import { asArray } from '../json'
 import { previewContent, previewSpoilers } from './content'
 import type { MapperContext } from './context'
 
 export function mapChat(ctx: MapperContext, chat: TdObject): ChatSummary {
-  const positions: TdObject[] = Array.isArray(chat.positions) ? chat.positions : []
+  const positions: TdObject[] = asArray(chat.positions)
   const mainPosition = positions.find((position) => position.list?._ === 'chatListMain')
   const lastMessage = chat.last_message
   // 0 means "nothing read yet", not message 0: the unread divider must then fall

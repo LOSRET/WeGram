@@ -1,6 +1,7 @@
 import type { InlineButton, InlineButtonStyle } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
+import { asArray } from '../json'
 
 /**
  * Inline buttons exist twice in TDLib: `replyMarkupInlineKeyboard` under a
@@ -51,10 +52,10 @@ export function inlineButtonOf(button: TdObject | undefined, text: string): Inli
  */
 export function mapReplyMarkup(markup: TdObject | undefined): InlineButton[][] | undefined {
   if (!markup || markup._ !== 'replyMarkupInlineKeyboard') return undefined
-  const rows: TdObject[] = Array.isArray(markup.rows) ? markup.rows : []
+  const rows: TdObject[] = asArray(markup.rows)
   const mapped: InlineButton[][] = []
   for (const row of rows) {
-    const buttons = (Array.isArray(row) ? row : [])
+    const buttons = asArray(row)
       .map((button) => inlineButtonOf(button, typeof button?.text === 'string' ? button.text : ''))
       .filter((button): button is InlineButton => button !== null)
     if (buttons.length) mapped.push(buttons)

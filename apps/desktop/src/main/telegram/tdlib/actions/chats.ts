@@ -1,6 +1,7 @@
 import { AppError } from '@wegram/protocol'
 import type { ChatSummary } from '@wegram/protocol'
 
+import { asArray } from '../json'
 import { mapChat } from '../map/chat'
 import type { ActionDeps, PostPermissionDeps } from './deps'
 
@@ -23,7 +24,7 @@ export async function listChats(
     chat_list: { _: 'chatListMain' },
     limit: input.offset + input.limit,
   })
-  const ids: number[] = Array.isArray(response.chat_ids) ? response.chat_ids : []
+  const ids: number[] = asArray<number>(response.chat_ids)
   const page = ids.slice(input.offset, input.offset + input.limit)
   const summaries = await Promise.all(page.map((id) => fetchChatSummary(deps, id)))
   // Photos come second: the rows must not wait for one network round trip per

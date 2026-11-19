@@ -1,6 +1,7 @@
 import type { Message } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
+import { asArray } from '../json'
 import { mapMessage } from '../map/message'
 import type { ActionDeps } from './deps'
 
@@ -72,7 +73,7 @@ export async function history(
       limit: limit - collected.length,
       only_local: false,
     })
-    const rawMessages: TdObject[] = Array.isArray(response.messages) ? response.messages : []
+    const rawMessages: TdObject[] = asArray(response.messages)
     const fresh = rawMessages.filter((raw) => {
       const id = Number(raw.id)
       if (!Number.isFinite(id) || seen.has(id)) return false
@@ -155,7 +156,7 @@ async function fetchNewerThan(
     limit: size,
     only_local: false,
   })
-  const rawNewer = (Array.isArray(response.messages) ? response.messages : []).filter(
+  const rawNewer = asArray(response.messages).filter(
     (raw: TdObject) => Number(raw.id) > fromMessageId,
   )
   return mapRawPage(deps, chatId, rawNewer)

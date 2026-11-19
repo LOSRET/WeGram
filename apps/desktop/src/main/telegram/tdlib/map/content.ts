@@ -1,6 +1,7 @@
 import type { Message, MessageEntity, RichBlock } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
+import { asArray } from '../json'
 import { mapEntities } from './entities'
 import {
   documentMedia,
@@ -164,7 +165,7 @@ export async function serviceText(content: TdObject, ctx: ServiceTextContext): P
     case 'messageChatDeletePhoto':
       return `${who}移除了群聊头像`
     case 'messageChatAddMembers': {
-      const ids: number[] = Array.isArray(content.member_user_ids) ? content.member_user_ids : []
+      const ids: number[] = asArray<number>(content.member_user_ids)
       const names = await Promise.all(ids.map((id) => ctx.resolveUserName(Number(id))))
       if (names.length === 0) return `${who}邀请了新成员加入群聊`
       return `${who}邀请${names.join('、')}加入了群聊`

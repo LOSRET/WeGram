@@ -1,6 +1,7 @@
 import type { Contact } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
+import { asArray } from '../json'
 import { mapContact } from '../map/contact'
 import type { ActionDeps } from './deps'
 
@@ -17,7 +18,7 @@ import type { ActionDeps } from './deps'
  */
 export async function listContacts(deps: ActionDeps): Promise<Contact[]> {
   const response = await deps.invoke({ _: 'getContacts' })
-  const ids: number[] = Array.isArray(response?.user_ids) ? response.user_ids : []
+  const ids: number[] = asArray<number>(response?.user_ids)
 
   const users = await Promise.all(
     ids.map(async (userId) => {

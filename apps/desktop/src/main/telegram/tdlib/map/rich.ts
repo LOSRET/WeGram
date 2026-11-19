@@ -10,6 +10,7 @@ import type {
 } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
+import { asArray } from '../json'
 import { inlineButtonOf } from './buttons'
 import { documentMedia, photoMedia, videoMedia, voiceMedia } from './media'
 import { richText } from './rich-text'
@@ -122,7 +123,7 @@ function sectionSize(value: unknown): number | undefined {
 }
 
 function listBlock(block: TdObject, depth: number): RichBlock | null {
-  const rawItems: TdObject[] = Array.isArray(block.items) ? block.items : []
+  const rawItems: TdObject[] = asArray(block.items)
   const items: RichListItem[] = rawItems.map((item) => ({
     label: typeof item.label === 'string' ? item.label : '',
     value: Number(item.value ?? 0),
@@ -133,8 +134,8 @@ function listBlock(block: TdObject, depth: number): RichBlock | null {
 }
 
 function tableBlock(block: TdObject): RichBlock | null {
-  const rawRows: TdObject[][] = Array.isArray(block.cells) ? block.cells : []
-  const rows = rawRows.map((row) => (Array.isArray(row) ? row : []).map(tableCell))
+  const rawRows: TdObject[][] = asArray<TdObject[]>(block.cells)
+  const rows = rawRows.map((row) => asArray(row).map(tableCell))
   if (!rows.length) return null
   const caption = captionOf(block.caption)
   return {
@@ -194,7 +195,7 @@ function detailsBlock(block: TdObject, depth: number): RichBlock | null {
 }
 
 function buttonRowBlock(block: TdObject): RichBlock | null {
-  const raw: TdObject[] = Array.isArray(block.buttons) ? block.buttons : []
+  const raw: TdObject[] = asArray(block.buttons)
   const row = raw
     .map((button) => inlineButtonOf(button, richText(button?.text).text))
     .filter((button): button is NonNullable<typeof button> => button !== null)
@@ -202,7 +203,7 @@ function buttonRowBlock(block: TdObject): RichBlock | null {
 }
 
 function galleryBlock(block: TdObject): RichBlock | null {
-  const raw: TdObject[] = Array.isArray(block.blocks) ? block.blocks : []
+  const raw: TdObject[] = asArray(block.blocks)
   const items: RichMedia[] = []
   for (const child of raw) {
     const media = mediaOf(child)
