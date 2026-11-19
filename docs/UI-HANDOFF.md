@@ -25,6 +25,8 @@ listed in "Known deltas" is a deliberate, documented difference.
 | `renderer/src/components/OverlayScrollbar.tsx` | WeChat's floating scrollbar: a 6 px translucent pill drawn over the rows (hover/scroll/drag), so long lists get no layout gutter and nothing re-flows when it appears. Used by the chat list and the transcript. |
 | `renderer/src/components/ChatPane.tsx` | 46 px header (title, typing, call/… buttons), watermark empty state, chat-info popover. |
 | `renderer/src/components/MessageList.tsx` | Bubbles, real sender photos on both sides (own avatar on the right; `senderAvatarUrl`, `evt:avatars`, `Self.avatarUrl`), hover-only timestamp/read receipt, day + unread separators. |
+| `renderer/src/components/message-list/CommentBar.tsx` | WeChat's 评论 N 条 bar under a bubble (design doc §9.8) — the handle, not the thread. |
+| `renderer/src/components/chat-pane/CommentPanel.tsx` | Telegram's discussion view: the full chat pane, sliding in from the right (250 ms, `COMMENT_PANEL_ANIM_MS` unmount delay), pinned post, comments drawn with `MessageRow` (scroll-up paging, session cache) and the chat composer's card at the bottom (`messages:sendComment`). Styles: `styles/comments.css`. |
 | `renderer/src/components/Composer.tsx` | Bordered input card, toolbar under the text, attach menu, send button inside the card. A channel manages it through `onCollapse`: the channel composer shows a labelled 收起 button next to 发送 that puts the 服务号 bar back. |
 | `renderer/src/components/chat-pane/ChannelBar.tsx` | A channel's bottom edge instead of the composer: WeChat's 服务号 card — 静音 always, plus the keyboard switch on the right when `chats:canPost` says this account may post (the switch swaps the card for the composer). A read-only channel keeps only 静音, and its message menu has no 回复. |
 | `renderer/src/components/ExpressionPicker.tsx` | The composer's 表情/贴纸 panel: the client's 464 px card with 最近使用, the 10-column 所有表情 grid, a 搜索 tab and one tab per installed sticker set (with 下一页 paging). Picking an emoji inserts it at the caret; clicking a sticker sends it. |
@@ -614,6 +616,19 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
     the leading `+`; `formatPhone` adds it for display. 发消息 opens the private chat
     (`chats:openPrivate` creates it on first use) and switches back to 聊天;
     语音聊天 / 视频聊天 toast (no call path).
+31. **The comment area is Telegram's discussion view, and it is adapted, not measured.**
+    WeChat (reference shot, 2026-11-20) expands comments inline under the card; the
+    owner asked for Telegram's logic instead, so 评论 N 条 only opens a full-pane panel
+    that slides in from the right (250 ms). The comments themselves are the transcript's
+    own rows (`MessageRow`) — avatar, sender, bubble, hover timestamp, media — and the
+    bottom input is the chat composer's card, posting through `messages:sendComment`.
+    Telegram's own view was not screenshot-measured here: the 46 px header follows the
+    chat header, the 36 px post avatar follows the contact card, and the panel shows
+    only the counters TDLib has (阅读 / 转发). Reactions (赞 / 在看 / 收藏) are a
+    different model and are not drawn; there is no search icon in the header yet. The
+    footer follows the official client's gate (`BottomControls::isJoinGroup`): when the
+    account may not post, the composer is replaced by 加入讨论组 / 申请加入讨论组, and the
+    input returns only after the join — sending never auto-joins.
 
 ---
 

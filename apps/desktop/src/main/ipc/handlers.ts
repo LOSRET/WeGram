@@ -121,6 +121,23 @@ export function createHandlers({
       adapter.historyAround(payload as { chatId: number; messageId: number; limit: number }),
     'messages:newer': (payload) =>
       adapter.historyNewer(payload as { chatId: number; fromMessageId: number; limit: number }),
+    'messages:comments': (payload) =>
+      adapter.comments(
+        payload as {
+          chatId: number
+          messageId: number
+          fromMessageId?: number
+          limit: number
+        },
+      ),
+    'messages:commentInfo': (payload) =>
+      adapter.commentInfo(payload as { chatId: number; messageId: number }),
+    'messages:joinCommentGroup': (payload) =>
+      adapter.joinCommentGroup(payload as { chatId: number; messageId: number }),
+    'messages:sendComment': (payload) =>
+      adapter.sendComment(
+        payload as { chatId: number; messageId: number; text: string; replyTo?: number },
+      ),
     'messages:send': (payload) =>
       adapter.sendText(payload as { chatId: number; text: string; replyTo?: number }),
     'messages:edit': (payload) =>

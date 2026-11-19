@@ -18,6 +18,56 @@ export type AdapterKind = 'mock' | 'tdlib'
 
 export type MediaKind = 'photo' | 'file'
 
+/** One page request of a message's comment thread (design doc §9.8). */
+export interface CommentQuery {
+  /** The commented message's chat: a channel, or the discussion group. */
+  chatId: number
+  /** The commented message; TDLib resolves the linked group itself. */
+  messageId: number
+  /** Oldest comment already loaded; omitted for the newest page. */
+  fromMessageId?: number
+  limit: number
+}
+
+export interface CommentPage {
+  messages: Message[]
+  hasMore: boolean
+}
+
+/** The message whose comment thread is being read or written. */
+export interface CommentTarget {
+  /** The commented message's chat, not necessarily the discussion group. */
+  chatId: number
+  messageId: number
+}
+
+/**
+ * Whether this account may post in a thread's discussion group, plus what the
+ * composer should offer instead when it may not (design doc §9.8).
+ */
+export interface CommentAccess {
+  canComment: boolean
+  joined: boolean
+  canJoin: boolean
+  joinByRequest: boolean
+  slowModeSeconds: number
+}
+
+export interface CommentJoinResult {
+  joined: boolean
+  requestSent: boolean
+}
+
+/** Posting a comment: the discussion view's input (design doc §9.8). */
+export interface CommentSendQuery {
+  /** The commented message's chat, not necessarily the one the comment lands in. */
+  chatId: number
+  messageId: number
+  text: string
+  /** Comment id being answered; omitted posts at the thread root. */
+  replyTo?: number
+}
+
 /**
  * Domain events the adapter may emit. The IPC layer maps these onto `evt:*`
  * channels (§7.2) and batches them before they reach the renderer.
@@ -116,6 +166,21 @@ export interface TelegramAdapter {
     fromMessageId: number
     limit: number
   }): Promise<{ messages: Message[]; hasNewer: boolean }>
+  /**
+   * One page of a message's comment thread (design doc §9.8). `fromMessageId`
+   * walks towards older comments; the page comes back ascending, like history.
+   */
+  comments(input: CommentQuery): Promise<CommentPage>
+  /**
+   * Whether the composer can be used for this thread's group. Mirrors the
+   * official client, which composes it from membership + permissions instead of
+   * asking the server (see `comment-access.ts`).
+   */
+  commentInfo(input: CommentTarget): Promise<CommentAccess>
+  /** Joins the thread's discussion group, or sends a join request. */
+  joinCommentGroup(input: CommentTarget): Promise<CommentJoinResult>
+  /** Posts a comment into the message's thread and answers the sent row. */
+  sendComment(input: CommentSendQuery): Promise<{ message: Message }>
   sendText(input: {
     chatId: number
     text: string

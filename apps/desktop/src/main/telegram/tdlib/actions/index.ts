@@ -8,6 +8,7 @@
  * history paging never has to be reviewed against the send path.
  */
 export * from './chats'
+export * from './comments'
 export * from './contacts'
 export * from './deps'
 export * from './files'

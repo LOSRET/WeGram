@@ -1,5 +1,5 @@
 import type { Message } from '@wegram/protocol'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { loadLatestWindow } from '../../lib/anchoredWindow'
 import { errorMessage, invoke } from '../../lib/ipc'
@@ -12,6 +12,7 @@ import { MessageList } from '../message-list'
 import { ChannelBar } from './ChannelBar'
 import { ChatHeader } from './ChatHeader'
 import { ChatInfoPopover } from './ChatInfoPopover'
+import { CommentPanel, COMMENT_PANEL_ANIM_MS } from './CommentPanel'
 import {
   AnchorPendingPlaceholder,
   EmptyTranscriptPlaceholder,
@@ -70,6 +71,43 @@ export function ChatPane() {
   const [channelInputChatId, setChannelInputChatId] = useState<number | null>(null)
   /** A mute call is in flight, so the bar cannot be double-toggled. */
   const [muteBusy, setMuteBusy] = useState(false)
+
+  /**
+   * The full-pane discussion view (design doc §9.8). It stays mounted while it
+   * slides out, which is why the message is kept next to the open flag and the
+   * unmount is scheduled after the animation.
+   */
+  const [comments, setComments] = useState<{ message: Message; open: boolean } | null>(null)
+  const commentTimerRef = useRef<number | null>(null)
+
+  const openComments = useCallback((message: Message): void => {
+    if (commentTimerRef.current !== null) {
+      window.clearTimeout(commentTimerRef.current)
+      commentTimerRef.current = null
+    }
+    setComments({ message, open: true })
+  }, [])
+
+  const closeComments = useCallback((): void => {
+    setComments((current) => (current ? { ...current, open: false } : null))
+    if (commentTimerRef.current !== null) window.clearTimeout(commentTimerRef.current)
+    commentTimerRef.current = window.setTimeout(() => {
+      commentTimerRef.current = null
+      setComments((current) => (current && !current.open ? null : current))
+    }, COMMENT_PANEL_ANIM_MS)
+  }, [])
+
+  useEffect(
+    () => () => {
+      if (commentTimerRef.current !== null) window.clearTimeout(commentTimerRef.current)
+    },
+    [],
+  )
+
+  /** Another conversation owns another discussion view: switching chats closes it. */
+  useEffect(() => {
+    setComments(null)
+  }, [activeChatId])
 
   const {
     pendingLanding,
@@ -197,7 +235,7 @@ export function ChatPane() {
   const actions = createMessageActions(activeChatId)
 
   return (
-    <main className="wx-chat">
+    <main className={`wx-chat${comments ? ' wx-chat--comments' : ''}`}>
       <ChatHeader title={chat.title} typing={typing} onOpenInfo={setInfoAt} />
 
       {loadingHistory && messages.length === 0 ? (
@@ -243,6 +281,7 @@ export function ChatPane() {
           onDelete={setDeleting}
           onForward={setForwarding}
           onCopy={actions.copy}
+          onOpenComments={openComments}
         />
       )}
 
@@ -270,6 +309,17 @@ export function ChatPane() {
           onOpenInput={() => setChannelInputChatId(activeChatId)}
         />
       )}
+
+      {comments ? (
+        <CommentPanel
+          /* The live store row, not the snapshot taken on open: posting a comment
+             patches `interaction.comments` through an `interaction` op, and the
+             panel's header follows it. */
+          message={messages.find((item) => item.id === comments.message.id) ?? comments.message}
+          open={comments.open}
+          onClose={closeComments}
+        />
+      ) : null}
 
       {forwarding ? (
         <ForwardDialog

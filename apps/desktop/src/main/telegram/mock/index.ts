@@ -22,6 +22,7 @@ import { registerMediaFile } from '../../media/registry'
 import { AdapterEmitter, type MediaKind, type TelegramAdapter } from '../adapter'
 import { MockAssets } from './assets'
 import { MockAvatars } from './avatars'
+import { createMockComments } from './comments'
 import { listMockContacts } from './contacts'
 import {
   ME,
@@ -33,6 +34,7 @@ import {
 } from './constants'
 import { applyRead, simulateTransfer } from './effects'
 import { buildFixtures } from './fixtures'
+import { searchChats, searchMessages } from './search'
 import { getMockStickerSet, listMockStickerSets } from './stickers'
 import { emitTraffic } from './traffic'
 
@@ -60,6 +62,12 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   private auth: AuthState = { kind: 'idle' }
   private connection: ConnectionState = 'offline'
   private readonly fixtures = new Map<number, Fixture>()
+  /** The comment endpoints live in `./comments.ts`; fields keep this file small. */
+  private readonly commentApi = createMockComments(this.fixtures, (event) => this.emit(event))
+  readonly comments = this.commentApi.comments
+  readonly commentInfo = this.commentApi.info
+  readonly joinCommentGroup = this.commentApi.join
+  readonly sendComment = this.commentApi.send
   private readonly assets = new MockAssets()
   private readonly avatars: MockAvatars
   private nextMessageId = 5000
@@ -440,9 +448,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   }
 
   async searchGlobal(input: { q: string; limit: number }): Promise<ChatSummary[]> {
-    const needle = input.q.toLowerCase()
-    const all = [...this.fixtures.values()].map((fixture) => fixture.chat)
-    return all.filter((chat) => chat.title.toLowerCase().includes(needle)).slice(0, input.limit)
+    return searchChats(this.fixtures, input.q, input.limit)
   }
 
   async searchInChat(input: {
@@ -450,10 +456,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     q: string
     fromMessageId?: number
   }): Promise<Message[]> {
-    const needle = input.q.toLowerCase()
-    return this.requireFixture(input.chatId).messages.filter((m) =>
-      m.text.toLowerCase().includes(needle),
-    )
+    return searchMessages(this.fixtures, input)
   }
 
   async downloadFile(input: {

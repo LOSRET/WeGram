@@ -1,8 +1,6 @@
 import { z } from 'zod'
 
 import {
-  appInfoSchema,
-  appSettingsSchema,
   authStateSchema,
   chatOpSchema,
   chatSummarySchema,
@@ -10,16 +8,19 @@ import {
   messageEntitySchema,
   messageOpSchema,
   messageSchema,
-  proxyConfigSchema,
-  proxyTestResultSchema,
   scrollAnchorSchema,
   selfSchema,
   stickerSetSchema,
   userAvatarSchema,
   stickerSetSummarySchema,
-  viewerItemSchema,
-  viewerStateSchema,
 } from './dto'
+import {
+  appInfoSchema,
+  appSettingsSchema,
+  proxyConfigSchema,
+  proxyTestResultSchema,
+} from './settings'
+import { viewerItemSchema, viewerStateSchema } from './viewer'
 import { contactSchema } from './contact'
 import { appErrorSchema } from './errors'
 
@@ -72,6 +73,26 @@ export const invokeChannels = [
   'messages:around',
   /** One page below a window that does not reach the newest message. */
   'messages:newer',
+  /**
+   * One page of a message's comment thread (a channel's discussion group, or the
+   * replies to a post inside that group). `fromMessageId` pages towards older
+   * comments; the answer is ascending, like every transcript page.
+   */
+  'messages:comments',
+  /**
+   * Whether this account may post in the thread's discussion group, and whether
+   * a join button is the next step (design doc §9.8). Mirrors the official
+   * client: no server "can comment" call, the adapter composes it from the
+   * supergroup's membership status, join-to-send flag and permissions.
+   */
+  'messages:commentInfo',
+  /** Joins the thread's discussion group (or sends a join request). */
+  'messages:joinCommentGroup',
+  /**
+   * Posts a comment on a message (the discussion view's input). TDLib keeps the
+   * thread in the linked supergroup, so the adapter resolves the chat itself.
+   */
+  'messages:sendComment',
   'messages:send',
   'messages:edit',
   'messages:delete',
@@ -187,6 +208,53 @@ export const invokeSchemas = {
       limit: z.number().int().positive().max(100),
     }),
     response: z.object({ messages: z.array(messageSchema), hasNewer: z.boolean() }),
+  },
+  'messages:comments': {
+    request: z.object({
+      /** Chat of the commented message: a channel, or the discussion group itself. */
+      chatId: z.number().int(),
+      /** The commented message (TDLib resolves the thread, including the linked group). */
+      messageId: z.number().int(),
+      /** Oldest comment already loaded; omit for the newest page. */
+      fromMessageId: z.number().int().optional(),
+      limit: z.number().int().positive().max(100),
+    }),
+    response: z.object({ messages: z.array(messageSchema), hasMore: z.boolean() }),
+  },
+  'messages:commentInfo': {
+    request: z.object({ chatId: z.number().int(), messageId: z.number().int() }),
+    response: z.object({
+      /** The composer may be used right now. */
+      canComment: z.boolean(),
+      /** The account is a member of the discussion group. */
+      joined: z.boolean(),
+      /** A join button is the way forward (not a member, and not banned). */
+      canJoin: z.boolean(),
+      /** The group approves joins manually, so the button says 申请加入. */
+      joinByRequest: z.boolean(),
+      /** Seconds left on slow mode before another comment may be sent. */
+      slowModeSeconds: z.number().int().nonnegative(),
+    }),
+  },
+  'messages:joinCommentGroup': {
+    request: z.object({ chatId: z.number().int(), messageId: z.number().int() }),
+    response: z.object({
+      /** The account is in the group now. */
+      joined: z.boolean(),
+      /** A join request was sent and waits for an administrator. */
+      requestSent: z.boolean(),
+    }),
+  },
+  'messages:sendComment': {
+    request: z.object({
+      /** The commented message's chat: a channel, or the discussion group. */
+      chatId: z.number().int(),
+      messageId: z.number().int(),
+      text: z.string().min(1),
+      /** Comment id being answered; omitted posts at the thread root. */
+      replyTo: z.number().int().optional(),
+    }),
+    response: z.object({ message: messageSchema }),
   },
   'messages:send': {
     request: z.object({

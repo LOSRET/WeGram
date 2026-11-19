@@ -68,6 +68,8 @@ export interface MessageListProps {
   onDelete: (message: Message) => void
   onForward: (message: Message) => void
   onCopy: (message: Message) => void
+  /** Opens the full-pane comment view of the message (design doc §9.8). */
+  onOpenComments: (message: Message) => void
 }
 
 interface MenuState {
@@ -119,6 +121,7 @@ export function MessageList({
   onDelete,
   onForward,
   onCopy,
+  onOpenComments,
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const hostRef = useRef<HTMLDivElement | null>(null)
@@ -316,6 +319,7 @@ export function MessageList({
                   avatarUrl={senderAvatarUrl(first, chat, self, userAvatars)}
                   readOutboxMaxId={chat.lastReadOutboxMessageId ?? 0}
                   onOpenMenu={openMenu}
+                  onOpenComments={onOpenComments}
                 />
               </div>
             )

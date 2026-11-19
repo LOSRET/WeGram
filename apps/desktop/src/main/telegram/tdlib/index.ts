@@ -377,6 +377,26 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     return actions.historyNewer(this.actionDeps, input)
   }
 
+  /** One page of a message's comment thread; see `actions/comments.ts`. */
+  async comments(input: Parameters<typeof actions.comments>[1]) {
+    return actions.comments(this.actionDeps, input)
+  }
+
+  /** Whether this account may comment on the message; see `actions/comments.ts`. */
+  async commentInfo(input: Parameters<typeof actions.commentInfo>[1]) {
+    return actions.commentInfo(this.actionDeps, input)
+  }
+
+  /** Joins the thread's discussion group, or sends a join request. */
+  async joinCommentGroup(input: Parameters<typeof actions.joinCommentGroup>[1]) {
+    return actions.joinCommentGroup(this.actionDeps, input)
+  }
+
+  /** Posts a comment into a message's thread; see `actions/comments.ts`. */
+  async sendComment(input: Parameters<typeof actions.sendComment>[1]) {
+    return actions.sendComment(this.actionDeps, input)
+  }
+
   async sendText(input: {
     chatId: number
     text: string

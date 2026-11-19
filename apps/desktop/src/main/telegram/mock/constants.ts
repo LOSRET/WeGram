@@ -53,6 +53,23 @@ export interface Fixture {
    * The real adapter reads the same fields from TDLib's `getContacts` + `user`.
    */
   contact?: { username?: string; phone?: string; dcId?: number }
+  /**
+   * Comment threads by message id (design doc §9.8). TDLib keeps them in the
+   * message thread — a channel's linked discussion group — not in the transcript,
+   * so the mock does too; `messages:comments` serves them.
+   */
+  comments?: Record<number, Message[]>
+  /**
+   * Comment permissions for the mock's discussion groups (design doc §9.8).
+   * Defaults to "joined and allowed"; a thread can require a join first.
+   */
+  commentAccess?: {
+    joined?: boolean
+    canComment?: boolean
+    joinByRequest?: boolean
+    slowModeSeconds?: number
+    banned?: boolean
+  }
 }
 
 export interface MockFile {

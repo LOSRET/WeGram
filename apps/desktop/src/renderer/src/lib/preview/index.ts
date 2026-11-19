@@ -25,7 +25,9 @@ import {
   msg,
   now,
   previewFiles,
+  previewCommentAccess,
   previewStickerSet,
+  previewThreads,
   PREVIEW_STICKERS,
   channelPostRights,
 } from './fixtures'
@@ -210,6 +212,74 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       const limit = Number(store.limit ?? 50)
       const newer = all.filter((item) => item.id > fromId)
       return { messages: newer.slice(0, limit), hasNewer: newer.length > limit }
+    }
+    case 'messages:comments': {
+      const all = previewThreads[`${store.chatId}:${store.messageId}`] ?? []
+      const fromId = store.fromMessageId as number | undefined
+      const older = fromId === undefined ? all : all.filter((item) => item.id < fromId)
+      const limit = Number(store.limit ?? 30)
+      const page = older.slice(Math.max(0, older.length - limit))
+      return { messages: page, hasMore: page.length < older.length }
+    }
+    case 'messages:commentInfo': {
+      const key = `${store.chatId}:${store.messageId}`
+      if (!previewThreads[key]) {
+        throw { code: 'not_implemented', message: '这个帖子还没有讨论群组，不能评论' }
+      }
+      const access = previewCommentAccess[key] ?? {}
+      const joined = access.joined ?? true
+      const canComment = access.canComment ?? joined
+      return {
+        canComment,
+        joined,
+        canJoin: !joined && !(access.banned ?? false) && !canComment,
+        joinByRequest: access.joinByRequest ?? false,
+        slowModeSeconds: canComment ? (access.slowModeSeconds ?? 0) : 0,
+      }
+    }
+    case 'messages:joinCommentGroup': {
+      const key = `${store.chatId}:${store.messageId}`
+      const access = previewCommentAccess[key] ?? {}
+      if (access.joinByRequest) return { joined: false, requestSent: true }
+      previewCommentAccess[key] = { ...access, joined: true, canComment: true }
+      return { joined: true, requestSent: false }
+    }
+    case 'messages:sendComment': {
+      const chatId = Number(store.chatId)
+      const messageId = Number(store.messageId)
+      const thread = previewThreads[`${chatId}:${messageId}`]
+      if (!thread) throw { code: 'not_implemented', message: '这个帖子还没有讨论群组，不能评论' }
+      const message: Message = {
+        id: thread.reduce((max, item) => Math.max(max, item.id), 0) + 1,
+        chatId,
+        senderId: ME.id,
+        senderName: '我',
+        outgoing: true,
+        date: now(),
+        kind: 'text',
+        text: String(store.text),
+      }
+      thread.push(message)
+      const target = (messagesByChat[chatId] ?? []).find((item) => item.id === messageId)
+      if (target) {
+        target.interaction = {
+          ...target.interaction,
+          comments: thread.length,
+          canOpen: true,
+        }
+        emit('evt:messages', {
+          chatId,
+          ops: [
+            {
+              op: 'interaction',
+              chatId,
+              messageId,
+              interaction: target.interaction,
+            },
+          ],
+        })
+      }
+      return { message }
     }
     case 'messages:send': {
       const list = messagesByChat[store.chatId] ?? []

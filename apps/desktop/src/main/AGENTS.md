@@ -14,7 +14,7 @@ login-window.ts     the frameless 280×373 login BrowserWindow (#login), close/r
 ipc/router.ts       per-channel zod validation, Result envelope
 ipc/handlers.ts     one handler per invoke channel
 telegram/           adapter.ts (the seam) / tdlib/ (real adapter) / mock/ (fixtures) /
-                    updates.ts / events.ts
+                    updates.ts / events.ts / comment-access.ts (the comment permission rule)
 telegram/tdlib/actions/  TDLib requests as functions over ActionDeps, grouped into
                     chats / history / files / send / search (index.ts re-exports)
 media/              registry.ts (token → path) / protocol.ts (wx-media://) / image-size.ts

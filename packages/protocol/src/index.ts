@@ -1,4 +1,6 @@
 export * from './dto'
 export * from './contact'
+export * from './settings'
+export * from './viewer'
 export * from './errors'
 export * from './channels'

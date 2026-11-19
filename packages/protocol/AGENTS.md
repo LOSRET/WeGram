@@ -6,11 +6,13 @@ Scope: the IPC contract shared by main, preload and renderer. Read the root
 ## What belongs here
 
 Every value that crosses IPC is declared here **first**: `dto.ts` (the core zod
-schemas + inferred types), `contact.ts` (the 通讯录 `Contact` row, split out when
-`dto.ts` reached its 550-line budget), `channels.ts` (channel tables and their
-request/response schemas) and `errors.ts` (`AppError`). The package is exported
-straight from source (`src/index.ts`, no build step), so `pnpm typecheck` in the
-consumer is the only build.
+schemas + inferred types), `channels.ts` (channel tables and their request/response
+schemas), `errors.ts` (`AppError`) and the modules split out when `dto.ts` hit its
+550-line budget — `contact.ts` (the 通讯录 `Contact` row), `settings.ts` (proxy,
+app settings, `app:info`) and `viewer.ts` (the 图片和视频 window's payloads). The
+package is exported straight from source (`src/index.ts`, no build step), so
+`pnpm typecheck` in the consumer is the only build. A new field that pushes `dto.ts`
+over the budget is a signal to split the domain out, not to raise the cap.
 
 ## Rules
 

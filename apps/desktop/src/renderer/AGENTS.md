@@ -18,8 +18,12 @@ store/                zustand: data defaults (initialState.ts), pure reducers, s
 components/message-list/  virtualiser + MessageRow + Divider + the scroll hooks:
                          useInitialPosition / usePrependRestore / useAnchorSave /
                          useLandingSave / useJumpToLatest / useLocateScroll / useViewportSeen;
-                         RichMessage (page blocks), ContactCard (vCards), InlineButtons
-components/chat-pane/     render tree + useChatHistory (history/ modules) + messageActions
+                         RichMessage (page blocks), ContactCard (vCards), InlineButtons,
+                         CommentBar (评论 N 条 handle, §9.8)
+components/chat-pane/     render tree + useChatHistory (history/ modules) + messageActions +
+                         CommentPanel (full-pane discussion view, slides in from the right;
+                         chat-style rows + the composer card, posts via messages:sendComment;
+                         non-members get the official client's 加入/申请加入 gate instead)
 components/contacts/      通讯录: ContactsList (service rows + address book by initial) +
                          ContactDetail (the card)
 components/picker/        the expression panel's data hooks and body components
@@ -55,6 +59,11 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
 
 ## Rules that have already cost a debugging session
 
+- **An avatar box needs `position: relative`.** `.wx-avatar__img` is absolutely
+  positioned with `inset: 0` so a photo fills its rounded square; a new wrapper that
+  draws one (the comment rows did) without `position: relative` throws the photo out
+  to the nearest positioned ancestor — the message row — where it paints over the whole
+  bubble at full row size. The comment avatar has its own containing block for this.
 - **A prop read inside an async decode must go through a ref.** `TgsSticker` played
   from the lottie load callback using the render-time `active`: a sticker whose file
   was already cached mounted in the same commit as the visibility measurement, the
@@ -66,6 +75,11 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
 - **Never gate content visibility on `requestAnimationFrame` alone.** Electron
   throttles rAF while the window is occluded, so the pane stays invisible with
   its data loaded. Always pair a frame-based reveal with a `setTimeout` fallback.
+- **A CSS slide needs the element mounted closed first, and the parent must delay the
+  unmount.** `CommentPanel` renders at `translateX(100%)` and flips `is-open` on the
+  next tick (a 20 ms timeout, since rAF is throttled while occluded); on close the
+  pane keeps it mounted for `COMMENT_PANEL_ANIM_MS` (250 ms) or the panel vanishes
+  mid-slide. Any future full-pane push view follows the same two rules.
 - **A programmatic `scrollTop` write desyncs `@tanstack/react-virtual`** (it
   re-reads its offset only on real scroll events). After every programmatic
   scroll, dispatch one `scroll` event so the virtualizer re-measures — otherwise

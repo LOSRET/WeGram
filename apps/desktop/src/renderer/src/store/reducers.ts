@@ -55,6 +55,15 @@ export function reduceOps(
           item.id === op.messageId ? { ...item, text: op.text, edited: true } : item,
         )
         break
+      case 'interaction':
+        // A counter patch, never a replacement: the live update carries no
+        // `canOpen` flag, so merging keeps the thread's pull working.
+        next = next.map((item) =>
+          item.id === op.messageId
+            ? { ...item, interaction: { ...item.interaction, ...op.interaction } }
+            : item,
+        )
+        break
       case 'delete':
         for (const id of op.messageIds) deleted.add(id)
         next = next.filter((item) => !op.messageIds.includes(item.id))

@@ -9,6 +9,7 @@ import { RichMessage } from './RichMessage'
 import { RichText } from '../RichText'
 import { StickerRenderer } from '../StickerRenderer'
 import { AlbumBubble } from './AlbumBubble'
+import { CommentBar } from './CommentBar'
 import { isEmojiOnly } from './emoji'
 
 export interface MessageRowProps {
@@ -33,6 +34,8 @@ export interface MessageRowProps {
    * stable callback: a per-row arrow function made `memo` useless.
    */
   onOpenMenu: (message: Message, x: number, y: number) => void
+  /** Opens Telegram's full-pane discussion view for that message's thread. */
+  onOpenComments: (message: Message) => void
 }
 
 /**
@@ -65,6 +68,7 @@ export const MessageRow = memo(
     avatarUrl,
     readOutboxMaxId,
     onOpenMenu,
+    onOpenComments,
   }: MessageRowProps) {
     const first = messages[0]
     const last = messages[messages.length - 1]
@@ -200,6 +204,11 @@ export const MessageRow = memo(
               {buttons ? <InlineButtons rows={buttons} /> : null}
             </div>
           )}
+          {/* 评论 N 条 (design doc §9.8): just the handle — the thread opens in the
+              full-pane CommentPanel, like Telegram's discussion view. */}
+          {first.interaction?.comments ? (
+            <CommentBar interaction={first.interaction} onOpen={() => onOpenComments(first)} />
+          ) : null}
           <span className="wx-message__meta">
             {formatMessageTime(last.date)}
             {last.edited ? ' · 已编辑' : ''}
@@ -227,5 +236,6 @@ export const MessageRow = memo(
     previous.readOutboxMaxId === next.readOutboxMaxId &&
     previous.repliedTo === next.repliedTo &&
     previous.onOpenMenu === next.onOpenMenu &&
+    previous.onOpenComments === next.onOpenComments &&
     sameRow(previous.messages, next.messages),
 )

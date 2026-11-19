@@ -3,6 +3,7 @@ import type {
   ChatSummary,
   Contact,
   Message,
+  MessageInteraction,
   MessageMedia,
   Self,
   Sticker,
@@ -337,6 +338,72 @@ export const messagesByChat: Record<number, Message[]> = {
     },
   ],
   99: perfMessages,
+}
+
+/* ---------- comment threads (design doc §9.8) ---------- */
+
+const COMMENT_AUTHORS = ['小满', '阿星', '林深', '周末不加班', 'Cathy', '老周', '海边的卡夫卡', 'K']
+const COMMENT_BODIES = [
+  '这条我先收藏了，晚点对着改。',
+  '同问 +1，我也卡在这一步。',
+  '已经踩过这个坑了，按你说的顺序调整就好了。',
+  '能否再展开讲讲第二种格式？',
+  '实测有效，感谢分享。',
+  '我把这段转给同事了，正好用得上。',
+  '这个思路可以，不过要注意旧版本兼容。',
+  '支持，等这个功能很久了。',
+]
+
+/** One preview thread, oldest first; ids start above the transcript's. */
+function thread(chatId: number, messageId: number, count: number, minutesAgo: number): Message[] {
+  return Array.from({ length: count }, (_, index) => ({
+    id: 900_000 + messageId * 100 + index,
+    chatId,
+    senderId: 4101 + (index % COMMENT_AUTHORS.length),
+    senderName: COMMENT_AUTHORS[index % COMMENT_AUTHORS.length] ?? '小满',
+    ...(index % 3 === 0 ? { senderAvatarUrl: senderAvatar(4101 + index) } : {}),
+    outgoing: false,
+    date: now() - Math.max(60, (minutesAgo - index * 2) * 60),
+    kind: 'text' as const,
+    text: COMMENT_BODIES[index % COMMENT_BODIES.length] ?? '👍',
+  }))
+}
+
+/**
+ * Comment permissions per thread, shaped like `messages:commentInfo`. The
+ * channel's discussion group starts unjoined so the join button has a case to
+ * show; everything else is writable as-is.
+ */
+export const previewCommentAccess: Record<
+  string,
+  {
+    joined?: boolean
+    canComment?: boolean
+    joinByRequest?: boolean
+    slowModeSeconds?: number
+    banned?: boolean
+  }
+> = {
+  '5:502': { joined: false, canComment: false },
+}
+
+/** The preview's threads; the bar counts and `messages:comments` both read them. */
+export const previewThreads: Record<string, Message[]> = {
+  '2:203': thread(2, 203, 7, 300),
+  '2:204': thread(2, 204, 3, 60),
+  '5:502': thread(5, 502, 78, 600),
+}
+
+/**
+ * Attach the comment bar's numbers to the commented messages. The real adapter
+ * maps them from `interaction_info`; the preview writes them once, here.
+ */
+for (const [key, comments] of Object.entries(previewThreads)) {
+  const [chatId, messageId] = key.split(':').map(Number)
+  const target = (messagesByChat[chatId ?? 0] ?? []).find((message) => message.id === messageId)
+  if (!target) continue
+  const extra: Partial<MessageInteraction> = messageId === 502 ? { views: 12400, forwards: 96 } : {}
+  target.interaction = { comments: comments.length, canOpen: true, ...extra }
 }
 
 export function msg(

@@ -1,5 +1,6 @@
 import type { Message, MessageMedia } from '@wegram/protocol'
 
+import { mockThread, threadInteraction } from './comments'
 import { ME, at, text, type Fixture } from './constants'
 
 type MediaOf = (
@@ -13,6 +14,28 @@ type MediaOf = (
  * a managed channel, and the 5000-message stress fixture for the virtualised
  * list. Media comes from `MockAssets`, which materialised the files first.
  */
+
+/**
+ * Attach comment threads to the messages they belong to (design doc §9.8): the
+ * parent message gets its `interaction` (the comment bar's numbers), and the
+ * replies stay off the transcript, exactly as TDLib keeps them.
+ */
+function withThreads(
+  fixture: Fixture,
+  threads: Record<number, Message[]>,
+  extras: Record<number, { views?: number; forwards?: number }> = {},
+): Fixture {
+  return {
+    ...fixture,
+    comments: threads,
+    messages: fixture.messages.map((message) => {
+      const thread = threads[message.id]
+      if (!thread) return message
+      return { ...message, interaction: threadInteraction(thread, extras[message.id]) }
+    }),
+  }
+}
+
 export function buildFixtures(mediaOf: MediaOf): Map<number, Fixture> {
   const fixtures = new Map<number, Fixture>()
   fixtures.set(1, {
@@ -107,7 +130,7 @@ export function buildFixtures(mediaOf: MediaOf): Map<number, Fixture> {
     ],
   })
 
-  fixtures.set(2, {
+  const wegramGroup: Fixture = {
     chat: {
       id: 2,
       title: 'WeGram 产品群',
@@ -159,7 +182,16 @@ export function buildFixtures(mediaOf: MediaOf): Map<number, Fixture> {
         media: mediaOf(7003, { stickerFormat: 'tgs', stickerEmoji: '✨' }),
       },
     ],
-  })
+  }
+  // The group mirrors a supergroup with a discussion thread: two posts carry
+  // comment bars, their replies live only in the thread (design doc §9.8).
+  fixtures.set(
+    2,
+    withThreads(wegramGroup, {
+      203: mockThread(2, 203, 7, 300),
+      204: mockThread(2, 204, 3, 60),
+    }),
+  )
 
   fixtures.set(3, {
     chat: {
@@ -198,7 +230,7 @@ export function buildFixtures(mediaOf: MediaOf): Map<number, Fixture> {
     messages: [text(4, 401, 180, '会议纪要已经放到共享盘', false)],
   })
 
-  fixtures.set(5, {
+  const newsChannel: Fixture = {
     chat: {
       id: 5,
       title: 'Telegram News',
@@ -211,6 +243,9 @@ export function buildFixtures(mediaOf: MediaOf): Map<number, Fixture> {
       lastReadInboxMessageId: 502,
       lastReadOutboxMessageId: 0,
     },
+    // The channel's discussion group is not joined yet: the panel offers
+    // 加入讨论组 first, like the official client does for a non-member.
+    commentAccess: { joined: false, canComment: false },
     messages: [
       text(5, 501, 600, 'Telegram 11.0 released', false),
       // Channel posts are sent by the chat itself (`messageSenderChat`), not by a
@@ -227,7 +262,17 @@ export function buildFixtures(mediaOf: MediaOf): Map<number, Fixture> {
         text: '频道消息：发送者是频道本身',
       },
     ],
-  })
+  }
+  // A channel post with a linked discussion group: 78 comments, and the read /
+  // forward counters WeChat's article card shows above them.
+  fixtures.set(
+    5,
+    withThreads(
+      newsChannel,
+      { 502: mockThread(5, 502, 78, 600) },
+      { 502: { views: 12400, forwards: 96 } },
+    ),
+  )
 
   // A channel this account *does* manage: the bar shows the keyboard switch and
   // the composer opens from it. Chat 5 above is the read-only case.

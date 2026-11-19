@@ -7,7 +7,7 @@ import type { TdObject } from './client'
 import { mapConnectionState } from './map/chat'
 import type { MapperContext } from './map/context'
 import { isTranscriptRemoval } from './map/deletion'
-import { mapMessage } from './map/message'
+import { mapInteraction, mapMessage } from './map/message'
 
 /** What the update stream needs from the adapter. */
 export interface UpdateDeps {
@@ -74,6 +74,29 @@ export function createUpdateHandler(deps: UpdateDeps): (update: TdObject) => Pro
         } catch {
           // The message may have been deleted in the same batch.
         }
+        return
+      }
+      /**
+       * Engagement counters moved (views, forwards, replies). The update carries
+       * no message content and fires on every view, so the whole message is not
+       * remapped: a cheap `interaction` op patches the row instead.
+       */
+      case 'updateMessageInteractionInfo': {
+        const interaction = mapInteraction({ interaction_info: update.interaction_info }) ?? {
+          comments: 0,
+        }
+        deps.emit({
+          type: 'messages',
+          chatId: update.chat_id,
+          ops: [
+            {
+              op: 'interaction',
+              chatId: update.chat_id,
+              messageId: update.message_id,
+              interaction,
+            },
+          ],
+        })
         return
       }
       case 'updateDeleteMessages': {

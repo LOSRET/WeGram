@@ -311,6 +311,12 @@ import-order sensitive: `pnpm build`, then compare a screenshot of the mock app.
 Per-domain modules re-exported from `index.ts` — the export surface must stay identical
 (preload bundles the protocol index, 190 kB). Optional / lowest value.
 
+**Partially done 2026-11-20**: the comment/interaction DTO pushed `dto.ts` over the
+550-line cap, so `settings.ts` (MASK / proxy / app settings / `app:info`) and
+`viewer.ts` (the 图片和视频 payloads, importing `appSettingsSchema`) were split out and
+`channels.ts` now imports from those two. `dto.ts` is at ~470 lines; the message schemas
+still live in it, so the rest of this batch is unchanged.
+
 Files over 200 lines that are **not** in the plan: `WechatIcons.tsx` (458, generated
 artwork — leave it), `Composer.tsx` (283), `MediaBubble.tsx` (261), `main/index.ts` (250),
 `ProxyPanel.tsx` (222), `OverlayScrollbar.tsx` (205), `PerfPanel.tsx` (198),
