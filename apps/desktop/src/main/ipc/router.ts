@@ -2,6 +2,7 @@ import {
   asAppErrorShape,
   invokeChannels,
   invokeSchemas,
+  type AppErrorShape,
   type InvokeChannel,
 } from '@wegram/protocol'
 import { ipcMain } from 'electron'
@@ -12,7 +13,7 @@ export type IpcHandlerMap = Partial<Record<InvokeChannel, IpcHandler>>
 export interface IpcResult {
   ok: boolean
   data?: unknown
-  error?: { code: string; message: string; retryAfter?: number }
+  error?: AppErrorShape
 }
 
 const registered: InvokeChannel[] = []

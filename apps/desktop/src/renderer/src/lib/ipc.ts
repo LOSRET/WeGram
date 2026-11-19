@@ -1,4 +1,9 @@
-import type { InvokeChannel, InvokeRequest, InvokeResponse } from '@wegram/protocol'
+import type {
+  AppErrorShape,
+  InvokeChannel,
+  InvokeRequest,
+  InvokeResponse,
+} from '@wegram/protocol'
 
 export function invoke<C extends InvokeChannel>(
   channel: C,
@@ -15,6 +20,6 @@ export function errorMessage(error: unknown): string {
   return String(error)
 }
 
-export function isAppErrorShape(error: unknown): error is { code: string; message: string } {
+export function isAppErrorShape(error: unknown): error is AppErrorShape {
   return Boolean(error && typeof error === 'object' && 'code' in error && 'message' in error)
 }
