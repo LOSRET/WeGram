@@ -81,7 +81,6 @@ export function createMainWindow(theme: 'light' | 'dark'): BrowserWindow {
 }
 
 /** Only https and tg: links leave the app (design doc §8.3). */
-/** Only https and tg: links leave the app (design doc §8.3). */
 function openExternal(url: string): void {
   try {
     const parsed = new URL(url)

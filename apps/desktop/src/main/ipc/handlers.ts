@@ -20,6 +20,7 @@ import {
   viewerItem,
   viewerState,
 } from '../viewer'
+import { storedTheme } from '../windows'
 import type { IpcHandlerMap } from './router'
 
 export interface HandlerDeps {
@@ -61,6 +62,16 @@ export function createHandlers({
   onAuthInteraction,
   onLocate,
 }: HandlerDeps): IpcHandlerMap {
+  /**
+   * The viewer's own downloads (open / save / copy / reveal) outrank the
+   * transcript's background fetches, so the file the reader is acting on wins.
+   */
+  const VIEWER_DOWNLOAD_PRIORITY = 32
+  const localFile = async (fileId: number): Promise<string> => {
+    const { path } = await adapter.downloadFile({ fileId, priority: VIEWER_DOWNLOAD_PRIORITY })
+    return path
+  }
+
   return {
     'app:info': () => info,
 
@@ -173,7 +184,7 @@ export function createHandlers({
       adapter.downloadFile(payload as { fileId: number; priority: number }),
     'media:open': async (payload) => {
       const { fileId } = payload as { fileId: number }
-      const { path } = await adapter.downloadFile({ fileId, priority: 32 })
+      const path = await localFile(fileId)
       // Only files the protocol layer just produced are ever opened.
       const failure = await shell.openPath(path)
       if (failure) throw new AppError('internal', `Failed to open file: ${failure}`)
@@ -222,9 +233,7 @@ export function createHandlers({
       uiDb.setSetting(RECENT_EMOJI_KEY, JSON.stringify(emoji.slice(0, RECENT_EMOJI_LIMIT)))
     },
 
-    'settings:get': () => ({
-      theme: uiDb.getSetting('theme') === 'dark' ? ('dark' as const) : ('light' as const),
-    }),
+    'settings:get': () => ({ theme: storedTheme(uiDb) }),
     'settings:set': (payload) => {
       const patch = payload as { patch: { theme?: 'light' | 'dark' } }
       if (patch.patch.theme) {
@@ -260,7 +269,7 @@ export function createHandlers({
     'viewer:save': async (payload) => {
       const { fileId } = payload as { fileId: number }
       // Only files the protocol layer just produced are ever copied.
-      const { path: source } = await adapter.downloadFile({ fileId, priority: 32 })
+      const source = await localFile(fileId)
       const item = viewerItem(fileId)
       const name = item?.fileName?.trim() || basename(source)
       const video = item?.kind === 'video'
@@ -287,14 +296,14 @@ export function createHandlers({
       if (viewerItem(fileId)?.kind === 'video') {
         throw new AppError('not_implemented', '视频不支持复制到剪贴板')
       }
-      const { path: source } = await adapter.downloadFile({ fileId, priority: 32 })
+      const source = await localFile(fileId)
       const image = nativeImage.createFromPath(source)
       if (image.isEmpty()) throw new AppError('internal', 'Failed to decode the image')
       clipboard.writeImage(image)
     },
     'viewer:reveal': async (payload) => {
       const { fileId } = payload as { fileId: number }
-      const { path: source } = await adapter.downloadFile({ fileId, priority: 32 })
+      const source = await localFile(fileId)
       shell.showItemInFolder(source)
     },
     'viewer:pin': (payload) => ({ onTop: setViewerPin((payload as { onTop: boolean }).onTop) }),
