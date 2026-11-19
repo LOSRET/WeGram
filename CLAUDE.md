@@ -16,6 +16,7 @@ pnpm workspace with W1 + W2 + the W3 main body implemented:
 
 - `docs/技术方案.md` — authoritative design (Chinese). Change the design here first, then the code.
 - `packages/protocol` — IPC contract: DTO zod schemas, channel tables, `AppError`. Single source of truth shared by main, preload and renderer. Exported straight from source (`src/index.ts`), no build step.
+- `packages/mock-session` — the fake session's pure rules (paging, read marker, comment access), shared by the main mock adapter and the browser preview. Imports nothing: it is bundled into the renderer.
 - `apps/desktop` — Electron app: `src/main` (adapter + IPC + store + media protocol), `src/preload` (whitelisted `window.tg`), `src/renderer` (React 19 + Tailwind v4 UI).
 - `spikes/tdlib` — measured TDLib behaviour on this machine; `RESULTS.md` holds packaging constraints that only fail at build time.
 

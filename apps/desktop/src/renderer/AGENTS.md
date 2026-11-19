@@ -30,10 +30,19 @@ components/picker/        the expression panel's data hooks and body components
 components/ExpressionPicker.tsx  the picker's state + composition
 components/viewer/        the 图片和视频 window: MediaViewer shell + useViewerItem /
                          useViewerZoom + ViewerToolbar / ViewerGrid + viewerMenu / viewerActions
+components/Avatar.tsx    the ONE avatar box (photo or initials); the box class it is given
+                        is the positioned element, which is the rule that once cost a session
+components/SearchField.tsx  the ONE search pill (label + input + optional trailing control)
 components/           the remaining visual concerns (Composer, MediaBubble, …)
 lib/ipc.ts            thin `window.tg` wrapper
 lib/clipboard.ts      text copy for the contact card (navigator.clipboard + execCommand fallback)
 lib/format.ts         time / preview / avatar helpers (pure, unit-tested)
+lib/search.ts         normalizeQuery / containsText — the ONE reading of a search box
+lib/self.ts           SelfIdentity + selfIdentity(auth); one placeholder id (1000)
+lib/popupPlacement.ts (pure, unit-tested) "which edge does this card hang from"
+lib/mediaBox.ts       (pure, unit-tested) the reserved media box + percent text
+lib/composerInput.ts  (pure, unit-tested) Enter / Shift+Enter / IME rule
+lib/useComposerInput.ts  composition ref + textarea props, shared by both composers
 lib/contacts.ts       通讯录 initial/grouping, pinyin via ICU (pure, unit-tested)
 lib/entities.ts       TL entity → text segments (pure, unit-tested)
 lib/useAnchoredScroll.ts  ready gate, stick-to-bottom, resize compensation

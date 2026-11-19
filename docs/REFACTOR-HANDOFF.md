@@ -356,6 +356,47 @@ artwork — leave it), `Composer.tsx` (283), `MediaBubble.tsx` (261), `main/inde
 8. **The real account in `spikes/tdlib/data` is read-only.** Never send/edit/delete/forward
    against it; `-Mock` / `WEGRAM_ADAPTER=mock` for anything that writes.
 
+## Dedupe pass (2026-11-20)
+
+A read-only duplication audit (a 7-line block scan plus three deep passes over main,
+renderer and protocol/preview) became one branch, one commit per item. What moved:
+
+| Was duplicated | Now lives in |
+|---|---|
+| the three `BrowserWindow` factories | `main/app-window.ts` (`createAppWindow`, `attachNavigationPolicy`); the viewer's missing `will-navigate` guard was a separate commit |
+| "append a message and announce it" in the mock (4 copies) | `main/telegram/mock/transcript.ts` (`outgoingMessage`, `appendMessage`) |
+| the send envelope + the thread resolver | `main/telegram/tdlib/actions/message-input.ts`; one `resolveThread` with `requireRoot` |
+| the media field table (photo/video/animation/document/voice) | `main/telegram/tdlib/map/media.ts` |
+| "a missing array means empty" (24 sites) | `main/telegram/tdlib/json.ts` (`asArray`) |
+| the newer-messages page | `history.ts` → `fetchNewerThan` |
+| avatar boxes (7 copies, one already lost `draggable`) | `components/Avatar.tsx` |
+| the search pill + the query rule (4 panels) | `components/SearchField.tsx`, `lib/search.ts` |
+| Enter / Shift+Enter / IME | `lib/composerInput.ts` + `lib/useComposerInput.ts` |
+| floating-card placement (`rect.right - 232`, `rect.top - 92`) | `lib/popupPlacement.ts` + `AnchoredPopup` |
+| the reserved media box + percent text | `lib/mediaBox.ts` |
+| the signed-in identity (two placeholder ids) | `lib/self.ts` (1000; the comment panel used 0) |
+| calendar-day maths | `lib/format.ts` → `calendarDaysAgo` |
+| the fake session's paging / read / comment rules | new package `@wegram/mock-session`, wired into both tsconfigs, both vite configs, eslint's `max-lines` list and the version scripts |
+
+**Deliberately NOT merged** — the audit concluded these only *look* duplicated:
+
+- mock adapter vs TDLib adapter: two implementations of `TelegramAdapter` is the design.
+- `TelegramAdapter` → `TdlibAdapter` forwarding → `actions/*`: that is the seam.
+- `store/settings.ts` vs `store/ui-db.ts`, and the three `proxy` modules: different
+  formats by rule (JSON+DPAPI vs SQL; URL parse vs sealed config vs TDLib call).
+- the two `map/*` dispatch switches: two different TDLib type trees.
+- `setError(errorMessage(e))` at ~28 sites: where an error goes depends on the call site
+  (`ProxyPanel` hands the login window its own error line — there is no store there).
+- per-panel empty/loading skeletons and CSS declaration blocks: `wx-*` is a measured contract.
+- `preview/index.ts`'s invoke switch vs `main/ipc/handlers.ts`: handlers need Electron and
+  the preview may not import main; only the pure rules are shared (that is the package).
+
+**Still open** — the fixtures themselves are still two copies
+(`main/telegram/mock/fixtures.ts` ↔ `renderer/src/lib/preview/fixtures.ts`) and have
+drifted (a `lastRead*` pair, one phone format, file ids). Merging them means a shared
+fixture module with each side's `mediaOf` injected; until then a consistency test that
+compares the two through the protocol schemas is the cheap guard.
+
 ## Start-here checklist for the next session
 
 ```powershell
