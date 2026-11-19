@@ -27,7 +27,7 @@ The login is its **own window**, like WeChat's: a frameless 280×373 `BrowserWin
 
 `ui.db` uses the built-in `node:sqlite` (Electron 38 ships Node 22.22) instead of better-sqlite3, so there is no native module to rebuild for the Electron ABI. All SQL is confined to `apps/desktop/src/main/store/ui-db.ts`; `settings.json` keeps only the proxy config because it carries a sealed secret.
 
-Still deferred: search (global + in-chat), pinning/mute controls, settings page. Release packaging lives in `.github/workflows/release.yml` (tag → NSIS installer → GitHub Release), proven by `v0.1.0`; the installer itself has never been installed or code-signed.
+Still deferred: search (global + in-chat), pinning chat controls, settings page. Release packaging lives in `.github/workflows/release.yml` (a version bump on `main` → NSIS installer → GitHub Release; pushing a `v*` tag still works), proven by `v0.1.0`–`v0.1.2`; the installer itself has never been installed or code-signed.
 `ui.db` reading positions (`scroll_anchor_id`/`scroll_offset`) are wired: MessageList writes them,
 ChatPane restores them when the reader was not at the bottom. A row older than the
 newest page is loaded *around* itself (`messages:around`), and a window that stops
@@ -70,6 +70,8 @@ The TypeScript/Electron equivalent of rustracker's "no `.unwrap()` in production
 **Git.** Verify before committing (at least `pnpm typecheck && pnpm lint`). One logical change per commit, Conventional Commit messages. Small fix → current branch; multi-file feature or refactor → new branch.
 
 **Version.** The root `package.json` is the only place a version is written down. `pnpm sync-version` copies it into `apps/desktop` (what Electron and electron-builder read) and `packages/protocol`; `pnpm check:version`, the first step of `pnpm verify`, fails on drift. Bump with `pnpm version 0.2.1 --no-git-tag-version && pnpm sync-version`; the renderer gets the value inlined as `__WEGRAM_VERSION__` at build time, main uses `app.getVersion()`, and a release tag re-stamps the root manifest in CI.
+
+**Release.** `.github/workflows/release.yml` packages on **push to `main`**: it reads the root version, and if `v<version>` does not exist yet it builds the NSIS installer once, creates the tag at that commit and publishes the GitHub Release. The same version pushed again is skipped (one release per version), so a version bump + `git push` is the whole release procedure. Pushing a `v*` tag or running the workflow manually still works and refreshes that release's assets.
 
 ### Agent-maintainable code (the split rules)
 
