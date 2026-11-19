@@ -345,7 +345,7 @@ soft-IoU over all 2500 masks, best hit confirmed by eye; scripts
 |---|---|---|---|
 | `MoreIcon` (…) | `#0846` | `ScissorsIcon` | `#0859` |
 | `CallIcon` (话机) | `#0300` | `ChevronDownIcon` | `#0555` (12×12) |
-| `StickerCubeIcon` (贴纸 cube) | `#1268` | `CallBubbleIcon` (was `#1755`, empty bubble) | `#1206` |
+| `CubeTabIcon` (收藏: rail tab and composer) | `#1268` | `CallBubbleIcon` (was `#1755`, empty bubble) | `#1206` |
 
 ****The 通讯录 glyphs (2026-11-19).** Four more payloads, matched from the user's
 address-book screenshot with the same Chamfer pass (`.cache/contacts_ref/match_icons.py`;
@@ -453,12 +453,16 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
 
 ## 5. Known deltas vs the real client
 
-1. **Composer toolbar**: ours now has the client's five buttons in order — 表情, 贴纸
-   (cube), 文件夹, 剪刀 + chevron, 麦克风 — all from payloads. The smiley and the cube
-   open the shared expression panel on the 表情 / first sticker-set tab respectively
-   (§2.3); folder opens a photo/file menu, scissors and mic show a "not wired" toast.
-   The client's separate right-hand "语音输入" circle is **deliberately left out** —
-   the send button sits right after the toolbar.
+1. **Composer toolbar**: ours has the client's five buttons in order — 表情, 收藏
+   (cube), 文件夹, 剪刀 + chevron, 麦克风 — all from payloads. The smiley opens the
+   expression panel (§2.3) on 表情; installed sticker sets are that panel's strip tabs,
+   so there is no second expression entry in the toolbar. 收藏, 剪刀 and 麦克风 (and the
+   scissors chevron) show a "not wired" toast: the cube is the same `#1268` payload the
+   rail's 收藏 tab draws, and favourites have no protocol source yet (delta 3). An earlier
+   pass had the cube open the panel on the first sticker set — that mislabelled a 收藏
+   affordance as 贴纸 and looked like 收藏 opening 表情. The client's separate right-hand
+   "语音输入" circle is **deliberately left out** — the send button sits right after the
+   toolbar.
 2. **Avatars are real where the protocol carries them, initials elsewhere.** The rail
    avatar, every chat row and now **every message row** load the account's/profile photo
    through `wx-media://` (`Self.avatarUrl`, `ChatSummary.avatarUrl`,

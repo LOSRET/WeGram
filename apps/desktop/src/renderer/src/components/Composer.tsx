@@ -6,14 +6,7 @@ import { errorMessage, invoke } from '../lib/ipc'
 import { messagePreview } from '../lib/format'
 import { useAppStore } from '../store/useAppStore'
 import { Popup } from './ContextMenu'
-import {
-  ChevronDownIcon,
-  EmojiIcon,
-  FolderIcon,
-  MicIcon,
-  ScissorsIcon,
-  StickerCubeIcon,
-} from './Icon'
+import { ChevronDownIcon, CubeTabIcon, EmojiIcon, FolderIcon, MicIcon, ScissorsIcon } from './Icon'
 import { ExpressionPicker } from './ExpressionPicker'
 
 export interface ComposerEditing {
@@ -48,7 +41,7 @@ export function Composer({
 }: ComposerProps) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
-  const [picker, setPicker] = useState<'emoji' | 'stickers' | null>(null)
+  const [picker, setPicker] = useState<'emoji' | null>(null)
   const [attachAt, setAttachAt] = useState<{ x: number; y: number } | null>(null)
   const composingRef = useRef(false)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
@@ -246,14 +239,20 @@ export function Composer({
             >
               <EmojiIcon size={21} />
             </button>
+            {/*
+              The client's cube is 收藏, not a second expression entry: the sticker
+              sets live as tabs inside the 表情 panel (docs/UI-HANDOFF.md, §5 delta 1).
+              Favourites have no protocol source yet, so this reports that like the
+              other unwired toolbar entries do.
+            */}
             <button
-              className={`wx-tool-button${picker === 'stickers' ? ' wx-tool-button--active' : ''}`}
-              onClick={() => setPicker((current) => (current === 'stickers' ? null : 'stickers'))}
+              className="wx-tool-button"
+              onClick={() => notWired('收藏')}
               disabled={busy || Boolean(editing)}
-              title="贴纸"
-              aria-label="贴纸集合"
+              title="收藏"
+              aria-label="收藏"
             >
-              <StickerCubeIcon size={21} />
+              <CubeTabIcon size={21} />
             </button>
             <button
               className="wx-tool-button"
@@ -326,9 +325,7 @@ export function Composer({
 
       {picker ? (
         <ExpressionPicker
-          key={picker}
           chatId={chatId}
-          mode={picker}
           onPickEmoji={insertEmoji}
           onSent={stickerSent}
           onClose={closePicker}

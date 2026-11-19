@@ -38,7 +38,6 @@ export {
   PlusIcon,
   ScissorsIcon,
   SearchIcon,
-  StickerCubeIcon,
   VideoCallOutlineIcon,
 } from './WechatIcons'
 
