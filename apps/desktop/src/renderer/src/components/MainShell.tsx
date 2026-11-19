@@ -12,6 +12,7 @@ import { SectionPlaceholder } from './SectionPlaceholder'
 import { SideRail, type ShellSection } from './SideRail'
 import { errorMessage, invoke } from '../lib/ipc'
 import { activateChat } from '../lib/openChat'
+import { containsText, normalizeQuery } from '../lib/search'
 import { useAppStore } from '../store/useAppStore'
 
 interface Anchor {
@@ -121,9 +122,9 @@ export function MainShell() {
   )
 
   const filteredChats = useMemo(() => {
-    const needle = deferredQuery.trim().toLowerCase()
+    const needle = normalizeQuery(deferredQuery)
     if (!needle) return chats
-    return chats.filter((chat) => chat.title.toLowerCase().includes(needle))
+    return chats.filter((chat) => containsText(chat.title, needle))
   }, [chats, deferredQuery])
 
   /**

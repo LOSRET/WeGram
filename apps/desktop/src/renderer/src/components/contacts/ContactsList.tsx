@@ -2,9 +2,11 @@ import type { Contact } from '@wegram/protocol'
 import { useRef, useState } from 'react'
 
 import { groupContacts } from '../../lib/contacts'
+import { containsText, normalizeQuery } from '../../lib/search'
 import { useAppStore } from '../../store/useAppStore'
 import { Avatar } from '../Avatar'
-import { ChevronDownIcon, ContactsManageIcon, SearchIcon } from '../Icon'
+import { ChevronDownIcon, ContactsManageIcon } from '../Icon'
+import { SearchField } from '../SearchField'
 import { OverlayScrollbar } from '../OverlayScrollbar'
 
 interface ContactsListProps {
@@ -46,26 +48,22 @@ export function ContactsList({
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
-  const needle = query.trim().toLowerCase()
+  const needle = normalizeQuery(query)
   const searching = needle.length > 0
   const filtered = searching
-    ? contacts.filter((contact) => contact.title.toLowerCase().includes(needle))
+    ? contacts.filter((contact) => containsText(contact.title, needle))
     : contacts
   const groups = groupContacts(filtered)
 
   return (
     <section className="wx-list wx-contacts" aria-label="通讯录">
       <div className="wx-contacts__head">
-        <label className="wx-search wx-contacts__search">
-          <SearchIcon size={15} />
-          <input
-            value={query}
-            placeholder="搜索"
-            spellCheck={false}
-            onChange={(event) => onQueryChange(event.target.value)}
-            onPointerDown={(event) => event.stopPropagation()}
-          />
-        </label>
+        <SearchField
+          className="wx-contacts__search"
+          value={query}
+          onValueChange={onQueryChange}
+          guardPointer
+        />
         <button
           type="button"
           className="wx-contacts__manage"

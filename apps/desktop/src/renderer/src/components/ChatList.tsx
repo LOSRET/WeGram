@@ -4,7 +4,8 @@ import { memo, useRef, type MouseEvent } from 'react'
 
 import { Avatar } from './Avatar'
 import { OverlayScrollbar } from './OverlayScrollbar'
-import { PlusIcon, SearchIcon } from './Icon'
+import { PlusIcon } from './Icon'
+import { SearchField } from './SearchField'
 import { formatChatTime, previewSegments } from '../lib/format'
 
 /**
@@ -121,16 +122,7 @@ export function ChatList({
   return (
     <section className="wx-list" aria-label="会话列表">
       <div className="wx-list__head">
-        <label className="wx-search">
-          <SearchIcon size={15} />
-          <input
-            value={query}
-            placeholder="搜索"
-            spellCheck={false}
-            onChange={(event) => onQueryChange(event.target.value)}
-            onPointerDown={(event) => event.stopPropagation()}
-          />
-        </label>
+        <SearchField value={query} onValueChange={onQueryChange} guardPointer />
         <button
           className="wx-list__plus"
           title="更多"

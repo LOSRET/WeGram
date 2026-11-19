@@ -1,3 +1,5 @@
+import { containsText, normalizeQuery } from './search'
+
 /**
  * The picker's emoji catalogue (design doc §9.3): the Unicode emoji this client
  * actually sends in text — WeChat's own 表情 are a closed emoticon set, while a
@@ -320,10 +322,10 @@ export const EMOJI: readonly EmojiItem[] = [
  * matches nothing (the tab shows the hint instead).
  */
 export function searchEmoji(query: string): EmojiItem[] {
-  const needle = query.trim().toLowerCase()
+  const needle = normalizeQuery(query)
   if (!needle) return []
   return EMOJI.filter((item) =>
-    `${item.name} ${item.keywords ?? ''} ${item.char}`.toLowerCase().includes(needle),
+    containsText(`${item.name} ${item.keywords ?? ''} ${item.char}`, needle),
   )
 }
 

@@ -5,6 +5,7 @@ import { loadLatestWindow } from '../lib/anchoredWindow'
 import { searchEmoji } from '../lib/emoji'
 import { errorMessage, invoke } from '../lib/ipc'
 import { pageForIndex } from '../lib/pickerTabs'
+import { containsText, normalizeQuery } from '../lib/search'
 import { useAppStore } from '../store/useAppStore'
 import { EmojiBody } from './picker/EmojiBody'
 import { PickerTabs } from './picker/PickerTabs'
@@ -87,13 +88,12 @@ export function ExpressionPicker({ chatId, onPickEmoji, onSent, onClose }: Expre
     setQuery('')
   }
 
-  const needle = query.trim()
+  const needle = normalizeQuery(query)
   const hits = useMemo(() => {
     if (!needle) return { emoji: [], sets: [] }
-    const lower = needle.toLowerCase()
     return {
       emoji: searchEmoji(needle),
-      sets: sets.filter((set) => set.title.toLowerCase().includes(lower)),
+      sets: sets.filter((set) => containsText(set.title, needle)),
     }
   }, [needle, sets])
 
