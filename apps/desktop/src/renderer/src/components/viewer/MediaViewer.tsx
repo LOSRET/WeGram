@@ -2,6 +2,7 @@ import type { ViewerState } from '@wegram/protocol'
 import { useCallback, useEffect, useState } from 'react'
 
 import { errorMessage, invoke } from '../../lib/ipc'
+import { percentOf } from '../../lib/mediaBox'
 import type { Point } from '../../lib/zoom'
 import { Popup } from '../ContextMenu'
 import { VideoCanvas } from './VideoCanvas'
@@ -182,7 +183,7 @@ export function MediaViewer() {
               {progress === null ? (
                 <span className="wx-spinner" />
               ) : (
-                `${Math.round(progress * 100)}%`
+                percentOf(progress)
               )}
             </div>
           ) : null}

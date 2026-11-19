@@ -3,6 +3,7 @@ import { useRef, useState } from 'react'
 
 import { ensureMedia, formatBytes, progressRatio, useFileProgress, useMediaUrl } from '../lib/media'
 import { formatDuration } from '../lib/format'
+import { percentOf, reserveBox } from '../lib/mediaBox'
 import { errorMessage, invoke } from '../lib/ipc'
 import { openPhotoViewer, openVideoViewer } from '../lib/viewer'
 import { PlayIcon } from './viewer/ViewerIcons'
@@ -63,12 +64,14 @@ function PhotoBubble({
   const progress = useFileProgress(media.fileId)
   const uploading = Boolean(progress && !progress.completed && ratio !== undefined)
 
-  const width = media.width ?? 4
-  const height = media.height ?? 3
-  const scale = Math.min(MAX_PHOTO_W / width, MAX_PHOTO_H / height)
   const box = inAlbum
     ? undefined
-    : { width: Math.round(width * scale), height: Math.round(height * scale) }
+    : reserveBox(media, {
+        maxWidth: MAX_PHOTO_W,
+        maxHeight: MAX_PHOTO_H,
+        fallbackWidth: 4,
+        fallbackHeight: 3,
+      })
 
   return (
     <button
@@ -91,11 +94,11 @@ function PhotoBubble({
         <img className="wx-photo__image" src={url} alt={media.fileName ?? '图片'} loading="lazy" />
       ) : (
         <span className="wx-photo__pending">
-          {ratio === undefined ? <span className="wx-spinner" /> : `${Math.round(ratio * 100)}%`}
+          {ratio === undefined ? <span className="wx-spinner" /> : percentOf(ratio)}
         </span>
       )}
       {url && uploading ? (
-        <span className="wx-photo__upload">{Math.round((ratio ?? 0) * 100)}%</span>
+        <span className="wx-photo__upload">{percentOf(ratio ?? 0)}</span>
       ) : null}
     </button>
   )
@@ -115,12 +118,14 @@ function VideoBubble({
   const url = useMediaUrl(media, 6)
   const { ratio } = useBubbleProgress(media)
 
-  const width = media.width ?? 16
-  const height = media.height ?? 9
-  const scale = Math.min(MAX_PHOTO_W / width, MAX_PHOTO_H / height)
   const box = inAlbum
     ? undefined
-    : { width: Math.round(width * scale), height: Math.round(height * scale) }
+    : reserveBox(media, {
+        maxWidth: MAX_PHOTO_W,
+        maxHeight: MAX_PHOTO_H,
+        fallbackWidth: 16,
+        fallbackHeight: 9,
+      })
 
   // Like a photo, a video opens in the client's 图片和视频 window — it does not
   // play inside the bubble, and the transport lives in that window's player bar.
@@ -147,7 +152,7 @@ function VideoBubble({
         <span className="wx-video__duration">{formatDuration(media.duration)}</span>
       ) : null}
       {!url && ratio !== undefined ? (
-        <span className="wx-video__progress">{Math.round(ratio * 100)}%</span>
+        <span className="wx-video__progress">{percentOf(ratio)}</span>
       ) : null}
     </button>
   )
@@ -178,14 +183,14 @@ function FileBubble({ media }: { media: MessageMedia }) {
         <span className="wx-file__meta">
           {formatBytes(media.size)}
           {!completed && ratio !== undefined && !opening
-            ? ` · ${Math.round(ratio * 100)}%`
+            ? ` · ${percentOf(ratio)}`
             : opening
               ? ' · 正在打开…'
               : ''}
         </span>
         {!completed && ratio !== undefined ? (
           <span className="wx-file__bar">
-            <span style={{ width: `${Math.round(ratio * 100)}%` }} />
+            <span style={{ width: percentOf(ratio) }} />
           </span>
         ) : null}
       </span>
@@ -228,9 +233,7 @@ function VoiceBubble({ media }: { media: MessageMedia }) {
         {'▁▃▅▇▅▃▁'.repeat(3)}
       </span>
       <span className="wx-voice__time">
-        {!url && ratio !== undefined
-          ? `${Math.round(ratio * 100)}%`
-          : formatDuration(media.duration)}
+        {!url && ratio !== undefined ? percentOf(ratio) : formatDuration(media.duration)}
       </span>
       {url ? (
         <audio
