@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import type { SVGProps } from 'react'
 
 /**
@@ -9,7 +10,9 @@ import type { SVGProps } from 'react'
  * that set: `MomentsTabIcon` is WeChat's design-system compass
  * (`.cache/wxres/tabBar_icons_outlined_discover.svg`), and `TelegramLogo` is the
  * third-party brand mark from Simple Icons (CC0). The brand mark is used for the
- * rail's 聊天 tab, the login card and the empty-pane watermark.
+ * rail's 聊天 tab, the login card and the empty-pane watermark. The selected-state
+ * variants (`*TabFilledIcon`) are rebuilt from the outlined tab geometry, because
+ * this build's payload set did not carry the client's filled tab art.
  */
 
 type IconProps = SVGProps<SVGSVGElement> & { size?: number }
@@ -62,6 +65,95 @@ export function MomentsTabIcon({ size = 24, ...rest }: IconProps) {
       {...rest}
     >
       <path d="M12,20.8 C16.8601058,20.8 20.8,16.8601058 20.8,12 C20.8,7.1398942 16.8601058,3.2 12,3.2 C7.1398942,3.2 3.2,7.1398942 3.2,12 C3.2,16.8601058 7.1398942,20.8 12,20.8 Z M12,22 C6.4771525,22 2,17.5228475 2,12 C2,6.47771525 6.4771525,2 12,2 C17.5228475,2 22,6.47771525 22,12 C22,17.5228475 17.5228475,22 12,22 Z M11.1233556,11.1233556 L9.26736162,14.7326384 L12.8766444,12.8766444 L14.7326384,9.26736162 L11.1233556,11.1233556 Z M10.232233,10.232233 L16.1243501,7.20234187 C16.2678549,7.12854767 16.4381526,7.12854767 16.5816575,7.20234187 C16.8272333,7.32862381 16.9239401,7.63007409 16.7976581,7.87564991 L13.767767,13.767767 L7.87564991,16.7976581 C7.73214506,16.8714523 7.56184738,16.8714523 7.41834253,16.7976581 C7.17276672,16.6713762 7.07605992,16.3699259 7.20234187,16.1243501 L10.232233,10.232233 Z" />
+    </svg>
+  )
+}
+
+/**
+ * The same three tab glyphs in their selected state. The client fills the active
+ * tab and keeps the others as outlines; the extracted payload set only carried the
+ * outlined art, so these are rebuilt from that same geometry — the person from the
+ * outline's outer subpaths, the cube as its silhouette with the face seams cut
+ * out, the compass as the disc with the needle knocked out. `currentColor` keeps
+ * them tintable by the rail.
+ */
+
+/** 通讯录, selected: solid head and shoulders plus the three contact lines. */
+export function ContactsTabFilledIcon({ size = 24, ...rest }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      focusable="false"
+      {...rest}
+    >
+      <path d="M11 3C13.2642 3.00023 15.1006 5.01486 15.1006 7.5L15.0947 7.73145C14.985 10.109 13.1935 11.9998 11 12C8.73581 11.9998 6.90039 9.98514 6.90039 7.5C6.90039 5.01486 8.73581 3.00023 11 3Z" />
+      <path d="M11.459 13.5068C16.1625 13.6557 19.4743 16.0781 19.9561 18.5C19.9818 18.6292 19.9938 18.8253 19.998 19.0449C20.0149 19.9124 19.3804 20.6174 18.5176 20.708L17.9766 20.7598C16.5992 20.8813 14.3882 21 11 21L9.61914 20.9932C6.55996 20.9617 4.62863 20.8281 3.48242 20.708C2.67333 20.623 2.06468 19.9979 2.00586 19.2051L2.00195 19.0449C2.00623 18.8254 2.0183 18.6292 2.04395 18.5C2.54029 15.9998 6.05373 13.5 11 13.5Z" />
+      <path d="M23 8.25C23.4142 8.25 23.75 8.58579 23.75 9C23.75 9.41421 23.4142 9.75 23 9.75H17C16.5858 9.75 16.25 9.41421 16.25 9C16.25 8.58579 16.5858 8.25 17 8.25H23ZM23 11.25C23.4142 11.25 23.75 11.5858 23.75 12C23.75 12.4142 23.4142 12.75 23 12.75H19C18.5858 12.75 18.25 12.4142 18.25 12C18.25 11.5858 18.5858 11.25 19 11.25H23ZM23 14.25C23.4142 14.25 23.75 14.5858 23.75 15C23.75 15.4142 23.4142 15.75 23 15.75H21C20.5858 15.75 20.25 15.4142 20.25 15C20.25 14.5858 20.5858 14.25 21 14.25H23Z" />
+    </svg>
+  )
+}
+
+/** 收藏, selected: the cube silhouette with its three face seams cut out. */
+export function CubeTabFilledIcon({ size = 24, ...rest }: IconProps) {
+  // The seams have to be holes, not paint, so the mask id must be unique per instance.
+  const seamId = `wx-cube-seam-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      focusable="false"
+      {...rest}
+    >
+      <mask id={seamId} maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+        <rect width="24" height="24" fill="#fff" />
+        <path
+          d="M4.53 7.69 12 11.83 19.47 7.69"
+          fill="none"
+          stroke="#000"
+          strokeWidth="1.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M12 11.83V21.4"
+          fill="none"
+          stroke="#000"
+          strokeWidth="1.2"
+          strokeLinecap="round"
+        />
+      </mask>
+      <path
+        mask={`url(#${seamId})`}
+        d="M10.6768 2.38184C11.5109 1.97168 12.4891 1.97168 13.3232 2.38184L13.5 2.47559L19.5 5.94043C20.37 6.4428 20.9268 7.34419 20.9932 8.33789L21 8.53809V15.4668C20.9998 16.5384 20.4281 17.5286 19.5 18.0645L13.5 21.5283C12.5718 22.0642 11.4282 22.0642 10.5 21.5283L4.5 18.0645C3.57193 17.5286 3.00017 16.5384 3 15.4668V8.53809L3.00684 8.33789C3.07315 7.34419 3.63 6.4428 4.5 5.94043L10.5 2.47559L10.6768 2.38184Z"
+      />
+    </svg>
+  )
+}
+
+/** 朋友圈, selected: the compass disc with the needle knocked out of it. */
+export function MomentsTabFilledIcon({ size = 24, ...rest }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden="true"
+      focusable="false"
+      {...rest}
+    >
+      <path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M12 2C6.4771525 2 2 6.4771525 2 12C2 17.5228475 6.4771525 22 12 22C17.5228475 22 22 17.5228475 22 12C22 6.4771525 17.5228475 2 12 2ZM10.232233 10.232233L16.1243501 7.20234187C16.2678549 7.12854767 16.4381526 7.12854767 16.5816575 7.20234187C16.8272333 7.32862381 16.9239401 7.63007409 16.7976581 7.87564991L13.767767 13.767767L7.87564991 16.7976581C7.73214506 16.8714523 7.56184738 16.8714523 7.41834253 16.7976581C7.17276672 16.6713762 7.07605992 16.3699259 7.20234187 16.1243501L10.232233 10.232233Z"
+      />
     </svg>
   )
 }

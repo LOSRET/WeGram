@@ -182,10 +182,12 @@
   font-size: 13px;
 }
 
-.wx-empty-chat__logo {
+.wx-empty-chat__logo,
+.wx-empty-chat__glyph {
   color: #efefef;
 }
 
-[data-theme='dark'] .wx-empty-chat__logo {
+[data-theme='dark'] .wx-empty-chat__logo,
+[data-theme='dark'] .wx-empty-chat__glyph {
   color: #2a2a2c;
 }

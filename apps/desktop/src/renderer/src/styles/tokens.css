@@ -73,8 +73,9 @@
      grey than the #8a8a8a this used to carry, which is why the icons read both
      thinner and smaller than the client's at the same line width). */
   --wx-rail-icon: #5c5c5c;
-  /* Active rail section (not the brand-coloured 聊天 tab). */
-  --wx-rail-icon-active: #6a6a6a;
+  /* Active rail section: the client fills the selected tab's glyph with brand
+     green; the other tabs keep the grey outline. */
+  --wx-rail-icon-active: var(--wx-brand);
   /* Pane-header, composer-toolbar and other UI glyphs, plus the list header's
      round "+". Both measured off the client in each theme. */
   --wx-icon: #6f6f6f;
@@ -167,7 +168,6 @@
   --wx-divider: rgba(255, 255, 255, 0.07);
   --wx-brand-weak: rgba(7, 193, 96, 0.16);
   --wx-rail-icon: #969697;
-  --wx-rail-icon-active: #e1e1e5;
   --wx-icon: #a5a5a5;
   --wx-icon-strong: #b1b1b1;
   /* No dark contact pane has been measured yet; these follow the shell's dark

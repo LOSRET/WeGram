@@ -16,7 +16,8 @@ listed in "Known deltas" is a deliberate, documented difference.
 |---|---|
 | `renderer/src/styles/index.css` | Rewritten. All design tokens + every component style. Single source of truth for colour/size. |
 | `renderer/src/components/MainShell.tsx` | Three-column shell, owns the toast + app menu + settings dialog state. |
-| `renderer/src/components/SideRail.tsx` | 61 px icon rail: avatar (connection dot), 聊天/通讯录/收藏/朋友圈, 手机/设置. The avatar is the account's real profile photo (`Self.avatarUrl`), initials until it arrives. 聊天 and 通讯录 switch the shell; the Telegram mark is brand green only while 聊天 is active. |
+| `renderer/src/components/SideRail.tsx` | 61 px icon rail: avatar (connection dot), 聊天/通讯录/收藏/朋友圈, 手机/设置. The avatar is the account's real profile photo (`Self.avatarUrl`), initials until it arrives. All four sections are selectable; the selected tab swaps its outlined glyph for the filled one and is painted brand green, like the client. |
+| `renderer/src/components/SectionPlaceholder.tsx` | The 收藏 / 朋友圈 pane: those two tabs switch the shell (and turn green) but the protocol has no data for them, so the pane says 收藏/朋友圈还没有接入 instead of a toast. |
 | `renderer/src/components/ChatList.tsx` | Search pill + circular "+" (both inside the list column) + 65 px rows. Selecting the row that is already open toggles the conversation shut. Rows show the real chat photo when `ChatSummary.avatarUrl` is present, initials otherwise. |
 | `renderer/src/components/contacts/ContactsList.tsx` | The 通讯录 column (§2.4): 26 px search, 35 px 通讯录管理 card, 36 px service rows, 54 px contact rows grouped by initial. |
 | `renderer/src/components/contacts/ContactDetail.tsx` | The contact card: 60 px avatar, 微信号, 朋友资料 / 更多信息, and the three blue actions (发消息 / 语音聊天 / 视频聊天). |
@@ -32,7 +33,7 @@ listed in "Known deltas" is a deliberate, documented difference.
 | `renderer/src/components/ContextMenu.tsx` | Exports `Popup` (positioned, closes on Escape/outside click) plus the message menu. |
 | `renderer/src/components/AppMenu.tsx` | The rail "≡" menu: settings, theme, sign out, adapter caption. |
 | `renderer/src/components/PlusMenu.tsx` | The list header's "+" card: 发起群聊 / 添加朋友 / 写笔记 with their payload glyphs (all three toast — none is in the protocol). |
-| `renderer/src/components/Icon.tsx` | Payload re-exports, the design-system compass, and `TelegramLogo` — the Simple Icons roundel that serves as the rail's 聊天 tab, the login mark and the empty-pane watermark (tinted through `currentColor`). |
+| `renderer/src/components/Icon.tsx` | Payload re-exports, the design-system compass, and `TelegramLogo` — the Simple Icons roundel that serves as the rail's 聊天 tab, the login mark and the empty-pane watermark (tinted through `currentColor`). Also the three `*TabFilledIcon` selected-state glyphs, rebuilt from the outlined tab geometry because this build's payload set has no filled tab art (the cube's face seams are a mask, the compass's needle is an even-odd hole). |
 | `renderer/src/components/WechatIcons.tsx` | **Generated** from `Weixin.dll` payloads — see §3. Never hand-edit; regenerate. |
 | `renderer/src/screens/LoginWindow.tsx` | **The standalone login window** (`#login` route): self-drawn title strip (WeGram / 齿轮 / ×), the QR screen, the phone → code → 2FA fallback, the profile step with 进入 WeGram, footer links, proxy and help sheets. |
 | `renderer/src/components/QrCode.tsx` | The login QR: `qrcode`'s matrix as one SVG path (350-ish dark modules in a single element), never themed. |
@@ -486,16 +487,22 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
 9. **The brand mark is Telegram's, not WeChat's.** `TelegramLogo` in `Icon.tsx` is
    the Simple Icons roundel (`https://simpleicons.org/?q=telegram`, CC0 1.0) copied
    verbatim; the plane is a hole in the disc, so no white fill is painted. It is used
-   three times: the rail's 聊天 tab in `--wx-brand` (`#07c160`), the login window's
-   brand mark in `--wx-login-green` (the client's login green `#00c375`), and the
-   empty-pane watermark in the light `#efefef` / `#222` it had before — the watermark
-   stays low-contrast rather than becoming a green logo.
+   three times: the rail's 聊天 tab (brand green while that tab is selected, like
+   every other active tab), the login window's brand mark in `--wx-login-green` (the
+   client's login green `#00c375`), and the empty-pane watermark in the light
+   `#efefef` / `#222` it had before — the watermark stays low-contrast rather than
+   becoming a green logo.
 10. **Re-selecting the open conversation closes it; the rail now switches sections.**
     In the client, clicking the highlighted row does nothing; here it is a toggle: the
     right pane returns to the watermark state and the list keeps its search filter
-    (requested 2026-11-17). The rail's 聊天 tab is a real section switch now (returning
-    from 通讯录 keeps the previously open chat selected), not inert. Closing the pane
-    still flushes the reading anchor, so reopening the chat restores the same position.
+    (requested 2026-11-17). The rail's four tabs are real section switches now
+    (returning from 通讯录 keeps the previously open chat selected), not inert: the
+    selected tab is filled brand green (`--wx-rail-icon-active`) as on the client, and
+    收藏 / 朋友圈 switch to a placeholder pane because the protocol has no data for
+    them (they used to raise the "还没有接入" toast). The client's filled tab payloads
+    were not in the extracted set, so `Icon.tsx` rebuilds the three filled glyphs from
+    the outlined geometry (see the file-map row). Closing the pane still flushes the
+    reading anchor, so reopening the chat restores the same position.
 11. **The header "+" opens WeChat's three-entry card, but none of the entries is
     wired.** 发起群聊 / 添加朋友 / 写笔记 match the client's menu down to the payload
     glyphs, and the card hangs centred under the round button 12 px below it

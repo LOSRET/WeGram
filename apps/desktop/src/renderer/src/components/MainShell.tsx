@@ -8,6 +8,7 @@ import { NoChatPlaceholder } from './chat-pane/Placeholders'
 import { ContactDetail, ContactsList } from './contacts'
 import { PlusMenu } from './PlusMenu'
 import { ProxyPanel } from './ProxyPanel'
+import { SectionPlaceholder } from './SectionPlaceholder'
 import { SideRail, type ShellSection } from './SideRail'
 import { errorMessage, invoke } from '../lib/ipc'
 import { activateChat } from '../lib/openChat'
@@ -173,36 +174,41 @@ export function MainShell() {
           onUnavailable={showUnavailable}
         />
         {section === 'chats' ? (
-          <ChatList
-            chats={filteredChats}
-            activeChatId={activeChatId}
-            query={query}
-            onQueryChange={setQuery}
-            onSelect={openChat}
-            onOpenPlus={(anchor) => setPlusMenu(anchor)}
-          />
+          <>
+            <ChatList
+              chats={filteredChats}
+              activeChatId={activeChatId}
+              query={query}
+              onQueryChange={setQuery}
+              onSelect={openChat}
+              onOpenPlus={(anchor) => setPlusMenu(anchor)}
+            />
+            <ChatPane />
+          </>
+        ) : section === 'contacts' ? (
+          <>
+            <ContactsList
+              contacts={contacts ?? []}
+              activeUserId={contactUserId}
+              query={contactQuery}
+              onQueryChange={setContactQuery}
+              onSelect={(contact) => setContactUserId(contact.userId)}
+              onUnavailable={showUnavailable}
+              channelCount={channelCount}
+              loading={contacts === null}
+            />
+            {selectedContact ? (
+              <ContactDetail
+                contact={selectedContact}
+                onOpenChat={openContactChat}
+                onUnavailable={showUnavailable}
+              />
+            ) : (
+              <NoChatPlaceholder />
+            )}
+          </>
         ) : (
-          <ContactsList
-            contacts={contacts ?? []}
-            activeUserId={contactUserId}
-            query={contactQuery}
-            onQueryChange={setContactQuery}
-            onSelect={(contact) => setContactUserId(contact.userId)}
-            onUnavailable={showUnavailable}
-            channelCount={channelCount}
-            loading={contacts === null}
-          />
-        )}
-        {section === 'chats' ? (
-          <ChatPane />
-        ) : selectedContact ? (
-          <ContactDetail
-            contact={selectedContact}
-            onOpenChat={openContactChat}
-            onUnavailable={showUnavailable}
-          />
-        ) : (
-          <NoChatPlaceholder />
+          <SectionPlaceholder section={section} />
         )}
       </div>
 
