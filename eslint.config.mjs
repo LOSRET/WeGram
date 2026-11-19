@@ -56,6 +56,18 @@ export default tseslint.config(
     },
   },
 
+  // ---- agent-maintainability: keep files loadable in one context window ----
+  // The tree was split into <400-line modules on 2026-11-19; this is the
+  // backstop, so a new feature cannot recreate a 1000-line file. Generated
+  // artwork is exempt.
+  {
+    files: ['apps/desktop/src/**/*.{ts,tsx}', 'packages/protocol/src/**/*.ts'],
+    ignores: ['apps/desktop/src/renderer/src/components/WechatIcons.tsx'],
+    rules: {
+      'max-lines': ['error', { max: 550, skipBlankLines: false, skipComments: false }],
+    },
+  },
+
   // ---- architecture: `tdl` / `prebuilt-tdlib` live in one place only ---------
   // Design doc §2: everything else talks to the `TelegramAdapter` interface, so
   // swapping the protocol library stays inside `telegram/`.
