@@ -151,7 +151,7 @@ async function bootstrap(): Promise<void> {
   })
 
   const info: AppInfo = {
-    version: '0.1.0',
+    version: '0.2.0',
     appVersion: app.getVersion(),
     adapter: adapter.kind,
     userDataPath: userDataDir,

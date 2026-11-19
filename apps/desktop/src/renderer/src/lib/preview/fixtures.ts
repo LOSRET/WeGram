@@ -372,8 +372,8 @@ export function media(fileId: number, extra: Partial<MessageMedia> = {}): Messag
 export const channelPostRights: Record<number, boolean> = { 6: true }
 
 export const info: AppInfo = {
-  version: '0.1.0',
-  appVersion: '0.1.0-web',
+  version: '0.2.0',
+  appVersion: '0.2.0-web',
   adapter: 'mock',
   userDataPath: '(browser preview)',
 }

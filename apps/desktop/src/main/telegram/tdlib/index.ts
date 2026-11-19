@@ -154,7 +154,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
         use_message_database: true,
         use_secret_chats: false,
         system_language_code: 'zh-hans',
-        application_version: '0.1.0',
+        application_version: '0.2.0',
         device_model: 'WeGram Desktop',
         system_version: 'Windows',
       },

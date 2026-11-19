@@ -69,7 +69,7 @@ export function AppMenu({ x, y, onClose, onOpenSettings }: AppMenuProps) {
       </button>
       <div className="wx-context-menu__separator" />
       <div className="wx-context-menu__caption">
-        {info?.adapter === 'mock' ? 'Mock 适配器' : 'TDLib'} · v{info?.appVersion ?? '0.1.0'}
+        {info?.adapter === 'mock' ? 'Mock 适配器' : 'TDLib'} · v{info?.appVersion ?? '0.2.0'}
       </div>
     </Popup>
   )
