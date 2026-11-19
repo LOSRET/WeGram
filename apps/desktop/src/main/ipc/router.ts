@@ -4,11 +4,21 @@ import {
   invokeSchemas,
   type AppErrorShape,
   type InvokeChannel,
+  type InvokeRequest,
 } from '@wegram/protocol'
 import { ipcMain } from 'electron'
 
-export type IpcHandler = (payload: unknown) => Promise<unknown> | unknown
-export type IpcHandlerMap = Partial<Record<InvokeChannel, IpcHandler>>
+/**
+ * One handler per channel, typed with that channel's request schema.
+ *
+ * The payload used to be `unknown`, and every handler re-declared the shape it
+ * expected with `payload as { ... }` — a shape that could (and did) drift from
+ * the zod schema without a single compile error. The mapped type below makes
+ * each handler read `payload.chatId` with the type the protocol promises.
+ */
+export type IpcHandlerMap = {
+  [C in InvokeChannel]?: (payload: InvokeRequest<C>) => Promise<unknown> | unknown
+}
 
 export interface IpcResult {
   ok: boolean
@@ -25,8 +35,12 @@ const registered: InvokeChannel[] = []
  */
 export function registerIpc(handlers: IpcHandlerMap): void {
   for (const channel of invokeChannels) {
-    const handler = handlers[channel]
-    if (!handler) continue
+    const run = handlers[channel]
+    if (!run) continue
+
+    // The one cast in this file: the mapped type pairs each channel with its own
+    // payload, which `channel` (a union member) cannot carry into the closure.
+    const handler = run as (payload: unknown) => unknown
 
     ipcMain.handle(channel, async (_event, payload: unknown): Promise<IpcResult> => {
       try {

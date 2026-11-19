@@ -12,6 +12,7 @@ import type {
   StickerSet,
   StickerSetSummary,
   UserAvatar,
+  InvokeRequest,
 } from '@wegram/protocol'
 
 export type AdapterKind = 'mock' | 'tdlib'
@@ -92,7 +93,7 @@ export interface TelegramAdapter {
   logout(): Promise<void>
   me(): Promise<Self>
 
-  listChats(input: { limit: number; offset: number }): Promise<ChatSummary[]>
+  listChats(input: InvokeRequest<'chats:list'>): Promise<ChatSummary[]>
   getChat(chatId: number): Promise<ChatSummary>
   openChat(chatId: number): Promise<void>
   /**
@@ -117,27 +118,19 @@ export interface TelegramAdapter {
    */
   listContacts(): Promise<Contact[]>
 
-  history(input: {
-    chatId: number
-    fromMessageId?: number
-    limit: number
-  }): Promise<{ messages: Message[]; hasMore: boolean }>
+  history(input: InvokeRequest<'messages:history'>): Promise<{ messages: Message[]; hasMore: boolean }>
   /**
    * A window centred on one message. Used instead of paging back from the newest
    * page when the target (a saved reading position or the unread boundary) is
    * deep: it reaches the row in one round trip instead of walking the gap.
    */
-  historyAround(input: {
-    chatId: number
-    messageId: number
-    limit: number
-  }): Promise<{ messages: Message[]; hasMore: boolean; hasNewer: boolean }>
+  historyAround(
+    input: InvokeRequest<'messages:around'>,
+  ): Promise<{ messages: Message[]; hasMore: boolean; hasNewer: boolean }>
   /** One page below an anchored window that does not reach the newest message. */
-  historyNewer(input: {
-    chatId: number
-    fromMessageId: number
-    limit: number
-  }): Promise<{ messages: Message[]; hasNewer: boolean }>
+  historyNewer(
+    input: InvokeRequest<'messages:newer'>,
+  ): Promise<{ messages: Message[]; hasNewer: boolean }>
   /**
    * One page of a message's comment thread (design doc §9.8). `fromMessageId`
    * walks towards older comments; the page comes back ascending, like history.
@@ -153,41 +146,26 @@ export interface TelegramAdapter {
   joinCommentGroup(input: CommentTarget): Promise<CommentJoinResult>
   /** Posts a comment into the message's thread and answers the sent row. */
   sendComment(input: CommentSendQuery): Promise<{ message: Message }>
-  sendText(input: {
-    chatId: number
-    text: string
-    replyTo?: number
-  }): Promise<{ localId: string; message: Message }>
-  editText(input: { chatId: number; messageId: number; text: string }): Promise<Message>
-  deleteMessages(input: { chatId: number; messageIds: number[]; forBoth: boolean }): Promise<void>
-  forwardMessages(input: {
-    fromChatId: number
-    messageIds: number[]
-    toChatId: number
-  }): Promise<void>
-  markRead(input: { chatId: number; upToMessageId: number }): Promise<void>
+  sendText(input: InvokeRequest<'messages:send'>): Promise<{ localId: string; message: Message }>
+  editText(input: InvokeRequest<'messages:edit'>): Promise<Message>
+  deleteMessages(input: InvokeRequest<'messages:delete'>): Promise<void>
+  forwardMessages(input: InvokeRequest<'messages:forward'>): Promise<void>
+  markRead(input: InvokeRequest<'messages:read'>): Promise<void>
 
   /** Sends a local file as a photo or a document (design doc §1: media upload). */
-  sendMedia(input: {
-    chatId: number
-    filePath: string
-    kind: MediaKind
-    caption?: string
-    replyTo?: number
-  }): Promise<{ localId: string; message: Message }>
-  sendSticker(input: {
-    chatId: number
-    fileId: number
-    replyTo?: number
-  }): Promise<{ localId: string; message: Message }>
+  sendMedia(input: InvokeRequest<'media:send'>): Promise<{ localId: string; message: Message }>
+  sendSticker(input: InvokeRequest<'messages:sendSticker'>): Promise<{
+    localId: string
+    message: Message
+  }>
 
   listStickerSets(): Promise<StickerSetSummary[]>
   getStickerSet(setId: string): Promise<StickerSet>
 
-  searchGlobal(input: { q: string; limit: number }): Promise<ChatSummary[]>
-  searchInChat(input: { chatId: number; q: string; fromMessageId?: number }): Promise<Message[]>
+  searchGlobal(input: InvokeRequest<'search:global'>): Promise<ChatSummary[]>
+  searchInChat(input: InvokeRequest<'search:inChat'>): Promise<Message[]>
 
-  downloadFile(input: { fileId: number; priority: number }): Promise<{ path: string; url: string }>
+  downloadFile(input: InvokeRequest<'media:download'>): Promise<{ path: string; url: string }>
 
   setProxy(config: ProxyConfig | null): Promise<void>
   testProxy(config: ProxyConfig): Promise<ProxyTestResult>

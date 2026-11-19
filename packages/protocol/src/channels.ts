@@ -5,7 +5,6 @@ import {
   chatOpSchema,
   chatSummarySchema,
   connectionStateSchema,
-  messageEntitySchema,
   messageOpSchema,
   messageSchema,
   scrollAnchorSchema,
@@ -307,11 +306,16 @@ export const invokeSchemas = {
   },
   'stickers:sets': { request: noPayload, response: z.array(stickerSetSummarySchema) },
   'stickers:set': { request: z.object({ setId: z.string().min(1) }), response: stickerSetSchema },
+  /**
+   * The draft is plain text: the composer has no formatting controls, so the
+   * `entities` field that used to sit here was never sent, stored or read back —
+   * it only made the handler's hand-written cast look complete. Add it back
+   * together with a caller.
+   */
   'ui:saveDraft': {
     request: z.object({
       chatId: z.number().int(),
       text: z.string(),
-      entities: z.array(messageEntitySchema).optional(),
       replyTo: z.number().int().optional(),
     }),
     response: noPayload,
