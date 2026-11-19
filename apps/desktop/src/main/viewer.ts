@@ -2,7 +2,7 @@ import type { ViewerItem, ViewerState } from '@wegram/protocol'
 import { AppError } from '@wegram/protocol'
 import { BrowserWindow, screen } from 'electron'
 
-import { createAppWindow } from './app-window'
+import { attachNavigationPolicy, createAppWindow } from './app-window'
 import { createLogger } from './util'
 import { VIEWER_MIN_H, VIEWER_MIN_W, viewerWindowSize } from './viewer-size'
 
@@ -177,10 +177,10 @@ function createViewerWindow(parent: BrowserWindow | null): BrowserWindow {
     win.focus()
   })
 
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    logger.warn(`viewer refused window.open(${url})`)
-    return { action: 'deny' }
-  })
+  // The viewer is a route of the same bundle; leaving it would strand the
+  // toolbar and the strip it is showing (the shell and login windows guard this
+  // the same way, and the viewer had been the one copy without it).
+  attachNavigationPolicy(win, { links: 'deny', label: 'viewer' })
 
   return win
 }
