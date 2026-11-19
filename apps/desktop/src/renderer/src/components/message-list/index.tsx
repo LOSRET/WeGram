@@ -1,6 +1,6 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { ChatSummary, Message } from '@wegram/protocol'
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 
 import { isSameDay } from '../../lib/format'
 import { useAnchoredScroll } from '../../lib/useAnchoredScroll'
@@ -14,14 +14,16 @@ import { MessageRow } from './MessageRow'
 import { buildMessageMenuItems } from './menu'
 import { findRowIndex, groupMessages } from './rows'
 import { senderAvatarUrl } from './senderAvatar'
-import { messagesById, pickSeenUpTo } from './seen'
-import { countUnreadBelow } from './unreadBelow'
-import { useScrollFlags } from './scrollFlags'
+import { messagesById } from './seen'
 import { findUnreadMessage, type LandingPosition } from './unread'
 import { useAnchorSave } from './useAnchorSave'
 import { useInitialPosition } from './useInitialPosition'
+import { useJumpToLatest } from './useJumpToLatest'
+import { useLandingSave } from './useLandingSave'
+import { useLocateScroll } from './useLocateScroll'
 import { usePrependRestore } from './usePrependRestore'
-import { resyncScroller } from './scroller'
+import { useScrollFlags } from './scrollFlags'
+import { useViewportSeen } from './useViewportSeen'
 
 export interface MessageListProps {
   chat: ChatSummary
@@ -77,14 +79,18 @@ interface MenuState {
 /**
  * The virtualised transcript.
  *
- * This component owns the DOM and the render tree only. The three timing problems
- * that used to be interleaved with it live in their own hooks, because each one is
- * a separate bug class:
+ * This component owns the DOM and the render tree only. The timing problems that
+ * used to be interleaved with it live in their own hooks, because each one is a
+ * separate bug class:
  *
  *   `useInitialPosition`  — where the list lands on first paint (anchor or bottom)
  *                           and the "never hide the content" safety nets
  *   `usePrependRestore`   — prepending older pages without moving the reader's row
  *   `useAnchorSave`       — writing the reading position back to `ui.db`
+ *   `useLandingSave`      — recording a landing that no scroll event will report
+ *   `useJumpToLatest`     — following a latest-window reload to its end
+ *   `useLocateScroll`     — 定位到聊天位置: scroll to the row, then flash it
+ *   `useViewportSeen`     — the one "seen" measurement (read marker + buoy)
  *
  * Read `scroller.ts` before writing any `scrollTop` here: a programmatic scroll
  * must be followed by a scroll event, or the virtualizer paints the wrong slice.
@@ -204,96 +210,19 @@ export function MessageList({
     anchoredWindow: hasNewer,
   })
 
-  /**
-   * The landing has to survive the reader leaving without scrolling.
-   *
-   *  - A saved position that turned out to be unusable — the transcript fits the
-   *    viewport, so the reader is looking at the newest message anyway — must not
-   *    stay in `ui.db`: a later, longer transcript would reopen scrolled up to an
-   *    old row. Nothing else clears it, because a transcript that fits never
-   *    scrolls.
-   *  - Opening at the unread divider is itself a reading position, and no scroll
-   *    event will ever record it. Stored as "this row at the top", because the
-   *    divider only exists for this open (see `useAnchorSave.savePosition`).
-   */
-  useEffect(() => {
-    if (!ready || landing === null || flags.restoring.current) return
-    if (landing.kind === 'unread') {
-      // "At the bottom" must mean the chat's bottom: an anchored window's end is
-      // an arbitrary old row, and storing `null` there would discard the position.
-      if (!hasNewer && atBottom) scheduleAnchorSave()
-      else savePosition({ messageId: landing.messageId, offset: 0 })
-      return
-    }
-    if (hasNewer || !atBottom) return
-    scheduleAnchorSave()
-    // `flags` itself is a fresh object per render; the ref inside it is stable.
-  }, [ready, atBottom, hasNewer, landing, scheduleAnchorSave, savePosition, flags.restoring])
+  useLandingSave({
+    ready,
+    landing,
+    atBottom,
+    hasNewer,
+    restoring: flags.restoring,
+    scheduleAnchorSave,
+    savePosition,
+  })
 
-  /**
-   * A latest-window reload replaces every row, so the viewport has to follow it to
-   * the end. The signal is per chat and consumed by a mount-time ref: a tick meant
-   * for another conversation must not move this one when it is mounted later.
-   */
-  const jumpToLatest = useAppStore((state) => state.jumpToLatest)
-  const consumedJumpTick = useRef(jumpToLatest?.tick ?? 0)
-  useEffect(() => {
-    if (!jumpToLatest || jumpToLatest.chatId !== chat.id) return
-    if (jumpToLatest.tick === consumedJumpTick.current) return
-    consumedJumpTick.current = jumpToLatest.tick
-    const land = (): void => {
-      virtualizer.scrollToEnd()
-      scrollToBottom()
-      resyncScroller(scrollRef.current)
-    }
-    const frame = requestAnimationFrame(land)
-    // rAF is throttled for an occluded window (see useInitialPosition); the timer
-    // is the net that still lands the scroll.
-    const timer = window.setTimeout(land, 80)
-    return () => {
-      cancelAnimationFrame(frame)
-      window.clearTimeout(timer)
-    }
-  }, [jumpToLatest, chat.id, virtualizer, scrollToBottom])
+  useJumpToLatest({ chatId: chat.id, scrollRef, virtualizer, scrollToBottom })
 
-  /**
-   * 定位到聊天位置: one scroll to the requested row, then a flash that fades out by
-   * itself (the list owns the timer; nothing outside knows the row is special).
-   *
-   * The rows array is read through a ref: a message arriving must not re-run the
-   * scroll, or every arrival would yank the reader back to the located picture.
-   */
-  const rowsRef = useRef(rows)
-  rowsRef.current = rows
-  const [flashId, setFlashId] = useState<number | null>(null)
-  useEffect(() => {
-    if (located === null) return
-    const el = scrollRef.current
-    if (!el) return
-    const scrollToRow = (): boolean => {
-      const index = findRowIndex(rowsRef.current, located)
-      if (index < 0) return false
-      virtualizer.scrollToIndex(index, { align: 'start' })
-      resyncScroller(el)
-      return true
-    }
-    if (!scrollToRow()) return
-    setFlashId(located)
-    /**
-     * Row heights are estimates until they are measured, and the first page may
-     * still be settling; one correction after the paint is what the anchored
-     * restore does in a loop. The frame-based path gets the timer net the whole
-     * list uses: rAF is throttled while the window is occluded.
-     */
-    const correct = window.setTimeout(() => {
-      scrollToRow()
-    }, 80)
-    const flashOut = window.setTimeout(() => setFlashId(null), 1600)
-    return () => {
-      window.clearTimeout(correct)
-      window.clearTimeout(flashOut)
-    }
-  }, [located, virtualizer])
+  const flashId = useLocateScroll({ located, rows, scrollRef, virtualizer })
 
   const { loadOlder } = usePrependRestore({
     scrollRef,
@@ -312,55 +241,15 @@ export function MessageList({
    * `messages:read` moves the marker, the server answers with the new unread count,
    * and the pill follows. See `components/message-list/unreadBelow.ts`.
    */
-  const [seenIndex, setSeenIndex] = useState(-1)
-  const buoy = countUnreadBelow(messages, chat.lastReadInboxMessageId ?? null, seenIndex)
-
-  /** How far the reader has actually read, in message ids (see `lib/readGate.ts`). */
-  const seenUpToRef = useRef<number | null>(null)
-
-  /**
-   * One measurement pass over the rendered rows answers both questions the
-   * transcript has about the viewport: how far the read marker may move (the newest
-   * row that has been on screen), and which row is the last one above the fold (the
-   * pill counts what is left below it). A single definition of "seen" — a row whose
-   * top edge is inside the viewport — instead of two that drift apart.
-   */
-  const measureViewport = useCallback(() => {
-    const scroller = scrollRef.current
-    const sizer = contentRef.current
-    if (!scroller || !sizer) return
-
-    const { newestIndex, newestId } = pickSeenUpTo({
-      items: virtualizer.getVirtualItems(),
-      /**
-       * The sizer sits inside the scroller's own padding, and the padding scrolls
-       * with the content: this one difference is "top padding - scrollTop", which
-       * is what turns a row's `start` into its distance from the viewport's top.
-       * Two rect reads per commit instead of one per rendered row.
-       */
-      sizerOffset: sizer.getBoundingClientRect().top - scroller.getBoundingClientRect().top,
-      viewportHeight: scroller.clientHeight,
-      // The row's last message is the newest thing it shows: an album on screen is
-      // already read up to its last item.
-      idAt: (index) => {
-        const items = rows[index]?.messages
-        return items?.[items.length - 1]?.id
-      },
-    })
-
-    // The pill and the read marker count messages; the virtualiser counts rows.
-    const seenMessageIndex = newestIndex >= 0 ? (lastMessageIndexOfRow[newestIndex] ?? -1) : -1
-    setSeenIndex((previous) => (previous === seenMessageIndex ? previous : seenMessageIndex))
-    if (newestId !== seenUpToRef.current) {
-      seenUpToRef.current = newestId
-      onSeenUpToChange(newestId)
-    }
-  }, [rows, lastMessageIndexOfRow, onSeenUpToChange, scrollRef, contentRef, virtualizer])
-
-  // Runs after every commit, so a row that grew (`measureElement`, an image
-  // finishing) is covered as well: geometry decides, not the scroll event.
-  useLayoutEffect(() => {
-    measureViewport()
+  const { measureViewport, buoy } = useViewportSeen({
+    rows,
+    lastMessageIndexOfRow,
+    messages,
+    lastReadInboxMessageId: chat.lastReadInboxMessageId ?? null,
+    scrollRef,
+    contentRef,
+    virtualizer,
+    onSeenUpToChange,
   })
 
   /** One stable handler for every row: a fresh arrow per row defeats `memo`. */
