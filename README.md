@@ -25,9 +25,9 @@ WeGram 是一个自用的 Telegram 桌面客户端：协议层用 Telegram 官�
 | W3 | 图片与文件收发（含进度）、`wx-media://` 媒体协议、三种贴纸格式（WebP / TGS / WebM）、贴纸面板、TL 实体渲染、日期与未读分隔、已读回执、typing | ✅ |
 | W3+ | 独立媒体查看器窗口：图片缩放/旋转/保存，视频播放（倍速、静音、时间轴） | ✅ |
 | W3+ | 独立登录窗口：280×373 无边框窗口、扫码登录（TDLib QR）+ 手机号回退、首次登录直接进主界面、有登录记录时先过资料页 | ✅ |
-| — | 搜索（全局 + 会话内）、置顶/免打扰、完整设置页、NSIS 安装包 | ⏳ 待做 |
+| — | 搜索（全局 + 会话内）、置顶会话、完整设置页、签名安装包的安装验证 | ⏳ 待做 |
 
-`pnpm verify` 当前全绿：25 个测试文件 / 222 个用例。`pnpm test` 只跑纯逻辑模块，不需要 DOM，也不需要 Electron。
+`pnpm verify` 当前全绿：38 个测试文件 / 322 个用例。`pnpm test` 只跑纯逻辑模块，不需要 DOM，也不需要 Electron。
 
 ## 功能
 
@@ -50,8 +50,9 @@ WeGram/
 ├─ apps/desktop/                 Electron 应用
 │  ├─ src/main/                  主进程
 │  │  ├─ telegram/adapter.ts     TelegramAdapter 接口（领域模型，与 TDLib JSON 解耦）
-│  │  ├─ telegram/mock.ts        假数据适配器 —— UI 可以脱离协议层并行开发
+│  │  ├─ telegram/mock/          假数据适配器（fixtures / assets / traffic）—— UI 可以脱离协议层并行开发
 │  │  ├─ telegram/tdlib/         唯一允许 import tdl / prebuilt-tdlib 的目录
+│  │  ├─ windows.ts              主窗口工厂、标题栏主题、外链白名单
 │  │  ├─ ipc/                    通道路由 + zod 入参校验 + AppError 归一
 │  │  ├─ media/                  wx-media:// 协议、token 注册表、图片尺寸探测
 │  │  ├─ store/                  ui.db（草稿/主题/滚动位置）与 settings.json（只放代理）
@@ -184,4 +185,6 @@ scripts\start-real.cmd build    # 强制重建
 
 ## 许可证
 
-仓库暂未附带开源许可证，默认保留所有权利。第三方组件（TDLib、Electron、React 等）各自遵循其原许可证。
+代码以 **MIT** 许可证发布，见 [LICENSE](LICENSE)。
+
+例外：界面中从微信客户端提取的图形资源（图标等）不属于 MIT 授权范围——"WeChat"、"微信" 是腾讯的商标，这些资源仅限本机个人使用，**不要随代码分发**。TDLib、Electron、React 等第三方组件遵循各自许可证。

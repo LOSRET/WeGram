@@ -25,9 +25,9 @@ You sign in with your own account and see your real chats, groups and channels. 
 | W3 | Photo and document send/receive with progress, the `wx-media://` media protocol, all three sticker formats (WebP / TGS / WebM), sticker picker, TL entity rendering, day and unread dividers, read receipts, typing indicator | ✅ |
 | W3+ | Standalone media viewer window: zoom / rotate / save for photos, playback (speed, mute, timeline) for videos | ✅ |
 | W3+ | Standalone login window: frameless 280×373, QR login via TDLib with a phone fallback, straight into the shell on first sign-in, profile step only for a restored session | ✅ |
-| — | Search (global + in-chat), pin/mute, full settings page, NSIS installer | ⏳ pending |
+| — | Search (global + in-chat), pinning chats, full settings page, a verified signed installer | ⏳ pending |
 
-`pnpm verify` is green: 25 test files, 222 cases. `pnpm test` covers pure modules only — no DOM, no Electron.
+`pnpm verify` is green: 38 test files, 322 cases. `pnpm test` covers pure modules only — no DOM, no Electron.
 
 ## Features
 
@@ -50,8 +50,9 @@ WeGram/
 ├─ apps/desktop/                 Electron app
 │  ├─ src/main/                  main process
 │  │  ├─ telegram/adapter.ts     TelegramAdapter interface (domain model, decoupled from TDLib JSON)
-│  │  ├─ telegram/mock.ts        fake adapter — lets the UI proceed without the protocol layer
+│  │  ├─ telegram/mock/          fake adapter (fixtures / assets / traffic) — lets the UI proceed without the protocol layer
 │  │  ├─ telegram/tdlib/         the only folder allowed to import tdl / prebuilt-tdlib
+│  │  ├─ windows.ts              shell window factory, title-bar theme, external-link allowlist
 │  │  ├─ ipc/                    channel router, zod input validation, AppError normalisation
 │  │  ├─ media/                  wx-media:// protocol, token registry, image-size probe
 │  │  ├─ store/                  ui.db (drafts/theme/scroll anchor) and settings.json (proxy only)
@@ -184,4 +185,6 @@ Logs land in `.cache\app.log`.
 
 ## License
 
-No open-source license is attached yet; all rights reserved by default. Third-party components (TDLib, Electron, React and the rest) keep their own licenses.
+The code is released under the **MIT** license — see [LICENSE](LICENSE).
+
+Exception: the graphical assets extracted from the WeChat client (icons and the like) are **not** covered by MIT. "WeChat" and "微信" are trademarks of Tencent; those assets are for personal local use only and must **not** be redistributed with the code. Third-party components (TDLib, Electron, React and the rest) keep their own licenses.
