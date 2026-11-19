@@ -3,6 +3,7 @@ import type {
   ChatOp,
   ChatSummary,
   ConnectionState,
+  ContactProfile,
   Message,
   MessageOp,
   ProxyConfig,
@@ -85,6 +86,12 @@ export interface TelegramAdapter {
   canPost(chatId: number): Promise<boolean>
   /** Mutes / unmutes a chat and answers the refreshed summary. */
   setChatMuted(chatId: number, muted: boolean): Promise<ChatSummary>
+  /**
+   * The Telegram identity behind a private chat: username / phone / user id.
+   * The 通讯录 detail pane asks once per selected contact; the chat summary has
+   * the name and photo but not the identity.
+   */
+  contactProfile(chatId: number): Promise<ContactProfile>
 
   history(input: {
     chatId: number

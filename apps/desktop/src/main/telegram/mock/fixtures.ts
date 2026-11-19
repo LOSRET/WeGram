@@ -20,6 +20,9 @@ export function buildFixtures(mediaOf: MediaOf): Map<number, Fixture> {
       id: 1,
       title: '文件传输助手',
       kind: 'private',
+      // Our own Saved Messages conversation: a chat, not a contact. The
+      // 通讯录 drops it by comparing this id with `Self.id`.
+      userId: ME.id,
       unread: 0,
       pinned: true,
       muted: false,
@@ -163,6 +166,7 @@ export function buildFixtures(mediaOf: MediaOf): Map<number, Fixture> {
       id: 3,
       title: '妈',
       kind: 'private',
+      userId: 37,
       unread: 1,
       pinned: false,
       muted: false,
@@ -175,6 +179,7 @@ export function buildFixtures(mediaOf: MediaOf): Map<number, Fixture> {
       text(3, 301, 26, '降温了，多穿点', false),
       text(3, 302, 25, '晚上回来吃饭吗', false),
     ],
+    contact: { username: 'mama_wegram', phone: '+86 138 0000 0000' },
   })
 
   fixtures.set(4, {
@@ -265,6 +270,89 @@ export function buildFixtures(mediaOf: MediaOf): Map<number, Fixture> {
       },
     ],
   })
+
+  // A handful of private chats whose only purpose is the 通讯录: they give the
+  // contact list several initials (A/B/C/D/E) and a 微信号 to show. They are
+  // ordinary chats too, so 发消息 opens a transcript with one message.
+  const contacts: Array<{
+    id: number
+    userId: number
+    title: string
+    messageId: number
+    minutesAgo: number
+    body: string
+    username?: string
+    phone?: string
+  }> = [
+    {
+      id: 7,
+      userId: 21,
+      title: 'Ada Lovelace',
+      messageId: 701,
+      minutesAgo: 15,
+      body: '明天图书馆见',
+      username: 'ada_lovelace',
+    },
+    {
+      id: 8,
+      userId: 22,
+      title: 'Ben Carter',
+      messageId: 801,
+      minutesAgo: 45,
+      body: 'Thanks, that works!',
+      username: 'ben_carter',
+    },
+    {
+      id: 9,
+      userId: 23,
+      title: '陈晨',
+      messageId: 901,
+      minutesAgo: 120,
+      body: '周末一起吃个饭？',
+      username: 'chenchen',
+    },
+    {
+      id: 10,
+      userId: 24,
+      title: 'Dmitri Volkov',
+      messageId: 1001,
+      minutesAgo: 240,
+      body: 'Ок, договорились',
+      username: 'dvolkov',
+    },
+    {
+      id: 11,
+      userId: 25,
+      title: 'Eva Müller',
+      messageId: 1101,
+      minutesAgo: 360,
+      body: '🎉',
+      username: 'eva_m',
+      phone: '+49 151 0000 0000',
+    },
+  ]
+  for (const contact of contacts) {
+    fixtures.set(contact.id, {
+      chat: {
+        id: contact.id,
+        title: contact.title,
+        kind: 'private',
+        userId: contact.userId,
+        unread: 0,
+        pinned: false,
+        muted: false,
+        lastMessageText: contact.body,
+        lastMessageAt: at(contact.minutesAgo),
+        lastReadInboxMessageId: contact.messageId,
+        lastReadOutboxMessageId: 0,
+      },
+      messages: [text(contact.id, contact.messageId, contact.minutesAgo, contact.body, false)],
+      contact: {
+        ...(contact.username ? { username: contact.username } : {}),
+        ...(contact.phone ? { phone: contact.phone } : {}),
+      },
+    })
+  }
 
   // Stress fixture for the virtualised list (W2 acceptance: 5000 messages).
   const bulk: Message[] = []

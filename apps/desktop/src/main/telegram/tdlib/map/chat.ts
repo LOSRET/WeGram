@@ -1,7 +1,7 @@
 import type { ChatSummary, ConnectionState } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
-import { previewContent } from './content'
+import { previewContent, previewSpoilers } from './content'
 import type { MapperContext } from './context'
 
 export function mapChat(ctx: MapperContext, chat: TdObject): ChatSummary {
@@ -14,16 +14,26 @@ export function mapChat(ctx: MapperContext, chat: TdObject): ChatSummary {
   const lastReadInbox = Number(chat.last_read_inbox_message_id ?? 0)
   if (typeof chat.title === 'string') ctx.chatTitles.set(chat.id, chat.title)
   const avatarUrl = ctx.chatAvatarUrls.get(chat.id)
+  const lastSpoilers = lastMessage ? previewSpoilers(lastMessage.content) : []
+  // The 通讯录 hides our own Saved Messages by comparing this with `Self.id`.
+  // TDLib always sends it for private/secret chats, but a partial object must not
+  // leak NaN into a DTO the zod boundary validates.
+  const peerUserId =
+    chat.type?._ === 'chatTypePrivate' || chat.type?._ === 'chatTypeSecret'
+      ? Number(chat.type.user_id)
+      : Number.NaN
   return {
     id: chat.id,
     title: chat.title ?? '',
     kind: mapChatKind(chat.type),
+    ...(Number.isFinite(peerUserId) && peerUserId > 0 ? { userId: peerUserId } : {}),
     unread: chat.unread_count ?? 0,
     pinned: Boolean(mainPosition?.is_pinned),
     muted: isMuted(chat.notification_settings),
     ...(lastReadInbox > 0 ? { lastReadInboxMessageId: lastReadInbox } : {}),
     lastReadOutboxMessageId: Number(chat.last_read_outbox_message_id ?? 0),
     ...(lastMessage ? { lastMessageText: previewContent(lastMessage.content) } : {}),
+    ...(lastSpoilers.length > 0 ? { lastMessageSpoilers: lastSpoilers } : {}),
     ...(lastMessage ? { lastMessageAt: Number(lastMessage.date) } : {}),
     ...(avatarUrl ? { avatarUrl } : {}),
   }

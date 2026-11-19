@@ -11,7 +11,12 @@ import {
 } from './Icon'
 import { avatarColor, initials } from '../lib/format'
 
+/** The two sections the rail can switch between (the rest are not wired). */
+export type ShellSection = 'chats' | 'contacts'
+
 interface SideRailProps {
+  section: ShellSection
+  onSectionChange: (section: ShellSection) => void
   /** Opens the app menu (settings / theme / sign out) under the pressed button. */
   onOpenMenu: (anchor: { x: number; y: number }) => void
   /** Sections the protocol does not cover yet. */
@@ -22,10 +27,10 @@ interface SideRailProps {
  * The 61 px icon rail on the far left of WeChat: avatar on top, the four
  * sections under it, device + settings pinned to the bottom.
  *
- * Only 聊天 has a working view; the other sections report that they are not
+ * 聊天 and 通讯录 switch the shell; 收藏 and 朋友圈 report that they are not
  * wired up yet instead of pretending to navigate.
  */
-export function SideRail({ onOpenMenu, onUnavailable }: SideRailProps) {
+export function SideRail({ section, onSectionChange, onOpenMenu, onUnavailable }: SideRailProps) {
   const auth = useAppStore((state) => state.auth)
   const connection = useAppStore((state) => state.connection)
   const chats = useAppStore((state) => state.chats)
@@ -36,6 +41,8 @@ export function SideRail({ onOpenMenu, onUnavailable }: SideRailProps) {
   // until then the rail keeps the initial like a freshly added contact.
   const avatarUrl = me?.avatarUrl ?? null
   const unread = chats.reduce((total, chat) => total + chat.unread, 0)
+  const chatsActive = section === 'chats'
+  const contactsActive = section === 'contacts'
 
   const openMenu = (event: MouseEvent<HTMLButtonElement>): void => {
     const rect = event.currentTarget.getBoundingClientRect()
@@ -58,13 +65,26 @@ export function SideRail({ onOpenMenu, onUnavailable }: SideRailProps) {
       </button>
 
       <div className="wx-rail__nav">
-        <button className="wx-rail__btn wx-rail__btn--active" title="聊天" aria-current="page">
-          <TelegramLogo size={21} className="wx-rail__brand" />
+        <button
+          className={`wx-rail__btn${chatsActive ? ' wx-rail__btn--active' : ''}`}
+          title="聊天"
+          aria-current={chatsActive ? 'page' : undefined}
+          onClick={() => onSectionChange('chats')}
+        >
+          <TelegramLogo
+            size={21}
+            className={`wx-rail__brand${chatsActive ? '' : ' wx-rail__brand--idle'}`}
+          />
           {unread > 0 ? (
             <span className="wx-rail__badge">{unread > 99 ? '99+' : unread}</span>
           ) : null}
         </button>
-        <button className="wx-rail__btn" title="通讯录" onClick={() => onUnavailable('通讯录')}>
+        <button
+          className={`wx-rail__btn${contactsActive ? ' wx-rail__btn--active' : ''}`}
+          title="通讯录"
+          aria-current={contactsActive ? 'page' : undefined}
+          onClick={() => onSectionChange('contacts')}
+        >
           <ContactsTabIcon size={24} />
         </button>
         <button className="wx-rail__btn" title="收藏" onClick={() => onUnavailable('收藏')}>

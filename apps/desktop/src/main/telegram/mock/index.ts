@@ -7,6 +7,7 @@ import type {
   AuthState,
   ChatSummary,
   ConnectionState,
+  ContactProfile,
   Message,
   MessageMedia,
   ProxyConfig,
@@ -25,13 +26,13 @@ import {
   ME,
   MOCK_CODE,
   MOCK_PASSWORD,
-  MOCK_STICKER_SET_ID,
   mimeFromPath,
   type Fixture,
   type MockFile,
 } from './constants'
 import { applyRead, simulateTransfer } from './effects'
 import { buildFixtures } from './fixtures'
+import { getMockStickerSet, listMockStickerSets } from './stickers'
 import { emitTraffic } from './traffic'
 
 export interface MockAdapterOptions {
@@ -192,10 +193,13 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     this.requireFixture(chatId)
   }
 
-  /** The mock has no user directory; reuse a private chat, or say it is missing. */
+  /** The mock has no user directory; reuse the private chat that carries that id. */
   async openPrivateChat(userId: number): Promise<ChatSummary> {
-    const fixture = [...this.fixtures.values()].find((item) => item.chat.kind === 'private')
-    if (!fixture) throw new AppError('not_implemented', `mock has no private chat for user ${userId}`)
+    const fixture =
+      [...this.fixtures.values()].find((item) => item.chat.userId === userId) ??
+      [...this.fixtures.values()].find((item) => item.chat.kind === 'private')
+    if (!fixture)
+      throw new AppError('not_implemented', `mock has no private chat for user ${userId}`)
     return fixture.chat
   }
 
@@ -210,6 +214,17 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     fixture.chat.muted = muted
     this.emit({ type: 'chats', ops: [{ op: 'upsert', chat: { ...fixture.chat } }] })
     return { ...fixture.chat }
+  }
+
+  /** The 通讯录 detail pane's identity block, from the fixture's `contact`. */
+  async contactProfile(chatId: number): Promise<ContactProfile> {
+    const fixture = this.requireFixture(chatId)
+    return {
+      chatId,
+      ...(fixture.chat.userId ? { userId: fixture.chat.userId } : {}),
+      ...(fixture.contact?.username ? { username: fixture.contact.username } : {}),
+      ...(fixture.contact?.phone ? { phone: fixture.contact.phone } : {}),
+    }
   }
 
   async history(input: {
@@ -373,26 +388,11 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   }
 
   async listStickerSets(): Promise<StickerSetSummary[]> {
-    const cover = this.assets.stickers[0]
-    return [
-      {
-        id: MOCK_STICKER_SET_ID,
-        title: 'WeGram 贴纸',
-        ...(cover ? { thumbnail: cover } : {}),
-      },
-    ]
+    return listMockStickerSets(this.assets)
   }
 
   async getStickerSet(setId: string): Promise<StickerSet> {
-    if (setId !== MOCK_STICKER_SET_ID)
-      throw new AppError('internal', `Unknown sticker set ${setId}`)
-    const cover = this.assets.stickers[0]
-    return {
-      id: MOCK_STICKER_SET_ID,
-      title: 'WeGram 贴纸',
-      ...(cover ? { thumbnail: cover } : {}),
-      stickers: this.assets.stickers.map((sticker) => ({ ...sticker })),
-    }
+    return getMockStickerSet(this.assets, setId)
   }
 
   async editText(input: { chatId: number; messageId: number; text: string }): Promise<Message> {

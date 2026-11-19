@@ -16,8 +16,11 @@ listed in "Known deltas" is a deliberate, documented difference.
 |---|---|
 | `renderer/src/styles/index.css` | Rewritten. All design tokens + every component style. Single source of truth for colour/size. |
 | `renderer/src/components/MainShell.tsx` | Three-column shell, owns the toast + app menu + settings dialog state. |
-| `renderer/src/components/SideRail.tsx` | 61 px icon rail: avatar (connection dot), 聊天/通讯录/收藏/朋友圈, 手机/设置. The avatar is the account's real profile photo (`Self.avatarUrl`), initials until it arrives. The 聊天 tab is the Telegram mark in brand green. |
+| `renderer/src/components/SideRail.tsx` | 61 px icon rail: avatar (connection dot), 聊天/通讯录/收藏/朋友圈, 手机/设置. The avatar is the account's real profile photo (`Self.avatarUrl`), initials until it arrives. 聊天 and 通讯录 switch the shell; the Telegram mark is brand green only while 聊天 is active. |
 | `renderer/src/components/ChatList.tsx` | Search pill + circular "+" (both inside the list column) + 65 px rows. Selecting the row that is already open toggles the conversation shut. Rows show the real chat photo when `ChatSummary.avatarUrl` is present, initials otherwise. |
+| `renderer/src/components/contacts/ContactsList.tsx` | The 通讯录 column (§2.4): 26 px search, 35 px 通讯录管理 card, 36 px service rows, 54 px contact rows grouped by initial. |
+| `renderer/src/components/contacts/ContactDetail.tsx` | The contact card: 60 px avatar, 微信号, 朋友资料 / 更多信息, and the three blue actions (发消息 / 语音聊天 / 视频聊天). |
+| `renderer/src/lib/contacts.ts` | Private-chat filter + initial/grouping rules (pinyin via ICU collation; pure, unit-tested). |
 | `renderer/src/components/OverlayScrollbar.tsx` | WeChat's floating scrollbar: a 6 px translucent pill drawn over the rows (hover/scroll/drag), so long lists get no layout gutter and nothing re-flows when it appears. Used by the chat list and the transcript. |
 | `renderer/src/components/ChatPane.tsx` | 46 px header (title, typing, call/… buttons), watermark empty state, chat-info popover. |
 | `renderer/src/components/MessageList.tsx` | Bubbles, real sender photos on both sides (own avatar on the right; `senderAvatarUrl`, `evt:avatars`, `Self.avatarUrl`), hover-only timestamp/read receipt, day + unread separators. |
@@ -244,6 +247,40 @@ Missing against the client, on purpose: the **自定义表情** (heart) tab. Fav
 TDLib custom-emoji sets, whose messages are custom-emoji *entities* rather than
 stickers; the protocol has no send path for them yet, so the tab would be dead.
 
+### 2.4 The 通讯录 (added 2026-11-19)
+
+Measured off the user's own address book screenshot (1377×892 **physical** pixels at
+125% scaling, so CSS px = screenshot px ÷ 1.25; the list column measured 238.4 CSS px —
+the same 238 px this app uses, so no width change was needed).
+
+| Metric | Value |
+|---|---|
+| list column | 238 px (same as the conversation list); background stays `--wx-list` |
+| contacts header | 85 px: 12 top + **26 px search pill** + 12 + **35 px 通讯录管理 card** |
+| 通讯录管理 card | full width minus 12 px side insets, radius 8, 16 px label, 21 px payload glyph (ink 18×15) |
+| service rows | **36 px**, 16 px label, 12 px chevron at the left (16 px inset), count 13 px at the right (10 px inset) |
+| group header | **30 px**, 13 px, 36 px left inset |
+| contact row | **54 px**, 30 px avatar (radius 4), 36 px left inset, 8 px gap, 16 px name |
+| detail card | fixed **310 px** wide, centred; 59 px top padding |
+| detail avatar | **60 px**, radius 6; name 17 px/500; 微信号 14 px, 4 px below the 24 px name line |
+| detail rules | 19 px below the header block; 1 px `#f0f0f0` |
+| detail sections | 20 px top / 10 px bottom (更多信息 16); label 14 px; rows 24 px line-height, 72 px label column |
+| detail actions | three 96 px columns, 11 px side insets (centres 59/155/251), 30 px above, 24 px glyph + 8 px gap + 14 px label |
+
+Colour additions (light; the dark column is inferred from the shell, no dark contacts
+window was measured): action blue **`#304b82`** (`--wx-link`, same ink as the
+login links), section labels / chevrons / 微信号 **`#6e6e73`**
+(`--wx-contact-muted`), trailing counts **`#9f9fa6`** (`--wx-contact-count`),
+hairline **`#f0f0f0`** (`--wx-contact-rule`). A selected contact row is a neutral
+**`rgba(0,0,0,.08)`** (`--wx-row-selected`), never the chat list's green.
+
+The card's layout is exact: avatar top 91, header rule 170, 朋友资料 label 191, 备注 219,
+更多信息 label 273, 来源 303, 添加时间 329, action icons 397 and labels 429 — all CSS px
+from the window top. Our DOM measures 91 / 170 / 191 / 219 / 273 / 301 / 367 (actions
+padding start) with the same section paddings. The one deliberate change is the second
+更多信息 row: Telegram has no 添加时间, so 用户 ID (and 手机号 when `contacts:profile`
+exposes it) takes its place, and 来源 says `Telegram`.
+
 ---
 
 ## 3. Icon provenance (this is the part people get wrong)
@@ -288,7 +325,10 @@ the two, which is the weight the rest of the row uses.
 
 `WechatIcons.tsx` is produced by `.cache/wxsvg/gen_icons.py`: drop `width`/`height`,
 strip `style="…"`, `fill="black"` → `currentColor`, hyphenated attrs → JSX camelCase,
-one element per line. Re-run it if the client updates and the artwork changes.
+one element per line. Re-run it if the client updates and the artwork changes; the
+script's `ICONS` list is the complete set (`KeyboardIcon` included — it was added by
+hand once and was lost by a regeneration), and the committed file is what
+`pnpm exec prettier --write` makes of the script's output.
 
 **Not in that payload set, therefore replaced:** the rail "chats" tab and the
 empty-pane watermark are now the Telegram roundel (`TelegramLogo`, Simple Icons,
@@ -305,7 +345,22 @@ soft-IoU over all 2500 masks, best hit confirmed by eye; scripts
 | `CallIcon` (话机) | `#0300` | `ChevronDownIcon` | `#0555` (12×12) |
 | `StickerCubeIcon` (贴纸 cube) | `#1268` | `CallBubbleIcon` (was `#1755`, empty bubble) | `#1206` |
 
-**The image-viewer toolbar is payload art too** (2026-11-17, second pass). The earlier
+****The 通讯录 glyphs (2026-11-19).** Four more payloads, matched from the user's
+address-book screenshot with the same Chamfer pass (`.cache/contacts_ref/match_icons.py`;
+top hit confirmed by eye):
+
+| Component | payload | viewBox | Notes |
+|---|---|---|---|
+| `ContactsManageIcon` (通讯录管理: person + second head) | `#0345` | 24 | outline sibling of `ContactsTabIcon` |
+| `MessageOutlineIcon` (发消息: speech bubble) | `#0579` | 24 | the tail points down-left |
+| `CallOutlineIcon` (语音聊天: handset) | `#0079` | 24 | not the filled `CallIcon` `#0300` |
+| `VideoCallOutlineIcon` (视频聊天: camera) | `#0310` | 24 | rectangle + right-hand lens |
+
+The service-row `›` and the 联系人 `⌄` are the existing `ChevronDownIcon` (`#0555`)
+rotated −90°, not new artwork. The four are outline family; the composer's filled
+`CallIcon` / `CallBubbleIcon` are different weights — do not swap them.
+
+**The image-viewer toolbar is payload art too**** (2026-11-17, second pass). The earlier
 "the viewer draws its own glyphs" note was wrong: eight of the nine buttons are in the
 same 2345-document payload block. They were located by cropping each glyph out of a
 native viewer screenshot, then walking the payload masks by eye — the preview glyphs
@@ -409,8 +464,13 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
    initial square. A sender's photo is downloaded in the background, so a row opened on a
    cold cache shows its initial for a moment and swaps in the picture when
    `evt:avatars` lands — that is the intended behaviour, not a missing image.
-3. **Rail sections other than 聊天** only raise a toast. 通讯录 is cheap to build from
-   `chat.kind === 'private'`; 收藏 and 朋友圈 have no data at all.
+3. **通讯录 is built from private chats, not Telegram's address book.** The rail's
+   通讯录 tab lists `chat.kind === 'private'` minus the Saved Messages conversation
+   (`ChatSummary.userId === Self.id`), groups them by initial and shows the selected
+   contact's card in the right pane (§2.4). 收藏 and 朋友圈 still have no data and toast.
+   The client's service rows are kept for the silhouette: 公众号、服务号 counts channels;
+   新的朋友 / 企业微信联系人 / 我的企业 / 通讯录管理 / 备注 / 语音聊天 / 视频聊天 /
+   更多资料 toast.
 4. **No pin (always-on-top) button** in the title strip; WeChat has one left of the
    window controls.
 5. **Window controls** are the native `titleBarOverlay` buttons (~46 px each) versus
@@ -429,11 +489,12 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
    brand mark in `--wx-login-green` (the client's login green `#00c375`), and the
    empty-pane watermark in the light `#efefef` / `#222` it had before — the watermark
    stays low-contrast rather than becoming a green logo.
-10. **Re-selecting the open conversation closes it.** In the client, clicking the
-    highlighted row does nothing; here it is a toggle: the right pane returns to the
-    watermark state and the list keeps its search filter (requested 2026-11-17). The
-    rail's 聊天 tab stays inert, as in the client. Closing the pane still flushes the
-    reading anchor, so reopening the chat restores the same position.
+10. **Re-selecting the open conversation closes it; the rail now switches sections.**
+    In the client, clicking the highlighted row does nothing; here it is a toggle: the
+    right pane returns to the watermark state and the list keeps its search filter
+    (requested 2026-11-17). The rail's 聊天 tab is a real section switch now (returning
+    from 通讯录 keeps the previously open chat selected), not inert. Closing the pane
+    still flushes the reading anchor, so reopening the chat restores the same position.
 11. **The header "+" opens WeChat's three-entry card, but none of the entries is
     wired.** 发起群聊 / 添加朋友 / 写笔记 match the client's menu down to the payload
     glyphs, and the card hangs centred under the round button 12 px below it
@@ -515,6 +576,27 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
 26. **The 280×373 login window is fixed.** The client's window is the same size and also
     not resizable; ours is centred on the primary display every time (the client
     remembers where you left it) — one less piece of window state to persist.
+27. **The contacts list only sees the loaded chat page.** `chats:list` asks for 100
+    chats (schema max 200); an account with more private chats than that has contacts
+    that never appear. The contacts column has no pagination or virtualiser yet (a few
+    hundred rows are fine — the chat list already paints 526), and bots are not
+    filtered: `ChatSummary` has no bot flag, and `getContacts` would be the honest
+    source if the address book ever needs to be exact.
+28. **Chinese names get pinyin initials from ICU, not a pinyin table.** `contactInitial`
+    compares the first Han character against 23 boundary characters ("阿" for A, "八"
+    for B … "匝" for Z) with `Intl.Collator('zh-Hans-CN')`; the last boundary it sorts
+    at/after is the section. That matches the client for ordinary names, but polyphones
+    (重/长) and names whose pinyin differs from ICU's dictionary can land in a
+    neighbouring letter; a real pinyin table would be the upgrade.
+29. **The five service rows are WeChat's, not Telegram's.** 公众号、服务号 is the channel
+    count; 企业微信联系人 and 我的企业 have no counterpart at all but are kept to preserve
+    the client's silhouette (both toast). This follows the existing "＋ menu" convention:
+    the shape is faithful, the action says 还没有接入.
+30. **The contact card's 微信号 is the Telegram username.** WeChat's 微信号 / 来源 /
+    添加时间 do not exist in Telegram: the card shows `username` (or 未设置), 来源
+    `Telegram`, and 用户 ID / 手机号 from `contacts:profile`. A phone number appears only
+    when TDLib exposes it (the peer must be in the address book). 发消息 opens the
+    conversation and switches back to 聊天; 语音聊天 / 视频聊天 toast (no call path).
 
 ---
 
@@ -525,7 +607,10 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
    from payloads now. Left over: identify the client's sixth composer glyph (◎) and the
    voice-input circle, which has no payload. (The chats tab no longer needs one — it is
    the Telegram mark now.)
-2. 通讯录 panel: reuse `ChatList` with private chats only, grouped by initial.
+2. ~~通讯录 panel~~ — done 2026-11-19 (§2.4): private chats grouped by pinyin initial,
+   the client's service rows and the contact card. Follow-ups: paginate past the first
+   `chats:list` page, virtualise past ~300 contacts, filter bots, and (optionally) take
+   the card's identity from Telegram's real address book (`getContacts`).
 3. Chat-info popover → real side panel (members, mute/pin controls) — the protocol
    already has `muted`/`pinned`.
 4. Global search overlay (W4) and in-chat search.
@@ -534,7 +619,7 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
    **the transcript's sender rows** (`Message.senderAvatarUrl` + `evt:avatars`;
    `components/message-list/senderAvatar.ts` owns the priority rule and is unit-tested).
    Next: a virtualised chat list (526 rows render at once on this account), and profile
-   photos in 通讯录 / the chat-info popover once those views exist.
+   photos in the chat-info popover once that view exists.
 
 ---
 

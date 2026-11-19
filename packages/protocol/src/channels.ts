@@ -20,6 +20,7 @@ import {
   viewerItemSchema,
   viewerStateSchema,
 } from './dto'
+import { contactProfileSchema } from './contact'
 import { appErrorSchema } from './errors'
 
 /**
@@ -56,6 +57,8 @@ export const invokeChannels = [
   'chats:canPost',
   /** 静音 / 取消静音 for the channel bar; answers the refreshed summary. */
   'chats:setMuted',
+  /** The Telegram identity behind a private chat (the 通讯录 detail pane). */
+  'contacts:profile',
   'messages:history',
   /**
    * One window centred on a message, for a reading position or unread boundary
@@ -137,11 +140,18 @@ export const invokeSchemas = {
   },
   'chats:get': { request: z.object({ chatId: z.number().int() }), response: chatSummarySchema },
   'chats:open': { request: z.object({ chatId: z.number().int() }), response: noPayload },
-  'chats:openPrivate': { request: z.object({ userId: z.number().int() }), response: chatSummarySchema },
+  'chats:openPrivate': {
+    request: z.object({ userId: z.number().int() }),
+    response: chatSummarySchema,
+  },
   'chats:canPost': { request: z.object({ chatId: z.number().int() }), response: z.boolean() },
   'chats:setMuted': {
     request: z.object({ chatId: z.number().int(), muted: z.boolean() }),
     response: chatSummarySchema,
+  },
+  'contacts:profile': {
+    request: z.object({ chatId: z.number().int() }),
+    response: contactProfileSchema,
   },
   'messages:history': {
     request: z.object({

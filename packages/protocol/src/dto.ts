@@ -55,6 +55,8 @@ export const chatSummarySchema = z.object({
   id: z.number().int(),
   title: z.string(),
   kind: chatKindSchema,
+  /** Peer user id (private/secret); 通讯录 hides our own Saved Messages. */
+  userId: z.number().int().optional(),
   unread: z.number().int().nonnegative(),
   pinned: z.boolean(),
   muted: z.boolean(),

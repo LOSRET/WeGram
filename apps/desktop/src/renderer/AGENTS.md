@@ -20,6 +20,8 @@ components/message-list/  virtualiser + MessageRow + Divider + the scroll hooks:
                          useLandingSave / useJumpToLatest / useLocateScroll / useViewportSeen;
                          RichMessage (page blocks), ContactCard (vCards), InlineButtons
 components/chat-pane/     render tree + useChatHistory (history/ modules) + messageActions
+components/contacts/      通讯录: ContactsList (service rows + private chats by initial) +
+                         ContactDetail (the card)
 components/picker/        the expression panel's data hooks and body components
 components/ExpressionPicker.tsx  the picker's state + composition
 components/viewer/        the 图片和视频 window: MediaViewer shell + useViewerItem /
@@ -28,6 +30,7 @@ components/           the remaining visual concerns (Composer, MediaBubble, …)
 lib/ipc.ts            thin `window.tg` wrapper
 lib/clipboard.ts      text copy for the contact card (navigator.clipboard + execCommand fallback)
 lib/format.ts         time / preview / avatar helpers (pure, unit-tested)
+lib/contacts.ts       通讯录 filter + initial/grouping, pinyin via ICU (pure, unit-tested)
 lib/entities.ts       TL entity → text segments (pure, unit-tested)
 lib/useAnchoredScroll.ts  ready gate, stick-to-bottom, resize compensation
 lib/scrollGeometry.ts (pure, unit-tested) the ONE "is the reader at the bottom" rule
@@ -143,6 +146,12 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   "as big as the window". `.wx-viewer__image` therefore carries `flex: none;
   max-width: none; max-height: none;`; any future element sized from
   `lib/zoom.ts` needs the same reset.
+- **通讯录 is built from private chats, not Telegram's address book.** It lists
+  `chat.kind === 'private'` minus the Saved Messages conversation
+  (`chat.userId === Self.id`), groups Chinese names by pinyin through the ICU
+  collation boundaries in `lib/contacts.ts`, and only sees the `chats:list` page the
+  shell loaded. Bots are not filtered (`ChatSummary` has no bot flag). Do not swap the
+  grouping for a pinyin dependency without asking.
 - **Long panes use `components/OverlayScrollbar.tsx`**, never a native scrollbar:
   Chromium gives native bars a layout gutter, so rows re-flow when the bar
   appears. Popovers keep native thin bars on purpose.

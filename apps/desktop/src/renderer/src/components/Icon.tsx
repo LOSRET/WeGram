@@ -18,13 +18,16 @@ export {
   AddFriendIcon,
   CallBubbleIcon,
   CallIcon,
+  CallOutlineIcon,
   ChevronDownIcon,
+  ContactsManageIcon,
   ContactsTabIcon,
   CubeTabIcon,
   DeviceIcon,
   EmojiIcon,
   FolderIcon,
   MenuIcon,
+  MessageOutlineIcon,
   MicIcon,
   MoreIcon,
   NewGroupIcon,
@@ -33,6 +36,7 @@ export {
   ScissorsIcon,
   SearchIcon,
   StickerCubeIcon,
+  VideoCallOutlineIcon,
 } from './WechatIcons'
 
 import { CallBubbleIcon } from './WechatIcons'

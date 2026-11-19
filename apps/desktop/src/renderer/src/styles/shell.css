@@ -158,6 +158,11 @@
   color: var(--wx-brand);
 }
 
+/* 通讯录 is the active section: the 聊天 tab is just another grey tab then. */
+.wx-rail__brand--idle {
+  color: var(--wx-rail-icon);
+}
+
 .wx-rail__badge {
   position: absolute;
   top: -2px;

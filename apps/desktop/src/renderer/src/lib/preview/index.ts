@@ -18,6 +18,7 @@ import { stickerMedia } from '../stickerMedia'
 import {
   ME,
   chats,
+  contactProfiles,
   info,
   media,
   messagesByChat,
@@ -71,7 +72,6 @@ function clearQrTimer(): void {
   if (qrTimer !== null) window.clearTimeout(qrTimer)
   qrTimer = null
 }
-
 
 /**
  * The adapter's read rule in three lines: the marker only moves forward, and
@@ -168,6 +168,15 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       chat.muted = Boolean(store.muted)
       emit('evt:chats', { ops: [{ op: 'upsert', chat: { ...chat } }] })
       return { ...chat }
+    }
+    case 'chats:openPrivate': {
+      const chat = chats.find((item) => item.kind === 'private' && item.userId === store.userId)
+      if (!chat) throw { code: 'internal', message: 'unknown preview contact' }
+      return { ...chat }
+    }
+    case 'contacts:profile': {
+      const chatId = Number(store.chatId)
+      return contactProfiles[chatId] ?? { chatId }
     }
     case 'messages:read': {
       const upTo = Number(store.upToMessageId)

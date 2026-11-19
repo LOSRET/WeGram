@@ -1,0 +1,314 @@
+/* ---------- 通讯录 (contacts) ---------- */
+
+/* The middle column keeps the chat list's 238 px width and background; only its
+   header grows (a 26 px search pill and the 36 px 通讯录管理 card) and its rows
+   are indented. WeChat's contacts column is a different list from the
+   conversation column, and so are its metrics (measured 2026-11-19):
+   36 px service rows and 54 px contact rows against the chat list's 65 px. */
+
+.wx-contacts__head {
+  flex: 0 0 auto;
+  padding: 12px 12px 0;
+}
+
+.wx-contacts__search {
+  height: 26px;
+}
+
+.wx-contacts__manage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 35px;
+  margin-top: 12px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 8px;
+  background: var(--wx-field);
+  color: var(--wx-text);
+  font-size: 16px;
+}
+
+.wx-contacts__manage:hover {
+  background: var(--wx-elevated);
+}
+
+.wx-contacts__menu {
+  padding-top: 16px;
+}
+
+.wx-contacts__entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 36px;
+  padding: 0 10px 0 16px;
+  border: none;
+  background: transparent;
+  color: var(--wx-text);
+  font-size: 16px;
+  text-align: left;
+}
+
+.wx-contacts__entry:hover {
+  background: var(--wx-row-hover);
+}
+
+/* The 12 px chevron is the chat list's own glyph, rotated: WeChat points the
+   service rows right and the open 联系人 row down. */
+.wx-contacts__chevron {
+  display: inline-flex;
+  flex: 0 0 12px;
+  color: var(--wx-contact-muted);
+  transition: transform 120ms ease;
+}
+
+.wx-contacts__chevron--right {
+  transform: rotate(-90deg);
+}
+
+.wx-contacts__entry-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wx-contacts__count {
+  flex: 0 0 auto;
+  font-size: 13px;
+  color: var(--wx-contact-count);
+}
+
+.wx-contacts__groups {
+  padding-top: 4px;
+}
+
+.wx-contacts__group-head {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 10px 0 36px;
+  font-size: 13px;
+  color: var(--wx-contact-muted);
+  user-select: none;
+}
+
+.wx-contacts__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 54px;
+  padding: 0 10px 0 36px;
+  border: none;
+  background: transparent;
+  color: var(--wx-text);
+  font-size: 16px;
+  text-align: left;
+}
+
+.wx-contacts__row:hover {
+  background: var(--wx-row-hover);
+}
+
+.wx-contacts__row--active,
+.wx-contacts__row--active:hover {
+  background: var(--wx-row-selected);
+}
+
+/* Contact rows use the client's 30 px avatar, not the 40 px conversation one. */
+.wx-contacts__avatar {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.wx-contacts__name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wx-contacts__empty {
+  padding: 28px 16px;
+  font-size: 13px;
+  color: var(--wx-text-secondary);
+  text-align: center;
+}
+
+/* ---------- Contact detail pane ---------- */
+
+/* The card is a fixed 310 px column centred in the pane (the client insets the
+   same width no matter how wide the window gets). It fits the 600 px minimum
+   window height, so it only ever needs the (invisible) overflow escape. */
+.wx-contact-pane {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  background: var(--wx-pane);
+  scrollbar-width: none;
+}
+
+.wx-contact-pane::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.wx-contact-detail {
+  width: 310px;
+  margin: 0 auto;
+  padding: 59px 0 40px;
+}
+
+.wx-contact-detail__head {
+  position: relative;
+  display: flex;
+  gap: 16px;
+}
+
+.wx-contact-detail__avatar {
+  width: 60px;
+  height: 60px;
+  flex: 0 0 60px;
+  border-radius: 6px;
+  font-size: 20px;
+}
+
+.wx-contact-detail__meta {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 28px 0 0;
+}
+
+.wx-contact-detail__name {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 24px;
+  color: var(--wx-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wx-contact-detail__id {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--wx-contact-muted);
+  overflow-wrap: anywhere;
+}
+
+.wx-contact-detail__more {
+  position: absolute;
+  top: 2px;
+  right: -6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--wx-contact-muted);
+}
+
+.wx-contact-detail__more:hover {
+  background: var(--wx-row-hover);
+}
+
+.wx-contact-detail__rule {
+  height: 1px;
+  background: var(--wx-contact-rule);
+}
+
+.wx-contact-detail__rule--head {
+  margin-top: 19px;
+}
+
+.wx-contact-detail__section {
+  padding: 20px 0 10px;
+}
+
+.wx-contact-detail__section--more {
+  padding-bottom: 16px;
+}
+
+.wx-contact-detail__label {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  color: var(--wx-contact-muted);
+}
+
+.wx-contact-detail__row {
+  display: flex;
+  gap: 8px;
+  min-height: 24px;
+  font-size: 14px;
+  line-height: 24px;
+}
+
+.wx-contact-detail__row-label {
+  flex: 0 0 72px;
+  color: var(--wx-contact-muted);
+}
+
+.wx-contact-detail__row-value {
+  flex: 1;
+  min-width: 0;
+  color: var(--wx-text);
+  overflow-wrap: anywhere;
+}
+
+.wx-contact-detail__remark {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--wx-contact-muted);
+  font-size: 14px;
+  line-height: 24px;
+  text-align: left;
+}
+
+.wx-contact-detail__remark:hover {
+  color: var(--wx-text);
+}
+
+/* Three 96 px columns; the 11 px side padding puts their centres where the
+   client's are (59 / 155 / 251 px across the 310 px card). */
+.wx-contact-detail__actions {
+  display: flex;
+  justify-content: space-between;
+  padding: 30px 11px 0;
+}
+
+.wx-contact-detail__action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 96px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--wx-link);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.wx-contact-detail__action:hover {
+  color: var(--wx-link-active);
+}

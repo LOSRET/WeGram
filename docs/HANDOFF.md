@@ -57,6 +57,14 @@ Greenfield → working skeleton in three milestones:
   复制/打印 are hidden. Measured metrics: `UI-HANDOFF.md` §2.1 (second table), deltas 17–20.
   The mock now ships a 6 s WebM fixture (`mock-assets.ts` `SAMPLE_VIDEO_WEBM`) so the
   window is reachable without the real account.
+- **通讯录 (contacts, 2026-11-19)**: the rail's 通讯录 tab now switches the shell to
+  the address book. The middle column carries the client's header stack (search,
+  通讯录管理 card, 新的朋友 / 公众号、服务号 / 企业微信联系人 / 我的企业 / 联系人) and
+  private chats grouped by initial; the right pane is the contact card (60 px avatar,
+  微信号, 朋友资料, 更多信息, 发消息 / 语音聊天 / 视频聊天). Data = private chats minus
+  Saved Messages; a new `contacts:profile` channel adds the Telegram username/phone.
+  Metrics, icon provenance and the deliberate deltas: `docs/UI-HANDOFF.md` §2.4, §3,
+  §5 items 27–30.
 - **Sender photos in the transcript (W3 addendum)**: group members are no longer
   initials. `Message.senderAvatarUrl` carries the picture a row can already draw, and
   the adapter's photo pool (the one that fetched chat photos) now resolves **people**

@@ -1,6 +1,7 @@
 import type {
   AppInfo,
   ChatSummary,
+  ContactProfile,
   Message,
   MessageMedia,
   Self,
@@ -47,6 +48,8 @@ export const chats: ChatSummary[] = [
     id: 1,
     title: '文件传输助手',
     kind: 'private',
+    // Saved Messages: a private chat that the 通讯录 must not list as a contact.
+    userId: ME.id,
     unread: 0,
     pinned: true,
     muted: false,
@@ -71,6 +74,7 @@ export const chats: ChatSummary[] = [
     id: 3,
     title: '妈',
     kind: 'private',
+    userId: 37,
     unread: 1,
     pinned: false,
     muted: false,
@@ -86,6 +90,52 @@ export const chats: ChatSummary[] = [
     muted: true,
     lastMessageText: '会议纪要已经放到共享盘',
     lastMessageAt: now() - 10800,
+  },
+  // Contacts the browser preview's 通讯录 shows: two Latin initials and one CJK
+  // name, each with a 微信号 (the preview's `contactProfiles`).
+  {
+    id: 7,
+    title: 'Ada Lovelace',
+    kind: 'private',
+    userId: 21,
+    unread: 0,
+    pinned: false,
+    muted: false,
+    lastMessageText: '明天图书馆见',
+    lastMessageAt: now() - 900,
+  },
+  {
+    id: 8,
+    title: 'Ben Carter',
+    kind: 'private',
+    userId: 22,
+    unread: 0,
+    pinned: false,
+    muted: false,
+    lastMessageText: 'Thanks, that works!',
+    lastMessageAt: now() - 2700,
+  },
+  {
+    id: 9,
+    title: '陈晨',
+    kind: 'private',
+    userId: 23,
+    unread: 0,
+    pinned: false,
+    muted: false,
+    lastMessageText: '周末一起吃个饭？',
+    lastMessageAt: now() - 7200,
+  },
+  {
+    id: 10,
+    title: 'Dmitri Volkov',
+    kind: 'private',
+    userId: 24,
+    unread: 0,
+    pinned: false,
+    muted: false,
+    lastMessageText: 'Ок, договорились',
+    lastMessageAt: now() - 14_400,
   },
   {
     id: 5,
@@ -243,6 +293,10 @@ export const messagesByChat: Record<number, Message[]> = {
   ],
   3: [msg(3, 301, '降温了，多穿点', false, 1_560), msg(3, 302, '晚上回来吃饭吗', false, 1_500)],
   4: [msg(4, 401, '会议纪要已经放到共享盘', false, 10_800)],
+  7: [msg(7, 701, '明天图书馆见', false, 900)],
+  8: [msg(8, 801, 'Thanks, that works!', false, 2_700)],
+  9: [msg(9, 901, '周末一起吃个饭？', false, 7_200)],
+  10: [msg(10, 1001, 'Ок, договорились', false, 14_400)],
   5: [
     msg(5, 501, 'Telegram 11.0 released', false, 36_000),
     // Channel post: sent by the chat itself, so senderId is 0 and senderChatId is set.
@@ -371,10 +425,22 @@ export function media(fileId: number, extra: Partial<MessageMedia> = {}): Messag
 /** Channels the preview account may post in (TDLib: an administrator right). */
 export const channelPostRights: Record<number, boolean> = { 6: true }
 
+/**
+ * The identity the 通讯录 detail pane asks for (`contacts:profile`). Keyed by
+ * chat id; a chat without an entry answers with just its id, like a Telegram
+ * peer that hides its username and phone.
+ */
+export const contactProfiles: Record<number, ContactProfile> = {
+  3: { chatId: 3, userId: 37, username: 'mama_wegram', phone: '+86 138 0000 0000' },
+  7: { chatId: 7, userId: 21, username: 'ada_lovelace' },
+  8: { chatId: 8, userId: 22, username: 'ben_carter' },
+  9: { chatId: 9, userId: 23, username: 'chenchen' },
+  10: { chatId: 10, userId: 24, username: 'dvolkov' },
+}
+
 export const info: AppInfo = {
   version: __WEGRAM_VERSION__,
   appVersion: `${__WEGRAM_VERSION__}-web`,
   adapter: 'mock',
   userDataPath: '(browser preview)',
 }
-

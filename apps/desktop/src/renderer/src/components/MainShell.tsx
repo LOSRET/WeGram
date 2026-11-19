@@ -4,9 +4,11 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'rea
 import { AppMenu } from './AppMenu'
 import { ChatList } from './ChatList'
 import { ChatPane } from './chat-pane'
+import { NoChatPlaceholder } from './chat-pane/Placeholders'
+import { ContactDetail, ContactsList } from './contacts'
 import { PlusMenu } from './PlusMenu'
 import { ProxyPanel } from './ProxyPanel'
-import { SideRail } from './SideRail'
+import { SideRail, type ShellSection } from './SideRail'
 import { invoke } from '../lib/ipc'
 import { activateChat } from '../lib/openChat'
 import { useAppStore } from '../store/useAppStore'
@@ -36,6 +38,15 @@ export function MainShell() {
   const [menu, setMenu] = useState<Anchor | null>(null)
   /** The list header's "+" menu (发起群聊 / 添加朋友 / 写笔记). */
   const [plusMenu, setPlusMenu] = useState<Anchor | null>(null)
+  /** Which rail section owns the middle + right columns. */
+  const [section, setSection] = useState<ShellSection>('chats')
+  /** The contact whose card the right pane shows (通讯录 only). */
+  const [contactId, setContactId] = useState<number | null>(null)
+  /**
+   * The 通讯录 search stays here, not inside the list, so switching to 聊天 and
+   * back does not silently drop the filter the reader typed.
+   */
+  const [contactQuery, setContactQuery] = useState('')
 
   // Toasts are fire-and-forget and owned here: the rail can raise one before a
   // conversation is even open.
@@ -44,6 +55,20 @@ export function MainShell() {
     const timer = window.setTimeout(() => useAppStore.getState().setToast(null), 2200)
     return () => window.clearTimeout(timer)
   }, [toast])
+
+  /** The selected contact is resolved from the live list: a deleted chat closes the card. */
+  const selectedContact = useMemo(
+    () => chats.find((chat) => chat.id === contactId && chat.kind === 'private') ?? null,
+    [chats, contactId],
+  )
+
+  const showUnavailable = useCallback((label: string) => setToast(`${label}还没有接入`), [setToast])
+
+  /** 发消息 on a contact card: open the conversation and return to 聊天. */
+  const openContactChat = useCallback((chat: ChatSummary) => {
+    activateChat(chat)
+    setSection('chats')
+  }, [])
 
   const filteredChats = useMemo(() => {
     const needle = deferredQuery.trim().toLowerCase()
@@ -88,18 +113,46 @@ export function MainShell() {
 
       <div className="wx-body">
         <SideRail
+          section={section}
+          onSectionChange={(next) => {
+            setSection(next)
+            // The "+" card belongs to the conversation list; it must not float
+            // over the contact list after the rail switched the column away.
+            setPlusMenu(null)
+          }}
           onOpenMenu={(anchor) => setMenu(anchor)}
-          onUnavailable={(label) => setToast(`${label}还没有接入，先看聊天吧`)}
+          onUnavailable={showUnavailable}
         />
-        <ChatList
-          chats={filteredChats}
-          activeChatId={activeChatId}
-          query={query}
-          onQueryChange={setQuery}
-          onSelect={openChat}
-          onOpenPlus={(anchor) => setPlusMenu(anchor)}
-        />
-        <ChatPane />
+        {section === 'chats' ? (
+          <ChatList
+            chats={filteredChats}
+            activeChatId={activeChatId}
+            query={query}
+            onQueryChange={setQuery}
+            onSelect={openChat}
+            onOpenPlus={(anchor) => setPlusMenu(anchor)}
+          />
+        ) : (
+          <ContactsList
+            chats={chats}
+            activeChatId={contactId}
+            query={contactQuery}
+            onQueryChange={setContactQuery}
+            onSelect={(chat) => setContactId(chat.id)}
+            onUnavailable={showUnavailable}
+          />
+        )}
+        {section === 'chats' ? (
+          <ChatPane />
+        ) : selectedContact ? (
+          <ContactDetail
+            chat={selectedContact}
+            onOpenChat={openContactChat}
+            onUnavailable={showUnavailable}
+          />
+        ) : (
+          <NoChatPlaceholder />
+        )}
       </div>
 
       {plusMenu ? (
@@ -107,7 +160,7 @@ export function MainShell() {
           x={plusMenu.x}
           y={plusMenu.y}
           onClose={() => setPlusMenu(null)}
-          onUnavailable={(label) => setToast(`${label}还没有接入，先看聊天吧`)}
+          onUnavailable={showUnavailable}
         />
       ) : null}
 
