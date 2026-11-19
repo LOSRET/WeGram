@@ -6,6 +6,7 @@ import { resolveCommentAccess, type ChatMemberKind } from '../../comment-access'
 import type { TdObject } from '../client'
 import { mapMessage } from '../map/message'
 import type { ActionDeps } from './deps'
+import { inputText, sendAndMap } from './message-input'
 
 /** The protocol caps a page at 100; TDLib may answer with fewer by itself. */
 const MAX_COMMENTS = 100
@@ -62,35 +63,20 @@ export async function sendComment(
   deps: ActionDeps,
   input: { chatId: number; messageId: number; text: string; replyTo?: number },
 ): Promise<{ message: Message }> {
-  const thread = await deps.invoke({
-    _: 'getMessageThread',
-    chat_id: input.chatId,
-    message_id: input.messageId,
+  const { chatId: discussionChatId, rootId } = await resolveThread(deps, input, {
+    requireRoot: true,
   })
-  const discussionChatId = Number(thread?.chat_id ?? 0)
-  const threadRootId = Number(thread?.message_thread_id ?? 0)
-  if (!discussionChatId || !threadRootId) {
-    throw new AppError('not_implemented', '这个帖子还没有讨论群组，不能评论')
-  }
-  const raw = await deps.invoke({
-    _: 'sendMessage',
-    chat_id: discussionChatId,
-    reply_to: {
-      _: 'inputMessageReplyToMessage',
-      message_id: input.replyTo ?? threadRootId,
-    },
-    input_message_content: {
-      _: 'inputMessageText',
-      text: { _: 'formattedText', text: input.text },
-      clear_draft: true,
-    },
+  const { message } = await sendAndMap(deps, discussionChatId, inputText(input.text, true), {
+    replyTo: input.replyTo ?? rootId,
   })
-  return { message: await mapMessage(deps.mapper, discussionChatId, raw) }
+  return { message }
 }
 /** Discussion chat + thread root of a message, or a readable failure. */
 async function resolveThread(
   deps: Pick<ActionDeps, 'invoke'>,
   input: CommentTarget,
+  /** Sending needs the thread root (it is the reply target); reading does not. */
+  options: { requireRoot?: boolean } = {},
 ): Promise<{ chatId: number; rootId: number }> {
   const thread = await deps.invoke({
     _: 'getMessageThread',
@@ -100,6 +86,9 @@ async function resolveThread(
   const chatId = Number(thread?.chat_id ?? 0)
   const rootId = Number(thread?.message_thread_id ?? 0)
   if (!chatId) throw new AppError('not_implemented', '这个帖子还没有讨论群组，不能评论')
+  if (options.requireRoot && !rootId) {
+    throw new AppError('not_implemented', '这个帖子还没有讨论群组，不能评论')
+  }
   return { chatId, rootId }
 }
 
