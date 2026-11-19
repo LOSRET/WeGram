@@ -1,4 +1,4 @@
-import type { EventChannel } from '@wegram/protocol'
+import type { EventChannel, EventPayload } from '@wegram/protocol'
 
 export interface EventSink {
   send(channel: EventChannel, envelope: { seq: number; payload: unknown }): void
@@ -21,7 +21,12 @@ export class EventBus {
     private readonly flushMs = 60,
   ) {}
 
-  publish(channel: EventChannel, payload: unknown): void {
+  /**
+   * The payload is checked against the channel's event schema: a field added to
+   * `AdapterEvent` but forgotten in `events.ts` used to compile and then arrive
+   * at the renderer as `undefined`.
+   */
+  publish<C extends EventChannel>(channel: C, payload: EventPayload<C>): void {
     this.pending.push({ channel, payload })
     if (this.timer) return
     this.timer = setTimeout(() => this.flush(), this.flushMs)
