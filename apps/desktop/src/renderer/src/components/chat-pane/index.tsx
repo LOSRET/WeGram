@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { loadLatestWindow } from '../../lib/anchoredWindow'
 import { errorMessage, invoke } from '../../lib/ipc'
+import type { PopupAnchor } from '../../lib/popupPlacement'
 import { mayMarkRead } from '../../lib/readGate'
 import { useAppStore } from '../../store/useAppStore'
 import { Composer } from '../Composer'
@@ -60,7 +61,7 @@ export function ChatPane() {
   const [forwarding, setForwarding] = useState<Message | null>(null)
   const [deleting, setDeleting] = useState<Message | null>(null)
   /** Chat-info popover (the "…" button in the header). */
-  const [infoAt, setInfoAt] = useState<{ x: number; y: number } | null>(null)
+  const [infoAt, setInfoAt] = useState<PopupAnchor | null>(null)
   /**
    * Channels: whether this account may post there. Asked once per chat and kept
    * for the session — switching back must not let the keyboard button flicker
@@ -353,7 +354,7 @@ export function ChatPane() {
         <ChatInfoPopover
           chat={chat}
           loadedCount={messages.length}
-          position={infoAt}
+          anchor={infoAt}
           onClose={() => setInfoAt(null)}
         />
       ) : null}

@@ -6,7 +6,8 @@ import { useComposerInput } from '../lib/useComposerInput'
 import { errorMessage, invoke } from '../lib/ipc'
 import { messagePreview } from '../lib/format'
 import { useAppStore } from '../store/useAppStore'
-import { Popup } from './ContextMenu'
+import { anchorOf, type PopupAnchor } from '../lib/popupPlacement'
+import { AnchoredPopup } from './ContextMenu'
 import { ChevronDownIcon, CubeTabIcon, EmojiIcon, FolderIcon, MicIcon, ScissorsIcon } from './Icon'
 import { ExpressionPicker } from './ExpressionPicker'
 
@@ -43,7 +44,7 @@ export function Composer({
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [picker, setPicker] = useState<'emoji' | null>(null)
-  const [attachAt, setAttachAt] = useState<{ x: number; y: number } | null>(null)
+  const [attachAnchor, setAttachAnchor] = useState<PopupAnchor | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const draftTimer = useRef<number | null>(null)
   /** Where the next render should put the caret after an emoji pick. */
@@ -131,7 +132,7 @@ export function Composer({
    * touches the filesystem.
    */
   const attach = async (kind: 'photo' | 'file'): Promise<void> => {
-    setAttachAt(null)
+    setAttachAnchor(null)
     if (busy) return
     try {
       const picked = await invoke('media:pick', { kind })
@@ -246,10 +247,9 @@ export function Composer({
             <button
               className="wx-tool-button"
               onPointerDown={(event) => event.stopPropagation()}
-              onClick={(event) => {
-                const rect = event.currentTarget.getBoundingClientRect()
-                setAttachAt({ x: rect.left, y: rect.top - 92 })
-              }}
+              onClick={(event) =>
+                setAttachAnchor(anchorOf(event.currentTarget.getBoundingClientRect()))
+              }
               disabled={busy || Boolean(editing)}
               title="发送文件"
               aria-label="发送图片或文件"
@@ -301,15 +301,19 @@ export function Composer({
         </div>
       </div>
 
-      {attachAt ? (
-        <Popup x={attachAt.x} y={attachAt.y} onClose={() => setAttachAt(null)}>
+      {attachAnchor ? (
+        <AnchoredPopup
+          anchor={attachAnchor}
+          placement={{ side: 'above' }}
+          onClose={() => setAttachAnchor(null)}
+        >
           <button className="wx-context-menu__item" onClick={() => void attach('photo')}>
             发送图片
           </button>
           <button className="wx-context-menu__item" onClick={() => void attach('file')}>
             发送文件
           </button>
-        </Popup>
+        </AnchoredPopup>
       ) : null}
 
       {picker ? (
