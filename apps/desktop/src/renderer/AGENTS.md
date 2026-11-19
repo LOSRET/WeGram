@@ -41,6 +41,8 @@ lib/search.ts         normalizeQuery / containsText — the ONE reading of a sea
 lib/self.ts           SelfIdentity + selfIdentity(auth); one placeholder id (1000)
 lib/popupPlacement.ts (pure, unit-tested) "which edge does this card hang from"
 lib/mediaBox.ts       (pure, unit-tested) the reserved media box + percent text
+lib/unreadBoundary.ts (type only) the snapshot a chat opens with; `UnreadMarker` is an alias
+lib/listMetrics.ts    (pure, unit-tested via scripts/style-contract) the virtualised row height
 lib/composerInput.ts  (pure, unit-tested) Enter / Shift+Enter / IME rule
 lib/useComposerInput.ts  composition ref + textarea props, shared by both composers
 lib/contacts.ts       通讯录 initial/grouping, pinyin via ICU (pure, unit-tested)

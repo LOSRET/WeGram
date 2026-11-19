@@ -14,7 +14,7 @@ app-window.ts       the ONE BrowserWindow factory (security webPreferences, rout
 windows.ts          the shell window: geometry, theme repaint, minimize↔viewer wiring
 login-window.ts     the frameless 280×373 login BrowserWindow (#login), close/refocus
 viewer.ts           the 图片和视频 window; unowned on purpose (see below), pins/hides it
-ipc/router.ts       per-channel zod validation, Result envelope
+ipc/router.ts       per-channel zod validation, typed handler map, Result envelope
 ipc/handlers.ts     one handler per invoke channel
 telegram/           adapter.ts (the seam) / tdlib/ (real adapter) / mock/ (fixtures) /
                     updates.ts / events.ts / comment-access.ts (the comment permission rule)

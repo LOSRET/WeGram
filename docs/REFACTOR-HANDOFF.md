@@ -394,9 +394,40 @@ renderer and protocol/preview) became one branch, one commit per item. What move
 **Still open** — the fixtures themselves are still two copies
 (`main/telegram/mock/fixtures.ts` ↔ `renderer/src/lib/preview/fixtures.ts`) and have
 drifted (a `lastRead*` pair, one phone format, file ids). Merging them means a shared
-fixture module with each side's `mediaOf` injected; until then a consistency test that
-compares the two through the protocol schemas is the cheap guard.
+fixture module with each side's `mediaOf` injected; until then
+`apps/desktop/scripts/fixture-parity.test.ts` is the cheap guard (see the contract
+pass below).
 
+## Contract pass (2026-11-20, the audit's "B class")
+
+Second batch from the same audit: the places where one contract was written more than
+once. Same branch, one commit per item.
+
+| Was mirrored | Now |
+|---|---|
+| invoke request shapes: zod schema + a handler cast + the adapter signature | one: the `channels.ts` schema. `IpcHandlerMap` is keyed by channel and typed `InvokeRequest<C>`, the adapter's inputs are `InvokeRequest<...>` as well, and the only cast left is the channel loop in `router.ts`. |
+| the comment contract (four inline zod objects, six hand-written interfaces) | `packages/protocol/src/comment.ts`; the adapter re-exports the types |
+| `AppErrorCode` (a hand-written union beside `code: z.string()`) | `appErrorCodeSchema` + `z.infer`; `IpcResult.error` and the renderer guard use `AppErrorShape` |
+| `EventBus.publish(channel, payload: unknown)` | `publish<C extends EventChannel>(channel: C, payload: EventPayload<C>)`, so `events.ts` is checked against the event schemas |
+| row height 65 (TS) vs `--wx-list-item-h` (CSS); panel slide 250 ms vs `0.25s` | constants moved to `lib/listMetrics.ts` / `lib/comments.ts`; `apps/desktop/scripts/style-contract.test.ts` reads the stylesheets and fails on drift |
+| `RECENT_EMOJI_LIMIT` (10 in three places, 24 in the schema), the sticker-format enum (three literals), the viewer strip bound (two copies), `UnreadBoundary`/`UnreadMarker` (two declarations) | one constant / schema / type each |
+
+**Found by removing the casts**: `ui:saveDraft` declared an `entities` field that no
+caller sent and no store kept — invisible while the handler carried `payload as {...}`.
+The field is gone until something needs it.
+
+**Still open**: the fixture *data* (see the note above). Until it is merged,
+`apps/desktop/scripts/fixture-parity.test.ts` asserts that the preview is a subset of
+the mock, that every shared row agrees on title/kind/unread/pinned/muted, that every
+mock row parses as its protocol schema, and it pins the one known gap (chat 11,
+Eva Müller) so neither side can drift silently. That test needed
+`__WEGRAM_VERSION__` in `vitest.config.ts`, because the preview module reads the
+build-time constant when it is imported.
+
+**Not done, on purpose**: the mock adapter and the TDLib adapter still each implement
+`TelegramAdapter`; the three `proxy` modules and the two stores keep their own formats;
+`setError(errorMessage(e))` stays at its call sites. The audit's C class lists why —
+see the dedupe section above.
 ## Start-here checklist for the next session
 
 ```powershell

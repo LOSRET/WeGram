@@ -25,8 +25,8 @@ import would drag the whole DTO layer into the preview.
 
 Fixtures, media generation and event wiring stay in each fake: the mock writes real
 PNG/WebP/TGS files under `userData` and mints `wx-media://` tokens, while the
-preview uses `data:` URLs. The data itself is still mirrored (a known, separate
-item in `docs/REFACTOR-HANDOFF.md`), so only the *rules* live here.
+preview uses `data:` URLs. The data itself is still mirrored, so only the *rules* live here.
+`apps/desktop/scripts/fixture-parity.test.ts` guards what the two copies must agree on.
 
 ## Verify
 
