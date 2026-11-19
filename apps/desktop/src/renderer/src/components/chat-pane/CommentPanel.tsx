@@ -75,7 +75,17 @@ export function CommentPanel({
   onClose: () => void
 }) {
   const key = commentKey(message.chatId, message.id)
-  const [page, setPage] = useState<ThreadPage | null>(() => threadCache.get(key) ?? null)
+  /**
+   * A thread that exists but has no comments yet. TDLib answers
+   * `getMessageThreadHistory` for such a thread with "Receive messages in an
+   * unexpected chat" (measured on a channel whose posts open with 0 comments),
+   * so the empty page is known up front instead of fetched — the panel then says
+   * 还没有评论 and offers the composer, which is the point of opening it.
+   */
+  const threadIsEmpty = message.interaction !== undefined && message.interaction.comments === 0
+  const [page, setPage] = useState<ThreadPage | null>(
+    () => threadCache.get(key) ?? (threadIsEmpty ? { messages: [], hasMore: false } : null),
+  )
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [entered, setEntered] = useState(false)

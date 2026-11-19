@@ -56,13 +56,17 @@ export function reduceOps(
         )
         break
       case 'interaction':
-        // A counter patch, never a replacement: the live update carries no
-        // `canOpen` flag, so merging keeps the thread's pull working.
-        next = next.map((item) =>
-          item.id === op.messageId
-            ? { ...item, interaction: { ...item.interaction, ...op.interaction } }
-            : item,
-        )
+        // A counter patch, never a replacement: an update carries only the
+        // fields that changed (a view count, a fresh reply count), so merging
+        // keeps whatever it does not mention. `comments` is required on a
+        // stored interaction and a patch may omit it, so it is narrowed here;
+        // a view-only patch for a row without an interaction changes nothing.
+        next = next.map((item) => {
+          if (item.id !== op.messageId) return item
+          const comments = op.interaction.comments ?? item.interaction?.comments
+          if (comments === undefined) return item
+          return { ...item, interaction: { ...item.interaction, ...op.interaction, comments } }
+        })
         break
       case 'delete':
         for (const id of op.messageIds) deleted.add(id)

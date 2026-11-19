@@ -1,6 +1,7 @@
 import type { ChatSummary, Message } from '@wegram/protocol'
 import { memo, type MouseEvent } from 'react'
 
+import { hasCommentBar } from '../../lib/comments'
 import { formatMessageTime, messagePreview } from '../../lib/format'
 import { Avatar } from '../Avatar'
 import { MediaBubble } from '../MediaBubble'
@@ -74,6 +75,7 @@ export const MessageRow = memo(
     const first = messages[0]
     const last = messages[messages.length - 1]
     if (!first || !last) return null
+    const interaction = first.interaction
 
     if (first.kind === 'service') {
       return <div className="wx-service">{first.text || '系统消息'}</div>
@@ -194,9 +196,11 @@ export const MessageRow = memo(
             </div>
           )}
           {/* 评论 N 条 (design doc §9.8): just the handle — the thread opens in the
-              full-pane CommentPanel, like Telegram's discussion view. */}
-          {first.interaction?.comments ? (
-            <CommentBar interaction={first.interaction} onOpen={() => onOpenComments(first)} />
+              full-pane CommentPanel, like Telegram's discussion view. A thread that
+              nobody has commented in yet keeps the handle too (写评论), or the reader
+              could never be the first one. */}
+          {hasCommentBar(interaction) ? (
+            <CommentBar interaction={interaction} onOpen={() => onOpenComments(first)} />
           ) : null}
           <span className="wx-message__meta">
             {formatMessageTime(last.date)}

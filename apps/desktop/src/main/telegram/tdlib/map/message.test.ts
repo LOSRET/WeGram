@@ -290,7 +290,6 @@ describe('mapMessage', () => {
           last_message_id: 0,
         },
       },
-      properties: { _: 'messageProperties', can_get_message_thread: true },
     })
 
     expect(message.interaction).toEqual({
@@ -301,22 +300,8 @@ describe('mapMessage', () => {
     })
   })
 
-  it('keeps a comments-only interaction and drops an all-zero one', async () => {
-    const commented = await mapMessage(makeContext(), 2, {
-      id: 4,
-      date: 10,
-      sender_id: { _: 'messageSenderUser', user_id: 42 },
-      content: { _: 'messageText', text: { text: 'hi' } },
-      interaction_info: {
-        _: 'messageInteractionInfo',
-        view_count: 0,
-        forward_count: 0,
-        reply_info: { _: 'messageReplyInfo', reply_count: 3 },
-      },
-    })
-    expect(commented.interaction).toEqual({ comments: 3 })
-
-    const empty = await mapMessage(makeContext(), 2, {
+  it('keeps a thread that nobody has commented in yet', async () => {
+    const quiet = await mapMessage(makeContext(), 2, {
       id: 5,
       date: 10,
       sender_id: { _: 'messageSenderUser', user_id: 42 },
@@ -328,6 +313,21 @@ describe('mapMessage', () => {
         reply_info: { _: 'messageReplyInfo', reply_count: 0 },
       },
     })
-    expect(empty).not.toHaveProperty('interaction')
+    // reply_info is the "this post owns a comment section" signal, so a thread
+    // with 0 comments still draws 写评论 — otherwise nobody can be the first.
+    expect(quiet.interaction).toEqual({ comments: 0, canOpen: true })
+
+    const noThread = await mapMessage(makeContext(), 2, {
+      id: 6,
+      date: 10,
+      sender_id: { _: 'messageSenderUser', user_id: 42 },
+      content: { _: 'messageText', text: { text: 'hi' } },
+      interaction_info: {
+        _: 'messageInteractionInfo',
+        view_count: 0,
+        forward_count: 0,
+      },
+    })
+    expect(noThread).not.toHaveProperty('interaction')
   })
 })

@@ -1,7 +1,13 @@
 import type { Message } from '@wegram/protocol'
 import { describe, expect, it } from 'vitest'
 
-import { commentKey, formatCount, hasCommentBar, mergeComments } from './comments'
+import {
+  commentBarLabel,
+  commentKey,
+  formatCount,
+  hasCommentBar,
+  mergeComments,
+} from './comments'
 
 function comment(id: number, text = `c${id}`): Message {
   return {
@@ -22,10 +28,17 @@ describe('comment bar rules', () => {
     expect(commentKey(2, 203)).not.toBe(commentKey(3, 203))
   })
 
-  it('only draws the bar when there are comments', () => {
+  it('draws the bar for a count and for a thread that has none yet', () => {
     expect(hasCommentBar(undefined)).toBe(false)
     expect(hasCommentBar({ comments: 0 })).toBe(false)
+    expect(hasCommentBar({ comments: 0, canOpen: true })).toBe(true)
     expect(hasCommentBar({ comments: 1, canOpen: true })).toBe(true)
+  })
+
+  it('labels an unused thread as 写评论 and a used one with its count', () => {
+    expect(commentBarLabel({ comments: 0, canOpen: true })).toBe('写评论')
+    expect(commentBarLabel({ comments: 12 })).toBe('评论 12 条')
+    expect(commentBarLabel({ comments: 12_400 })).toBe('评论 1.2万 条')
   })
 
   it('prepends an older page and keeps the thread ascending', () => {

@@ -89,23 +89,30 @@ export async function mapMessage(
  *
  * TDLib only fills reply_info where a comment thread exists — a channel post
  * with a linked discussion group, and the posts inside that group — so this is
- * also the "does this row get a comment bar" test. An all-zero interaction is
- * dropped instead of carried around as an empty object.
+ * also the "does this row get a comment bar" test. `reply_info` is there from
+ * the moment the thread exists, with `reply_count` 0 until somebody comments,
+ * so such a row keeps its interaction: dropping it made "有评论区" posts look
+ * like posts without one, and nobody could be the first to comment.
+ *
+ * `message.properties` does not exist in TDLib 1.8.70 (`getMessageProperties`
+ * is a *call*, not a field), so the old `raw.properties?.can_get_message_thread`
+ * read was `undefined` on every real message and `canOpen` never arrived. The
+ * presence of reply_info is the signal that the thread can be pulled.
  */
 export function mapInteraction(raw: TdObject): MessageInteraction | null {
   const info = raw.interaction_info
   if (!info || typeof info !== 'object') return null
-  const comments = Number(info.reply_info?.reply_count ?? 0)
+  const replyInfo = info.reply_info
+  const comments = Number(replyInfo?.reply_count ?? 0)
   const views = Number(info.view_count ?? 0)
   const forwards = Number(info.forward_count ?? 0)
-  if (!Number.isFinite(comments) || (!comments && !views && !forwards)) return null
+  const hasThread = Boolean(replyInfo && typeof replyInfo === 'object')
+  if (!Number.isFinite(comments) || (!comments && !views && !forwards && !hasThread)) return null
   return {
     comments: comments > 0 ? comments : 0,
     ...(views > 0 ? { views } : {}),
     ...(forwards > 0 ? { forwards } : {}),
-    // can_get_message_thread is the only reliable "the thread can be opened"
-    // signal; a stale counter without it must not offer the pull.
-    ...(raw.properties?.can_get_message_thread ? { canOpen: true } : {}),
+    ...(hasThread ? { canOpen: true } : {}),
   }
 }
 

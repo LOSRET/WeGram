@@ -52,6 +52,18 @@ describe('applyMessageOps', () => {
     expect(state.messagesByChat[CHAT_ID]).toBeUndefined()
   })
 
+  it('keeps a known comment count when an update only carries views', () => {
+    const store = useAppStore.getState()
+    store.setHistory(CHAT_ID, [{ ...message(1), interaction: { comments: 78, canOpen: true } }], false)
+    store.applyMessageOps(CHAT_ID, [
+      { op: 'interaction', chatId: CHAT_ID, messageId: 1, interaction: { views: 12_400 } },
+    ])
+
+    const row = useAppStore.getState().messagesByChat[CHAT_ID]?.[0]
+    // TDLib omits reply_info from a view-only update; that must not wipe the bar.
+    expect(row?.interaction).toEqual({ comments: 78, canOpen: true, views: 12_400 })
+  })
+
   it('patches a loaded chat directly and leaves the queue alone', () => {
     const store = useAppStore.getState()
     store.setHistory(CHAT_ID, [message(1)], true)

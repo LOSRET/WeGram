@@ -31,12 +31,23 @@ export function commentKey(chatId: number, messageId: number): string {
 }
 
 /**
- * Whether the row draws a comment bar. WeChat hides the whole area when a post
- * has no comments, and so do we: a 0 next to an arrow invites a tap that shows
- * an empty list.
+ * Whether the row draws a comment bar.
+ *
+ * A count alone is not the test: TDLib reports reply_info as soon as a post owns
+ * a discussion thread, and for a while that count is 0. Hiding the bar there
+ * made "has a comment section" indistinguishable from "has none", and nobody
+ * could be the first to comment. `canOpen` is that "the thread exists" flag.
  */
-export function hasCommentBar(interaction: MessageInteraction | undefined): boolean {
-  return Boolean(interaction && interaction.comments > 0)
+export function hasCommentBar(
+  interaction: MessageInteraction | undefined,
+): interaction is MessageInteraction {
+  return Boolean(interaction && (interaction.comments > 0 || interaction.canOpen))
+}
+
+/** 评论 N 条 on a used thread, 写评论 on one that still has 0. */
+export function commentBarLabel(interaction: MessageInteraction): string {
+  if (interaction.comments <= 0) return '写评论'
+  return `评论 ${formatCount(interaction.comments)} 条`
 }
 
 /**

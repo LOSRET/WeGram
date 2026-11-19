@@ -1,4 +1,10 @@
-import type { AuthState, ChatSummary, ConnectionState, Self } from '@wegram/protocol'
+import type {
+  AuthState,
+  ChatSummary,
+  ConnectionState,
+  MessageInteraction,
+  Self,
+} from '@wegram/protocol'
 
 import { registerMediaFile } from '../../media/registry'
 import type { Logger } from '../../util'
@@ -8,7 +14,7 @@ import { asArray } from './json'
 import { mapConnectionState } from './map/chat'
 import type { MapperContext } from './map/context'
 import { isTranscriptRemoval } from './map/deletion'
-import { mapInteraction, mapMessage } from './map/message'
+import { mapMessage } from './map/message'
 
 /** What the update stream needs from the adapter. */
 export interface UpdateDeps {
@@ -81,11 +87,29 @@ export function createUpdateHandler(deps: UpdateDeps): (update: TdObject) => Pro
        * Engagement counters moved (views, forwards, replies). The update carries
        * no message content and fires on every view, so the whole message is not
        * remapped: a cheap `interaction` op patches the row instead.
+       *
+       * The patch carries only what the update actually says. TDLib leaves
+       * `reply_info` out whenever it has no reply data at hand, and the old
+       * `?? { comments: 0 }` fallback then wrote 0 over a count the history page
+       * had delivered — a channel post lost its 评论 N 条 bar on the first view
+       * after it was opened, and got it back only on a reload.
        */
       case 'updateMessageInteractionInfo': {
-        const interaction = mapInteraction({ interaction_info: update.interaction_info }) ?? {
-          comments: 0,
+        const info = update.interaction_info
+        if (!info || typeof info !== 'object') return
+        const patch: Partial<MessageInteraction> = {}
+        const views = Number(info.view_count ?? 0)
+        const forwards = Number(info.forward_count ?? 0)
+        const reply = info.reply_info
+        if (Number.isFinite(views) && views > 0) patch.views = views
+        if (Number.isFinite(forwards) && forwards > 0) patch.forwards = forwards
+        if (reply && typeof reply === 'object') {
+          const comments = Number(reply.reply_count ?? 0)
+          if (Number.isFinite(comments) && comments >= 0) patch.comments = comments
+          // The thread exists, so the row keeps (or gains) its 写评论 handle.
+          patch.canOpen = true
         }
+        if (Object.keys(patch).length === 0) return
         deps.emit({
           type: 'messages',
           chatId: update.chat_id,
@@ -94,7 +118,7 @@ export function createUpdateHandler(deps: UpdateDeps): (update: TdObject) => Pro
               op: 'interaction',
               chatId: update.chat_id,
               messageId: update.message_id,
-              interaction,
+              interaction: patch,
             },
           ],
         })

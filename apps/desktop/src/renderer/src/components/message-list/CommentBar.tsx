@@ -1,6 +1,6 @@
 import type { MessageInteraction } from '@wegram/protocol'
 
-import { formatCount } from '../../lib/comments'
+import { commentBarLabel } from '../../lib/comments'
 import { MessageOutlineIcon } from '../WechatIcons'
 
 /**
@@ -20,10 +20,10 @@ export function CommentBar({
     <button
       className="wx-comment-bar"
       onClick={onOpen}
-      title={`查看这 ${interaction.comments} 条评论`}
+      title={interaction.comments > 0 ? `查看这 ${interaction.comments} 条评论` : '写评论'}
     >
       <MessageOutlineIcon size={14} />
-      <span>评论 {formatCount(interaction.comments)} 条</span>
+      <span>{commentBarLabel(interaction)}</span>
       <span className="wx-comment-bar__chevron" aria-hidden="true">
         ›
       </span>

@@ -394,8 +394,10 @@ export const messageInteractionSchema = z.object({
   /** 评论: replies to the message (`reply_info.reply_count`), nested ones included. */
   comments: z.number().int().nonnegative(),
   /**
-   * Whether the comment thread can be fetched (`messageProperties.can_get_message_thread`).
-   * False means the number is stale or the thread is not accessible right now.
+   * Whether the message owns a comment thread. TDLib 1.8.70's `message` carries
+   * no `properties` field (only `getMessageProperties` answers that), so this is
+   * read from `reply_info` being present — the thread exists even before anyone
+   * has commented (`comments === 0`), which is what makes 写评论 reachable.
    */
   canOpen: z.boolean().optional(),
 })
@@ -477,12 +479,17 @@ export const messageOpSchema = z.discriminatedUnion('op', [
    * Engagement moved (views, forwards, replies) without the message changing:
    * patching the counter is far cheaper than remapping the whole message, and
    * `updateMessageInteractionInfo` fires on every view.
+   *
+   * The patch is partial on purpose: TDLib omits `reply_info` from an update
+   * whenever it has no reply data at hand, and a missing field must not erase
+   * what the history page already delivered (a view-only update used to zero a
+   * real comment count and take the comment bar with it).
    */
   z.object({
     op: z.literal('interaction'),
     chatId: z.number().int(),
     messageId: z.number().int(),
-    interaction: messageInteractionSchema,
+    interaction: messageInteractionSchema.partial(),
   }),
 ])
 export type MessageOp = z.infer<typeof messageOpSchema>

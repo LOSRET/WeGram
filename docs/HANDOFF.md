@@ -453,14 +453,27 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
 - **A comment thread is a TDLib message thread, and the count is free.**
   `message.interaction_info.reply_info.reply_count` is filled only for channel posts
   with a linked discussion group and for the posts inside that group — exactly the rows
-  that get WeChat's comment bar — and `messageProperties.can_get_message_thread` says
-  whether the thread can be pulled. `getMessageThreadHistory` is called with the
+  that get WeChat's comment bar. `getMessageThreadHistory` is called with the
   *commented* message's `chat_id`; for a channel post TDLib routes to the linked
   supergroup itself, so the renderer never needs the discussion chat id. It answers
   newest-first and treats `from_message_id` as exclusive, like `getChatHistory`;
-  `actions/comments.ts` sorts a page ascending. `updateMessageInteractionInfo` fires on
-  every view, so it is patched with the `interaction` op instead of a `getMessage`
-  round trip (the op merges, so a live patch never drops `canOpen`).
+  `actions/comments.ts` sorts a page ascending.
+  Measured on 2026-11-20 (live, over CDP and the shipped type defs), three facts that
+  shape the bar:
+  (a) **`message.properties` does not exist in TDLib 1.8.70** — `getMessageProperties`
+  is a call, not a field — so the old `raw.properties?.can_get_message_thread` read was
+  `undefined` on every real message and `canOpen` never arrived (every row had
+  `canOpen: null`); "this post owns a thread" is now read from `reply_info` being
+  present, which is true from the first post with `reply_count: 0` until somebody
+  comments. A 0-comment thread therefore still draws the bar, as 写评论 — hiding it made
+  "有评论区" posts indistinguishable from posts with none, and nobody could be the first.
+  (b) `getMessageThreadHistory` answers a 0-comment thread with **"Receive messages in
+  an unexpected chat"**, so `CommentPanel` seeds an empty page for it instead of asking.
+  (c) `updateMessageInteractionInfo` fires on every view and **may carry no
+  `reply_info`**, so the `interaction` op is a partial patch: the old
+  `?? { comments: 0 }` fallback zeroed a real count and the bar vanished on the first
+  view after opening the post (several posts in 心惊报 reproduced it; the fix keeps
+  only the fields the update actually mentions).
 - **Restoring a reading position needs all three pieces.** (a) the list must not mount
   before the stored anchor is known — a cached chat otherwise captures the bottom as its
   position; (b) `scrollToIndex` is only an estimate with dynamic row heights, so the
