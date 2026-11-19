@@ -21,6 +21,15 @@ import {
   proxyTestResultSchema,
 } from './settings'
 import { viewerItemSchema, viewerStateSchema } from './viewer'
+import {
+  commentAccessSchema,
+  commentJoinResultSchema,
+  commentPageSchema,
+  commentQuerySchema,
+  commentSendSchema,
+  commentSentSchema,
+  commentTargetSchema,
+} from './comment'
 import { contactSchema } from './contact'
 import { appErrorSchema } from './errors'
 
@@ -209,53 +218,13 @@ export const invokeSchemas = {
     }),
     response: z.object({ messages: z.array(messageSchema), hasNewer: z.boolean() }),
   },
-  'messages:comments': {
-    request: z.object({
-      /** Chat of the commented message: a channel, or the discussion group itself. */
-      chatId: z.number().int(),
-      /** The commented message (TDLib resolves the thread, including the linked group). */
-      messageId: z.number().int(),
-      /** Oldest comment already loaded; omit for the newest page. */
-      fromMessageId: z.number().int().optional(),
-      limit: z.number().int().positive().max(100),
-    }),
-    response: z.object({ messages: z.array(messageSchema), hasMore: z.boolean() }),
-  },
-  'messages:commentInfo': {
-    request: z.object({ chatId: z.number().int(), messageId: z.number().int() }),
-    response: z.object({
-      /** The composer may be used right now. */
-      canComment: z.boolean(),
-      /** The account is a member of the discussion group. */
-      joined: z.boolean(),
-      /** A join button is the way forward (not a member, and not banned). */
-      canJoin: z.boolean(),
-      /** The group approves joins manually, so the button says 申请加入. */
-      joinByRequest: z.boolean(),
-      /** Seconds left on slow mode before another comment may be sent. */
-      slowModeSeconds: z.number().int().nonnegative(),
-    }),
-  },
+  'messages:comments': { request: commentQuerySchema, response: commentPageSchema },
+  'messages:commentInfo': { request: commentTargetSchema, response: commentAccessSchema },
   'messages:joinCommentGroup': {
-    request: z.object({ chatId: z.number().int(), messageId: z.number().int() }),
-    response: z.object({
-      /** The account is in the group now. */
-      joined: z.boolean(),
-      /** A join request was sent and waits for an administrator. */
-      requestSent: z.boolean(),
-    }),
+    request: commentTargetSchema,
+    response: commentJoinResultSchema,
   },
-  'messages:sendComment': {
-    request: z.object({
-      /** The commented message's chat: a channel, or the discussion group. */
-      chatId: z.number().int(),
-      messageId: z.number().int(),
-      text: z.string().min(1),
-      /** Comment id being answered; omitted posts at the thread root. */
-      replyTo: z.number().int().optional(),
-    }),
-    response: z.object({ message: messageSchema }),
-  },
+  'messages:sendComment': { request: commentSendSchema, response: commentSentSchema },
   'messages:send': {
     request: z.object({
       chatId: z.number().int(),

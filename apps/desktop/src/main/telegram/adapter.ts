@@ -18,54 +18,26 @@ export type AdapterKind = 'mock' | 'tdlib'
 
 export type MediaKind = 'photo' | 'file'
 
-/** One page request of a message's comment thread (design doc §9.8). */
-export interface CommentQuery {
-  /** The commented message's chat: a channel, or the discussion group. */
-  chatId: number
-  /** The commented message; TDLib resolves the linked group itself. */
-  messageId: number
-  /** Oldest comment already loaded; omitted for the newest page. */
-  fromMessageId?: number
-  limit: number
-}
-
-export interface CommentPage {
-  messages: Message[]
-  hasMore: boolean
-}
-
-/** The message whose comment thread is being read or written. */
-export interface CommentTarget {
-  /** The commented message's chat, not necessarily the discussion group. */
-  chatId: number
-  messageId: number
-}
-
 /**
- * Whether this account may post in a thread's discussion group, plus what the
- * composer should offer instead when it may not (design doc §9.8).
+ * The comment contract lives in packages/protocol (`comment.ts`); the adapter
+ * re-exports it so the rest of main keeps importing its vocabulary from the seam.
  */
-export interface CommentAccess {
-  canComment: boolean
-  joined: boolean
-  canJoin: boolean
-  joinByRequest: boolean
-  slowModeSeconds: number
-}
+import type {
+  CommentAccess,
+  CommentJoinResult,
+  CommentPage,
+  CommentQuery,
+  CommentSendQuery,
+  CommentTarget,
+} from '@wegram/protocol'
 
-export interface CommentJoinResult {
-  joined: boolean
-  requestSent: boolean
-}
-
-/** Posting a comment: the discussion view's input (design doc §9.8). */
-export interface CommentSendQuery {
-  /** The commented message's chat, not necessarily the one the comment lands in. */
-  chatId: number
-  messageId: number
-  text: string
-  /** Comment id being answered; omitted posts at the thread root. */
-  replyTo?: number
+export type {
+  CommentAccess,
+  CommentJoinResult,
+  CommentPage,
+  CommentQuery,
+  CommentSendQuery,
+  CommentTarget,
 }
 
 /**
