@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { stat } from 'node:fs/promises'
 import { basename } from 'node:path'
 
+import { pageAround, pageNewer, pageOlder } from '@wegram/mock-session'
 import { AppError } from '@wegram/protocol'
 import type {
   AuthState,
@@ -236,10 +237,12 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     fromMessageId?: number
     limit: number
   }): Promise<{ messages: Message[]; hasMore: boolean }> {
-    const all = this.requireFixture(input.chatId).messages
-    const upper = input.fromMessageId ? all.filter((m) => m.id < input.fromMessageId!) : all
-    const slice = upper.slice(Math.max(0, upper.length - input.limit))
-    return { messages: slice.map((m) => ({ ...m })), hasMore: upper.length > slice.length }
+    const page = pageOlder(
+      this.requireFixture(input.chatId).messages,
+      input.fromMessageId,
+      input.limit,
+    )
+    return { messages: page.messages.map((message) => ({ ...message })), hasMore: page.hasMore }
   }
 
   async historyAround(input: {
@@ -247,17 +250,12 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     messageId: number
     limit: number
   }): Promise<{ messages: Message[]; hasMore: boolean; hasNewer: boolean }> {
-    const all = this.requireFixture(input.chatId).messages
-    const found = all.findIndex((message) => message.id === input.messageId)
-    const center = found >= 0 ? found : all.findIndex((message) => message.id > input.messageId)
-    if (center < 0) return { messages: [], hasMore: true, hasNewer: false }
-    const start = Math.max(0, center - input.limit)
-    const end = Math.min(all.length, center + input.limit + 1)
-    return {
-      messages: all.slice(start, end).map((message) => ({ ...message })),
-      hasMore: start > 0,
-      hasNewer: end < all.length,
-    }
+    const { messages, hasMore, hasNewer } = pageAround(
+      this.requireFixture(input.chatId).messages,
+      input.messageId,
+      input.limit,
+    )
+    return { messages: messages.map((message) => ({ ...message })), hasMore, hasNewer }
   }
 
   async historyNewer(input: {
@@ -265,12 +263,12 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     fromMessageId: number
     limit: number
   }): Promise<{ messages: Message[]; hasNewer: boolean }> {
-    const all = this.requireFixture(input.chatId).messages
-    const newer = all.filter((message) => message.id > input.fromMessageId)
-    return {
-      messages: newer.slice(0, input.limit).map((message) => ({ ...message })),
-      hasNewer: newer.length > input.limit,
-    }
+    const { messages, hasNewer } = pageNewer(
+      this.requireFixture(input.chatId).messages,
+      input.fromMessageId,
+      input.limit,
+    )
+    return { messages: messages.map((message) => ({ ...message })), hasNewer }
   }
 
   async sendText(input: {

@@ -1,3 +1,4 @@
+import { nextReadState } from '@wegram/mock-session'
 import { AppError } from '@wegram/protocol'
 
 import type { AdapterEvent } from '../adapter'
@@ -18,13 +19,10 @@ export function applyRead(
 ): void {
   const fixture = deps.fixtures.get(chatId)
   if (!fixture) throw new AppError('internal', `Unknown mock chat ${chatId}`)
-  const latest = fixture.messages[fixture.messages.length - 1]
-  const upTo = upToMessageId ?? latest?.id
-  if (upTo === undefined) return
-  fixture.chat.lastReadInboxMessageId = Math.max(fixture.chat.lastReadInboxMessageId ?? 0, upTo)
-  fixture.chat.unread = fixture.messages.filter(
-    (message) => !message.outgoing && message.id > upTo,
-  ).length
+  const state = nextReadState(fixture.chat, fixture.messages, upToMessageId)
+  if (!state) return
+  fixture.chat.lastReadInboxMessageId = state.lastReadInboxMessageId
+  fixture.chat.unread = state.unread
   deps.emit({ type: 'chats', ops: [{ op: 'upsert', chat: { ...fixture.chat } }] })
 }
 

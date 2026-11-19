@@ -1,6 +1,8 @@
 import type { Message, MessageMedia } from '@wegram/protocol'
 
-import { mockThread, threadInteraction } from './comments'
+import { threadInteraction } from '@wegram/mock-session'
+
+import { mockThread } from './comments'
 import { ME, at, text, type Fixture } from './constants'
 
 type MediaOf = (
@@ -31,7 +33,7 @@ function withThreads(
     messages: fixture.messages.map((message) => {
       const thread = threads[message.id]
       if (!thread) return message
-      return { ...message, interaction: threadInteraction(thread, extras[message.id]) }
+      return { ...message, interaction: threadInteraction(thread.length, extras[message.id]) }
     }),
   }
 }

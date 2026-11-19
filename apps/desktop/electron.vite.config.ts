@@ -15,6 +15,7 @@ const { version } = JSON.parse(
 ) as { version: string }
 
 const protocolAlias = {
+  '@wegram/mock-session': resolve(__dirname, '../../packages/mock-session/src/index.ts'),
   '@wegram/protocol': resolve(__dirname, '../../packages/protocol/src/index.ts'),
 }
 
@@ -40,7 +41,7 @@ export default defineConfig({
   main: {
     ...shared,
     define: { __WEGRAM_API_CREDENTIALS__: apiCredentials() },
-    plugins: [externalizeDepsPlugin({ exclude: ['@wegram/protocol'] })],
+    plugins: [externalizeDepsPlugin({ exclude: ['@wegram/protocol', '@wegram/mock-session'] })],
     build: {
       rollupOptions: {
         input: { index: resolve(__dirname, 'src/main/index.ts') },
@@ -49,7 +50,7 @@ export default defineConfig({
   },
   preload: {
     ...shared,
-    plugins: [externalizeDepsPlugin({ exclude: ['@wegram/protocol'] })],
+    plugins: [externalizeDepsPlugin({ exclude: ['@wegram/protocol', '@wegram/mock-session'] })],
     build: {
       rollupOptions: {
         input: { index: resolve(__dirname, 'src/preload/index.ts') },

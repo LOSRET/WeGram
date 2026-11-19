@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { mockThread, pageThread, threadInteraction } from './comments'
+import { threadInteraction } from '@wegram/mock-session'
+
+import { mockThread, pageThread } from './comments'
 
 describe('mock comment threads', () => {
   it('builds a thread whose ids ascend and whose dates follow the post', () => {
@@ -15,7 +17,7 @@ describe('mock comment threads', () => {
 
   it('counts as the interaction the bar reads', () => {
     const thread = mockThread(5, 502, 78, 600)
-    expect(threadInteraction(thread, { views: 12_400, forwards: 96 })).toEqual({
+    expect(threadInteraction(thread.length, { views: 12_400, forwards: 96 })).toEqual({
       comments: 78,
       canOpen: true,
       views: 12_400,

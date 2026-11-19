@@ -1,5 +1,6 @@
+import { composeCommentAccess, pageOlder } from '@wegram/mock-session'
 import { AppError } from '@wegram/protocol'
-import type { Message, MessageInteraction } from '@wegram/protocol'
+import type { Message } from '@wegram/protocol'
 
 import type {
   AdapterEvent,
@@ -87,11 +88,8 @@ export function pageThread(
   thread: Message[] | undefined,
   input: { fromMessageId?: number; limit: number },
 ): { messages: Message[]; hasMore: boolean } {
-  const all = thread ?? []
-  const cursor = input.fromMessageId
-  const older = cursor === undefined ? all : all.filter((message) => message.id < cursor)
-  const page = older.slice(Math.max(0, older.length - input.limit))
-  return { messages: page.map((message) => ({ ...message })), hasMore: page.length < older.length }
+  const page = pageOlder(thread ?? [], input.fromMessageId, input.limit)
+  return { messages: page.messages.map((message) => ({ ...message })), hasMore: page.hasMore }
 }
 /** One page of a fixture's thread, with the unknown-chat guard the adapter relies on. */
 export function commentsOf(fixtures: Map<number, Fixture>, input: CommentQuery): CommentPage {
@@ -139,17 +137,7 @@ export function commentAccessOf(
   if (!fixture.comments?.[input.messageId]) {
     throw new AppError('not_implemented', '这个帖子还没有讨论群组，不能评论')
   }
-  const access = fixture.commentAccess ?? {}
-  const joined = access.joined ?? true
-  const canComment = access.canComment ?? joined
-  const banned = access.banned ?? false
-  return {
-    canComment,
-    joined,
-    canJoin: !joined && !banned && !canComment,
-    joinByRequest: access.joinByRequest ?? false,
-    slowModeSeconds: canComment ? (access.slowModeSeconds ?? 0) : 0,
-  }
+  return composeCommentAccess(fixture.commentAccess)
 }
 
 /** Joining the mock group: a request group only records the request. */
@@ -180,15 +168,3 @@ export function createMockComments(
   }
 }
 
-/** The comment bar's numbers for a thread, plus optional channel counters. */
-export function threadInteraction(
-  thread: Message[],
-  extra: { views?: number; forwards?: number } = {},
-): MessageInteraction {
-  return {
-    comments: thread.length,
-    canOpen: true,
-    ...(extra.views ? { views: extra.views } : {}),
-    ...(extra.forwards ? { forwards: extra.forwards } : {}),
-  }
-}
