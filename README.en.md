@@ -181,12 +181,7 @@ Logs land in `.cache\app.log`.
 ## Disclaimer
 
 - A personal, study-oriented project. Not affiliated with or endorsed by Telegram or Tencent.
-- "WeChat" and "微信" are trademarks of Tencent. The chrome assets extracted from the client are for personal local use only — **do not redistribute them**.
-- Use credentials you registered yourself at my.telegram.org. Reusing an official client's or another project's `api_id` / `api_hash` violates the Telegram API Terms and gets the app banned.
-- `spikes/tdlib/data` holds a real account's session and is gitignored: never commit it, never share it, and never run write operations (send / delete / forward / mark-as-read) against it in automated tests.
 
 ## License
 
 The code is released under the **MIT** license — see [LICENSE](LICENSE).
-
-Exception: the graphical assets extracted from the WeChat client (icons and the like) are **not** covered by MIT. "WeChat" and "微信" are trademarks of Tencent; those assets are for personal local use only and must **not** be redistributed with the code. Third-party components (TDLib, Electron, React and the rest) keep their own licenses.

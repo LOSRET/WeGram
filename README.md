@@ -181,12 +181,7 @@ scripts\start-real.cmd build    # 强制重建
 ## 免责声明
 
 - 个人自用 / 学习性质的项目，与 Telegram、腾讯均无关联，也未获其背书。
-- "WeChat"、"微信" 是腾讯的商标；界面中取自客户端的图形资源仅用于本机个人使用，**不要分发**。
-- 请使用自己在 my.telegram.org 申请的凭据。借用官方客户端或他人项目的 `api_id` / `api_hash` 违反 Telegram API 条款，会封号。
-- `spikes/tdlib/data` 是真实账号的登录态，已被 gitignore：不要提交、不要外传；自动化测试里不要做写操作（发消息 / 删除 / 转发 / 标已读）。
 
 ## 许可证
 
 代码以 **MIT** 许可证发布，见 [LICENSE](LICENSE)。
-
-例外：界面中从微信客户端提取的图形资源（图标等）不属于 MIT 授权范围——"WeChat"、"微信" 是腾讯的商标，这些资源仅限本机个人使用，**不要随代码分发**。TDLib、Electron、React 等第三方组件遵循各自许可证。
