@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 >
 > **Then read the layer notes** for the directory you are about to touch — they are short and they hold the rules that are specific to that layer: `packages/protocol/AGENTS.md`, `apps/desktop/src/main/AGENTS.md`, `apps/desktop/src/renderer/AGENTS.md`.
 >
-> **Restructuring or splitting files? Read `docs/REFACTOR-HANDOFF.md` first** — what already moved and why, the conventions the code now enforces mechanically, and the batches still pending (`mock.ts`, `preview-bridge.ts`, `styles/index.css`, `packages/protocol`).
+> **Restructuring or splitting files? Read `docs/REFACTOR-HANDOFF.md` first** — what already moved and why, the conventions the code now enforces mechanically, and the one batch still pending (`packages/protocol`). The split rules themselves are in "Agent-maintainable code" below.
 >
 > **`pnpm verify` is the one command that decides whether a change is done** (lint → typecheck → test → build). It must pass before you report success.
 
@@ -69,6 +69,39 @@ The TypeScript/Electron equivalent of rustracker's "no `.unwrap()` in production
 
 **Git.** Verify before committing (at least `pnpm typecheck && pnpm lint`). One logical change per commit, Conventional Commit messages. Small fix → current branch; multi-file feature or refactor → new branch.
 
+### Agent-maintainable code (the split rules)
+
+The tree was split on 2026-11-19 so that an agent can read a whole module before editing
+it — what moved, why, and the checks that were run are in `docs/REFACTOR-HANDOFF.md`.
+These rules keep it that way:
+
+- **One file = one reason to change.** A component owns its render tree; data fetching,
+  scroll/geometry, IPC and pure rules live beside it in their own module. When a file
+  starts acquiring a second concern, split it instead of adding another branch.
+- **Size budget: ~350 lines is normal, 550 is the cap.** ESLint enforces
+  `max-lines: 550` on `apps/desktop/src/**` and `packages/protocol/src/**` (generated
+  `WechatIcons.tsx` is exempt). Hitting the cap is a design signal, not a formatting
+  problem.
+- **Split by responsibility, never by line count.** Keep the public import path stable
+  with a directory index (`viewer/`, `picker/`, `login/`, `history/`,
+  `tdlib/actions/index.ts`, `mock/index.ts`). No `utils.ts` / `helpers.ts` dumping
+  grounds.
+- **Pure rules leave, and get a test.** Time, size, geometry, ordering and "may this be
+  cached" rules go to React-free / Electron-free modules (`renderer/src/lib/`, plain
+  functions in `main/**`) so `pnpm test` can pin them; a refactor that extracts a rule
+  adds its test in the same batch.
+- **Comments are part of the module.** The load-bearing explanations (scroll timing,
+  cold-cache retries, QR cancellation, read-marker rules) travel with the code they
+  describe. A move that drops them is a regression even when the tests pass.
+- **A split changes no behaviour and no contract.** No channel/DTO/`wx-*` renames, no
+  drive-by edits, one logical batch per commit, `pnpm verify` before each.
+- **A move updates the map.** Update the touched layer note (`renderer/AGENTS.md`,
+  `main/AGENTS.md`, `packages/protocol/AGENTS.md`) and `docs/REFACTOR-HANDOFF.md` in
+  the same batch, or the next session rediscovers the layout the hard way.
+- **New features share the budget.** Prefer a new module plus a small call site over
+  growing an existing component; run `pnpm lint` (it includes the cap) before opening a
+  PR.
+
 ## Commands
 
 ```powershell
@@ -114,7 +147,7 @@ node login.mjs    # interactive; requires TELEGRAM_API_ID / TELEGRAM_API_HASH in
 
 ## Architecture rules
 
-- Only `apps/desktop/src/main/telegram/tdlib/**` (the adapter folder: `index.ts`, `client.ts`, `actions.ts`, `updates.ts`, `avatar-cache.ts`, `stickers.ts`, `proxy.ts`, `map/*`) may import `tdl` / `prebuilt-tdlib`. Everything else talks to the `TelegramAdapter` interface in `telegram/adapter.ts`. **ESLint enforces this** (`eslint.config.mjs`, "architecture"): importing `tdl`, `prebuilt-tdlib` or `node:sqlite` outside its one allowed file is a lint error, and so is importing Electron / Node / TDLib from the renderer.
+- Only `apps/desktop/src/main/telegram/tdlib/**` (the adapter folder: `index.ts`, `client.ts`, `actions/`, `updates.ts`, `avatar-cache.ts`, `stickers.ts`, `proxy.ts`, `map/*`) may import `tdl` / `prebuilt-tdlib`. Everything else talks to the `TelegramAdapter` interface in `telegram/adapter.ts`. **ESLint enforces this** (`eslint.config.mjs`, "architecture"): importing `tdl`, `prebuilt-tdlib` or `node:sqlite` outside its one allowed file is a lint error, and so is importing Electron / Node / TDLib from the renderer.
 - The renderer must not see raw TDLib JSON: map into protocol DTOs at the adapter boundary. Adding a field means adding it to `packages/protocol/src/dto.ts` first.
 - New IPC channels go into `invokeChannels`/`invokeSchemas` (commands) or `eventChannels`/`eventSchemas` (events) in `packages/protocol/src/channels.ts`; preload and the router pick them up automatically. Never build channel names by concatenation.
 - Every event carries `seq`; the renderer is expected to detect gaps and re-sync.
@@ -125,7 +158,7 @@ node login.mjs    # interactive; requires TELEGRAM_API_ID / TELEGRAM_API_HASH in
 - Never gate content visibility on `requestAnimationFrame` alone (the list's `--pending` class): Electron throttles rAF while the window is occluded, and the pane then stays invisible with its data loaded. Always pair a frame-based reveal with a `setTimeout` fallback.
 - **Window lifetime follows authorization, and a completed sign-in opens the shell directly.** Only `main/login-window.ts`'s window exists until authorization; `syncWindowsToAuth` creates the shell immediately when a user-driven login becomes `ready` (closing the login window at once), while a session restored at startup waits for `login:enter`. It always creates the next window before closing the old one, or `window-all-closed` would quit mid-swap. The login window must not hydrate the chat store — it only follows `evt:auth`.
 - Credentials decide the adapter: with `TELEGRAM_API_ID`/`TELEGRAM_API_HASH` (environment, dev `.env`, or the value a release build inlined) the app runs TDLib; a development build without them runs the mock adapter, which is what keeps UI work unblocked without touching the real account. `WEGRAM_ADAPTER=mock` forces the mock in development only — a packaged build refuses to start without credentials rather than serve fixtures.
-- `src/renderer/src/lib/preview-bridge.ts` is browser-preview-only tooling. Do not let app logic depend on it.
+- `src/renderer/src/lib/preview-bridge.ts` (implementation under `lib/preview/`) is browser-preview-only tooling. Do not let app logic depend on it.
 - Local media reaches the renderer only as a `wx-media://f/<token>` URL registered by `main/media/registry.ts`; only the adapters (and the mock) may register a path. The `wx-media` handler in `main/media/protocol.ts` resolves tokens, never request paths, and streams with Range support.
 - The custom scheme is declared with `protocol.registerSchemesAsPrivileged` before `app.whenReady()`; the CSP in `renderer/index.html` must keep `wx-media:` in `img-src`, `media-src` and `connect-src` (TGS is fetched, then gunzipped in the renderer).
 - Sticker rendering depends on `lottie-web` (renderer only, TGS path). Keep the decompression guards in `lib/tgs.ts`: TGS is user-controlled input (§10).
