@@ -41,6 +41,13 @@ export const proxyTestResultSchema = z.object({
 })
 export type ProxyTestResult = z.infer<typeof proxyTestResultSchema>
 
+/**
+ * The picker's 最近使用 row holds this many, newest first. Main truncates on
+ * save and the renderer draws what it gets; the protocol caps the request so a
+ * stale renderer cannot grow the stored list.
+ */
+export const RECENT_EMOJI_LIMIT = 10
+
 export const appSettingsSchema = z.object({
   theme: z.enum(['light', 'dark']),
 })

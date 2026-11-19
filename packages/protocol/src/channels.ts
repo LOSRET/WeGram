@@ -18,8 +18,9 @@ import {
   appSettingsSchema,
   proxyConfigSchema,
   proxyTestResultSchema,
+  RECENT_EMOJI_LIMIT,
 } from './settings'
-import { viewerItemSchema, viewerStateSchema } from './viewer'
+import { viewerItemsSchema, viewerStateSchema } from './viewer'
 import {
   commentAccessSchema,
   commentJoinResultSchema,
@@ -342,7 +343,7 @@ export const invokeSchemas = {
   },
   'ui:getRecentEmoji': { request: noPayload, response: z.array(z.string()) },
   'ui:saveRecentEmoji': {
-    request: z.object({ emoji: z.array(z.string().min(1).max(32)).max(24) }),
+    request: z.object({ emoji: z.array(z.string().min(1).max(32)).max(RECENT_EMOJI_LIMIT) }),
     response: noPayload,
   },
   'settings:get': { request: noPayload, response: appSettingsSchema },
@@ -367,7 +368,7 @@ export const invokeSchemas = {
     request: z.object({
       /** The conversation the strip was taken from; 定位到聊天位置 needs it. */
       chatId: z.number().int(),
-      items: z.array(viewerItemSchema).min(1).max(200),
+      items: viewerItemsSchema,
       index: z.number().int().nonnegative(),
     }),
     response: noPayload,

@@ -10,6 +10,8 @@ import type {
 } from '@wegram/protocol'
 import type { StateCreator } from 'zustand'
 
+import type { UnreadBoundary } from '../lib/unreadBoundary'
+
 export interface EditingState {
   chatId: number
   messageId: number
@@ -27,12 +29,9 @@ export interface FileProgress {
 /**
  * Snapshot of what was unread when the chat was opened, captured *before* the
  * read marker can move — otherwise the unread divider would vanish on the first
- * paint.
+ * paint. Same shape as the list's landing boundary (see lib/unreadBoundary.ts).
  */
-export interface UnreadMarker {
-  lastReadInboxMessageId: number | null
-  unread: number
-}
+export type UnreadMarker = UnreadBoundary
 
 /**
  * A page of older messages fetched ahead of the reader but not yet in the

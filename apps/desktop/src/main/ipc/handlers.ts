@@ -1,7 +1,7 @@
 import { copyFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 
-import { AppError } from '@wegram/protocol'
+import { AppError, RECENT_EMOJI_LIMIT } from '@wegram/protocol'
 import type { AppInfo } from '@wegram/protocol'
 import { app, BrowserWindow, clipboard, dialog, nativeImage, shell } from 'electron'
 
@@ -280,8 +280,6 @@ export function createHandlers({
  * picker from opening — an unreadable row simply reads as empty.
  */
 const RECENT_EMOJI_KEY = 'emoji.recent'
-/** One row of 10 in the picker; the renderer shows the same length. */
-const RECENT_EMOJI_LIMIT = 10
 
 function readRecentEmoji(uiDb: UiDatabase): string[] {
   const raw = uiDb.getSetting(RECENT_EMOJI_KEY)

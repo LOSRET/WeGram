@@ -1,18 +1,9 @@
 import type { Message } from '@wegram/protocol'
 
-/**
- * What the chat looked like when it was opened: the read boundary and the unread
- * counter, captured by `MainShell` *before* the read marker can move (opening no
- * longer marks the chat read; the list reports what it shows, a few hundred
- * milliseconds after it mounts).
- *
- * Structurally identical to the store's `UnreadMarker`, declared here so this module
- * stays free of store imports (it is pure and unit-tested).
- */
-export interface UnreadBoundary {
-  lastReadInboxMessageId: number | null
-  unread: number
-}
+import type { UnreadBoundary } from '../../lib/unreadBoundary'
+
+/** Re-exported so callers of this module keep one import for its vocabulary. */
+export type { UnreadBoundary }
 
 /**
  * Where the transcript sits on its first paint.

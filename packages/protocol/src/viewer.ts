@@ -37,9 +37,15 @@ export const viewerItemSchema = z.object({
 })
 export type ViewerItem = z.infer<typeof viewerItemSchema>
 
+/**
+ * The strip the viewer pages through: at least one item, and never more than one
+ * window should hold. Both `viewer:open` and `viewer:init` use this bound.
+ */
+export const viewerItemsSchema = z.array(viewerItemSchema).min(1).max(200)
+
 /** What `viewer:init` answers: the strip, the current index and the theme. */
 export const viewerStateSchema = z.object({
-  items: z.array(viewerItemSchema).min(1).max(200),
+  items: viewerItemsSchema,
   index: z.number().int().nonnegative(),
   theme: appSettingsSchema.shape.theme,
 })

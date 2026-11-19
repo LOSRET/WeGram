@@ -15,6 +15,7 @@ import type {
   ViewerItem,
 } from '@wegram/protocol'
 
+import { RECENT_EMOJI_LIMIT } from '../emoji'
 import { stickerMedia } from '../stickerMedia'
 import {
   ME,
@@ -362,7 +363,7 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'ui:saveRecentEmoji': {
       const list: unknown = store.emoji
       recentEmoji = Array.isArray(list)
-        ? list.filter((item): item is string => typeof item === 'string').slice(0, 10)
+        ? list.filter((item): item is string => typeof item === 'string').slice(0, RECENT_EMOJI_LIMIT)
         : []
       return undefined
     }

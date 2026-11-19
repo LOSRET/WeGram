@@ -114,6 +114,10 @@ export type MessageEntity = z.infer<typeof messageEntitySchema>
  * from the mock adapter). The renderer never receives a filesystem path and never
  * loads `file://`, which also keeps the browser preview working.
  */
+/** The three sticker formats the client renders (design doc §9.4). */
+export const stickerFormatSchema = z.enum(['webp', 'tgs', 'webm'])
+export type StickerFormat = z.infer<typeof stickerFormatSchema>
+
 export const messageMediaSchema = z.object({
   fileId: z.number().int(),
   thumbFileId: z.number().int().optional(),
@@ -121,13 +125,13 @@ export const messageMediaSchema = z.object({
   width: z.number().int().optional(),
   height: z.number().int().optional(),
   duration: z.number().int().optional(),
-  stickerFormat: z.enum(['webp', 'tgs', 'webm']).optional(),
+  stickerFormat: stickerFormatSchema.optional(),
   /**
    * The thumbnail's own format. TDLib serves a static image as a sticker's
    * thumbnail even for TGS/WebM stickers, so a grid that renders the thumbnail
    * must not reuse `stickerFormat`.
    */
-  stickerThumbFormat: z.enum(['webp', 'tgs', 'webm']).optional(),
+  stickerThumbFormat: stickerFormatSchema.optional(),
   /** Emoji the sticker matches, used as its alt text and in the picker. */
   stickerEmoji: z.string().optional(),
   fileName: z.string().optional(),
@@ -166,8 +170,6 @@ export const contactCardSchema = z.object({
   userId: z.number().int().optional(),
 })
 export type ContactCard = z.infer<typeof contactCardSchema>
-export const stickerFormatSchema = z.enum(['webp', 'tgs', 'webm'])
-export type StickerFormat = z.infer<typeof stickerFormatSchema>
 
 /** One sticker from a set (design doc §9.4: WebP / TGS / WebM). */
 export const stickerSchema = z.object({
