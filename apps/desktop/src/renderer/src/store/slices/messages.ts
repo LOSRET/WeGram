@@ -8,7 +8,25 @@ import {
   reduceOps,
   splitOpsForWindow,
 } from '../reducers'
-import type { MessageActions, SliceCreator } from '../types'
+import type { MessageActions, OlderPage, SliceCreator } from '../types'
+
+/**
+ * A prefetched page may only be inserted while it is still contiguous with the
+ * transcript, and only while its rows are still what the server sent.
+ *
+ *  - A `delete`/`edit`/`replace` for a buffered id makes the snapshot wrong (a
+ *    deleted row would come back when the page is prepended).
+ *  - Anything else (a live arrival, a read marker) leaves it usable.
+ */
+function bufferStillUsable(page: OlderPage, ops: MessageOp[]): boolean {
+  const ids = new Set(page.messages.map((message) => message.id))
+  return !ops.some((op) => {
+    if (op.op === 'delete') return op.messageIds.some((id) => ids.has(id))
+    if (op.op === 'edit') return ids.has(op.messageId)
+    if (op.op === 'replace') return ids.has(op.message.id)
+    return false
+  })
+}
 
 /**
  * Transcript state. The rule that matters lives here and is easy to undo by
@@ -48,9 +66,14 @@ export const createMessagesSlice: SliceCreator<MessageActions> = (set) => ({
           page = reduceOps(messages, pending).list
         }
       }
+      // A replaced window makes any page fetched below the old one meaningless:
+      // `afterId` would still match a row of the new window by accident.
+      const olderPagesByChat = { ...state.olderPagesByChat }
+      delete olderPagesByChat[chatId]
       return {
         messagesByChat: { ...state.messagesByChat, [chatId]: page },
         hasMoreByChat: { ...state.hasMoreByChat, [chatId]: hasMore },
+        olderPagesByChat,
         hasNewerByChat: { ...state.hasNewerByChat, [chatId]: hasNewer },
         pendingOps,
       }
@@ -61,9 +84,28 @@ export const createMessagesSlice: SliceCreator<MessageActions> = (set) => ({
       const existing = state.messagesByChat[chatId] ?? EMPTY_MESSAGES
       const seen = new Set(existing.map((message) => message.id))
       const older = messages.filter((message) => !seen.has(message.id))
+      // The buffered page has just been inserted (or bypassed): the oldest row
+      // moved, so whatever was waiting below it is stale by definition.
+      const olderPagesByChat = { ...state.olderPagesByChat }
+      delete olderPagesByChat[chatId]
       return {
         messagesByChat: { ...state.messagesByChat, [chatId]: [...older, ...existing] },
         hasMoreByChat: { ...state.hasMoreByChat, [chatId]: hasMore },
+        olderPagesByChat,
+      }
+    }),
+
+  bufferOlderPage: (chatId, afterId, messages, hasMore) =>
+    set((state) => {
+      const existing = state.messagesByChat[chatId] ?? EMPTY_MESSAGES
+      // An empty answer means "not there yet" (a cold TDLib cache answers `[]`):
+      // buffering it would insert nothing and report the wrong `hasMore`.
+      if (messages.length === 0 || existing[0]?.id !== afterId) return {}
+      return {
+        olderPagesByChat: {
+          ...state.olderPagesByChat,
+          [chatId]: { afterId, messages, hasMore },
+        },
       }
     }),
 
@@ -141,11 +183,30 @@ export const createMessagesSlice: SliceCreator<MessageActions> = (set) => ({
         }
       }
 
+      /**
+       * A prefetched page is a snapshot: it is only worth keeping while it is
+       * still contiguous with the transcript (`afterId`) and none of its rows
+       * changed. Prepending a stale one would bring a deleted message back or
+       * draw an old caption. Dropping it costs one history request later; the
+       * orphan row would be a correctness bug.
+       */
+      const buffered = state.olderPagesByChat[chatId]
+      const stale =
+        buffered !== undefined &&
+        (list[0]?.id !== buffered.afterId ||
+          !bufferStillUsable(buffered, split?.applicable ?? ops))
+      let olderPagesByChat = state.olderPagesByChat
+      if (stale) {
+        olderPagesByChat = { ...state.olderPagesByChat }
+        delete olderPagesByChat[chatId]
+      }
+
       return {
         messagesByChat: { ...state.messagesByChat, [chatId]: list },
         editing,
         replyToByChat,
         pendingOps,
+        olderPagesByChat,
       }
     }),
 

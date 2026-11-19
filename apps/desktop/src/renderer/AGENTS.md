@@ -87,6 +87,12 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   down, no `ResizeObserver` glue halfway) and finishes it with a timer net —
   `lib/jumpSettle.ts` decides "still moving / stalled / out of time" — while a wheel,
   drag or key ends the move instead of fighting the reader.
+- **Older pages are fetched ahead of the reader, and the buffer is a snapshot.**
+  `useChatHistory.prefetchOlder` keeps one page in `olderPagesByChat` (on mount and after
+  every landing) because TDLib's first server answer takes seconds while a wheel reaches
+  the top in one. Never insert it without the `afterId` check, an empty page must not be
+  buffered (a cold cache answers `[]`), and a delete/edit/replace of a buffered row, or a
+  `setHistory`, has to drop it — otherwise a deleted message is prepended back.
 - **The read marker follows the viewport, not the bottom.** `MessageList` reports
   `onSeenUpToChange` (the newest row whose top edge is inside the viewport) and
   `ChatPane` sends `messages:read` up to it, still gated by `lib/readGate.ts`

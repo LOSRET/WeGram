@@ -19,6 +19,12 @@ interface UsePrependRestoreParams {
   ready: boolean
   flags: ScrollFlags
   onLoadOlder: () => Promise<void>
+  /**
+   * Fetch the next older page before it is needed. Called when the list comes up
+   * and every time a page lands, which is what keeps one page in hand — see
+   * `useChatHistory.prefetchOlder` for why the wait cannot be hidden otherwise.
+   */
+  onPrefetchOlder: () => void
 }
 
 /**
@@ -41,6 +47,7 @@ export function usePrependRestore({
   ready,
   flags,
   onLoadOlder,
+  onPrefetchOlder,
 }: UsePrependRestoreParams): { loadOlder: () => Promise<void> } {
   const captureSnapshot = (): { scrollHeight: number; scrollTop: number } | null => {
     const el = scrollRef.current
@@ -133,6 +140,9 @@ export function usePrependRestore({
       ])
     } finally {
       if (snapshot) await restorePosition(snapshot, anchor)
+      // One page is already on its way again: the reader is usually still
+      // scrolling towards the top, and the next page must not be a server wait.
+      onPrefetchOlder()
       window.setTimeout(() => {
         flags.prepending.current = false
       }, 200)
@@ -143,17 +153,26 @@ export function usePrependRestore({
   }, [flags.prepending, hasMore, onLoadOlder])
 
   /**
-   * A page can come back shorter than the viewport (TDLib likes to answer a
-   * history request from its local window first). With nothing to scroll, the
-   * `onScroll` handler never runs, so the reader would be stuck on a handful of
-   * messages with no way to ask for more. Fill the view instead.
+   * Two jobs, both driven by "the list is up / a page arrived":
+   *
+   *  - keep one older page warm behind the transcript (`onPrefetchOlder`), so the
+   *    reader's next scroll towards the top finds history instead of a server
+   *    wait. Refilling here, on every landing, is what keeps it one page ahead
+   *    while the reader keeps scrolling back — the first page is fetched as soon
+   *    as the transcript mounts, when the chat has more history at all.
+   *  - fill the viewport when a page came back shorter than the screen (TDLib
+   *    likes to answer a history request from its local window first). With
+   *    nothing to scroll, the `onScroll` handler never runs, so the reader would
+   *    be stuck on a handful of messages with no way to ask for more.
    */
   useEffect(() => {
-    if (!ready || !hasMore) return
+    if (!ready) return
+    onPrefetchOlder()
+    if (!hasMore) return
     const el = scrollRef.current
     if (!el) return
     if (el.scrollHeight <= el.clientHeight + 8) void loadOlder()
-    // Runs on every page; loadOlder itself is guarded against re-entry.
+    // Runs on every page; loadOlder and prefetchOlder are guarded against re-entry.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, hasMore, messages.length])
 

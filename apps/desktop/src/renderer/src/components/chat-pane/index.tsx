@@ -78,6 +78,7 @@ export function ChatPane() {
     loadingHistory,
     located,
     loadingOlder,
+    prefetchOlder,
     hasNewer,
     reload,
     loadOlder,
@@ -226,6 +227,7 @@ export function ChatPane() {
             setSeen(messageId === null ? null : { chatId: activeChatId, messageId })
           }
           onLoadOlder={loadOlder}
+          onPrefetchOlder={prefetchOlder}
           canReply={canPost}
           onReply={(message) => {
             useAppStore.getState().setReplyTo(activeChatId, message.id)

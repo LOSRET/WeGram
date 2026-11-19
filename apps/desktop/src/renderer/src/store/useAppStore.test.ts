@@ -178,6 +178,94 @@ describe('anchored windows', () => {
   })
 })
 
+/**
+ * The page fetched ahead of the reader (`useChatHistory.prefetchOlder`).
+ *
+ * TDLib's first server answer for an older page takes seconds, so the app keeps
+ * one page in hand. What matters here is that the snapshot can never be inserted
+ * into a transcript it no longer matches: that would resurrect a deleted row or
+ * draw an old caption.
+ */
+describe('prefetched older pages', () => {
+  const bufferedPage = () => {
+    const page = useAppStore.getState().olderPagesByChat[CHAT_ID]
+    if (!page) throw new Error('expected a buffered older page')
+    return page
+  }
+
+  it('keeps a page fetched below the current oldest row', () => {
+    const store = useAppStore.getState()
+    store.setHistory(CHAT_ID, [message(10)], true)
+    store.bufferOlderPage(CHAT_ID, 10, [message(8), message(9)], true)
+
+    expect(bufferedPage().afterId).toBe(10)
+    expect(bufferedPage().messages.map((item) => item.id)).toEqual([8, 9])
+  })
+
+  it('refuses a page that is no longer contiguous with the transcript', () => {
+    const store = useAppStore.getState()
+    store.setHistory(CHAT_ID, [message(10), message(11)], true)
+    // Fetched below row 9 while the transcript starts at 10: a different window.
+    store.bufferOlderPage(CHAT_ID, 9, [message(8)], true)
+
+    expect(useAppStore.getState().olderPagesByChat[CHAT_ID]).toBeUndefined()
+  })
+
+  it('refuses an empty page, which a cold TDLib cache answers', () => {
+    const store = useAppStore.getState()
+    store.setHistory(CHAT_ID, [message(10)], true)
+    store.bufferOlderPage(CHAT_ID, 10, [], true)
+
+    expect(useAppStore.getState().olderPagesByChat[CHAT_ID]).toBeUndefined()
+  })
+
+  it('is inserted by prependHistory and dropped afterwards', () => {
+    const store = useAppStore.getState()
+    store.setHistory(CHAT_ID, [message(10)], true)
+    store.bufferOlderPage(CHAT_ID, 10, [message(8), message(9)], false)
+
+    const page = bufferedPage()
+    useAppStore.getState().prependHistory(CHAT_ID, page.messages, page.hasMore)
+
+    const state = useAppStore.getState()
+    expect(state.messagesByChat[CHAT_ID]?.map((item) => item.id)).toEqual([8, 9, 10])
+    expect(state.hasMoreByChat[CHAT_ID]).toBe(false)
+    expect(state.olderPagesByChat[CHAT_ID]).toBeUndefined()
+  })
+
+  it('is dropped when a buffered row is deleted, so it cannot come back', () => {
+    const store = useAppStore.getState()
+    store.setHistory(CHAT_ID, [message(10)], true)
+    store.bufferOlderPage(CHAT_ID, 10, [message(8), message(9)], true)
+
+    useAppStore
+      .getState()
+      .applyMessageOps(CHAT_ID, [{ op: 'delete', chatId: CHAT_ID, messageIds: [9] }])
+
+    expect(useAppStore.getState().olderPagesByChat[CHAT_ID]).toBeUndefined()
+  })
+
+  it('survives a read marker and a live arrival', () => {
+    const store = useAppStore.getState()
+    store.setHistory(CHAT_ID, [message(10)], true)
+    store.bufferOlderPage(CHAT_ID, 10, [message(8), message(9)], true)
+
+    useAppStore.getState().applyMessageOps(CHAT_ID, [readOp(), newOp(11)])
+
+    expect(bufferedPage().messages.map((item) => item.id)).toEqual([8, 9])
+  })
+
+  it('is dropped when the window is replaced', () => {
+    const store = useAppStore.getState()
+    store.setHistory(CHAT_ID, [message(10)], true)
+    store.bufferOlderPage(CHAT_ID, 10, [message(8), message(9)], true)
+
+    useAppStore.getState().setHistory(CHAT_ID, [message(10)], true)
+
+    expect(useAppStore.getState().olderPagesByChat[CHAT_ID]).toBeUndefined()
+  })
+})
+
 describe('prependHistory', () => {
   it('prepends older messages and skips ids that are already there', () => {
     const store = useAppStore.getState()
@@ -203,6 +291,7 @@ describe('reset', () => {
     const state = useAppStore.getState()
     expect(state.activeChatId).toBeNull()
     expect(state.messagesByChat).toEqual({})
+    expect(state.olderPagesByChat).toEqual({})
     expect(state.mediaUrls).toEqual({})
     expect(state.toast).toBeNull()
     expect(typeof state.setHistory).toBe('function')

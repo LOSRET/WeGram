@@ -361,6 +361,16 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
   for a few frames (the virtualizer remeasures rows over several frames), then exact
   correction against the anchor row's DOM offset. Anchor-only fails because right after
   a prepend the anchor row is outside the rendered window and has no DOM node.
+- **Older history has to be *prefetched*, not fetched at the top** (2026-11-19). The
+  fetch itself is the jank: an older page comes from TDLib's local cache or from the
+  server (first server answer measured at ~3.4 s, which is why `LOAD_OLDER_TIMEOUT_MS`
+  exists), while a wheel gesture covers the last screen in about a second — the reader
+  hits `scrollTop < 160` and the wheel goes dead until the page lands. `useChatHistory`
+  `.prefetchOlder` now keeps one page in `olderPagesByChat` (fetched on mount and after
+  every landing); `loadOlder` only has to prepend it, so the "正在加载更早的消息…" chip
+  does not show in normal reading. The buffer is a *snapshot*: it is dropped when a
+  buffered row is deleted/edited, when the window is replaced by `setHistory`, and an
+  empty answer is never buffered (a cold TDLib cache answers `[]`).
 - **Never put a percentage `max-width` on the bubble itself** — on a flex child it
   resolves against the content size and collapses to min-content. It lives on
   `.wx-message-stack`.

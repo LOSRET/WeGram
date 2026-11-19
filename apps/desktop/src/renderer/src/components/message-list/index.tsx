@@ -46,6 +46,12 @@ export interface MessageListProps {
   /** What was unread when the chat was opened, for the "以下是新消息" divider. */
   unreadMarker: UnreadMarker | null
   onLoadOlder: () => Promise<void>
+  /**
+   * Keep one older page in hand (see `useChatHistory.prefetchOlder`). The list
+   * calls it as soon as it is up and after every landing, so a scroll towards the
+   * top finds history instead of a dead wait for TDLib.
+   */
+  onPrefetchOlder: () => void
   /** Extends an anchored window when the reader reaches its end. */
   onLoadNewer: () => void
   /** Replaces an anchored window with the newest page and scrolls to its end. */
@@ -98,6 +104,7 @@ export function MessageList({
   unreadMarker,
   onSeenUpToChange,
   onLoadOlder,
+  onPrefetchOlder,
   onLoadNewer,
   onReturnToLatest,
   canReply,
@@ -295,6 +302,7 @@ export function MessageList({
     ready,
     flags,
     onLoadOlder,
+    onPrefetchOlder,
   })
 
   /**

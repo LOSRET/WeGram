@@ -35,6 +35,22 @@ export interface UnreadMarker {
 }
 
 /**
+ * A page of older messages fetched ahead of the reader but not yet in the
+ * transcript (see `useChatHistory.prefetchOlder`).
+ *
+ * TDLib answers an older page from its local cache or from the server, and the
+ * first server answer was measured at ~3.4 s — no wheel gesture survives that.
+ * Keeping one page in hand turns "scroll up and wait" into "scroll up and it is
+ * already there". `afterId` is the oldest loaded id the page was fetched below:
+ * the page is only usable while that is *still* the oldest loaded row.
+ */
+export interface OlderPage {
+  afterId: number
+  messages: Message[]
+  hasMore: boolean
+}
+
+/**
  * Every piece of state the UI reads. Actions live in the slice interfaces below;
  * the data itself is seeded once from `DATA_DEFAULTS` (`initialState.ts`), so a
  * field can never be forgotten by `reset()`.
@@ -51,6 +67,12 @@ export interface AppData {
   pendingOps: Record<number, MessageOp[]>
   /** true when older messages may still exist on the server */
   hasMoreByChat: Record<number, boolean>
+  /**
+   * chatId → one page fetched below the oldest loaded row, not yet inserted.
+   * It lives in the store rather than in the fetching hook because a deletion
+   * or an edit of a buffered message must be able to invalidate it.
+   */
+  olderPagesByChat: Record<number, OlderPage>
   /**
    * true when the loaded window does not reach the newest message. The reader
    * landed on an old row (saved position or deep unread) and the window was
@@ -108,6 +130,12 @@ export interface MessageActions {
   prependHistory: (chatId: number, messages: Message[], hasMore: boolean) => void
   /** Extends an anchored window downward, keeping any ops that are still ahead. */
   appendNewer: (chatId: number, messages: Message[], hasNewer: boolean) => void
+  /**
+   * Keep a page fetched ahead of the reader. Ignored when `afterId` is no longer
+   * the oldest loaded row, or when the page is empty (a cold TDLib cache answers
+   * `[]`, and buffering that would stop paging for good).
+   */
+  bufferOlderPage: (chatId: number, afterId: number, messages: Message[], hasMore: boolean) => void
   applyMessageOps: (chatId: number, ops: MessageOp[]) => void
   /** Ask the list to scroll to the newest message (after a latest-window reload). */
   requestJumpToLatest: (chatId: number) => void
