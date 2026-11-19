@@ -351,10 +351,36 @@ function mapContentLabel(content: TdObject | undefined): string {
   }
 }
 
-function extractText(content: TdObject | undefined): string | undefined {
-  const formatted = content?.text ?? content?.caption
-  if (formatted && typeof formatted.text === 'string') return formatted.text
-  return undefined
+/**
+ * Spoiler ranges of `previewContent`'s string, so the chat row can draw the same
+ * block the transcript draws instead of leaking the hidden words.
+ *
+ * Only a flat text/caption preview can carry entities: a label like `[图片]` or a
+ * service line has no spoiler in it, and a rich page's preview is assembled from
+ * several runs, so its offsets would not line up — both return no ranges.
+ */
+export function previewSpoilers(content: TdObject | undefined): [number, number][] {
+  const formatted = formattedOf(content)
+  if (!formatted || !Array.isArray(formatted.entities)) return []
+  const text: string = formatted.text
+  const ranges: [number, number][] = []
+  for (const entity of formatted.entities) {
+    if (entity?.type?._ !== 'textEntityTypeSpoiler') continue
+    // TDLib offsets are UTF-16 code units, exactly like JS string indices.
+    const start = Number(entity.offset)
+    const end = start + Number(entity.length)
+    if (!Number.isInteger(start) || !Number.isInteger(end)) continue
+    if (start < 0 || end <= start || end > text.length) continue
+    ranges.push([start, end])
+  }
+  return ranges
 }
 
+function formattedOf(content: TdObject | undefined): TdObject | undefined {
+  const formatted = content?.text ?? content?.caption
+  return formatted && typeof formatted.text === 'string' ? formatted : undefined
+}
 
+function extractText(content: TdObject | undefined): string | undefined {
+  return formattedOf(content)?.text
+}

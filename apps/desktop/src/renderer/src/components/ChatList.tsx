@@ -4,7 +4,7 @@ import { memo, useRef, type MouseEvent } from 'react'
 
 import { OverlayScrollbar } from './OverlayScrollbar'
 import { PlusIcon, SearchIcon } from './Icon'
-import { avatarColor, formatChatTime, initials } from '../lib/format'
+import { avatarColor, formatChatTime, initials, previewSegments } from '../lib/format'
 
 /**
  * Every row is exactly this tall (`--wx-list-item-h`), which is what lets the list
@@ -54,7 +54,18 @@ const ChatRow = memo(function ChatRow({ chat, active, onSelect }: ChatRowProps) 
           <span className="wx-chat-item__time">{formatChatTime(chat.lastMessageAt)}</span>
         </div>
         <div className="wx-chat-item__row">
-          <span className="wx-chat-item__preview">{chat.lastMessageText ?? ''}</span>
+          <span className="wx-chat-item__preview">
+            {previewSegments(chat.lastMessageText ?? '', chat.lastMessageSpoilers).map(
+              (segment, index) =>
+                segment.spoiler ? (
+                  <span key={index} className="wx-spoiler wx-spoiler--preview">
+                    {segment.text}
+                  </span>
+                ) : (
+                  <span key={index}>{segment.text}</span>
+                ),
+            )}
+          </span>
           {chat.unread > 0 ? (
             <span className={`wx-badge${chat.muted ? ' wx-badge--muted' : ''}`}>
               {chat.unread > 99 ? '99+' : chat.unread}

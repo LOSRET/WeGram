@@ -60,6 +60,8 @@ export const chatSummarySchema = z.object({
   muted: z.boolean(),
   lastMessageText: z.string().optional(),
   lastMessageAt: z.number().optional(),
+  /** [start, end) spoiler runs of `lastMessageText`, so the row can mask them too. */
+  lastMessageSpoilers: z.array(z.tuple([z.number().int(), z.number().int()])).optional(),
   /** Highest incoming message id the server considers read (unread divider). */
   lastReadInboxMessageId: z.number().int().optional(),
   /** Highest outgoing message id the peer has read (read receipt). */
@@ -135,7 +137,6 @@ export const messageMediaSchema = z.object({
 })
 export type MessageMedia = z.infer<typeof messageMediaSchema>
 
-
 /**
  * One button under a message or inside a rich page (Telegram's inline keyboard).
  * `url` is set for the kinds that open something; `callback` marks the ones that
@@ -197,7 +198,6 @@ export const stickerSetSchema = stickerSetSummarySchema.extend({
   stickers: z.array(stickerSchema),
 })
 export type StickerSet = z.infer<typeof stickerSetSchema>
-
 
 /**
  * A run of text with the entities that style it (bold, links, mentions…). The

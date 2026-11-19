@@ -1,4 +1,7 @@
-import type { Message } from '@wegram/protocol'
+import type { ChatSummary, Message } from '@wegram/protocol'
+
+/** `[start, end)` spoiler runs of a preview, as `ChatSummary` carries them. */
+type SpoilerRuns = NonNullable<ChatSummary['lastMessageSpoilers']>
 
 /** WeChat stamps a list row: HH:MM today, 昨天 HH:MM, 星期X within the week, then MM/DD. */
 export function formatChatTime(seconds: number | undefined): string {
@@ -78,6 +81,47 @@ export function formatDuration(seconds: number | undefined): string {
   const minutes = Math.floor(total / 60)
   const rest = total % 60
   return `${minutes}:${String(rest).padStart(2, '0')}`
+}
+
+/**
+ * Split a chat-list preview into plain and spoiler runs.
+ *
+ * `lastMessageSpoilers` carries the spoiler offsets of the preview string, so the
+ * row can mask exactly the words the transcript masks. Out-of-range, inverted and
+ * overlapping ranges are clamped and merged, and the segments always concatenate
+ * back to `text` — the block must never eat or duplicate a character.
+ */
+export function previewSegments(
+  text: string,
+  runs: SpoilerRuns | undefined,
+): { text: string; spoiler: boolean }[] {
+  if (!text) return []
+  const clamped = (runs ?? [])
+    .map(([start, end]) => ({
+      start: Math.min(Math.max(start, 0), text.length),
+      end: Math.min(Math.max(end, 0), text.length),
+    }))
+    .filter((range) => range.end > range.start)
+    .sort((a, b) => a.start - b.start)
+  if (clamped.length === 0) return [{ text, spoiler: false }]
+
+  const merged: { start: number; end: number }[] = []
+  for (const range of clamped) {
+    const last = merged[merged.length - 1]
+    if (last && range.start <= last.end) last.end = Math.max(last.end, range.end)
+    else merged.push({ ...range })
+  }
+
+  const segments: { text: string; spoiler: boolean }[] = []
+  let cursor = 0
+  for (const range of merged) {
+    if (range.start > cursor)
+      segments.push({ text: text.slice(cursor, range.start), spoiler: false })
+    segments.push({ text: text.slice(range.start, range.end), spoiler: true })
+    cursor = range.end
+  }
+  if (cursor < text.length) segments.push({ text: text.slice(cursor), spoiler: false })
+  return segments
 }
 
 /** Short one-line representation of any message, used by replies and quotes. */

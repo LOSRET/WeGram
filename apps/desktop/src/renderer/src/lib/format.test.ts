@@ -11,6 +11,7 @@ import {
   initials,
   isSameDay,
   messagePreview,
+  previewSegments,
 } from './format'
 
 /**
@@ -176,5 +177,41 @@ describe('messagePreview', () => {
   it('uses a placeholder for empty text and trims whitespace otherwise', () => {
     expect(messagePreview(message({ text: '   ' }))).toBe('[消息]')
     expect(messagePreview(message({ text: ' hi ' }))).toBe('hi')
+  })
+})
+
+describe('previewSegments', () => {
+  it('returns the whole preview when nothing is hidden', () => {
+    expect(previewSegments('hello', undefined)).toEqual([{ text: 'hello', spoiler: false }])
+    expect(previewSegments('hello', [])).toEqual([{ text: 'hello', spoiler: false }])
+    expect(previewSegments('', [[0, 1]])).toEqual([])
+  })
+
+  it('splits around the hidden run without dropping a character', () => {
+    const segments = previewSegments('abwwcd', [[2, 4]])
+    expect(segments).toEqual([
+      { text: 'ab', spoiler: false },
+      { text: 'ww', spoiler: true },
+      { text: 'cd', spoiler: false },
+    ])
+    expect(segments.map((segment) => segment.text).join('')).toBe('abwwcd')
+  })
+
+  it('masks a preview that is entirely spoiler', () => {
+    expect(previewSegments('wwww', [[0, 4]])).toEqual([{ text: 'wwww', spoiler: true }])
+  })
+
+  it('clamps, sorts and merges overlapping or touching ranges', () => {
+    expect(
+      previewSegments('abcdef', [
+        [4, 9],
+        [1, 3],
+        [2, 2],
+        [3, 4],
+      ]),
+    ).toEqual([
+      { text: 'a', spoiler: false },
+      { text: 'bcdef', spoiler: true },
+    ])
   })
 })
