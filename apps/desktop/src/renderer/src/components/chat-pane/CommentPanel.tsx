@@ -32,9 +32,6 @@ interface ThreadPage {
  */
 const threadCache = new Map<string, ThreadPage>()
 
-/** Matches the slide in `comments.css`; the parent unmounts the panel after it. */
-export const COMMENT_PANEL_ANIM_MS = 250
-
 /** Pixels from the top that trigger loading an older page, like the transcript. */
 const LOAD_OLDER_AT = 90
 

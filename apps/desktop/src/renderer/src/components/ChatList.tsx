@@ -7,14 +7,7 @@ import { OverlayScrollbar } from './OverlayScrollbar'
 import { PlusIcon } from './Icon'
 import { SearchField } from './SearchField'
 import { formatChatTime, previewSegments } from '../lib/format'
-
-/**
- * Every row is exactly this tall (`--wx-list-item-h`), which is what lets the list
- * be virtualised without measuring a single element.
- */
-const LIST_ITEM_H = 65
-/** Rows kept painted outside the viewport, so a fast wheel scroll never shows white. */
-const LIST_OVERSCAN = 8
+import { CHAT_ROW_H, LIST_OVERSCAN } from '../lib/listMetrics'
 
 interface ChatRowProps {
   chat: ChatSummary
@@ -107,7 +100,7 @@ export function ChatList({
   const virtualizer = useVirtualizer({
     count: chats.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => LIST_ITEM_H,
+    estimateSize: () => CHAT_ROW_H,
     overscan: LIST_OVERSCAN,
     getItemKey: (index) => chats[index]?.id ?? index,
   })

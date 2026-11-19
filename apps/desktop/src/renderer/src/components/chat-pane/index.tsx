@@ -13,7 +13,8 @@ import { MessageList } from '../message-list'
 import { ChannelBar } from './ChannelBar'
 import { ChatHeader } from './ChatHeader'
 import { ChatInfoPopover } from './ChatInfoPopover'
-import { CommentPanel, COMMENT_PANEL_ANIM_MS } from './CommentPanel'
+import { COMMENT_PANEL_ANIM_MS } from '../../lib/comments'
+import { CommentPanel } from './CommentPanel'
 import {
   AnchorPendingPlaceholder,
   EmptyTranscriptPlaceholder,

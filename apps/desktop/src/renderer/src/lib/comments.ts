@@ -15,6 +15,16 @@ import type { Message, MessageInteraction } from '@wegram/protocol'
  */
 export const COMMENT_PAGE = 30
 
+/**
+ * How long the discussion view takes to slide in or out, in ms.
+ *
+ * The CSS transition and this number must agree: the parent keeps the panel
+ * mounted for exactly this long on the way out, so a mismatch either cuts the
+ * slide or leaves an invisible pane over the transcript. `styleContract.test.ts`
+ * pins them together.
+ */
+export const COMMENT_PANEL_ANIM_MS = 250
+
 /** A thread is identified by its chat and the commented message. */
 export function commentKey(chatId: number, messageId: number): string {
   return `${chatId}:${messageId}`
