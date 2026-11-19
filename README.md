@@ -90,7 +90,7 @@ WeGram/
 
 - Windows 10/11 x64。目前只在 Windows 上验证过，其它平台没有测过。
 - Node ≥ 22、pnpm 12（`packageManager` 已固定版本）。
-- 自己的 `api_id` / `api_hash`：到 [my.telegram.org/apps](https://my.telegram.org/apps) 建一个应用。**不要**借用官方客户端或别人项目的凭据。
+- 自己的 `api_id` / `api_hash`：到 [my.telegram.org/apps](https://my.telegram.org/apps) 建一个应用（见下节）。
 - 可选：可用的 SOCKS5 或 MTProxy。
 
 ## 快速开始
@@ -111,6 +111,8 @@ TELEGRAM_API_ID=1234567
 TELEGRAM_API_HASH=0123456789abcdef0123456789abcdef
 WEGRAM_PROXY=socks5://127.0.0.1:7890
 ```
+
+> 自己编译时用的 `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` 必须是你自己在 [my.telegram.org/apps](https://my.telegram.org/apps) 申请的凭据——发布版会在构建时把它们内联进主进程包。借用官方客户端或他人项目的 `api_id` / `api_hash` 违反 Telegram API 条款，会封号。
 
 ```powershell
 cd apps\desktop

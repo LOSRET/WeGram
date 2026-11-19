@@ -90,7 +90,7 @@ Four boundaries, enforced by ESLint rather than by good intentions:
 
 - Windows 10/11 x64. Only Windows has been exercised; other platforms are untested.
 - Node ≥ 22, pnpm 12 (pinned via `packageManager`).
-- Your own `api_id` / `api_hash` from [my.telegram.org/apps](https://my.telegram.org/apps). Do **not** reuse an official client's or another project's credentials.
+- Your own `api_id` / `api_hash` from [my.telegram.org/apps](https://my.telegram.org/apps) (see below).
 - Optional: a working SOCKS5 or MTProxy endpoint.
 
 ## Quick start
@@ -111,6 +111,8 @@ TELEGRAM_API_ID=1234567
 TELEGRAM_API_HASH=0123456789abcdef0123456789abcdef
 WEGRAM_PROXY=socks5://127.0.0.1:7890
 ```
+
+> When you build it yourself, `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` must be the credentials you registered at [my.telegram.org/apps](https://my.telegram.org/apps) — a release build inlines them into the main bundle. Reusing an official client's or another project's `api_id` / `api_hash` violates the Telegram API Terms and gets the account banned.
 
 ```powershell
 cd apps\desktop
