@@ -1,12 +1,20 @@
+import type { MessageMedia } from '@wegram/protocol'
+
 import { registerMediaFile } from '../../../media/registry'
 import type { TdObject } from '../client'
 
 /**
- * Shared by the message mapper (`mapContent`) and the rich-message mapper:
- * both read a TDLib media object and need the `wx-media://` URL of a file that
- * is already on disk. The renderer never sees the path itself — only adapters
- * may register one (media/registry).
+ * Shared by the message mapper (`mapContent`) and the rich-message mapper: both
+ * read the same TDLib objects and must produce identical `MessageMedia`.
+ *
+ * That identity is the point: a field added for one mapper (a new thumbnail
+ * size, a spoiler-safe placeholder) has to land for the other in the same edit,
+ * which a second copy of the spread cannot guarantee.
+ *
+ * A builder answers `fileId: 0` when TDLib gave it no file; callers that need a
+ * drawable item check the id and drop it (see `rich.ts` `asMedia`).
  */
+
 export function mediaUrls(
   file: TdObject | undefined,
   thumb?: TdObject | undefined,
@@ -24,6 +32,76 @@ function localUrlOf(file: TdObject | undefined): string | undefined {
   if (!local?.is_downloading_completed) return undefined
   if (typeof local.path !== 'string' || local.path.length === 0) return undefined
   return registerMediaFile(local.path)
+}
+
+/** A photo object (`messagePhoto.photo`, `pageBlockPhoto.photo`). */
+export function photoMedia(photo: TdObject | undefined): MessageMedia {
+  const sizes: TdObject[] = Array.isArray(photo?.sizes) ? photo.sizes : []
+  const display = pickLargest(sizes)
+  // A small variant doubles as the bubble placeholder until the full file lands.
+  const thumb = pickSmallestAtLeast(sizes, 160) ?? display
+  const thumbFileId = Number(thumb?.photo?.id ?? 0)
+  return {
+    fileId: Number(display?.photo?.id ?? 0),
+    ...(thumb !== display && thumbFileId ? { thumbFileId } : {}),
+    ...(display?.width ? { width: Number(display.width) } : {}),
+    ...(display?.height ? { height: Number(display.height) } : {}),
+    ...(photo?.minithumbnail?.data ? { minithumbnail: photo.minithumbnail.data } : {}),
+    ...mediaUrls(display?.photo, thumb?.photo),
+  }
+}
+
+/**
+ * A video or an animation. The two TDLib objects differ only in the name of
+ * their file field, so one builder with `field` keeps the field table single.
+ */
+export function videoMedia(value: TdObject | undefined, field: 'video' | 'animation'): MessageMedia {
+  const file = value?.[field]
+  return {
+    fileId: Number(file?.id ?? 0),
+    ...(value?.thumbnail?.file?.id ? { thumbFileId: Number(value.thumbnail.file.id) } : {}),
+    ...(value?.duration ? { duration: Number(value.duration) } : {}),
+    ...(value?.width ? { width: Number(value.width) } : {}),
+    ...(value?.height ? { height: Number(value.height) } : {}),
+    ...(typeof value?.file_name === 'string' && value.file_name
+      ? { fileName: value.file_name }
+      : {}),
+    ...(typeof value?.mime_type === 'string' && value.mime_type
+      ? { mimeType: value.mime_type }
+      : {}),
+    ...(value?.minithumbnail?.data ? { minithumbnail: value.minithumbnail.data } : {}),
+    ...mediaUrls(file, value?.thumbnail?.file),
+  }
+}
+
+/**
+ * A document or an audio file. Pages carry the audio variant, so the file field
+ * is whichever of the two exists; `title` is the audio page's name.
+ */
+export function documentMedia(value: TdObject | undefined): MessageMedia {
+  const file = value?.document ?? value?.audio
+  const fileName = value?.file_name ?? value?.title
+  return {
+    fileId: Number(file?.id ?? 0),
+    ...(value?.thumbnail?.file?.id ? { thumbFileId: Number(value.thumbnail.file.id) } : {}),
+    ...(typeof fileName === 'string' && fileName ? { fileName } : {}),
+    ...(file?.size ? { size: Number(file.size) } : {}),
+    ...(typeof value?.mime_type === 'string' && value.mime_type
+      ? { mimeType: value.mime_type }
+      : {}),
+    ...(value?.minithumbnail?.data ? { minithumbnail: value.minithumbnail.data } : {}),
+    ...mediaUrls(file, value?.thumbnail?.file),
+  }
+}
+
+/** A voice note; TDLib sometimes omits the MIME type, and ogg is the default. */
+export function voiceMedia(value: TdObject | undefined): MessageMedia {
+  return {
+    fileId: Number(value?.voice?.id ?? 0),
+    mimeType: value?.mime_type ?? 'audio/ogg',
+    ...(value?.duration ? { duration: Number(value.duration) } : {}),
+    ...mediaUrls(value?.voice),
+  }
 }
 
 export function pickLargest(sizes: TdObject[]): TdObject | undefined {
