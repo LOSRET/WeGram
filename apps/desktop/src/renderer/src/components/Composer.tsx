@@ -2,6 +2,7 @@ import type { Message } from '@wegram/protocol'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { loadLatestWindow } from '../lib/anchoredWindow'
+import { useComposerInput } from '../lib/useComposerInput'
 import { errorMessage, invoke } from '../lib/ipc'
 import { messagePreview } from '../lib/format'
 import { useAppStore } from '../store/useAppStore'
@@ -43,7 +44,6 @@ export function Composer({
   const [busy, setBusy] = useState(false)
   const [picker, setPicker] = useState<'emoji' | null>(null)
   const [attachAt, setAttachAt] = useState<{ x: number; y: number } | null>(null)
-  const composingRef = useRef(false)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const draftTimer = useRef<number | null>(null)
   /** Where the next render should put the caret after an emoji pick. */
@@ -118,6 +118,12 @@ export function Composer({
       setBusy(false)
     }
   }
+
+  /** Enter sends, Shift+Enter breaks the line, IME never sends (§8.4). */
+  const { inputHandlers } = useComposerInput({
+    onSend: () => void submit(),
+    onEscape: editing ? onCancelEdit : undefined,
+  })
 
   /**
    * Picks local files and sends them straight away, like WeChat's + panel. The
@@ -208,24 +214,7 @@ export function Composer({
           title="Enter 发送 · Shift+Enter 换行"
           value={text}
           onChange={(event) => setText(event.target.value)}
-          onCompositionStart={() => {
-            composingRef.current = true
-          }}
-          onCompositionEnd={() => {
-            composingRef.current = false
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape' && editing) {
-              event.preventDefault()
-              onCancelEdit()
-              return
-            }
-            // Never send while an IME composition is active (design doc §8.4).
-            if (event.key !== 'Enter' || event.shiftKey) return
-            if (composingRef.current || event.nativeEvent.isComposing) return
-            event.preventDefault()
-            void submit()
-          }}
+          {...inputHandlers}
         />
 
         <div className="wx-composer__actions">

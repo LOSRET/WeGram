@@ -9,6 +9,7 @@ import {
   withoutCommentBar,
 } from '../../lib/comments'
 import { messagePreview } from '../../lib/format'
+import { useComposerInput } from '../../lib/useComposerInput'
 import { errorMessage, invoke } from '../../lib/ipc'
 import { useAppStore } from '../../store/useAppStore'
 import { Avatar } from '../Avatar'
@@ -97,7 +98,6 @@ export function CommentPanel({
   const hostRef = useRef<HTMLDivElement | null>(null)
   const backRef = useRef<HTMLButtonElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
-  const composingRef = useRef(false)
   const requestRef = useRef(0)
   const loadingRef = useRef(false)
   /** Scroll geometry captured before an older page is prepended. */
@@ -320,6 +320,9 @@ export function CommentPanel({
     }
   }
 
+  /** Same Enter rule as the chat composer (§8.4). */
+  const { inputHandlers } = useComposerInput({ onSend: () => void send() })
+
   const post = message.text ? message.text : messagePreview(message)
   const stats = [
     message.interaction?.views ? `阅读 ${formatCount(message.interaction.views)}` : '',
@@ -434,19 +437,7 @@ export function CommentPanel({
                 title="Enter 发送 · Shift+Enter 换行"
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
-                onCompositionStart={() => {
-                  composingRef.current = true
-                }}
-                onCompositionEnd={() => {
-                  composingRef.current = false
-                }}
-                onKeyDown={(event) => {
-                  if (event.key !== 'Enter' || event.shiftKey) return
-                  // Never send while an IME composition is active (design doc §8.4).
-                  if (composingRef.current || event.nativeEvent.isComposing) return
-                  event.preventDefault()
-                  void send()
-                }}
+                {...inputHandlers}
               />
               <div className="wx-composer__actions">
                 <div className="wx-composer__tools" />
