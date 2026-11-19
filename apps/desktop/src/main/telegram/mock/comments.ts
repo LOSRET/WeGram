@@ -10,7 +10,8 @@ import type {
   CommentSendQuery,
   CommentTarget,
 } from '../adapter'
-import { at, ME, type Fixture } from './constants'
+import { at, type Fixture } from './constants'
+import { outgoingMessage } from './transcript'
 
 /**
  * Comment threads for the mock fixtures (design doc §9.8).
@@ -110,17 +111,13 @@ export function postComment(
   if (!fixture) throw new AppError('internal', `Unknown mock chat ${input.chatId}`)
   const thread = fixture.comments?.[input.messageId]
   if (!thread) throw new AppError('not_implemented', '这个帖子还没有讨论群组，不能评论')
-  const message: Message = {
+  const message = outgoingMessage({
     id: thread.reduce((max, item) => Math.max(max, item.id), 0) + 1,
     chatId: input.chatId,
-    senderId: ME.id,
-    senderName: '我',
-    outgoing: true,
-    date: Math.floor(Date.now() / 1000),
     kind: 'text',
     text: input.text,
-    ...(input.replyTo === undefined ? {} : { replyToId: input.replyTo }),
-  }
+    replyTo: input.replyTo,
+  })
   thread.push(message)
   const parent = fixture.messages.find((item) => item.id === input.messageId)
   const interaction = { ...parent?.interaction, comments: thread.length, canOpen: true }

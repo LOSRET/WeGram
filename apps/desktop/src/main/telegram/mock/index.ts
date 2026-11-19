@@ -37,6 +37,7 @@ import { buildFixtures } from './fixtures'
 import { searchChats, searchMessages } from './search'
 import { getMockStickerSet, listMockStickerSets } from './stickers'
 import { emitTraffic } from './traffic'
+import { appendMessage, outgoingMessage } from './transcript'
 
 export interface MockAdapterOptions {
   /** Where generated fixture media is written (under userData). */
@@ -278,22 +279,14 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     replyTo?: number
   }): Promise<{ localId: string; message: Message }> {
     const fixture = this.requireFixture(input.chatId)
-    const message: Message = {
+    const message = outgoingMessage({
       id: this.nextMessageId++,
       chatId: input.chatId,
-      senderId: ME.id,
-      senderName: '我',
-      outgoing: true,
-      date: Math.floor(Date.now() / 1000),
       kind: 'text',
       text: input.text,
-      ...(input.replyTo === undefined ? {} : { replyToId: input.replyTo }),
-    }
-    fixture.messages.push(message)
-    fixture.chat.lastMessageText = input.text
-    fixture.chat.lastMessageAt = message.date
-    this.emit({ type: 'messages', chatId: input.chatId, ops: [{ op: 'new', message }] })
-    this.emit({ type: 'chats', ops: [{ op: 'upsert', chat: { ...fixture.chat } }] })
+      replyTo: input.replyTo,
+    })
+    appendMessage({ emit: (event) => this.emit(event) }, fixture, message, input.text)
     return { localId: `mock-${message.id}`, message }
   }
 
@@ -327,23 +320,20 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
       localUrl: file.url,
       ...(size ? { width: size.width, height: size.height } : {}),
     }
-    const message: Message = {
+    const message = outgoingMessage({
       id: this.nextMessageId++,
       chatId: input.chatId,
-      senderId: ME.id,
-      senderName: '我',
-      outgoing: true,
-      date: Math.floor(Date.now() / 1000),
       kind: input.kind === 'photo' && size ? 'photo' : 'file',
       text: input.caption ?? '',
       media,
-      ...(input.replyTo === undefined ? {} : { replyToId: input.replyTo }),
-    }
-    fixture.messages.push(message)
-    fixture.chat.lastMessageText = `[${message.kind === 'photo' ? '图片' : '文件'}] ${file.name}`
-    fixture.chat.lastMessageAt = message.date
-    this.emit({ type: 'messages', chatId: input.chatId, ops: [{ op: 'new', message }] })
-    this.emit({ type: 'chats', ops: [{ op: 'upsert', chat: { ...fixture.chat } }] })
+      replyTo: input.replyTo,
+    })
+    appendMessage(
+      { emit: (event) => this.emit(event) },
+      fixture,
+      message,
+      `[${message.kind === 'photo' ? '图片' : '文件'}] ${file.name}`,
+    )
     // Upload progress is reported asynchronously, like TDLib does.
     void simulateTransfer(
       { files: this.assets.files, emit: (event) => this.emit(event) },
@@ -363,13 +353,9 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     const sticker = this.assets.stickers.find((item) => item.fileId === input.fileId)
     const file = this.assets.files.get(input.fileId)
     if (!sticker || !file) throw new AppError('internal', `Unknown mock sticker ${input.fileId}`)
-    const message: Message = {
+    const message = outgoingMessage({
       id: this.nextMessageId++,
       chatId: input.chatId,
-      senderId: ME.id,
-      senderName: '我',
-      outgoing: true,
-      date: Math.floor(Date.now() / 1000),
       kind: 'sticker',
       text: '',
       media: {
@@ -380,13 +366,14 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
         ...(sticker.height ? { height: sticker.height } : {}),
         localUrl: file.url,
       },
-      ...(input.replyTo === undefined ? {} : { replyToId: input.replyTo }),
-    }
-    fixture.messages.push(message)
-    fixture.chat.lastMessageText = `[贴纸] ${sticker.emoji ?? ''}`.trim()
-    fixture.chat.lastMessageAt = message.date
-    this.emit({ type: 'messages', chatId: input.chatId, ops: [{ op: 'new', message }] })
-    this.emit({ type: 'chats', ops: [{ op: 'upsert', chat: { ...fixture.chat } }] })
+      replyTo: input.replyTo,
+    })
+    appendMessage(
+      { emit: (event) => this.emit(event) },
+      fixture,
+      message,
+      `[贴纸] ${sticker.emoji ?? ''}`.trim(),
+    )
     return { localId: `mock-${message.id}`, message }
   }
 
