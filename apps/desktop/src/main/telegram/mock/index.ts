@@ -30,6 +30,7 @@ import {
   type Fixture,
   type MockFile,
 } from './constants'
+import { applyRead, simulateTransfer } from './effects'
 import { buildFixtures } from './fixtures'
 import { emitTraffic } from './traffic'
 
@@ -319,7 +320,12 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     this.emit({ type: 'messages', chatId: input.chatId, ops: [{ op: 'new', message }] })
     this.emit({ type: 'chats', ops: [{ op: 'upsert', chat: { ...fixture.chat } }] })
     // Upload progress is reported asynchronously, like TDLib does.
-    void this.simulateTransfer(fileId, info.size, true)
+    void simulateTransfer(
+      { files: this.assets.files, emit: (event) => this.emit(event) },
+      fileId,
+      info.size,
+      true,
+    )
     return { localId: `mock-${message.id}`, message }
   }
 
@@ -424,7 +430,11 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   }
 
   async markRead(input: { chatId: number; upToMessageId: number }): Promise<void> {
-    this.applyRead(input.chatId, input.upToMessageId)
+    applyRead(
+      { fixtures: this.fixtures, emit: (event) => this.emit(event) },
+      input.chatId,
+      input.upToMessageId,
+    )
   }
 
   async searchGlobal(input: { q: string; limit: number }): Promise<ChatSummary[]> {
@@ -450,7 +460,12 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   }): Promise<{ path: string; url: string }> {
     const file = this.assets.files.get(input.fileId)
     if (!file) throw new AppError('internal', `Unknown mock file ${input.fileId}`)
-    await this.simulateTransfer(input.fileId, file.size, false)
+    await simulateTransfer(
+      { files: this.assets.files, emit: (event) => this.emit(event) },
+      input.fileId,
+      file.size,
+      false,
+    )
     return { path: file.path, url: file.url }
   }
 
@@ -467,50 +482,6 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   }
 
   /* ---------- fixture plumbing ---------- */
-
-  /**
-   * Marks everything up to `upToMessageId` read the way TDLib does: the marker only
-   * moves forward and `unread` is whatever is still newer than it. Reporting the
-   * marker (instead of always "0 unread") is what lets the renderer watch the chat
-   * row and the rail badge fall message by message while the reader scrolls.
-   */
-  private applyRead(chatId: number, upToMessageId?: number): void {
-    const fixture = this.requireFixture(chatId)
-    const latest = fixture.messages[fixture.messages.length - 1]
-    const upTo = upToMessageId ?? latest?.id
-    if (upTo === undefined) return
-    fixture.chat.lastReadInboxMessageId = Math.max(fixture.chat.lastReadInboxMessageId ?? 0, upTo)
-    fixture.chat.unread = fixture.messages.filter(
-      (message) => !message.outgoing && message.id > upTo,
-    ).length
-    this.emit({ type: 'chats', ops: [{ op: 'upsert', chat: { ...fixture.chat } }] })
-  }
-
-  /** Drives `evt:file` so progress bars have something real to render. */
-  private async simulateTransfer(fileId: number, total: number, uploading: boolean): Promise<void> {
-    const steps = [0.12, 0.38, 0.71]
-    for (const step of steps) {
-      await new Promise((resolve) => setTimeout(resolve, 180))
-      this.emit({
-        type: 'file',
-        fileId,
-        downloaded: Math.round(total * step),
-        total,
-        ...(uploading ? { uploading: true } : {}),
-      })
-    }
-    const file = this.assets.files.get(fileId)
-    await new Promise((resolve) => setTimeout(resolve, 180))
-    this.emit({
-      type: 'file',
-      fileId,
-      downloaded: total,
-      total,
-      ...(file ? { url: file.url } : {}),
-      ...(uploading ? { uploading: true } : {}),
-      completed: true,
-    })
-  }
 
   private completeLogin(): void {
     this.clearQrTimer()
