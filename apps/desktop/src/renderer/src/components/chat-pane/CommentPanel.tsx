@@ -8,9 +8,10 @@ import {
   mergeComments,
   withoutCommentBar,
 } from '../../lib/comments'
-import { avatarColor, initials, messagePreview } from '../../lib/format'
+import { messagePreview } from '../../lib/format'
 import { errorMessage, invoke } from '../../lib/ipc'
 import { useAppStore } from '../../store/useAppStore'
+import { Avatar } from '../Avatar'
 import { MessageRow } from '../message-list/MessageRow'
 import { senderAvatarUrl } from '../message-list/senderAvatar'
 import { OverlayScrollbar } from '../OverlayScrollbar'
@@ -352,24 +353,12 @@ export function CommentPanel({
 
       <div className="wx-comments-panel__body" ref={hostRef}>
         <div className="wx-comments-panel__post">
-          <div
+          <Avatar
             className="wx-comments-panel__post-avatar"
-            style={
-              message.senderAvatarUrl
-                ? undefined
-                : {
-                    background: avatarColor(
-                      message.senderChatId || message.senderId || message.chatId,
-                    ),
-                  }
-            }
-          >
-            {message.senderAvatarUrl ? (
-              <img className="wx-avatar__img" src={message.senderAvatarUrl} alt="" />
-            ) : (
-              initials(message.senderName)
-            )}
-          </div>
+            url={message.senderAvatarUrl}
+            name={message.senderName}
+            colorId={message.senderChatId || message.senderId || message.chatId}
+          />
           <div className="wx-comments-panel__post-main">
             <span className="wx-comments-panel__post-name">{message.senderName}</span>
             <div className="wx-comments-panel__post-text">

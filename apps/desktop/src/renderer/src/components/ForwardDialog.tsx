@@ -1,6 +1,6 @@
 import type { ChatSummary, Message } from '@wegram/protocol'
 
-import { avatarColor, initials } from '../lib/format'
+import { Avatar } from './Avatar'
 
 interface ForwardDialogProps {
   chats: ChatSummary[]
@@ -29,9 +29,7 @@ export function ForwardDialog({ chats, message, onForward, onClose }: ForwardDia
               onClick={() => onForward(chat.id)}
               disabled={chat.id === message.chatId}
             >
-              <span className="wx-avatar" style={{ background: avatarColor(chat.id) }}>
-                {initials(chat.title)}
-              </span>
+              <Avatar className="wx-avatar" name={chat.title} colorId={chat.id} />
               <span className="wx-forward-item__title">{chat.title}</span>
               {chat.id === message.chatId ? <span className="wx-hint">当前会话</span> : null}
             </button>

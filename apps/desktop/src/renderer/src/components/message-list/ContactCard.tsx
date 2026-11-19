@@ -2,10 +2,10 @@ import type { ContactCard as ContactCardData } from '@wegram/protocol'
 import { useState } from 'react'
 
 import { copyText } from '../../lib/clipboard'
-import { avatarColor, initials } from '../../lib/format'
 import { errorMessage, invoke } from '../../lib/ipc'
 import { activateChat } from '../../lib/openChat'
 import { useAppStore } from '../../store/useAppStore'
+import { Avatar } from '../Avatar'
 
 /**
  * A `messageContact` bubble: the card Telegram sends for a shared vCard.
@@ -37,12 +37,11 @@ export function ContactCard({ contact }: { contact: ContactCardData }) {
   return (
     <div className="wx-contact">
       <div className="wx-contact__head">
-        <div
+        <Avatar
           className="wx-avatar wx-avatar--small"
-          style={{ background: avatarColor(contact.userId || 1) }}
-        >
-          {initials(name)}
-        </div>
+          name={name}
+          colorId={contact.userId || 1}
+        />
         <div className="wx-contact__meta">
           <span className="wx-contact__name">{name}</span>
           <span className="wx-contact__phone">{contact.phone || '无号码'}</span>

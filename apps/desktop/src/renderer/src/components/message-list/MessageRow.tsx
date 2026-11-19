@@ -1,7 +1,8 @@
 import type { ChatSummary, Message } from '@wegram/protocol'
 import { memo, type MouseEvent } from 'react'
 
-import { avatarColor, formatMessageTime, initials, messagePreview } from '../../lib/format'
+import { formatMessageTime, messagePreview } from '../../lib/format'
+import { Avatar } from '../Avatar'
 import { MediaBubble } from '../MediaBubble'
 import { ContactCard } from './ContactCard'
 import { InlineButtons } from './InlineButtons'
@@ -112,26 +113,14 @@ export const MessageRow = memo(
 
     return (
       <div className={`wx-message-row${first.outgoing ? ' wx-message-row--self' : ''}`}>
-        <div
+        <Avatar
           className="wx-avatar wx-avatar--small"
-          style={
-            avatarUrl
-              ? undefined
-              : {
-                  background: avatarColor(
-                    first.outgoing
-                      ? (self.id ?? 1000)
-                      : first.senderChatId || first.senderId || chat.id,
-                  ),
-                }
+          url={avatarUrl}
+          name={first.outgoing ? self.name : first.senderName}
+          colorId={
+            first.outgoing ? (self.id ?? 1000) : first.senderChatId || first.senderId || chat.id
           }
-        >
-          {avatarUrl ? (
-            <img className="wx-avatar__img" src={avatarUrl} alt="" draggable={false} />
-          ) : (
-            initials(first.outgoing ? self.name : first.senderName)
-          )}
-        </div>
+        />
 
         <div className={`wx-message-stack${first.outgoing ? ' wx-message-stack--self' : ''}`}>
           {showSender && first.senderName && first.senderName !== self.name ? (

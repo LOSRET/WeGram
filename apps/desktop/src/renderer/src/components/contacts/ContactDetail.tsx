@@ -1,7 +1,8 @@
 import type { Contact } from '@wegram/protocol'
 
-import { avatarColor, formatPhone, initials } from '../../lib/format'
+import { formatPhone } from '../../lib/format'
 import { useAppStore } from '../../store/useAppStore'
+import { Avatar } from '../Avatar'
 import { CallOutlineIcon, MessageOutlineIcon, MoreIcon, VideoCallOutlineIcon } from '../Icon'
 
 interface ContactDetailProps {
@@ -32,16 +33,12 @@ export function ContactDetail({ contact, onOpenChat, onUnavailable }: ContactDet
     <main className="wx-contact-pane" aria-label="联系人资料">
       <div className="wx-contact-detail">
         <header className="wx-contact-detail__head">
-          <div
+          <Avatar
             className="wx-avatar wx-contact-detail__avatar"
-            style={avatarUrl ? undefined : { background: avatarColor(contact.userId) }}
-          >
-            {avatarUrl ? (
-              <img className="wx-avatar__img" src={avatarUrl} alt="" draggable={false} />
-            ) : (
-              initials(contact.title)
-            )}
-          </div>
+            url={avatarUrl}
+            name={contact.title}
+            colorId={contact.userId}
+          />
           <div className="wx-contact-detail__meta">
             <h1 className="wx-contact-detail__name">{contact.title}</h1>
             <p className="wx-contact-detail__id">Telegram号： {handle}</p>

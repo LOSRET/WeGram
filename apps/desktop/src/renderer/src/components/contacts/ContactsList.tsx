@@ -2,8 +2,8 @@ import type { Contact } from '@wegram/protocol'
 import { useRef, useState } from 'react'
 
 import { groupContacts } from '../../lib/contacts'
-import { avatarColor, initials } from '../../lib/format'
 import { useAppStore } from '../../store/useAppStore'
+import { Avatar } from '../Avatar'
 import { ChevronDownIcon, ContactsManageIcon, SearchIcon } from '../Icon'
 import { OverlayScrollbar } from '../OverlayScrollbar'
 
@@ -194,16 +194,12 @@ function ContactRow({
       onClick={() => onSelect(contact)}
       aria-pressed={active}
     >
-      <span
+      <Avatar
         className="wx-avatar wx-contacts__avatar"
-        style={avatarUrl ? undefined : { background: avatarColor(contact.userId) }}
-      >
-        {avatarUrl ? (
-          <img className="wx-avatar__img" src={avatarUrl} alt="" draggable={false} />
-        ) : (
-          initials(contact.title)
-        )}
-      </span>
+        url={avatarUrl}
+        name={contact.title}
+        colorId={contact.userId}
+      />
       <span className="wx-contacts__name">{contact.title}</span>
     </button>
   )

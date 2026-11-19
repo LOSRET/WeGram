@@ -2,9 +2,10 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import type { ChatSummary } from '@wegram/protocol'
 import { memo, useRef, type MouseEvent } from 'react'
 
+import { Avatar } from './Avatar'
 import { OverlayScrollbar } from './OverlayScrollbar'
 import { PlusIcon, SearchIcon } from './Icon'
-import { avatarColor, formatChatTime, initials, previewSegments } from '../lib/format'
+import { formatChatTime, previewSegments } from '../lib/format'
 
 /**
  * Every row is exactly this tall (`--wx-list-item-h`), which is what lets the list
@@ -41,13 +42,7 @@ const ChatRow = memo(function ChatRow({ chat, active, onSelect }: ChatRowProps) 
         if (event.key === 'Enter' || event.key === ' ') onSelect(chat)
       }}
     >
-      <div className="wx-avatar" style={{ background: avatarColor(chat.id) }}>
-        {chat.avatarUrl ? (
-          <img className="wx-avatar__img" src={chat.avatarUrl} alt="" draggable={false} />
-        ) : (
-          initials(chat.title)
-        )}
-      </div>
+      <Avatar className="wx-avatar" url={chat.avatarUrl} name={chat.title} colorId={chat.id} />
       <div className="wx-chat-item__main">
         <div className="wx-chat-item__row">
           <span className="wx-chat-item__title">{chat.title}</span>
