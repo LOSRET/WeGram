@@ -134,6 +134,7 @@ async function bootstrap(): Promise<void> {
     userDataDir,
     initialProxy,
     allowMock: isDev,
+    applicationVersion: app.getVersion(),
   })
 
   bus = new EventBus({
@@ -151,7 +152,7 @@ async function bootstrap(): Promise<void> {
   })
 
   const info: AppInfo = {
-    version: '0.2.0',
+    version: app.getVersion(),
     appVersion: app.getVersion(),
     adapter: adapter.kind,
     userDataPath: userDataDir,

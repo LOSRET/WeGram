@@ -17,6 +17,8 @@ export interface CreateAdapterOptions {
    * must never show the fixture data set.
    */
   allowMock: boolean
+  /** Reported to Telegram as `application_version`; main passes app.getVersion(). */
+  applicationVersion?: string
 }
 
 /**
@@ -48,6 +50,9 @@ export function createAdapter(options: CreateAdapterOptions): TelegramAdapter {
       databaseDirectory: join(sessionDir, 'db'),
       filesDirectory: join(sessionDir, 'files'),
       initialProxy: options.initialProxy,
+      ...(options.applicationVersion
+        ? { applicationVersion: options.applicationVersion }
+        : {}),
     })
   }
 

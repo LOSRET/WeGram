@@ -58,9 +58,12 @@ jobs:
             throw "Tag '$tag' is not vX.Y.Z: release packaging only runs for version tags."
           }
           $version = $Matches.version
-          # electron-builder reads the version from apps/desktop/package.json, so the tag
-          # is the single source of truth and the committed version is only a placeholder.
-          node -e 'const fs = require("fs"); const p = "apps/desktop/package.json"; const pkg = JSON.parse(fs.readFileSync(p, "utf8")); pkg.version = process.argv[1]; fs.writeFileSync(p, JSON.stringify(pkg, null, 2) + "\n");' $version
+          # The tag is the source of truth for a release; the committed version is only
+          # a placeholder. Stamp the root manifest (what `pnpm sync-version` reads) and
+          # let the script copy it into apps/desktop, which electron-builder reads.
+          node -e 'const fs = require("fs"); const p = "package.json"; const pkg = JSON.parse(fs.readFileSync(p, "utf8")); pkg.version = process.argv[1]; fs.writeFileSync(p, JSON.stringify(pkg, null, 2) + "\n");' $version
+          pnpm sync-version
+          pnpm check:version
           "version=$version" >> $env:GITHUB_OUTPUT
           "prerelease=$($version.Contains('-'))" >> $env:GITHUB_OUTPUT
           Write-Host "Packaging WeGram $version from $tag"

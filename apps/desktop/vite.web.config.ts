@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import tailwindcss from '@tailwindcss/vite'
@@ -12,8 +13,14 @@ import { defineConfig } from 'vite'
  * in-renderer preview bridge (`lib/preview-bridge.ts`). This is a development
  * tool, not a shipping target: there is no `window.tg` in a browser otherwise.
  */
+const { version } = JSON.parse(
+  readFileSync(resolve(__dirname, '../../package.json'), 'utf8'),
+) as { version: string }
+
 export default defineConfig({
   root: resolve(__dirname, 'src/renderer'),
+  // The browser preview never sees app.getVersion(): inline the root version.
+  define: { __WEGRAM_VERSION__: JSON.stringify(version) },
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

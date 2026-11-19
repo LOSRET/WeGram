@@ -69,6 +69,8 @@ The TypeScript/Electron equivalent of rustracker's "no `.unwrap()` in production
 
 **Git.** Verify before committing (at least `pnpm typecheck && pnpm lint`). One logical change per commit, Conventional Commit messages. Small fix → current branch; multi-file feature or refactor → new branch.
 
+**Version.** The root `package.json` is the only place a version is written down. `pnpm sync-version` copies it into `apps/desktop` (what Electron and electron-builder read) and `packages/protocol`; `pnpm check:version`, the first step of `pnpm verify`, fails on drift. Bump with `pnpm version 0.2.1 --no-git-tag-version && pnpm sync-version`; the renderer gets the value inlined as `__WEGRAM_VERSION__` at build time, main uses `app.getVersion()`, and a release tag re-stamps the root manifest in CI.
+
 ### Agent-maintainable code (the split rules)
 
 The tree was split on 2026-11-19 so that an agent can read a whole module before editing

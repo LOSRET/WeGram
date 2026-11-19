@@ -1,8 +1,18 @@
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
+
+/**
+ * The root package.json is the single source of truth for the version (see
+ * scripts/sync-version.mjs). The renderer has no access to Electron's
+ * app.getVersion(), so the value is inlined here; main reads app.getVersion().
+ */
+const { version } = JSON.parse(
+  readFileSync(resolve(__dirname, '../../package.json'), 'utf8'),
+) as { version: string }
 
 const protocolAlias = {
   '@wegram/protocol': resolve(__dirname, '../../packages/protocol/src/index.ts'),
@@ -49,6 +59,7 @@ export default defineConfig({
   renderer: {
     ...shared,
     root: resolve(__dirname, 'src/renderer'),
+    define: { __WEGRAM_VERSION__: JSON.stringify(version) },
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {

@@ -33,6 +33,8 @@ export interface TdlibAdapterOptions {
   databaseDirectory: string
   filesDirectory: string
   initialProxy: ProxyConfig | null
+  /** Sent as TDLib's `application_version`; main passes app.getVersion(). */
+  applicationVersion?: string
 }
 
 /**
@@ -154,7 +156,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
         use_message_database: true,
         use_secret_chats: false,
         system_language_code: 'zh-hans',
-        application_version: '0.2.0',
+        application_version: this.options.applicationVersion ?? 'dev',
         device_model: 'WeGram Desktop',
         system_version: 'Windows',
       },
