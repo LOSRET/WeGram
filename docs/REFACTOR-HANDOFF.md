@@ -120,7 +120,9 @@ Root devDependencies added: `eslint 10.15.0`, `typescript-eslint 8.72.2`,
 | `main/proxy-url.test.ts` | `socks5://` / `mtproto://` parsing, credential decoding, the error cases |
 | `main/media/image-size.test.ts` | PNG / GIF / WebP (VP8X, VP8L, VP8) / JPEG SOF header probing |
 | `main/telegram/tdlib/map/content.test.ts` | `mapContent` for every supported TDLib content type, `serviceText` composition (WeChat wording, 你 vs the sender, member names), `previewContent`, the size pickers, `mediaUrls` |
-| `main/telegram/tdlib/map/message.test.ts` | sender resolution (user / channel chat / `未知`), service-message text, unsupported content, caption entities, reply/edit flags |
+| `main/telegram/tdlib/map/message.test.ts` | sender resolution (user / channel chat / `未知`), service-message text, unsupported content, caption entities, reply/edit flags, the rich body reaching the DTO, the full-version round trip, inline keyboard and contact card carry-over |
+| `main/telegram/tdlib/map/buttons.test.ts` | inline button addressing (url / login / web app / callback / copy), button styles (primary / danger / success / link, default stays absent), rows of a `replyMarkupInlineKeyboard`, non-inline markup ignored |
+| `main/telegram/tdlib/map/rich.test.ts` | rich text → entity offsets (bold/link/custom emoji), page-block mapping (headings, list, table, photo, quote, details), unknown blocks dropped, one-line chat-list preview |
 | `main/telegram/tdlib/map/chat.test.ts` | `mapChat` fields, the title-cache side effect, optional-field omission, `mapChatKind`, `mapConnectionState` |
 | `main/telegram/tdlib/map/entities.test.ts` | the TL entity type table, unknown types dropped, offset/length defaults |
 | `main/telegram/tdlib/map/sticker.test.ts` | sticker + set-cover thumbnail format mapping |
@@ -245,8 +247,14 @@ map/context.ts    MapperContext (chatTitles, chatAvatarUrls, stickerSizes, resol
 map/chat.ts       mapChat, mapChatKind, mapConnectionState
 map/message.ts    mapMessage
 map/entities.ts   mapEntities + the TL entity type table   (added — see below)
-map/content.ts    mapContent, serviceText, previewContent, mediaUrls, pickLargest,
-                  pickSmallestAtLeast, size/label helpers
+map/content.ts    mapContent, serviceText, previewContent, size/label helpers
+                  (the media readers moved to map/media.ts and are re-exported here)
+map/media.ts      mediaUrls / pickLargest / pickSmallestAtLeast: the media fields both
+                  mapContent and the rich mapper read (added with rich messages)
+map/buttons.ts    buttonTarget / inlineButtonOf / mapReplyMarkup: the one address rule
+                  for reply-markup buttons and rich page button rows
+map/rich.ts       mapRichMessage / richText / flattenBlocks: TDLib page blocks ->
+                  RichBlock, plus the flattened words used by previews and 复制
 map/sticker.ts    mapStickerThumbnail, mapStickerFormat
 map/user.ts       mapUser                                 (added — see below)
 ```

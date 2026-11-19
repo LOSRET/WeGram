@@ -1,3 +1,5 @@
+import type { TdObject } from '../client'
+
 /**
  * The cached lookups a mapper may read.
  *
@@ -26,4 +28,9 @@ export interface MapperContext {
    * hands the pictures over.
    */
   prefetchUserAvatars(userIds: number[]): void
+  /**
+   * Full body of a rich message TDLib truncated (`is_full: false`). Absent in
+   * unit tests, which never need a client: the mapper then keeps the excerpt.
+   */
+  resolveFullRichMessage?(chatId: number, messageId: number): Promise<TdObject | undefined>
 }

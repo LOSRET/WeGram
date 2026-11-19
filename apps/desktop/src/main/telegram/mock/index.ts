@@ -192,6 +192,13 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     this.requireFixture(chatId)
   }
 
+  /** The mock has no user directory; reuse a private chat, or say it is missing. */
+  async openPrivateChat(userId: number): Promise<ChatSummary> {
+    const fixture = [...this.fixtures.values()].find((item) => item.chat.kind === 'private')
+    if (!fixture) throw new AppError('not_implemented', `mock has no private chat for user ${userId}`)
+    return fixture.chat
+  }
+
   async canPost(chatId: number): Promise<boolean> {
     const fixture = this.requireFixture(chatId)
     // Groups and private chats keep the composer; only channels gate on rights.

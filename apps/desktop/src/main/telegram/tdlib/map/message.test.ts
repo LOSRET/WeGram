@@ -136,6 +136,49 @@ describe('mapMessage', () => {
     expect(message.text).toBe('[暂不支持的消息]')
   })
 
+
+  it('carries a rich message body into the DTO, not just its flattened text', async () => {
+    const message = await mapMessage(makeContext(), 9, {
+      id: 7,
+      date: 10,
+      sender_id: { _: 'messageSenderUser', user_id: 3 },
+      content: {
+        _: 'messageRichMessage',
+        message: {
+          _: 'richMessage',
+          is_full: true,
+          is_rtl: false,
+          blocks: [{ _: 'pageBlockParagraph', text: { _: 'richTextPlain', text: '广告' } }],
+        },
+      },
+    })
+
+    expect(message.kind).toBe('rich')
+    expect(message.text).toBe('广告')
+    // Dropping `rich` here made every rich message render as its flat text.
+    expect(message.rich).toHaveLength(1)
+  })
+
+  it('asks for the full version of a truncated rich message', async () => {
+    const resolveFullRichMessage = vi.fn(async () => ({
+      _: 'richMessage',
+      is_full: true,
+      is_rtl: false,
+      blocks: [{ _: 'pageBlockParagraph', text: { _: 'richTextPlain', text: '完整' } }],
+    }))
+    const message = await mapMessage(makeContext({ resolveFullRichMessage }), 9, {
+      id: 8,
+      date: 10,
+      sender_id: { _: 'messageSenderUser', user_id: 3 },
+      content: {
+        _: 'messageRichMessage',
+        message: { _: 'richMessage', is_full: false, is_rtl: false, blocks: [] },
+      },
+    })
+
+    expect(resolveFullRichMessage).toHaveBeenCalledWith(9, 8)
+    expect(message.text).toBe('完整')
+  })
   it('keeps the album id of a media group item and drops TDLib\'s "0"', async () => {
     const inAlbum = await mapMessage(makeContext(), 7, {
       id: 5,
@@ -178,5 +221,55 @@ describe('mapMessage', () => {
     expect(message.kind).toBe('photo')
     expect(message.entities).toEqual([{ type: 'bold', offset: 4, length: 4 }])
     expect(message.media).toMatchObject({ fileId: 5 })
+  })
+
+  it('carries the inline keyboard that hangs off the message', async () => {
+    const message = await mapMessage(makeContext(), 9, {
+      id: 9,
+      date: 10,
+      sender_id: { _: 'messageSenderUser', user_id: 3 },
+      content: { _: 'messageText', text: { text: 'hi' } },
+      reply_markup: {
+        _: 'replyMarkupInlineKeyboard',
+        force_reply: false,
+        rows: [
+          [
+            {
+              _: 'inlineKeyboardButton',
+              text: '打开',
+              type: { _: 'inlineKeyboardButtonTypeUrl', url: 'https://x.test' },
+            },
+          ],
+        ],
+      },
+    })
+
+    expect(message.buttons).toEqual([[{ text: '打开', url: 'https://x.test' }]])
+  })
+
+  it('maps a contact message into a card the renderer can draw', async () => {
+    const message = await mapMessage(makeContext(), 9, {
+      id: 10,
+      date: 10,
+      sender_id: { _: 'messageSenderUser', user_id: 3 },
+      content: {
+        _: 'messageContact',
+        contact: {
+          phone_number: '+86 132 8826 1857',
+          first_name: '假钞',
+          last_name: '',
+          vcard: '',
+          user_id: 4242,
+        },
+      },
+    })
+
+    expect(message.kind).toBe('contact')
+    expect(message.text).toBe('假钞')
+    expect(message.contact).toEqual({
+      firstName: '假钞',
+      phone: '+86 132 8826 1857',
+      userId: 4242,
+    })
   })
 })

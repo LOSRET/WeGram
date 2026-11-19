@@ -135,6 +135,34 @@ export const messageMediaSchema = z.object({
 })
 export type MessageMedia = z.infer<typeof messageMediaSchema>
 
+
+/**
+ * One button under a message or inside a rich page (Telegram's inline keyboard).
+ * `url` is set for the kinds that open something; `callback` marks the ones that
+ * send data to a bot — this client shows them but does not press them yet.
+ */
+/** Visual style a bot can put on a button (TDLib buttonStyle*). */
+export const inlineButtonStyleSchema = z.enum(['default', 'primary', 'danger', 'success', 'link'])
+export type InlineButtonStyle = z.infer<typeof inlineButtonStyleSchema>
+
+export const inlineButtonSchema = z.object({
+  text: z.string(),
+  url: z.string().optional(),
+  callback: z.boolean().optional(),
+  /** Absent for the ordinary grey button; see inlineButtonStyleSchema. */
+  style: inlineButtonStyleSchema.optional(),
+})
+export type InlineButton = z.infer<typeof inlineButtonSchema>
+
+/** A vCard message body: the card a contact message draws. */
+export const contactCardSchema = z.object({
+  firstName: z.string(),
+  lastName: z.string().optional(),
+  phone: z.string(),
+  /** TDLib user id of the contact; 0 means "not a Telegram user" and is dropped. */
+  userId: z.number().int().optional(),
+})
+export type ContactCard = z.infer<typeof contactCardSchema>
 export const stickerFormatSchema = z.enum(['webp', 'tgs', 'webm'])
 export type StickerFormat = z.infer<typeof stickerFormatSchema>
 
@@ -170,6 +198,165 @@ export const stickerSetSchema = stickerSetSummarySchema.extend({
 })
 export type StickerSet = z.infer<typeof stickerSetSchema>
 
+
+/**
+ * A run of text with the entities that style it (bold, links, mentions…). The
+ * same shape as a message body, reused by every rich block that carries text.
+ */
+export const richFormattedSchema = z.object({
+  text: z.string(),
+  entities: z.array(messageEntitySchema).optional(),
+})
+export type RichFormatted = z.infer<typeof richFormattedSchema>
+
+/** Typographic role of a text block; the renderer owns the sizes. */
+export const richTextRoleSchema = z.enum([
+  'title',
+  'subtitle',
+  'header',
+  'subheader',
+  'section',
+  'kicker',
+  'paragraph',
+  'footer',
+  'pre',
+])
+export type RichTextRole = z.infer<typeof richTextRoleSchema>
+
+export const richAlignSchema = z.enum(['left', 'center', 'right'])
+export type RichAlign = z.infer<typeof richAlignSchema>
+
+/** Media kinds a rich block can hold; the same set MediaBubble renders. */
+export const richMediaKindSchema = z.enum(['photo', 'video', 'file', 'voice'])
+export type RichMediaKind = z.infer<typeof richMediaKindSchema>
+
+export interface RichMedia {
+  kind: RichMediaKind
+  media: MessageMedia
+  caption?: RichFormatted
+  spoiler?: boolean
+}
+
+export interface RichListItem {
+  /** Bullet, number or checkbox text; empty for a bare item. */
+  label: string
+  /** Ordinal of an ordered list (0 for unordered ones). */
+  value: number
+  checked?: boolean
+  blocks: RichBlock[]
+}
+
+export interface RichTableCell {
+  /** Absent when the cell is invisible (it still occupies its slot). */
+  text?: RichFormatted
+  header: boolean
+  colspan: number
+  rowspan: number
+  align: RichAlign
+}
+
+/**
+ * One block of a rich message (Telegram 'messageRichMessage'): the body is a
+ * page — headings, paragraphs, lists, tables, quotes and media — not a caption.
+ *
+ * Declared by hand because the union is recursive: a list item, a quote and a
+ * collapsible block each contain blocks again, and a lazy zod schema cannot
+ * infer its own type. The schema below is annotated with this type, so drift
+ * between the two is still a compile error.
+ */
+export type RichBlock =
+  | { type: 'text'; role: RichTextRole; size?: number; text: RichFormatted }
+  | { type: 'divider' }
+  | { type: 'list'; items: RichListItem[] }
+  | {
+      type: 'table'
+      bordered: boolean
+      striped: boolean
+      compact: boolean
+      caption?: RichFormatted
+      rows: RichTableCell[][]
+    }
+  | {
+      type: 'media'
+      kind: RichMediaKind
+      media: MessageMedia
+      caption?: RichFormatted
+      spoiler?: boolean
+    }
+  | { type: 'gallery'; items: RichMedia[]; caption?: RichFormatted }
+  | { type: 'quote'; blocks: RichBlock[]; credit?: RichFormatted; expandable?: boolean }
+  | { type: 'details'; header: RichFormatted; blocks: RichBlock[]; open: boolean }
+  | { type: 'buttons'; rows: InlineButton[][] }
+
+const richListItemSchema: z.ZodType<RichListItem> = z.lazy(() =>
+  z.object({
+    label: z.string(),
+    value: z.number().int(),
+    checked: z.boolean().optional(),
+    blocks: z.array(richBlockSchema),
+  }),
+)
+
+const richTableCellSchema: z.ZodType<RichTableCell> = z.object({
+  text: richFormattedSchema.optional(),
+  header: z.boolean(),
+  colspan: z.number().int(),
+  rowspan: z.number().int(),
+  align: richAlignSchema,
+})
+
+const richMediaSchema: z.ZodType<RichMedia> = z.object({
+  kind: richMediaKindSchema,
+  media: messageMediaSchema,
+  caption: richFormattedSchema.optional(),
+  spoiler: z.boolean().optional(),
+})
+
+export const richBlockSchema: z.ZodType<RichBlock> = z.lazy(() =>
+  z.discriminatedUnion('type', [
+    z.object({
+      type: z.literal('text'),
+      role: richTextRoleSchema,
+      size: z.number().int().optional(),
+      text: richFormattedSchema,
+    }),
+    z.object({ type: z.literal('divider') }),
+    z.object({ type: z.literal('list'), items: z.array(richListItemSchema) }),
+    z.object({
+      type: z.literal('table'),
+      bordered: z.boolean(),
+      striped: z.boolean(),
+      compact: z.boolean(),
+      caption: richFormattedSchema.optional(),
+      rows: z.array(z.array(richTableCellSchema)),
+    }),
+    z.object({
+      type: z.literal('media'),
+      kind: richMediaKindSchema,
+      media: messageMediaSchema,
+      caption: richFormattedSchema.optional(),
+      spoiler: z.boolean().optional(),
+    }),
+    z.object({
+      type: z.literal('gallery'),
+      items: z.array(richMediaSchema),
+      caption: richFormattedSchema.optional(),
+    }),
+    z.object({
+      type: z.literal('quote'),
+      blocks: z.array(richBlockSchema),
+      credit: richFormattedSchema.optional(),
+      expandable: z.boolean().optional(),
+    }),
+    z.object({
+      type: z.literal('details'),
+      header: richFormattedSchema,
+      blocks: z.array(richBlockSchema),
+      open: z.boolean(),
+    }),
+    z.object({ type: z.literal('buttons'), rows: z.array(z.array(inlineButtonSchema)) }),
+  ]),
+)
 export const messageKindSchema = z.enum([
   'text',
   'photo',
@@ -179,6 +366,10 @@ export const messageKindSchema = z.enum([
   'voice',
   'poll',
   'service',
+  /** A system/inline page of blocks; see 'rich'. */
+  'rich',
+  /** A vCard card (`contact`), drawn as a contact bubble. */
+  'contact',
 ])
 export type MessageKind = z.infer<typeof messageKindSchema>
 
@@ -206,6 +397,12 @@ export const messageSchema = z.object({
   text: z.string(),
   entities: z.array(messageEntitySchema).optional(),
   media: messageMediaSchema.optional(),
+  /** Body of a kind 'rich' message; text still carries its flattened words. */
+  rich: z.array(richBlockSchema).optional(),
+  /** Body of a kind 'contact' message. */
+  contact: contactCardSchema.optional(),
+  /** Inline keyboard under the bubble: rows of buttons (TDLib `reply_markup`). */
+  buttons: z.array(z.array(inlineButtonSchema)).optional(),
   /**
    * Telegram media group (album). TDLib keys a group by `message.media_album_id`,
    * an int64 — it crosses IPC as a string, and `'0'` (not in an album) is absent.

@@ -17,7 +17,8 @@ lib/qr.ts                QR matrix + path helpers (pure, unit-tested)
 store/                zustand: data defaults (initialState.ts), pure reducers, slices
 components/message-list/  virtualiser + MessageRow + Divider + the scroll hooks:
                          useInitialPosition / usePrependRestore / useAnchorSave /
-                         useLandingSave / useJumpToLatest / useLocateScroll / useViewportSeen
+                         useLandingSave / useJumpToLatest / useLocateScroll / useViewportSeen;
+                         RichMessage (page blocks), ContactCard (vCards), InlineButtons
 components/chat-pane/     render tree + useChatHistory (history/ modules) + messageActions
 components/picker/        the expression panel's data hooks and body components
 components/ExpressionPicker.tsx  the picker's state + composition
@@ -25,6 +26,7 @@ components/viewer/        the 图片和视频 window: MediaViewer shell + useVie
                          useViewerZoom + ViewerToolbar / ViewerGrid + viewerMenu / viewerActions
 components/           the remaining visual concerns (Composer, MediaBubble, …)
 lib/ipc.ts            thin `window.tg` wrapper
+lib/clipboard.ts      text copy for the contact card (navigator.clipboard + execCommand fallback)
 lib/format.ts         time / preview / avatar helpers (pure, unit-tested)
 lib/entities.ts       TL entity → text segments (pure, unit-tested)
 lib/useAnchoredScroll.ts  ready gate, stick-to-bottom, resize compensation

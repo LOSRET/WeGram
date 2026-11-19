@@ -1,0 +1,170 @@
+/* ---------- Rich messages (Telegram "page" messages) ---------- */
+
+/* A rich bubble is a page, not a caption: the pre-wrap inherited from
+   .wx-bubble would keep the JSX indentation as text. */
+.wx-bubble--rich {
+  white-space: normal;
+  padding: 10px 12px;
+}
+
+.wx-rich {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.wx-rich__text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--wx-text);
+  font-size: 14px;
+  line-height: var(--wx-lh-body);
+}
+
+.wx-rich__text--title {
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.wx-rich__text--subtitle {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.wx-rich__text--header {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.wx-rich__text--subheader {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.wx-rich__text--section {
+  font-weight: 600;
+}
+
+.wx-rich__text--kicker,
+.wx-rich__text--footer {
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+}
+
+.wx-rich__divider {
+  border: none;
+  border-top: 1px solid var(--wx-line);
+  margin: 2px 0;
+}
+
+.wx-rich__quote {
+  margin: 0;
+  padding: 2px 0 2px 8px;
+  border-left: 3px solid var(--wx-line-strong);
+}
+
+.wx-rich__credit,
+.wx-rich__caption {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+}
+
+.wx-rich__details > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.wx-rich__details[open] > summary {
+  margin-bottom: 4px;
+}
+
+.wx-rich__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.wx-rich__item {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.wx-rich__marker {
+  flex: none;
+  min-width: 16px;
+  color: var(--wx-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.wx-rich__item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.wx-rich__table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.wx-rich__table {
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.wx-rich__table--bordered .wx-rich__cell {
+  border: 1px solid var(--wx-line);
+}
+
+.wx-rich__cell {
+  padding: 4px 8px;
+  vertical-align: top;
+}
+
+.wx-rich__cell--center {
+  text-align: center;
+}
+
+.wx-rich__cell--right {
+  text-align: right;
+}
+
+.wx-rich__table th.wx-rich__cell {
+  font-weight: 600;
+}
+
+.wx-rich__table--striped tbody tr:nth-child(even) {
+  background: var(--wx-row-hover);
+}
+
+.wx-rich__media {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wx-rich__gallery-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wx-rich__gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.wx-rich__gallery-item {
+  min-width: 0;
+}

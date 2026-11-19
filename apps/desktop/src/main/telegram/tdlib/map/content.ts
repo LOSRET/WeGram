@@ -1,15 +1,22 @@
-import type { Message, MessageEntity } from '@wegram/protocol'
+import type { Message, MessageEntity, RichBlock } from '@wegram/protocol'
 
-import { registerMediaFile } from '../../../media/registry'
 import type { TdObject } from '../client'
 import { mapEntities } from './entities'
+import { mediaUrls, pickLargest, pickSmallestAtLeast } from './media'
+import { mapRichMessage, richPreview } from './rich'
 import { mapStickerFormat } from './sticker'
+
+// Re-exported on purpose: this is where message media has always been read from,
+// and the shared readers now live in ./media so the rich mapper can use them too.
+export { mediaUrls, pickLargest, pickSmallestAtLeast } from './media'
 
 export function mapContent(content: TdObject): {
   kind: Message['kind']
   text: string
   entities: MessageEntity[]
   media?: Message['media']
+  rich?: RichBlock[]
+  contact?: Message['contact']
 } {
   switch (content._) {
     case 'messageText': {
@@ -144,6 +151,31 @@ export function mapContent(content: TdObject): {
         text: typeof content.emoji === 'string' ? content.emoji : '',
         entities: [],
       }
+    // A vCard: Telegram sends the card, the client draws it. The words travel
+    // as `text` so previews and quotes have something to show.
+    case 'messageContact': {
+      const card = content.contact ?? {}
+      const first = typeof card.first_name === 'string' ? card.first_name : ''
+      const last = typeof card.last_name === 'string' ? card.last_name : ''
+      const userId = Number(card.user_id ?? 0)
+      return {
+        kind: 'contact',
+        text: [first, last].filter(Boolean).join(' '),
+        entities: [],
+        contact: {
+          firstName: first || '未知',
+          ...(last ? { lastName: last } : {}),
+          phone: typeof card.phone_number === 'string' ? card.phone_number : '',
+          ...(userId ? { userId } : {}),
+        },
+      }
+    }
+    // A page of blocks (headings, lists, tables, media) — Telegram's rich
+    // message. `text` keeps the flattened words so previews and quotes work.
+    case 'messageRichMessage': {
+      const rich = mapRichMessage(content.message)
+      return { kind: 'rich', text: rich.text, entities: [], rich: rich.blocks }
+    }
     default:
       return { kind: 'service', text: '', entities: [] }
   }
@@ -306,6 +338,14 @@ function mapContentLabel(content: TdObject | undefined): string {
       return '[文件]'
     case 'messagePoll':
       return '[投票]'
+    case 'messageRichMessage':
+      return richPreview(content.message) || '[图文消息]'
+    case 'messageContact': {
+      const name = [content.contact?.first_name, content.contact?.last_name]
+        .filter(Boolean)
+        .join(' ')
+      return name ? `[名片] ${name}` : '[名片]'
+    }
     default:
       return ''
   }
@@ -317,37 +357,4 @@ function extractText(content: TdObject | undefined): string | undefined {
   return undefined
 }
 
-/** Local URLs for an already-downloaded file (and optional thumbnail). */
-export function mediaUrls(
-  file: TdObject | undefined,
-  thumb?: TdObject | undefined,
-): { localUrl?: string; thumbUrl?: string } {
-  const localUrl = localUrlOf(file)
-  const thumbUrl = localUrlOf(thumb)
-  return {
-    ...(localUrl ? { localUrl } : {}),
-    ...(thumbUrl ? { thumbUrl } : {}),
-  }
-}
 
-function localUrlOf(file: TdObject | undefined): string | undefined {
-  const local = file?.local
-  if (!local?.is_downloading_completed) return undefined
-  if (typeof local.path !== 'string' || local.path.length === 0) return undefined
-  return registerMediaFile(local.path)
-}
-
-export function pickLargest(sizes: TdObject[]): TdObject | undefined {
-  return sizes.reduce<TdObject | undefined>((best, size) => {
-    if (!best) return size
-    const area = (size.width ?? 0) * (size.height ?? 0)
-    const bestArea = (best.width ?? 0) * (best.height ?? 0)
-    return area > bestArea ? size : best
-  }, undefined)
-}
-
-export function pickSmallestAtLeast(sizes: TdObject[], minWidth: number): TdObject | undefined {
-  return [...sizes]
-    .filter((size) => (size.width ?? 0) >= minWidth)
-    .sort((a, b) => (a.width ?? 0) - (b.width ?? 0))[0]
-}

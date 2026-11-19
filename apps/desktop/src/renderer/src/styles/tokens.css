@@ -45,6 +45,9 @@
   --wx-pane-line: #f2f2f2;
   --wx-danger: #fa5151;
   --wx-warning: #ffc300;
+  /* Filled inline-keyboard button (TDLib buttonStylePrimary). */
+  --wx-button-primary: #2f6fb7;
+  --wx-button-primary-hover: #2a63a3;
   --wx-muted-dot: #b2b2b2;
   --wx-badge: #fa5151;
   /* A muted chat keeps the count: same badge shape, grey instead of red. */

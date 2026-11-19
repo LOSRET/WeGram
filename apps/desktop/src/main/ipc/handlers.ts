@@ -106,6 +106,8 @@ export function createHandlers({
     'chats:list': (payload) => adapter.listChats(payload as { limit: number; offset: number }),
     'chats:get': (payload) => adapter.getChat((payload as { chatId: number }).chatId),
     'chats:open': (payload) => adapter.openChat((payload as { chatId: number }).chatId),
+    'chats:openPrivate': (payload) =>
+      adapter.openPrivateChat((payload as { userId: number }).userId),
     'chats:canPost': (payload) => adapter.canPost((payload as { chatId: number }).chatId),
     'chats:setMuted': (payload) => {
       const { chatId, muted } = payload as { chatId: number; muted: boolean }

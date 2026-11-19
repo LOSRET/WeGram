@@ -88,7 +88,7 @@ function wrap(entity: EntityAttributes, children: ReactNode): ReactNode {
 }
 
 /** Only real web/telegram links leave the app (§8.3). */
-function safeHref(url: string | undefined): string | undefined {
+export function safeHref(url: string | undefined): string | undefined {
   if (!url) return undefined
   try {
     const parsed = new URL(url)

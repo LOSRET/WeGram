@@ -25,6 +25,8 @@
 @import './controls.css';
 @import './login.css';
 @import './rich-text.css';
+@import './rich-message.css';
+@import './cards.css';
 @import './viewer.css';
 @import './stickers.css';
 @import './dev.css';

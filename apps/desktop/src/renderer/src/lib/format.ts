@@ -96,6 +96,10 @@ export function messagePreview(message: Message): string {
       return `[语音] ${formatDuration(message.media?.duration)}`.trim()
     case 'poll':
       return `[投票] ${text}`
+    case 'rich':
+      return text ? `[图文] ${text}` : '[图文]'
+    case 'contact':
+      return text ? `[名片] ${text}` : '[名片]'
     default:
       return text || '[消息]'
   }

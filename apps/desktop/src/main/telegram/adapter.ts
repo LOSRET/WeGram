@@ -73,6 +73,11 @@ export interface TelegramAdapter {
   getChat(chatId: number): Promise<ChatSummary>
   openChat(chatId: number): Promise<void>
   /**
+   * Opens (creating it if needed) the private chat of a user: the contact card's
+   * 发消息 button. TDLib answers with the chat, which also joins the chat list.
+   */
+  openPrivateChat(userId: number): Promise<ChatSummary>
+  /**
    * Whether this account may post in the chat. Channels are the only kind the UI
    * asks about: posting there is an administrator right, so a channel without it
    * is rendered read-only and never offers a composer.

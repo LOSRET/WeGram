@@ -3,6 +3,9 @@ import { memo, type MouseEvent } from 'react'
 
 import { avatarColor, formatMessageTime, initials, messagePreview } from '../../lib/format'
 import { MediaBubble } from '../MediaBubble'
+import { ContactCard } from './ContactCard'
+import { InlineButtons } from './InlineButtons'
+import { RichMessage } from './RichMessage'
 import { RichText } from '../RichText'
 import { StickerRenderer } from '../StickerRenderer'
 import { AlbumBubble } from './AlbumBubble'
@@ -85,6 +88,13 @@ export const MessageRow = memo(
         : null
     const isSticker = !album && first.kind === 'sticker' && Boolean(media)
     const bigEmoji = !album && first.kind === 'text' && !mediaKind && isEmojiOnly(first.text)
+    // A rich message is a page of blocks; its `text` is only the flattened
+    // words kept for previews and 复制, so it must not be rendered as a body.
+    const rich = first.kind === 'rich' && first.rich?.length ? first.rich : undefined
+    const contact = first.kind === 'contact' ? first.contact : undefined
+    // An inline keyboard lives on the message, not in its content: text, photo
+    // and rich bubbles all can carry one.
+    const buttons = first.buttons?.length ? first.buttons : undefined
     // Telegram puts an album's caption on one of its items (normally the first).
     const caption = messages.find((message) => message.text) ?? null
     const showSender = !first.outgoing && chat.kind !== 'private'
@@ -127,6 +137,32 @@ export const MessageRow = memo(
             <div className="wx-sticker-wrap" onContextMenu={openMenu}>
               <StickerRenderer media={media} size={140} />
             </div>
+          ) : rich ? (
+            <div
+              className={`wx-bubble wx-bubble--rich${first.outgoing ? ' wx-bubble--self' : ''}`}
+              onContextMenu={openMenu}
+            >
+              {repliedTo ? (
+                <div className="wx-quote">
+                  {repliedTo.senderName}：{messagePreview(repliedTo)}
+                </div>
+              ) : null}
+              <RichMessage blocks={rich} chatId={chat.id} messageId={first.id} />
+              {buttons ? <InlineButtons rows={buttons} /> : null}
+            </div>
+          ) : contact ? (
+            <div
+              className={`wx-bubble wx-bubble--contact${first.outgoing ? ' wx-bubble--self' : ''}`}
+              onContextMenu={openMenu}
+            >
+              {repliedTo ? (
+                <div className="wx-quote">
+                  {repliedTo.senderName}：{messagePreview(repliedTo)}
+                </div>
+              ) : null}
+              <ContactCard contact={contact} />
+              {buttons ? <InlineButtons rows={buttons} /> : null}
+            </div>
           ) : bigEmoji ? (
             // Emoji-only message: no bubble, large glyph, like WeChat big emoji.
             <div className="wx-big-emoji" onContextMenu={openMenu}>
@@ -161,6 +197,7 @@ export const MessageRow = memo(
               {!album && !mediaKind && !first.text ? (
                 <span className="wx-bubble__empty">[不支持的消息]</span>
               ) : null}
+              {buttons ? <InlineButtons rows={buttons} /> : null}
             </div>
           )}
           <span className="wx-message__meta">

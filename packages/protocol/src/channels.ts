@@ -47,6 +47,8 @@ export const invokeChannels = [
   'chats:list',
   'chats:get',
   'chats:open',
+  /** Opens (creating if needed) the private chat of a contact card's user. */
+  'chats:openPrivate',
   /**
    * Whether this account may post in the chat. Only channels ask: posting there
    * is an administrator right, so the composer is offered only when it holds.
@@ -135,6 +137,7 @@ export const invokeSchemas = {
   },
   'chats:get': { request: z.object({ chatId: z.number().int() }), response: chatSummarySchema },
   'chats:open': { request: z.object({ chatId: z.number().int() }), response: noPayload },
+  'chats:openPrivate': { request: z.object({ userId: z.number().int() }), response: chatSummarySchema },
   'chats:canPost': { request: z.object({ chatId: z.number().int() }), response: z.boolean() },
   'chats:setMuted': {
     request: z.object({ chatId: z.number().int(), muted: z.boolean() }),

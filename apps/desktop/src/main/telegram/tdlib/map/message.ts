@@ -1,8 +1,22 @@
 import type { Message } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
+import { mapReplyMarkup } from './buttons'
 import { mapContent, serviceText, SERVICE_CONTENT_TYPES } from './content'
 import type { MapperContext } from './context'
+
+/**
+ * TDLib truncates long rich messages (`richMessage.is_full === false`); the
+ * full page is one extra round trip, and half an ad is worse than a slow row.
+ * Any failure keeps the excerpt instead of dropping the row.
+ */
+async function resolveContent(ctx: MapperContext, chatId: number, raw: TdObject): Promise<TdObject> {
+  const content: TdObject = raw.content ?? {}
+  if (content._ !== 'messageRichMessage' || !content.message) return content
+  if (content.message.is_full !== false) return content
+  const full = await ctx.resolveFullRichMessage?.(chatId, Number(raw.id))
+  return full ? { ...content, message: full } : content
+}
 
 export async function mapMessage(
   ctx: MapperContext,
@@ -27,8 +41,9 @@ export async function mapMessage(
       ? ctx.chatAvatarUrls.get(senderChatId)
       : undefined
   if (senderUserId) ctx.prefetchUserAvatars([senderUserId])
-  const content = raw.content ?? {}
+  const content = await resolveContent(ctx, chatId, raw)
   const mapped = mapContent(content)
+  const buttons = mapReplyMarkup(raw.reply_markup)
   const albumId = albumIdOf(raw)
   let text = mapped.text
   if (mapped.kind === 'service' && text === '') {
@@ -54,6 +69,9 @@ export async function mapMessage(
     text,
     ...(mapped.entities.length ? { entities: mapped.entities } : {}),
     ...(mapped.media ? { media: mapped.media } : {}),
+    ...(mapped.rich?.length ? { rich: mapped.rich } : {}),
+    ...(mapped.contact ? { contact: mapped.contact } : {}),
+    ...(buttons ? { buttons } : {}),
     ...(albumId ? { albumId } : {}),
     ...(raw.reply_to?.message_id ? { replyToId: raw.reply_to.message_id } : {}),
     ...(raw.edit_date ? { edited: true } : {}),

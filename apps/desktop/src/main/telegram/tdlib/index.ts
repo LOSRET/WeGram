@@ -21,6 +21,7 @@ import { AvatarCache } from './avatar-cache'
 import { configureTdlib, safeVersion } from './client'
 import type { TdClientLike, TdObject } from './client'
 import type { MapperContext } from './map/context'
+import { mapChat } from './map/chat'
 import { mapUser } from './map/user'
 import { applyProxy, setProxy as applyProxyConfig, testProxy as testProxyConfig } from './proxy'
 import type { ProxyDeps } from './proxy'
@@ -99,6 +100,18 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
       resolveUserName: (userId) => this.resolveUserName(userId),
       resolveChatTitle: (chatId) => this.resolveChatTitle(chatId),
       prefetchUserAvatars: (userIds) => this.avatars.prefetchUsers(userIds),
+      resolveFullRichMessage: async (chatId, messageId) => {
+        try {
+          return await this.invoke({ _: 'getFullRichMessage', chat_id: chatId, message_id: messageId })
+        } catch (error) {
+          // A deleted or edited-away page is not worth failing the row for.
+          this.logger.warn(
+            `rich message ${chatId}/${messageId} kept its excerpt:`,
+            error instanceof Error ? error.message : String(error),
+          )
+          return undefined
+        }
+      },
     }
 
     this.actionDeps = {
@@ -305,6 +318,18 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
 
   async openChat(chatId: number): Promise<void> {
     return actions.openChat(this.actionDeps, chatId)
+  }
+
+  /**
+   * A contact card's 发消息: TDLib creates the private chat on first use and
+   * answers with it. The summary is pushed as an upsert too, so the row exists
+   * in the renderer's list before the pane mounts.
+   */
+  async openPrivateChat(userId: number): Promise<ChatSummary> {
+    const raw = await this.invoke({ _: 'createPrivateChat', user_id: userId, force: false })
+    const summary = mapChat(this.mapper, raw)
+    this.emit({ type: 'chats', ops: [{ op: 'upsert', chat: summary }] })
+    return summary
   }
 
   async canPost(chatId: number): Promise<boolean> {

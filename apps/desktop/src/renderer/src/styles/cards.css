@@ -1,0 +1,148 @@
+/* ---------- Contact cards and inline keyboards ---------- */
+
+.wx-bubble--contact {
+  padding: 8px 10px;
+}
+
+.wx-contact {
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+}
+
+.wx-contact__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wx-contact__meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.wx-contact__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--wx-text);
+}
+
+.wx-contact__phone {
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+}
+
+.wx-contact__actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--wx-line);
+}
+
+.wx-contact__button {
+  flex: 1;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--wx-brand-text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.wx-contact__button:hover:enabled {
+  background: var(--wx-row-hover);
+}
+
+.wx-contact__button:disabled {
+  color: var(--wx-text-tertiary);
+  cursor: default;
+}
+
+.wx-inline-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.wx-inline-buttons__row {
+  display: flex;
+  gap: 4px;
+}
+
+.wx-inline-button {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.055);
+  color: var(--wx-text);
+  font-size: 13px;
+  line-height: 1.35;
+  text-align: center;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.wx-inline-button:hover {
+  background: rgba(0, 0, 0, 0.09);
+}
+
+[data-theme='dark'] .wx-inline-button {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme='dark'] .wx-inline-button:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.wx-inline-button--inert {
+  color: var(--wx-text-secondary);
+}
+
+/* The bot's own button styles (TDLib buttonStyle*): a filled button keeps its
+   fill on both themes, only the default button follows the theme. */
+.wx-inline-button--primary {
+  background: var(--wx-button-primary);
+  color: #fff;
+}
+
+.wx-inline-button--primary:hover {
+  background: var(--wx-button-primary-hover);
+}
+
+.wx-inline-button--danger {
+  background: var(--wx-danger);
+  color: #fff;
+}
+
+.wx-inline-button--success {
+  background: var(--wx-brand);
+  color: #fff;
+}
+
+.wx-inline-button--danger:hover,
+.wx-inline-button--success:hover {
+  filter: brightness(0.94);
+}
+
+.wx-inline-button--link {
+  background: transparent;
+  color: var(--wx-brand-text);
+  text-decoration: underline;
+}
+
+.wx-inline-button--link:hover {
+  background: transparent;
+}
+
+[data-theme='dark'] .wx-inline-button--link {
+  color: var(--wx-brand);
+}
