@@ -20,6 +20,8 @@ import type {
   ViewerItem,
 } from '@wegram/protocol'
 
+import { stickerMedia } from './stickerMedia'
+
 /**
  * Development-only bridge used when the renderer runs in a plain browser
  * (`pnpm web`). It mirrors just enough of the mock adapter to click through the
@@ -614,12 +616,7 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
         date: now(),
         kind: 'sticker',
         text: '',
-        media: media(sticker.fileId, {
-          stickerFormat: sticker.format,
-          ...(sticker.emoji ? { stickerEmoji: sticker.emoji } : {}),
-          ...(sticker.width ? { width: sticker.width } : {}),
-          ...(sticker.height ? { height: sticker.height } : {}),
-        }),
+        media: media(sticker.fileId, stickerMedia(sticker)),
       }
       list.push(message)
       messagesByChat[store.chatId] = list

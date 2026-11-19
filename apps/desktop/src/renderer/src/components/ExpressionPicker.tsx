@@ -6,6 +6,7 @@ import { EMOJI, RECENT_EMOJI_LIMIT, mergeRecentEmoji, searchEmoji } from '../lib
 import type { EmojiItem } from '../lib/emoji'
 import { errorMessage, invoke } from '../lib/ipc'
 import { pageForIndex, stripWindow } from '../lib/pickerTabs'
+import { stickerMedia } from '../lib/stickerMedia'
 import { useAppStore } from '../store/useAppStore'
 import { StickerRenderer } from './StickerRenderer'
 import { ChevronDownIcon, EmojiIcon, MicIcon, SearchIcon } from './WechatIcons'
@@ -22,20 +23,6 @@ interface ExpressionPickerProps {
 
 type PickerTab =
   { kind: 'emoji' } | { kind: 'search' } | { kind: 'set'; id: string } | { kind: 'empty' }
-
-function stickerMedia(sticker: Sticker) {
-  return {
-    fileId: sticker.fileId,
-    ...(sticker.thumbFileId ? { thumbFileId: sticker.thumbFileId } : {}),
-    // The grid shows the thumbnail, which TDLib keeps static even for animated
-    // stickers; both formats therefore travel together.
-    ...(sticker.thumbFormat ? { stickerThumbFormat: sticker.thumbFormat } : {}),
-    stickerFormat: sticker.format,
-    ...(sticker.emoji ? { stickerEmoji: sticker.emoji } : {}),
-    ...(sticker.width ? { width: sticker.width } : {}),
-    ...(sticker.height ? { height: sticker.height } : {}),
-  }
-}
 
 /**
  * The composer's expression picker (design doc §9.3), rebuilt against the client's
