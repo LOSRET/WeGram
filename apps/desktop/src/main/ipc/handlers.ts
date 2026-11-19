@@ -1,8 +1,8 @@
 import { copyFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 
-import { AppError } from '@wegram/protocol'
-import type { AppInfo, ProxyConfig, ViewerItem } from '@wegram/protocol'
+import { AppError, RECENT_EMOJI_LIMIT } from '@wegram/protocol'
+import type { AppInfo } from '@wegram/protocol'
 import { app, BrowserWindow, clipboard, dialog, nativeImage, shell } from 'electron'
 
 import { closeLoginWindow } from '../login-window'
@@ -20,6 +20,7 @@ import {
   viewerItem,
   viewerState,
 } from '../viewer'
+import { storedTheme } from '../windows'
 import type { IpcHandlerMap } from './router'
 
 export interface HandlerDeps {
@@ -48,8 +49,10 @@ export interface HandlerDeps {
 }
 
 /**
- * Every channel from `invokeChannels` is wired here. Payloads were validated by
- * the router, so handlers may cast to the DTO shape directly.
+ * Every channel from `invokeChannels` is wired here. The router validated the
+ * payload against the channel's zod schema, so `payload` already carries the
+ * protocol's type — no cast, and a field renamed in the protocol breaks this file
+ * at compile time instead of at runtime.
  */
 export function createHandlers({
   adapter,
@@ -61,6 +64,16 @@ export function createHandlers({
   onAuthInteraction,
   onLocate,
 }: HandlerDeps): IpcHandlerMap {
+  /**
+   * The viewer's own downloads (open / save / copy / reveal) outrank the
+   * transcript's background fetches, so the file the reader is acting on wins.
+   */
+  const VIEWER_DOWNLOAD_PRIORITY = 32
+  const localFile = async (fileId: number): Promise<string> => {
+    const { path } = await adapter.downloadFile({ fileId, priority: VIEWER_DOWNLOAD_PRIORITY })
+    return path
+  }
+
   return {
     'app:info': () => info,
 
@@ -82,15 +95,15 @@ export function createHandlers({
     'auth:state': () => adapter.getAuthState(),
     'auth:start': (payload) => {
       onAuthInteraction()
-      return adapter.submitPhone((payload as { phone: string }).phone)
+      return adapter.submitPhone(payload.phone)
     },
     'auth:code': (payload) => {
       onAuthInteraction()
-      return adapter.submitCode((payload as { code: string }).code)
+      return adapter.submitCode(payload.code)
     },
     'auth:password': (payload) => {
       onAuthInteraction()
-      return adapter.submitPassword((payload as { password: string }).password)
+      return adapter.submitPassword(payload.password)
     },
     'auth:qr': () => {
       onAuthInteraction()
@@ -103,46 +116,35 @@ export function createHandlers({
     'auth:logout': () => adapter.logout(),
     'auth:me': () => adapter.me(),
 
-    'chats:list': (payload) => adapter.listChats(payload as { limit: number; offset: number }),
-    'chats:get': (payload) => adapter.getChat((payload as { chatId: number }).chatId),
-    'chats:open': (payload) => adapter.openChat((payload as { chatId: number }).chatId),
-    'chats:openPrivate': (payload) =>
-      adapter.openPrivateChat((payload as { userId: number }).userId),
-    'chats:canPost': (payload) => adapter.canPost((payload as { chatId: number }).chatId),
-    'chats:setMuted': (payload) => {
-      const { chatId, muted } = payload as { chatId: number; muted: boolean }
-      return adapter.setChatMuted(chatId, muted)
-    },
+    'chats:list': (payload) => adapter.listChats(payload),
+    'chats:get': (payload) => adapter.getChat(payload.chatId),
+    'chats:open': (payload) => adapter.openChat(payload.chatId),
+    'chats:openPrivate': (payload) => adapter.openPrivateChat(payload.userId),
+    'chats:canPost': (payload) => adapter.canPost(payload.chatId),
+    'chats:setMuted': (payload) => adapter.setChatMuted(payload.chatId, payload.muted),
+    'contacts:list': () => adapter.listContacts(),
 
-    'messages:history': (payload) =>
-      adapter.history(payload as { chatId: number; fromMessageId?: number; limit: number }),
-    'messages:around': (payload) =>
-      adapter.historyAround(payload as { chatId: number; messageId: number; limit: number }),
-    'messages:newer': (payload) =>
-      adapter.historyNewer(payload as { chatId: number; fromMessageId: number; limit: number }),
-    'messages:send': (payload) =>
-      adapter.sendText(payload as { chatId: number; text: string; replyTo?: number }),
-    'messages:edit': (payload) =>
-      adapter.editText(payload as { chatId: number; messageId: number; text: string }),
-    'messages:delete': (payload) =>
-      adapter.deleteMessages(payload as { chatId: number; messageIds: number[]; forBoth: boolean }),
-    'messages:forward': (payload) =>
-      adapter.forwardMessages(
-        payload as { fromChatId: number; messageIds: number[]; toChatId: number },
-      ),
-    'messages:read': (payload) =>
-      adapter.markRead(payload as { chatId: number; upToMessageId: number }),
+    'messages:history': (payload) => adapter.history(payload),
+    'messages:around': (payload) => adapter.historyAround(payload),
+    'messages:newer': (payload) => adapter.historyNewer(payload),
+    'messages:comments': (payload) => adapter.comments(payload),
+    'messages:commentInfo': (payload) => adapter.commentInfo(payload),
+    'messages:joinCommentGroup': (payload) => adapter.joinCommentGroup(payload),
+    'messages:sendComment': (payload) => adapter.sendComment(payload),
+    'messages:send': (payload) => adapter.sendText(payload),
+    'messages:edit': (payload) => adapter.editText(payload),
+    'messages:delete': (payload) => adapter.deleteMessages(payload),
+    'messages:forward': (payload) => adapter.forwardMessages(payload),
+    'messages:read': (payload) => adapter.markRead(payload),
 
-    'search:global': (payload) => adapter.searchGlobal(payload as { q: string; limit: number }),
-    'search:inChat': (payload) =>
-      adapter.searchInChat(payload as { chatId: number; q: string; fromMessageId?: number }),
+    'search:global': (payload) => adapter.searchGlobal(payload),
+    'search:inChat': (payload) => adapter.searchInChat(payload),
 
     'media:pick': async (payload) => {
-      const { kind } = payload as { kind: 'photo' | 'file' }
       const owner = BrowserWindow.getFocusedWindow()
       const options: Electron.OpenDialogOptions = {
         properties: ['openFile', 'multiSelections'],
-        ...(kind === 'photo'
+        ...(payload.kind === 'photo'
           ? { filters: [{ name: '图片', extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif'] }] }
           : {}),
       }
@@ -151,99 +153,78 @@ export function createHandlers({
         : await dialog.showOpenDialog(options)
       return { paths: result.canceled ? [] : result.filePaths }
     },
-    'media:download': (payload) =>
-      adapter.downloadFile(payload as { fileId: number; priority: number }),
+    'media:download': (payload) => adapter.downloadFile(payload),
     'media:open': async (payload) => {
-      const { fileId } = payload as { fileId: number }
-      const { path } = await adapter.downloadFile({ fileId, priority: 32 })
+      const path = await localFile(payload.fileId)
       // Only files the protocol layer just produced are ever opened.
       const failure = await shell.openPath(path)
       if (failure) throw new AppError('internal', `Failed to open file: ${failure}`)
     },
     'media:send': (payload) => {
-      const input = payload as {
-        chatId: number
-        filePath: string
-        kind: 'photo' | 'file'
-        caption?: string
-        replyTo?: number
-      }
-      if (!input.filePath.trim()) throw new AppError('invalid_payload', 'Empty file path')
-      return adapter.sendMedia(input)
+      if (!payload.filePath.trim()) throw new AppError('invalid_payload', 'Empty file path')
+      return adapter.sendMedia(payload)
     },
-    'messages:sendSticker': (payload) =>
-      adapter.sendSticker(payload as { chatId: number; fileId: number; replyTo?: number }),
+    'messages:sendSticker': (payload) => adapter.sendSticker(payload),
     'stickers:sets': () => adapter.listStickerSets(),
-    'stickers:set': (payload) => adapter.getStickerSet((payload as { setId: string }).setId),
+    'stickers:set': (payload) => adapter.getStickerSet(payload.setId),
 
     'ui:saveDraft': (payload) => {
-      const draft = payload as { chatId: number; text: string; replyTo?: number }
       uiDb.saveDraft(
-        draft.chatId,
-        draft.text.trim().length
+        payload.chatId,
+        payload.text.trim().length
           ? {
-              text: draft.text,
-              ...(draft.replyTo === undefined ? {} : { replyTo: draft.replyTo }),
+              text: payload.text,
+              ...(payload.replyTo === undefined ? {} : { replyTo: payload.replyTo }),
             }
           : null,
       )
     },
-    'ui:getDraft': (payload) => uiDb.getDraft((payload as { chatId: number }).chatId),
+    'ui:getDraft': (payload) => uiDb.getDraft(payload.chatId),
     'ui:saveAnchor': (payload) => {
-      const anchor = payload as { chatId: number; messageId: number | null; offset: number }
       uiDb.saveScrollAnchor(
-        anchor.chatId,
-        anchor.messageId,
-        anchor.messageId === null ? 0 : anchor.offset,
+        payload.chatId,
+        payload.messageId,
+        payload.messageId === null ? 0 : payload.offset,
       )
     },
-    'ui:getAnchor': (payload) => uiDb.getScrollAnchor((payload as { chatId: number }).chatId),
+    'ui:getAnchor': (payload) => uiDb.getScrollAnchor(payload.chatId),
     'ui:getRecentEmoji': () => readRecentEmoji(uiDb),
     'ui:saveRecentEmoji': (payload) => {
-      const { emoji } = payload as { emoji: string[] }
-      uiDb.setSetting(RECENT_EMOJI_KEY, JSON.stringify(emoji.slice(0, RECENT_EMOJI_LIMIT)))
+      uiDb.setSetting(RECENT_EMOJI_KEY, JSON.stringify(payload.emoji.slice(0, RECENT_EMOJI_LIMIT)))
     },
 
-    'settings:get': () => ({
-      theme: uiDb.getSetting('theme') === 'dark' ? ('dark' as const) : ('light' as const),
-    }),
+    'settings:get': () => ({ theme: storedTheme(uiDb) }),
     'settings:set': (payload) => {
-      const patch = payload as { patch: { theme?: 'light' | 'dark' } }
-      if (patch.patch.theme) {
-        uiDb.setSetting('theme', patch.patch.theme)
-        onThemeChange?.(patch.patch.theme)
+      if (payload.patch.theme) {
+        uiDb.setSetting('theme', payload.patch.theme)
+        onThemeChange?.(payload.patch.theme)
       }
     },
 
     'proxy:get': () => toProxyView(store.get().proxy),
     'proxy:set': async (payload) => {
-      const { config } = payload as { config: ProxyConfig | null }
       const previous = store.get().proxy
-      if (!config) {
+      if (!payload.config) {
         await adapter.setProxy(null)
         store.setProxy(null)
         return
       }
       // Apply first: only persist a proxy that the protocol layer accepted.
-      await adapter.setProxy(resolveProxySecrets(config, previous))
-      store.setProxy(toStoredProxy(config, previous))
+      await adapter.setProxy(resolveProxySecrets(payload.config, previous))
+      store.setProxy(toStoredProxy(payload.config, previous))
     },
-    'proxy:test': (payload) => {
-      const { config } = payload as { config: ProxyConfig }
-      return adapter.testProxy(resolveProxySecrets(config, store.get().proxy))
-    },
+    'proxy:test': (payload) =>
+      adapter.testProxy(resolveProxySecrets(payload.config, store.get().proxy)),
 
     'viewer:open': (payload) => {
-      const request = payload as { chatId: number; items: ViewerItem[]; index: number }
       const focused = BrowserWindow.getFocusedWindow()
-      openViewer(request, isViewerWindow(focused) ? null : focused)
+      openViewer(payload, isViewerWindow(focused) ? null : focused)
     },
     'viewer:init': () => viewerState(),
     'viewer:save': async (payload) => {
-      const { fileId } = payload as { fileId: number }
       // Only files the protocol layer just produced are ever copied.
-      const { path: source } = await adapter.downloadFile({ fileId, priority: 32 })
-      const item = viewerItem(fileId)
+      const source = await localFile(payload.fileId)
+      const item = viewerItem(payload.fileId)
       const name = item?.fileName?.trim() || basename(source)
       const video = item?.kind === 'video'
       const options: Electron.SaveDialogOptions = {
@@ -263,32 +244,29 @@ export function createHandlers({
       return { canceled: false, path: result.filePath }
     },
     'viewer:copy': async (payload) => {
-      const { fileId } = payload as { fileId: number }
       // The clipboard holds bitmaps only; a video would need CF_HDROP, which
       // Electron does not expose, and the client does not offer it either.
-      if (viewerItem(fileId)?.kind === 'video') {
+      if (viewerItem(payload.fileId)?.kind === 'video') {
         throw new AppError('not_implemented', '视频不支持复制到剪贴板')
       }
-      const { path: source } = await adapter.downloadFile({ fileId, priority: 32 })
+      const source = await localFile(payload.fileId)
       const image = nativeImage.createFromPath(source)
       if (image.isEmpty()) throw new AppError('internal', 'Failed to decode the image')
       clipboard.writeImage(image)
     },
     'viewer:reveal': async (payload) => {
-      const { fileId } = payload as { fileId: number }
-      const { path: source } = await adapter.downloadFile({ fileId, priority: 32 })
+      const source = await localFile(payload.fileId)
       shell.showItemInFolder(source)
     },
-    'viewer:pin': (payload) => ({ onTop: setViewerPin((payload as { onTop: boolean }).onTop) }),
+    'viewer:pin': (payload) => ({ onTop: setViewerPin(payload.onTop) }),
     /**
      * 定位到聊天位置. Unlike the client this keeps the viewer window open: the
      * shell is raised above it instead (index.ts), so the reader can look at both.
      */
     'viewer:locate': (payload) => {
-      const { messageId } = payload as { messageId: number }
       const chatId = viewerChatId()
       if (chatId === null) throw new AppError('internal', 'Nothing is open in the viewer')
-      onLocate({ chatId, messageId })
+      onLocate({ chatId, messageId: payload.messageId })
     },
     'viewer:close': () => {
       closeViewer()
@@ -302,8 +280,6 @@ export function createHandlers({
  * picker from opening — an unreadable row simply reads as empty.
  */
 const RECENT_EMOJI_KEY = 'emoji.recent'
-/** One row of 10 in the picker; the renderer shows the same length. */
-const RECENT_EMOJI_LIMIT = 10
 
 function readRecentEmoji(uiDb: UiDatabase): string[] {
   const raw = uiDb.getSetting(RECENT_EMOJI_KEY)

@@ -2,11 +2,13 @@ import { randomUUID } from 'node:crypto'
 import { stat } from 'node:fs/promises'
 import { basename } from 'node:path'
 
+import { pageAround, pageNewer, pageOlder, sortChatList } from '@wegram/mock-session'
 import { AppError } from '@wegram/protocol'
 import type {
   AuthState,
   ChatSummary,
   ConnectionState,
+  Contact,
   Message,
   MessageMedia,
   ProxyConfig,
@@ -21,18 +23,22 @@ import { registerMediaFile } from '../../media/registry'
 import { AdapterEmitter, type MediaKind, type TelegramAdapter } from '../adapter'
 import { MockAssets } from './assets'
 import { MockAvatars } from './avatars'
+import { createMockComments } from './comments'
+import { listMockContacts } from './contacts'
 import {
   ME,
   MOCK_CODE,
   MOCK_PASSWORD,
-  MOCK_STICKER_SET_ID,
   mimeFromPath,
   type Fixture,
   type MockFile,
 } from './constants'
 import { applyRead, simulateTransfer } from './effects'
 import { buildFixtures } from './fixtures'
+import { searchChats, searchMessages } from './search'
+import { getMockStickerSet, listMockStickerSets } from './stickers'
 import { emitTraffic } from './traffic'
+import { appendMessage, outgoingMessage } from './transcript'
 
 export interface MockAdapterOptions {
   /** Where generated fixture media is written (under userData). */
@@ -58,6 +64,12 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   private auth: AuthState = { kind: 'idle' }
   private connection: ConnectionState = 'offline'
   private readonly fixtures = new Map<number, Fixture>()
+  /** The comment endpoints live in `./comments.ts`; fields keep this file small. */
+  private readonly commentApi = createMockComments(this.fixtures, (event) => this.emit(event))
+  readonly comments = this.commentApi.comments
+  readonly commentInfo = this.commentApi.info
+  readonly joinCommentGroup = this.commentApi.join
+  readonly sendComment = this.commentApi.send
   private readonly assets = new MockAssets()
   private readonly avatars: MockAvatars
   private nextMessageId = 5000
@@ -174,11 +186,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   }
 
   async listChats(input: { limit: number; offset: number }): Promise<ChatSummary[]> {
-    const all = [...this.fixtures.values()].map((fixture) => fixture.chat)
-    all.sort((a, b) => {
-      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
-      return (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0)
-    })
+    const all = sortChatList([...this.fixtures.values()].map((fixture) => fixture.chat))
     return all.slice(input.offset, input.offset + input.limit)
   }
 
@@ -192,10 +200,13 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     this.requireFixture(chatId)
   }
 
-  /** The mock has no user directory; reuse a private chat, or say it is missing. */
+  /** The mock has no user directory; reuse the private chat that carries that id. */
   async openPrivateChat(userId: number): Promise<ChatSummary> {
-    const fixture = [...this.fixtures.values()].find((item) => item.chat.kind === 'private')
-    if (!fixture) throw new AppError('not_implemented', `mock has no private chat for user ${userId}`)
+    const fixture =
+      [...this.fixtures.values()].find((item) => item.chat.userId === userId) ??
+      [...this.fixtures.values()].find((item) => item.chat.kind === 'private')
+    if (!fixture)
+      throw new AppError('not_implemented', `mock has no private chat for user ${userId}`)
     return fixture.chat
   }
 
@@ -212,15 +223,22 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     return { ...fixture.chat }
   }
 
+  /** The mock address book; see `listMockContacts`. */
+  async listContacts(): Promise<Contact[]> {
+    return listMockContacts(this.fixtures)
+  }
+
   async history(input: {
     chatId: number
     fromMessageId?: number
     limit: number
   }): Promise<{ messages: Message[]; hasMore: boolean }> {
-    const all = this.requireFixture(input.chatId).messages
-    const upper = input.fromMessageId ? all.filter((m) => m.id < input.fromMessageId!) : all
-    const slice = upper.slice(Math.max(0, upper.length - input.limit))
-    return { messages: slice.map((m) => ({ ...m })), hasMore: upper.length > slice.length }
+    const page = pageOlder(
+      this.requireFixture(input.chatId).messages,
+      input.fromMessageId,
+      input.limit,
+    )
+    return { messages: page.messages.map((message) => ({ ...message })), hasMore: page.hasMore }
   }
 
   async historyAround(input: {
@@ -228,17 +246,12 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     messageId: number
     limit: number
   }): Promise<{ messages: Message[]; hasMore: boolean; hasNewer: boolean }> {
-    const all = this.requireFixture(input.chatId).messages
-    const found = all.findIndex((message) => message.id === input.messageId)
-    const center = found >= 0 ? found : all.findIndex((message) => message.id > input.messageId)
-    if (center < 0) return { messages: [], hasMore: true, hasNewer: false }
-    const start = Math.max(0, center - input.limit)
-    const end = Math.min(all.length, center + input.limit + 1)
-    return {
-      messages: all.slice(start, end).map((message) => ({ ...message })),
-      hasMore: start > 0,
-      hasNewer: end < all.length,
-    }
+    const { messages, hasMore, hasNewer } = pageAround(
+      this.requireFixture(input.chatId).messages,
+      input.messageId,
+      input.limit,
+    )
+    return { messages: messages.map((message) => ({ ...message })), hasMore, hasNewer }
   }
 
   async historyNewer(input: {
@@ -246,12 +259,12 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     fromMessageId: number
     limit: number
   }): Promise<{ messages: Message[]; hasNewer: boolean }> {
-    const all = this.requireFixture(input.chatId).messages
-    const newer = all.filter((message) => message.id > input.fromMessageId)
-    return {
-      messages: newer.slice(0, input.limit).map((message) => ({ ...message })),
-      hasNewer: newer.length > input.limit,
-    }
+    const { messages, hasNewer } = pageNewer(
+      this.requireFixture(input.chatId).messages,
+      input.fromMessageId,
+      input.limit,
+    )
+    return { messages: messages.map((message) => ({ ...message })), hasNewer }
   }
 
   async sendText(input: {
@@ -260,22 +273,14 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     replyTo?: number
   }): Promise<{ localId: string; message: Message }> {
     const fixture = this.requireFixture(input.chatId)
-    const message: Message = {
+    const message = outgoingMessage({
       id: this.nextMessageId++,
       chatId: input.chatId,
-      senderId: ME.id,
-      senderName: '我',
-      outgoing: true,
-      date: Math.floor(Date.now() / 1000),
       kind: 'text',
       text: input.text,
-      ...(input.replyTo === undefined ? {} : { replyToId: input.replyTo }),
-    }
-    fixture.messages.push(message)
-    fixture.chat.lastMessageText = input.text
-    fixture.chat.lastMessageAt = message.date
-    this.emit({ type: 'messages', chatId: input.chatId, ops: [{ op: 'new', message }] })
-    this.emit({ type: 'chats', ops: [{ op: 'upsert', chat: { ...fixture.chat } }] })
+      replyTo: input.replyTo,
+    })
+    appendMessage({ emit: (event) => this.emit(event) }, fixture, message, input.text)
     return { localId: `mock-${message.id}`, message }
   }
 
@@ -309,23 +314,20 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
       localUrl: file.url,
       ...(size ? { width: size.width, height: size.height } : {}),
     }
-    const message: Message = {
+    const message = outgoingMessage({
       id: this.nextMessageId++,
       chatId: input.chatId,
-      senderId: ME.id,
-      senderName: '我',
-      outgoing: true,
-      date: Math.floor(Date.now() / 1000),
       kind: input.kind === 'photo' && size ? 'photo' : 'file',
       text: input.caption ?? '',
       media,
-      ...(input.replyTo === undefined ? {} : { replyToId: input.replyTo }),
-    }
-    fixture.messages.push(message)
-    fixture.chat.lastMessageText = `[${message.kind === 'photo' ? '图片' : '文件'}] ${file.name}`
-    fixture.chat.lastMessageAt = message.date
-    this.emit({ type: 'messages', chatId: input.chatId, ops: [{ op: 'new', message }] })
-    this.emit({ type: 'chats', ops: [{ op: 'upsert', chat: { ...fixture.chat } }] })
+      replyTo: input.replyTo,
+    })
+    appendMessage(
+      { emit: (event) => this.emit(event) },
+      fixture,
+      message,
+      `[${message.kind === 'photo' ? '图片' : '文件'}] ${file.name}`,
+    )
     // Upload progress is reported asynchronously, like TDLib does.
     void simulateTransfer(
       { files: this.assets.files, emit: (event) => this.emit(event) },
@@ -345,13 +347,9 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     const sticker = this.assets.stickers.find((item) => item.fileId === input.fileId)
     const file = this.assets.files.get(input.fileId)
     if (!sticker || !file) throw new AppError('internal', `Unknown mock sticker ${input.fileId}`)
-    const message: Message = {
+    const message = outgoingMessage({
       id: this.nextMessageId++,
       chatId: input.chatId,
-      senderId: ME.id,
-      senderName: '我',
-      outgoing: true,
-      date: Math.floor(Date.now() / 1000),
       kind: 'sticker',
       text: '',
       media: {
@@ -362,37 +360,23 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
         ...(sticker.height ? { height: sticker.height } : {}),
         localUrl: file.url,
       },
-      ...(input.replyTo === undefined ? {} : { replyToId: input.replyTo }),
-    }
-    fixture.messages.push(message)
-    fixture.chat.lastMessageText = `[贴纸] ${sticker.emoji ?? ''}`.trim()
-    fixture.chat.lastMessageAt = message.date
-    this.emit({ type: 'messages', chatId: input.chatId, ops: [{ op: 'new', message }] })
-    this.emit({ type: 'chats', ops: [{ op: 'upsert', chat: { ...fixture.chat } }] })
+      replyTo: input.replyTo,
+    })
+    appendMessage(
+      { emit: (event) => this.emit(event) },
+      fixture,
+      message,
+      `[贴纸] ${sticker.emoji ?? ''}`.trim(),
+    )
     return { localId: `mock-${message.id}`, message }
   }
 
   async listStickerSets(): Promise<StickerSetSummary[]> {
-    const cover = this.assets.stickers[0]
-    return [
-      {
-        id: MOCK_STICKER_SET_ID,
-        title: 'WeGram 贴纸',
-        ...(cover ? { thumbnail: cover } : {}),
-      },
-    ]
+    return listMockStickerSets(this.assets)
   }
 
   async getStickerSet(setId: string): Promise<StickerSet> {
-    if (setId !== MOCK_STICKER_SET_ID)
-      throw new AppError('internal', `Unknown sticker set ${setId}`)
-    const cover = this.assets.stickers[0]
-    return {
-      id: MOCK_STICKER_SET_ID,
-      title: 'WeGram 贴纸',
-      ...(cover ? { thumbnail: cover } : {}),
-      stickers: this.assets.stickers.map((sticker) => ({ ...sticker })),
-    }
+    return getMockStickerSet(this.assets, setId)
   }
 
   async editText(input: { chatId: number; messageId: number; text: string }): Promise<Message> {
@@ -445,9 +429,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   }
 
   async searchGlobal(input: { q: string; limit: number }): Promise<ChatSummary[]> {
-    const needle = input.q.toLowerCase()
-    const all = [...this.fixtures.values()].map((fixture) => fixture.chat)
-    return all.filter((chat) => chat.title.toLowerCase().includes(needle)).slice(0, input.limit)
+    return searchChats(this.fixtures, input.q, input.limit)
   }
 
   async searchInChat(input: {
@@ -455,10 +437,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     q: string
     fromMessageId?: number
   }): Promise<Message[]> {
-    const needle = input.q.toLowerCase()
-    return this.requireFixture(input.chatId).messages.filter((m) =>
-      m.text.toLowerCase().includes(needle),
-    )
+    return searchMessages(this.fixtures, input)
   }
 
   async downloadFile(input: {

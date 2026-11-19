@@ -1,10 +1,7 @@
-import { join } from 'node:path'
+import type { BrowserWindow } from 'electron'
+import { screen } from 'electron'
 
-import { app, BrowserWindow, screen } from 'electron'
-
-import { createLogger } from './util'
-
-const logger = createLogger('login')
+import { attachNavigationPolicy, createAppWindow } from './app-window'
 
 /**
  * The login window is its own window, like WeChat's: 280×373 DIP measured off the
@@ -23,26 +20,14 @@ const LOGIN_TITLE = 'WeGram'
 let loginWindow: BrowserWindow | null = null
 
 export function createLoginWindow(theme: 'light' | 'dark'): BrowserWindow {
-  const win = new BrowserWindow({
+  const win = createAppWindow({
     width: LOGIN_WINDOW_W,
     height: LOGIN_WINDOW_H,
-    show: false,
-    frame: false,
-    resizable: false,
-    maximizable: false,
-    minimizable: false,
-    fullscreenable: false,
-    title: LOGIN_TITLE,
     // The client's sheet is #fafafa, a touch warmer than the shell's #fbfbfb.
     backgroundColor: theme === 'dark' ? '#1e1e1f' : '#fafafa',
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      webSecurity: true,
-      spellcheck: false,
-    },
+    title: LOGIN_TITLE,
+    frameless: true,
+    hash: 'login',
   })
 
   loginWindow = win
@@ -61,24 +46,8 @@ export function createLoginWindow(theme: 'light' | 'dark'): BrowserWindow {
 
   win.once('ready-to-show', () => win.show())
 
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    logger.warn(`login window refused window.open(${url})`)
-    return { action: 'deny' }
-  })
-
-  win.webContents.on('will-navigate', (event, url) => {
-    const rendererUrl = process.env['ELECTRON_RENDERER_URL']
-    if (rendererUrl && url.startsWith(rendererUrl)) return
-    event.preventDefault()
-    logger.warn(`login window refused navigation to ${url}`)
-  })
-
-  const devUrl = process.env['ELECTRON_RENDERER_URL']
-  if (!app.isPackaged && devUrl) {
-    void win.loadURL(`${devUrl}#login`)
-  } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'), { hash: 'login' })
-  }
+  // The only window while the reader is signed out: it may not navigate at all.
+  attachNavigationPolicy(win, { links: 'deny', label: 'login window' })
 
   return win
 }

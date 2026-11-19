@@ -2,6 +2,7 @@ import type { Message } from '@wegram/protocol'
 
 import type { AdapterEvent } from '../adapter'
 import type { Fixture } from './constants'
+import { appendMessage } from './transcript'
 
 /**
  * One incoming message every 12 s, so the live paths (chat row preview, unread
@@ -40,13 +41,8 @@ export function emitTraffic({
     kind: 'text',
     text: `（mock）新消息 #${id + 1 - 5000}`,
   }
-  target.messages.push(message)
-  target.chat.lastMessageText = message.text
-  target.chat.lastMessageAt = message.date
-  target.chat.unread += 1
+  appendMessage({ emit }, target, message, message.text, { unread: true })
 
-  emit({ type: 'messages', chatId: target.chat.id, ops: [{ op: 'new', message }] })
-  emit({ type: 'chats', ops: [{ op: 'upsert', chat: { ...target.chat } }] })
   emit({
     type: 'typing',
     chatId: target.chat.id,

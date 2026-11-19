@@ -1,22 +1,31 @@
 import { z } from 'zod'
 
+/**
+ * Every failure the app may report across IPC.
+ *
+ * A union inferred from the schema, not hand-written beside it: the old
+ * `code: z.string()` accepted any string at the boundary while the class only
+ * allowed these nine, so a typo travelled as a valid `AppErrorShape`.
+ */
+export const appErrorCodeSchema = z.enum([
+  'auth_required',
+  'auth_failed',
+  'invalid_payload',
+  'not_implemented',
+  'tdlib_error',
+  'rate_limited',
+  'proxy_failed',
+  'network',
+  'internal',
+])
+export type AppErrorCode = z.infer<typeof appErrorCodeSchema>
+
 export const appErrorSchema = z.object({
-  code: z.string(),
+  code: appErrorCodeSchema,
   message: z.string(),
   retryAfter: z.number().optional(),
 })
 export type AppErrorShape = z.infer<typeof appErrorSchema>
-
-export type AppErrorCode =
-  | 'auth_required'
-  | 'auth_failed'
-  | 'invalid_payload'
-  | 'not_implemented'
-  | 'tdlib_error'
-  | 'rate_limited'
-  | 'proxy_failed'
-  | 'network'
-  | 'internal'
 
 /** Single error shape for the whole app: main throws it, renderer receives it. */
 export class AppError extends Error {

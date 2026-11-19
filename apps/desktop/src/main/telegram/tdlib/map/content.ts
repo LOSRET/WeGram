@@ -1,8 +1,15 @@
 import type { Message, MessageEntity, RichBlock } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
+import { asArray } from '../json'
 import { mapEntities } from './entities'
-import { mediaUrls, pickLargest, pickSmallestAtLeast } from './media'
+import {
+  documentMedia,
+  mediaUrls,
+  photoMedia,
+  videoMedia,
+  voiceMedia,
+} from './media'
 import { mapRichMessage, richPreview } from './rich'
 import { mapStickerFormat } from './sticker'
 
@@ -28,78 +35,36 @@ export function mapContent(content: TdObject): {
       }
     }
     case 'messagePhoto': {
-      const photo = content.photo ?? {}
-      const sizes: TdObject[] = Array.isArray(photo.sizes) ? photo.sizes : []
-      const display = pickLargest(sizes)
-      // A small variant doubles as the bubble placeholder until the full file lands.
-      const thumb = pickSmallestAtLeast(sizes, 160) ?? pickLargest(sizes)
       return {
         kind: 'photo',
         text: content.caption?.text ?? '',
         entities: mapEntities(content.caption?.entities),
-        media: {
-          fileId: display?.photo?.id ?? 0,
-          ...(thumb && thumb !== display ? { thumbFileId: thumb.photo?.id } : {}),
-          ...(display?.width ? { width: display.width } : {}),
-          ...(display?.height ? { height: display.height } : {}),
-          ...(photo.minithumbnail?.data ? { minithumbnail: photo.minithumbnail.data } : {}),
-          ...mediaUrls(display?.photo, thumb?.photo),
-        },
+        media: photoMedia(content.photo),
       }
     }
     case 'messageVideo': {
-      const video = content.video ?? {}
       return {
         kind: 'video',
         text: content.caption?.text ?? '',
         entities: mapEntities(content.caption?.entities),
-        media: {
-          fileId: video.video?.id ?? 0,
-          ...(video.thumbnail?.file?.id ? { thumbFileId: video.thumbnail.file.id } : {}),
-          ...(video.duration ? { duration: video.duration } : {}),
-          ...(video.width ? { width: video.width } : {}),
-          ...(video.height ? { height: video.height } : {}),
-          ...(video.file_name ? { fileName: video.file_name } : {}),
-          ...(video.mime_type ? { mimeType: video.mime_type } : {}),
-          ...(video.minithumbnail?.data ? { minithumbnail: video.minithumbnail.data } : {}),
-          ...mediaUrls(video.video, video.thumbnail?.file),
-        },
+        media: videoMedia(content.video, 'video'),
       }
     }
     case 'messageAnimation': {
       // GIF-style messages are videos to us: Chromium plays the MP4 natively.
-      const animation = content.animation ?? {}
       return {
         kind: 'video',
         text: content.caption?.text ?? '',
         entities: mapEntities(content.caption?.entities),
-        media: {
-          fileId: animation.animation?.id ?? 0,
-          ...(animation.thumbnail?.file?.id ? { thumbFileId: animation.thumbnail.file.id } : {}),
-          ...(animation.duration ? { duration: animation.duration } : {}),
-          ...(animation.width ? { width: animation.width } : {}),
-          ...(animation.height ? { height: animation.height } : {}),
-          ...(animation.file_name ? { fileName: animation.file_name } : {}),
-          ...(animation.mime_type ? { mimeType: animation.mime_type } : {}),
-          ...mediaUrls(animation.animation, animation.thumbnail?.file),
-        },
+        media: videoMedia(content.animation, 'animation'),
       }
     }
     case 'messageDocument': {
-      const document = content.document ?? {}
       return {
         kind: 'file',
         text: content.caption?.text ?? '',
         entities: mapEntities(content.caption?.entities),
-        media: {
-          fileId: document.document?.id ?? 0,
-          ...(document.thumbnail?.file?.id ? { thumbFileId: document.thumbnail.file.id } : {}),
-          ...(document.file_name ? { fileName: document.file_name } : {}),
-          ...(document.document?.size ? { size: document.document.size } : {}),
-          ...(document.mime_type ? { mimeType: document.mime_type } : {}),
-          ...(document.minithumbnail?.data ? { minithumbnail: document.minithumbnail.data } : {}),
-          ...mediaUrls(document.document, document.thumbnail?.file),
-        },
+        media: documentMedia(content.document),
       }
     }
     case 'messageSticker': {
@@ -120,17 +85,11 @@ export function mapContent(content: TdObject): {
       }
     }
     case 'messageVoiceNote': {
-      const voice = content.voice_note ?? {}
       return {
         kind: 'voice',
         text: content.caption?.text ?? '',
         entities: [],
-        media: {
-          fileId: voice.voice?.id ?? 0,
-          mimeType: voice.mime_type ?? 'audio/ogg',
-          ...(voice.duration ? { duration: voice.duration } : {}),
-          ...mediaUrls(voice.voice),
-        },
+        media: voiceMedia(content.voice_note),
       }
     }
     case 'messagePoll':
@@ -206,7 +165,7 @@ export async function serviceText(content: TdObject, ctx: ServiceTextContext): P
     case 'messageChatDeletePhoto':
       return `${who}移除了群聊头像`
     case 'messageChatAddMembers': {
-      const ids: number[] = Array.isArray(content.member_user_ids) ? content.member_user_ids : []
+      const ids: number[] = asArray<number>(content.member_user_ids)
       const names = await Promise.all(ids.map((id) => ctx.resolveUserName(Number(id))))
       if (names.length === 0) return `${who}邀请了新成员加入群聊`
       return `${who}邀请${names.join('、')}加入了群聊`
@@ -351,10 +310,36 @@ function mapContentLabel(content: TdObject | undefined): string {
   }
 }
 
-function extractText(content: TdObject | undefined): string | undefined {
-  const formatted = content?.text ?? content?.caption
-  if (formatted && typeof formatted.text === 'string') return formatted.text
-  return undefined
+/**
+ * Spoiler ranges of `previewContent`'s string, so the chat row can draw the same
+ * block the transcript draws instead of leaking the hidden words.
+ *
+ * Only a flat text/caption preview can carry entities: a label like `[图片]` or a
+ * service line has no spoiler in it, and a rich page's preview is assembled from
+ * several runs, so its offsets would not line up — both return no ranges.
+ */
+export function previewSpoilers(content: TdObject | undefined): [number, number][] {
+  const formatted = formattedOf(content)
+  if (!formatted || !Array.isArray(formatted.entities)) return []
+  const text: string = formatted.text
+  const ranges: [number, number][] = []
+  for (const entity of formatted.entities) {
+    if (entity?.type?._ !== 'textEntityTypeSpoiler') continue
+    // TDLib offsets are UTF-16 code units, exactly like JS string indices.
+    const start = Number(entity.offset)
+    const end = start + Number(entity.length)
+    if (!Number.isInteger(start) || !Number.isInteger(end)) continue
+    if (start < 0 || end <= start || end > text.length) continue
+    ranges.push([start, end])
+  }
+  return ranges
 }
 
+function formattedOf(content: TdObject | undefined): TdObject | undefined {
+  const formatted = content?.text ?? content?.caption
+  return formatted && typeof formatted.text === 'string' ? formatted : undefined
+}
 
+function extractText(content: TdObject | undefined): string | undefined {
+  return formattedOf(content)?.text
+}

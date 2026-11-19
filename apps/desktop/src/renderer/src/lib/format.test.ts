@@ -3,14 +3,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   avatarColor,
+  calendarDaysAgo,
   formatChatTime,
   formatClock,
   formatDaySeparator,
   formatDuration,
   formatMessageTime,
+  formatPhone,
   initials,
   isSameDay,
   messagePreview,
+  previewSegments,
 } from './format'
 
 /**
@@ -57,6 +60,20 @@ describe('formatClock', () => {
 describe('formatMessageTime', () => {
   it('renders the message clock as HH:MM', () => {
     expect(formatMessageTime(seconds(2026, 10, 17, 23, 59))).toBe('23:59')
+  })
+})
+
+describe('formatPhone', () => {
+  it('adds the leading + Telegram omits', () => {
+    expect(formatPhone('8613800000000')).toBe('+8613800000000')
+  })
+
+  it('leaves an already international number alone', () => {
+    expect(formatPhone('+49 151 0000 0000')).toBe('+49 151 0000 0000')
+  })
+
+  it('is empty for an empty value', () => {
+    expect(formatPhone('   ')).toBe('')
   })
 })
 
@@ -119,6 +136,20 @@ describe('isSameDay', () => {
   })
 })
 
+describe('calendarDaysAgo', () => {
+  const now = new Date(2026, 10, 17, 12, 0)
+
+  it('counts whole local days, not 24-hour spans', () => {
+    expect(calendarDaysAgo(seconds(2026, 10, 17, 0, 0), now)).toBe(0)
+    expect(calendarDaysAgo(seconds(2026, 10, 16, 23, 59), now)).toBe(1)
+    expect(calendarDaysAgo(seconds(2026, 10, 10, 8, 0), now)).toBe(7)
+  })
+
+  it('goes negative for a day in the future', () => {
+    expect(calendarDaysAgo(seconds(2026, 10, 18, 1, 0), now)).toBe(-1)
+  })
+})
+
 describe('initials', () => {
   it('takes the first two characters', () => {
     expect(initials('微信团队')).toBe('微信')
@@ -176,5 +207,41 @@ describe('messagePreview', () => {
   it('uses a placeholder for empty text and trims whitespace otherwise', () => {
     expect(messagePreview(message({ text: '   ' }))).toBe('[消息]')
     expect(messagePreview(message({ text: ' hi ' }))).toBe('hi')
+  })
+})
+
+describe('previewSegments', () => {
+  it('returns the whole preview when nothing is hidden', () => {
+    expect(previewSegments('hello', undefined)).toEqual([{ text: 'hello', spoiler: false }])
+    expect(previewSegments('hello', [])).toEqual([{ text: 'hello', spoiler: false }])
+    expect(previewSegments('', [[0, 1]])).toEqual([])
+  })
+
+  it('splits around the hidden run without dropping a character', () => {
+    const segments = previewSegments('abwwcd', [[2, 4]])
+    expect(segments).toEqual([
+      { text: 'ab', spoiler: false },
+      { text: 'ww', spoiler: true },
+      { text: 'cd', spoiler: false },
+    ])
+    expect(segments.map((segment) => segment.text).join('')).toBe('abwwcd')
+  })
+
+  it('masks a preview that is entirely spoiler', () => {
+    expect(previewSegments('wwww', [[0, 4]])).toEqual([{ text: 'wwww', spoiler: true }])
+  })
+
+  it('clamps, sorts and merges overlapping or touching ranges', () => {
+    expect(
+      previewSegments('abcdef', [
+        [4, 9],
+        [1, 3],
+        [2, 2],
+        [3, 4],
+      ]),
+    ).toEqual([
+      { text: 'a', spoiler: false },
+      { text: 'bcdef', spoiler: true },
+    ])
   })
 })

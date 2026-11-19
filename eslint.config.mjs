@@ -61,7 +61,12 @@ export default tseslint.config(
   // backstop, so a new feature cannot recreate a 1000-line file. Generated
   // artwork is exempt.
   {
-    files: ['apps/desktop/src/**/*.{ts,tsx}', 'packages/protocol/src/**/*.ts'],
+    files: [
+      'apps/desktop/src/**/*.{ts,tsx}',
+      'packages/protocol/src/**/*.ts',
+      'packages/mock-session/src/**/*.ts',
+      'packages/mock-fixtures/src/**/*.ts',
+    ],
     ignores: ['apps/desktop/src/renderer/src/components/WechatIcons.tsx'],
     rules: {
       'max-lines': ['error', { max: 550, skipBlankLines: false, skipComments: false }],

@@ -2,17 +2,12 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import type { ChatSummary } from '@wegram/protocol'
 import { memo, useRef, type MouseEvent } from 'react'
 
+import { Avatar } from './Avatar'
 import { OverlayScrollbar } from './OverlayScrollbar'
-import { PlusIcon, SearchIcon } from './Icon'
-import { avatarColor, formatChatTime, initials } from '../lib/format'
-
-/**
- * Every row is exactly this tall (`--wx-list-item-h`), which is what lets the list
- * be virtualised without measuring a single element.
- */
-const LIST_ITEM_H = 65
-/** Rows kept painted outside the viewport, so a fast wheel scroll never shows white. */
-const LIST_OVERSCAN = 8
+import { PlusIcon } from './Icon'
+import { SearchField } from './SearchField'
+import { formatChatTime, previewSegments } from '../lib/format'
+import { CHAT_ROW_H, LIST_OVERSCAN } from '../lib/listMetrics'
 
 interface ChatRowProps {
   chat: ChatSummary
@@ -41,20 +36,25 @@ const ChatRow = memo(function ChatRow({ chat, active, onSelect }: ChatRowProps) 
         if (event.key === 'Enter' || event.key === ' ') onSelect(chat)
       }}
     >
-      <div className="wx-avatar" style={{ background: avatarColor(chat.id) }}>
-        {chat.avatarUrl ? (
-          <img className="wx-avatar__img" src={chat.avatarUrl} alt="" draggable={false} />
-        ) : (
-          initials(chat.title)
-        )}
-      </div>
+      <Avatar className="wx-avatar" url={chat.avatarUrl} name={chat.title} colorId={chat.id} />
       <div className="wx-chat-item__main">
         <div className="wx-chat-item__row">
           <span className="wx-chat-item__title">{chat.title}</span>
           <span className="wx-chat-item__time">{formatChatTime(chat.lastMessageAt)}</span>
         </div>
         <div className="wx-chat-item__row">
-          <span className="wx-chat-item__preview">{chat.lastMessageText ?? ''}</span>
+          <span className="wx-chat-item__preview">
+            {previewSegments(chat.lastMessageText ?? '', chat.lastMessageSpoilers).map(
+              (segment, index) =>
+                segment.spoiler ? (
+                  <span key={index} className="wx-spoiler wx-spoiler--preview">
+                    {segment.text}
+                  </span>
+                ) : (
+                  <span key={index}>{segment.text}</span>
+                ),
+            )}
+          </span>
           {chat.unread > 0 ? (
             <span className={`wx-badge${chat.muted ? ' wx-badge--muted' : ''}`}>
               {chat.unread > 99 ? '99+' : chat.unread}
@@ -100,7 +100,7 @@ export function ChatList({
   const virtualizer = useVirtualizer({
     count: chats.length,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => LIST_ITEM_H,
+    estimateSize: () => CHAT_ROW_H,
     overscan: LIST_OVERSCAN,
     getItemKey: (index) => chats[index]?.id ?? index,
   })
@@ -115,16 +115,7 @@ export function ChatList({
   return (
     <section className="wx-list" aria-label="会话列表">
       <div className="wx-list__head">
-        <label className="wx-search">
-          <SearchIcon size={15} />
-          <input
-            value={query}
-            placeholder="搜索"
-            spellCheck={false}
-            onChange={(event) => onQueryChange(event.target.value)}
-            onPointerDown={(event) => event.stopPropagation()}
-          />
-        </label>
+        <SearchField value={query} onValueChange={onQueryChange} guardPointer />
         <button
           className="wx-list__plus"
           title="更多"

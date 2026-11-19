@@ -11,7 +11,12 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const rootDir = join(dirname(fileURLToPath(import.meta.url)), '..')
-const TARGETS = ['apps/desktop/package.json', 'packages/protocol/package.json']
+const TARGETS = [
+  'apps/desktop/package.json',
+  'packages/protocol/package.json',
+  'packages/mock-session/package.json',
+  'packages/mock-fixtures/package.json',
+]
 
 const readManifest = (relative) =>
   JSON.parse(readFileSync(join(rootDir, relative), 'utf8'))

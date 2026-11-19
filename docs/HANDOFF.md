@@ -57,6 +57,41 @@ Greenfield → working skeleton in three milestones:
   复制/打印 are hidden. Measured metrics: `UI-HANDOFF.md` §2.1 (second table), deltas 17–20.
   The mock now ships a 6 s WebM fixture (`mock-assets.ts` `SAMPLE_VIDEO_WEBM`) so the
   window is reachable without the real account.
+- **通讯录 (contacts, 2026-11-19, reworked the same day)**: the rail's 通讯录 tab
+  switches the shell to the address book. The middle column carries the client's
+  header stack (search, 通讯录管理 card, 新的朋友 / 公众号、服务号 / 企业微信联系人 /
+  我的企业 / 联系人) and the account's Telegram contacts grouped by initial; the right
+  pane is the contact card (60 px avatar, Telegram号, 朋友资料, 更多信息 —
+  手机号 / 数据中心 — and 发消息 / 语音聊天 / 视频聊天). **Data = TDLib `getContacts` + `getUser`** (`contacts:list`), not the
+  chat list: a person you never wrote to has a card but no conversation, and 发消息
+  creates the private chat on demand (`chats:openPrivate` → `createPrivateChat`).
+  Measured on the real account: 4 contacts, 2 with a username, 3 with a phone.
+  The 数据中心 row is decoded from the profile photo's persistent file id
+  (`tdlib/file-dc.ts`): TDLib exposes no DC field, and the photo is the only DC
+  signal a client gets (Pyrogram's `user.dc_id` is the same MTProto field), so
+  the value is approximate and 未知 for someone without a photo. Phone numbers
+  arrive without the leading `+`; the card adds it (`lib/format.ts`).
+  Metrics, icon provenance and the deliberate deltas: `docs/UI-HANDOFF.md` §2.4, §3,
+  §5 items 27–30.
+- **Message comments (2026-11-20)**: a message that owns a Telegram comment thread draws
+  WeChat's 评论 N 条 bar under its bubble; opening it fetches one page of
+  `getMessageThreadHistory` into Telegram's discussion view — a full-pane panel that
+  slides in from the right over the chat, with the commented post pinned on top. The
+  comments are the transcript's own rows (`MessageRow`: avatar, sender, bubble, hover
+  time, media), the input at the bottom is the chat composer's card, and
+  `messages:sendComment` posts into the thread's discussion group (`getMessageThread`
+  resolves it from the clicked message). Whether the input is offered at all follows
+  the official desktop client: `messages:commentInfo` composes membership, join-to-send
+  and permissions into canComment/canJoin (pure rule in `telegram/comment-access.ts`),
+  and a non-member gets 加入讨论组 / 申请加入讨论组 instead of the composer. Reaching the
+  top loads an older page (with scroll compensation); Esc / ‹ closes with the reverse
+  slide. The bar's numbers come from
+  `message.interaction_info` (comments, plus 阅读/转发 for channels) and live updates patch
+  the counter through the new `interaction` message op instead of remapping the message.
+  New channel `messages:comments`; new DTO `MessageInteraction`; mock fixtures carry two
+  group threads and the channel's 78-comment thread. Read-only: posting a comment is
+  deliberately not implemented (it needs the discussion chat's thread root id). Design:
+  `技术方案.md` §9.8.
 - **Sender photos in the transcript (W3 addendum)**: group members are no longer
   initials. `Message.senderAvatarUrl` carries the picture a row can already draw, and
   the adapter's photo pool (the one that fetched chat photos) now resolves **people**
@@ -415,6 +450,17 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
   caches titles (`chatTitles`, filled from `mapChat` and `updateChatTitle`) next to
   `userNames`. Measured on the real account: 20/20 messages in a channel use
   `messageSenderChat` (`senderChat` line in `tdlib:smoke`).
+- **A comment thread is a TDLib message thread, and the count is free.**
+  `message.interaction_info.reply_info.reply_count` is filled only for channel posts
+  with a linked discussion group and for the posts inside that group — exactly the rows
+  that get WeChat's comment bar — and `messageProperties.can_get_message_thread` says
+  whether the thread can be pulled. `getMessageThreadHistory` is called with the
+  *commented* message's `chat_id`; for a channel post TDLib routes to the linked
+  supergroup itself, so the renderer never needs the discussion chat id. It answers
+  newest-first and treats `from_message_id` as exclusive, like `getChatHistory`;
+  `actions/comments.ts` sorts a page ascending. `updateMessageInteractionInfo` fires on
+  every view, so it is patched with the `interaction` op instead of a `getMessage`
+  round trip (the op merges, so a live patch never drops `canOpen`).
 - **Restoring a reading position needs all three pieces.** (a) the list must not mount
   before the stored anchor is known — a cached chat otherwise captures the bottom as its
   position; (b) `scrollToIndex` is only an estimate with dynamic row heights, so the

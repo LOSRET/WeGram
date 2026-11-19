@@ -1,9 +1,8 @@
-import { join } from 'node:path'
-
 import type { ViewerItem, ViewerState } from '@wegram/protocol'
 import { AppError } from '@wegram/protocol'
-import { app, BrowserWindow, screen } from 'electron'
+import { BrowserWindow, screen } from 'electron'
 
+import { attachNavigationPolicy, createAppWindow } from './app-window'
 import { createLogger } from './util'
 import { VIEWER_MIN_H, VIEWER_MIN_W, viewerWindowSize } from './viewer-size'
 
@@ -150,24 +149,16 @@ function createViewerWindow(parent: BrowserWindow | null): BrowserWindow {
     workArea: display.workAreaSize,
   })
 
-  const win = new BrowserWindow({
-    ...size,
+  const win = createAppWindow({
+    width: size.width,
+    height: size.height,
     minWidth: VIEWER_MIN_W,
     minHeight: VIEWER_MIN_H,
-    show: false,
     // The viewer paints its own toolbar into the title strip, like the shell.
-    titleBarStyle: 'hidden',
-    titleBarOverlay: titleBarOverlay(theme),
+    overlay: titleBarOverlay(theme),
     backgroundColor: theme === 'dark' ? '#242424' : '#f7f7f7',
     title: VIEWER_TITLE,
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      webSecurity: true,
-      spellcheck: false,
-    },
+    hash: 'viewer',
   })
 
   // Centred inside the work area, like the client's viewer.
@@ -186,17 +177,10 @@ function createViewerWindow(parent: BrowserWindow | null): BrowserWindow {
     win.focus()
   })
 
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    logger.warn(`viewer refused window.open(${url})`)
-    return { action: 'deny' }
-  })
-
-  const devUrl = process.env['ELECTRON_RENDERER_URL']
-  if (!app.isPackaged && devUrl) {
-    void win.loadURL(`${devUrl}#viewer`)
-  } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'), { hash: 'viewer' })
-  }
+  // The viewer is a route of the same bundle; leaving it would strand the
+  // toolbar and the strip it is showing (the shell and login windows guard this
+  // the same way, and the viewer had been the one copy without it).
+  attachNavigationPolicy(win, { links: 'deny', label: 'viewer' })
 
   return win
 }

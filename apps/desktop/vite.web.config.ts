@@ -24,6 +24,8 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
+      '@wegram/mock-fixtures': resolve(__dirname, '../../packages/mock-fixtures/src/index.ts'),
+      '@wegram/mock-session': resolve(__dirname, '../../packages/mock-session/src/index.ts'),
       '@wegram/protocol': resolve(__dirname, '../../packages/protocol/src/index.ts'),
       '@renderer': resolve(__dirname, 'src/renderer/src'),
     },

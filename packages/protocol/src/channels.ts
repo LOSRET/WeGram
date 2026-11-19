@@ -1,25 +1,36 @@
 import { z } from 'zod'
 
 import {
-  appInfoSchema,
-  appSettingsSchema,
   authStateSchema,
   chatOpSchema,
   chatSummarySchema,
   connectionStateSchema,
-  messageEntitySchema,
   messageOpSchema,
   messageSchema,
-  proxyConfigSchema,
-  proxyTestResultSchema,
   scrollAnchorSchema,
   selfSchema,
   stickerSetSchema,
   userAvatarSchema,
   stickerSetSummarySchema,
-  viewerItemSchema,
-  viewerStateSchema,
 } from './dto'
+import {
+  appInfoSchema,
+  appSettingsSchema,
+  proxyConfigSchema,
+  proxyTestResultSchema,
+  RECENT_EMOJI_LIMIT,
+} from './settings'
+import { viewerItemsSchema, viewerStateSchema } from './viewer'
+import {
+  commentAccessSchema,
+  commentJoinResultSchema,
+  commentPageSchema,
+  commentQuerySchema,
+  commentSendSchema,
+  commentSentSchema,
+  commentTargetSchema,
+} from './comment'
+import { contactSchema } from './contact'
 import { appErrorSchema } from './errors'
 
 /**
@@ -56,6 +67,12 @@ export const invokeChannels = [
   'chats:canPost',
   /** 静音 / 取消静音 for the channel bar; answers the refreshed summary. */
   'chats:setMuted',
+  /**
+   * The account's Telegram address book (通讯录). People, not conversations:
+   * the list comes from TDLib's `getContacts`, so a contact without a private
+   * chat still appears, and 发消息 creates the chat on demand.
+   */
+  'contacts:list',
   'messages:history',
   /**
    * One window centred on a message, for a reading position or unread boundary
@@ -65,6 +82,26 @@ export const invokeChannels = [
   'messages:around',
   /** One page below a window that does not reach the newest message. */
   'messages:newer',
+  /**
+   * One page of a message's comment thread (a channel's discussion group, or the
+   * replies to a post inside that group). `fromMessageId` pages towards older
+   * comments; the answer is ascending, like every transcript page.
+   */
+  'messages:comments',
+  /**
+   * Whether this account may post in the thread's discussion group, and whether
+   * a join button is the next step (design doc §9.8). Mirrors the official
+   * client: no server "can comment" call, the adapter composes it from the
+   * supergroup's membership status, join-to-send flag and permissions.
+   */
+  'messages:commentInfo',
+  /** Joins the thread's discussion group (or sends a join request). */
+  'messages:joinCommentGroup',
+  /**
+   * Posts a comment on a message (the discussion view's input). TDLib keeps the
+   * thread in the linked supergroup, so the adapter resolves the chat itself.
+   */
+  'messages:sendComment',
   'messages:send',
   'messages:edit',
   'messages:delete',
@@ -137,12 +174,16 @@ export const invokeSchemas = {
   },
   'chats:get': { request: z.object({ chatId: z.number().int() }), response: chatSummarySchema },
   'chats:open': { request: z.object({ chatId: z.number().int() }), response: noPayload },
-  'chats:openPrivate': { request: z.object({ userId: z.number().int() }), response: chatSummarySchema },
+  'chats:openPrivate': {
+    request: z.object({ userId: z.number().int() }),
+    response: chatSummarySchema,
+  },
   'chats:canPost': { request: z.object({ chatId: z.number().int() }), response: z.boolean() },
   'chats:setMuted': {
     request: z.object({ chatId: z.number().int(), muted: z.boolean() }),
     response: chatSummarySchema,
   },
+  'contacts:list': { request: noPayload, response: z.array(contactSchema) },
   'messages:history': {
     request: z.object({
       chatId: z.number().int(),
@@ -177,6 +218,13 @@ export const invokeSchemas = {
     }),
     response: z.object({ messages: z.array(messageSchema), hasNewer: z.boolean() }),
   },
+  'messages:comments': { request: commentQuerySchema, response: commentPageSchema },
+  'messages:commentInfo': { request: commentTargetSchema, response: commentAccessSchema },
+  'messages:joinCommentGroup': {
+    request: commentTargetSchema,
+    response: commentJoinResultSchema,
+  },
+  'messages:sendComment': { request: commentSendSchema, response: commentSentSchema },
   'messages:send': {
     request: z.object({
       chatId: z.number().int(),
@@ -259,11 +307,16 @@ export const invokeSchemas = {
   },
   'stickers:sets': { request: noPayload, response: z.array(stickerSetSummarySchema) },
   'stickers:set': { request: z.object({ setId: z.string().min(1) }), response: stickerSetSchema },
+  /**
+   * The draft is plain text: the composer has no formatting controls, so the
+   * `entities` field that used to sit here was never sent, stored or read back —
+   * it only made the handler's hand-written cast look complete. Add it back
+   * together with a caller.
+   */
   'ui:saveDraft': {
     request: z.object({
       chatId: z.number().int(),
       text: z.string(),
-      entities: z.array(messageEntitySchema).optional(),
       replyTo: z.number().int().optional(),
     }),
     response: noPayload,
@@ -290,7 +343,7 @@ export const invokeSchemas = {
   },
   'ui:getRecentEmoji': { request: noPayload, response: z.array(z.string()) },
   'ui:saveRecentEmoji': {
-    request: z.object({ emoji: z.array(z.string().min(1).max(32)).max(24) }),
+    request: z.object({ emoji: z.array(z.string().min(1).max(32)).max(RECENT_EMOJI_LIMIT) }),
     response: noPayload,
   },
   'settings:get': { request: noPayload, response: appSettingsSchema },
@@ -315,7 +368,7 @@ export const invokeSchemas = {
     request: z.object({
       /** The conversation the strip was taken from; 定位到聊天位置 needs it. */
       chatId: z.number().int(),
-      items: z.array(viewerItemSchema).min(1).max(200),
+      items: viewerItemsSchema,
       index: z.number().int().nonnegative(),
     }),
     response: noPayload,

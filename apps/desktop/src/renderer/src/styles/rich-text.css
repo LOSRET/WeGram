@@ -36,13 +36,19 @@
 
 .wx-spoiler {
   border-radius: 3px;
-  background: currentColor;
+  background: var(--wx-spoiler);
   color: transparent;
   cursor: pointer;
 }
 
 .wx-spoiler > * {
   color: transparent;
+}
+
+/* The chat-list preview masks the same words but offers no reveal: the row
+   itself is the click target, so the block must not advertise one. */
+.wx-spoiler--preview {
+  cursor: inherit;
 }
 
 .wx-spoiler--revealed {

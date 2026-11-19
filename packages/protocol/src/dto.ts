@@ -55,11 +55,15 @@ export const chatSummarySchema = z.object({
   id: z.number().int(),
   title: z.string(),
   kind: chatKindSchema,
+  /** Peer user id (private/secret); 通讯录 hides our own Saved Messages. */
+  userId: z.number().int().optional(),
   unread: z.number().int().nonnegative(),
   pinned: z.boolean(),
   muted: z.boolean(),
   lastMessageText: z.string().optional(),
   lastMessageAt: z.number().optional(),
+  /** [start, end) spoiler runs of `lastMessageText`, so the row can mask them too. */
+  lastMessageSpoilers: z.array(z.tuple([z.number().int(), z.number().int()])).optional(),
   /** Highest incoming message id the server considers read (unread divider). */
   lastReadInboxMessageId: z.number().int().optional(),
   /** Highest outgoing message id the peer has read (read receipt). */
@@ -110,6 +114,10 @@ export type MessageEntity = z.infer<typeof messageEntitySchema>
  * from the mock adapter). The renderer never receives a filesystem path and never
  * loads `file://`, which also keeps the browser preview working.
  */
+/** The three sticker formats the client renders (design doc §9.4). */
+export const stickerFormatSchema = z.enum(['webp', 'tgs', 'webm'])
+export type StickerFormat = z.infer<typeof stickerFormatSchema>
+
 export const messageMediaSchema = z.object({
   fileId: z.number().int(),
   thumbFileId: z.number().int().optional(),
@@ -117,13 +125,13 @@ export const messageMediaSchema = z.object({
   width: z.number().int().optional(),
   height: z.number().int().optional(),
   duration: z.number().int().optional(),
-  stickerFormat: z.enum(['webp', 'tgs', 'webm']).optional(),
+  stickerFormat: stickerFormatSchema.optional(),
   /**
    * The thumbnail's own format. TDLib serves a static image as a sticker's
    * thumbnail even for TGS/WebM stickers, so a grid that renders the thumbnail
    * must not reuse `stickerFormat`.
    */
-  stickerThumbFormat: z.enum(['webp', 'tgs', 'webm']).optional(),
+  stickerThumbFormat: stickerFormatSchema.optional(),
   /** Emoji the sticker matches, used as its alt text and in the picker. */
   stickerEmoji: z.string().optional(),
   fileName: z.string().optional(),
@@ -134,7 +142,6 @@ export const messageMediaSchema = z.object({
   minithumbnail: z.string().optional(),
 })
 export type MessageMedia = z.infer<typeof messageMediaSchema>
-
 
 /**
  * One button under a message or inside a rich page (Telegram's inline keyboard).
@@ -163,8 +170,6 @@ export const contactCardSchema = z.object({
   userId: z.number().int().optional(),
 })
 export type ContactCard = z.infer<typeof contactCardSchema>
-export const stickerFormatSchema = z.enum(['webp', 'tgs', 'webm'])
-export type StickerFormat = z.infer<typeof stickerFormatSchema>
 
 /** One sticker from a set (design doc §9.4: WebP / TGS / WebM). */
 export const stickerSchema = z.object({
@@ -197,7 +202,6 @@ export const stickerSetSchema = stickerSetSummarySchema.extend({
   stickers: z.array(stickerSchema),
 })
 export type StickerSet = z.infer<typeof stickerSetSchema>
-
 
 /**
  * A run of text with the entities that style it (bold, links, mentions…). The
@@ -373,6 +377,30 @@ export const messageKindSchema = z.enum([
 ])
 export type MessageKind = z.infer<typeof messageKindSchema>
 
+/**
+ * Engagement under a message — the row WeChat's article cards carry above their
+ * comment list. TDLib fills it from `messageInteractionInfo`: counters on
+ * channels, and `reply_info` wherever the message owns a comment thread (a
+ * channel post with a discussion group, and the posts inside that group).
+ *
+ * The renderer draws a comment bar from this alone, so no extra request is
+ * needed until the reader actually opens the thread.
+ */
+export const messageInteractionSchema = z.object({
+  /** 阅读: TDLib `view_count`. Absent when the chat has no view counter. */
+  views: z.number().int().nonnegative().optional(),
+  /** 转发: TDLib `forward_count`. */
+  forwards: z.number().int().nonnegative().optional(),
+  /** 评论: replies to the message (`reply_info.reply_count`), nested ones included. */
+  comments: z.number().int().nonnegative(),
+  /**
+   * Whether the comment thread can be fetched (`messageProperties.can_get_message_thread`).
+   * False means the number is stale or the thread is not accessible right now.
+   */
+  canOpen: z.boolean().optional(),
+})
+export type MessageInteraction = z.infer<typeof messageInteractionSchema>
+
 export const messageSchema = z.object({
   id: z.number().int(),
   chatId: z.number().int(),
@@ -412,6 +440,8 @@ export const messageSchema = z.object({
   albumId: z.string().optional(),
   replyToId: z.number().int().optional(),
   edited: z.boolean().optional(),
+  /** Views / forwards / comments under the message; absent when there are none. */
+  interaction: messageInteractionSchema.optional(),
 })
 export type Message = z.infer<typeof messageSchema>
 
@@ -443,6 +473,17 @@ export const messageOpSchema = z.discriminatedUnion('op', [
     messageIds: z.array(z.number().int()),
   }),
   z.object({ op: z.literal('read'), chatId: z.number().int(), upToMessageId: z.number().int() }),
+  /**
+   * Engagement moved (views, forwards, replies) without the message changing:
+   * patching the counter is far cheaper than remapping the whole message, and
+   * `updateMessageInteractionInfo` fires on every view.
+   */
+  z.object({
+    op: z.literal('interaction'),
+    chatId: z.number().int(),
+    messageId: z.number().int(),
+    interaction: messageInteractionSchema,
+  }),
 ])
 export type MessageOp = z.infer<typeof messageOpSchema>
 
@@ -460,86 +501,7 @@ export const scrollAnchorSchema = z.object({
 })
 export type ScrollAnchor = z.infer<typeof scrollAnchorSchema>
 
-/**
- * Proxy configuration.
- *
- * Secrets crossing IPC are always `MASK` when already stored; sending `MASK`
- * back on `proxy:set` means "keep the stored secret" (design doc §6.4).
- */
-export const MASK = '***' as const
-
-export const proxyConfigSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('socks5'),
-    host: z.string().min(1),
-    port: z.number().int().min(1).max(65535),
-    username: z.string().optional(),
-    password: z.string().optional(),
-  }),
-  z.object({
-    type: z.literal('mtproto'),
-    host: z.string().min(1),
-    port: z.number().int().min(1).max(65535),
-    secret: z.string().optional(),
-  }),
-])
-export type ProxyConfig = z.infer<typeof proxyConfigSchema>
-
-export const proxyTestResultSchema = z.object({
-  ok: z.boolean(),
-  latencyMs: z.number().optional(),
-  error: z.string().optional(),
-})
-export type ProxyTestResult = z.infer<typeof proxyTestResultSchema>
-
-export const appSettingsSchema = z.object({
-  theme: z.enum(['light', 'dark']),
-})
-export type AppSettings = z.infer<typeof appSettingsSchema>
-
-/**
- * One item of the strip the standalone viewer window pages through.
- *
- * The client puts photos **and** videos in the same 图片和视频 window, so the item
- * carries its kind: the toolbar is shared, only the canvas and the bottom player
- * bar differ.
- *
- * The renderer owns the transcript, so it hands the viewer the whole strip plus
- * the index that was clicked; 上一张/下一张 then works without asking the adapter
- * for history again.
- */
-export const viewerItemSchema = z.object({
-  /** Media file id the viewer downloads through `media:download`. */
-  fileId: z.number().int().positive(),
-  /** Message carrying the media, so 更多 → 定位到聊天位置 keeps its origin. */
-  messageId: z.number().int().optional(),
-  kind: z.enum(['photo', 'video']),
-  fileName: z.string().optional(),
-  width: z.number().int().positive().optional(),
-  height: z.number().int().positive().optional(),
-  size: z.number().int().nonnegative().optional(),
-  /** Seconds; lets the player show the total before the file has loaded. */
-  duration: z.number().nonnegative().optional(),
-  /** base64 JPEG, ~40px: paints the 预览 grid before a file has been fetched. */
-  minithumbnail: z.string().optional(),
-})
-export type ViewerItem = z.infer<typeof viewerItemSchema>
-
-/** What `viewer:init` answers: the strip, the current index and the theme. */
-export const viewerStateSchema = z.object({
-  items: z.array(viewerItemSchema).min(1).max(200),
-  index: z.number().int().nonnegative(),
-  theme: appSettingsSchema.shape.theme,
-})
-export type ViewerState = z.infer<typeof viewerStateSchema>
-
-export const appInfoSchema = z.object({
-  version: z.string(),
-  appVersion: z.string(),
-  adapter: z.enum(['mock', 'tdlib']),
-  tdlibVersion: z.string().optional(),
-  userDataPath: z.string(),
-})
-export type AppInfo = z.infer<typeof appInfoSchema>
+/* Settings / proxy / app-info DTOs live in `settings.ts`; the viewer's in
+   `viewer.ts` — both were split out when this file reached its line budget. */
 
 export type { z }

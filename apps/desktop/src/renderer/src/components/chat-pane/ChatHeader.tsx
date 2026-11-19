@@ -1,11 +1,12 @@
+import { anchorOf, type PopupAnchor } from '../../lib/popupPlacement'
 import { CallIcon, CallMenuIcon, MoreIcon } from '../Icon'
 
 interface ChatHeaderProps {
   title: string
   /** The peer is typing right now (the store expires the flag itself). */
   typing: boolean
-  /** Opens the chat-info popover at the "…" button. */
-  onOpenInfo: (position: { x: number; y: number }) => void
+  /** Opens the chat-info popover against the "…" button. */
+  onOpenInfo: (anchor: PopupAnchor) => void
 }
 
 /**
@@ -31,10 +32,7 @@ export function ChatHeader({ title, typing, onOpenInfo }: ChatHeaderProps) {
           className="wx-ghost-btn"
           title="聊天信息"
           aria-label="聊天信息"
-          onClick={(event) => {
-            const rect = event.currentTarget.getBoundingClientRect()
-            onOpenInfo({ x: rect.right - 232, y: rect.bottom + 6 })
-          }}
+          onClick={(event) => onOpenInfo(anchorOf(event.currentTarget.getBoundingClientRect()))}
         >
           <MoreIcon size={18} />
         </button>

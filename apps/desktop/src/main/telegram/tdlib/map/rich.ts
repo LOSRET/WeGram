@@ -1,4 +1,5 @@
 import type {
+  MessageMedia,
   RichAlign,
   RichBlock,
   RichFormatted,
@@ -9,8 +10,9 @@ import type {
 } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
+import { asArray } from '../json'
 import { inlineButtonOf } from './buttons'
-import { mediaUrls, pickLargest, pickSmallestAtLeast } from './media'
+import { documentMedia, photoMedia, videoMedia, voiceMedia } from './media'
 import { richText } from './rich-text'
 
 /**
@@ -121,7 +123,7 @@ function sectionSize(value: unknown): number | undefined {
 }
 
 function listBlock(block: TdObject, depth: number): RichBlock | null {
-  const rawItems: TdObject[] = Array.isArray(block.items) ? block.items : []
+  const rawItems: TdObject[] = asArray(block.items)
   const items: RichListItem[] = rawItems.map((item) => ({
     label: typeof item.label === 'string' ? item.label : '',
     value: Number(item.value ?? 0),
@@ -132,8 +134,8 @@ function listBlock(block: TdObject, depth: number): RichBlock | null {
 }
 
 function tableBlock(block: TdObject): RichBlock | null {
-  const rawRows: TdObject[][] = Array.isArray(block.cells) ? block.cells : []
-  const rows = rawRows.map((row) => (Array.isArray(row) ? row : []).map(tableCell))
+  const rawRows: TdObject[][] = asArray<TdObject[]>(block.cells)
+  const rows = rawRows.map((row) => asArray(row).map(tableCell))
   if (!rows.length) return null
   const caption = captionOf(block.caption)
   return {
@@ -193,7 +195,7 @@ function detailsBlock(block: TdObject, depth: number): RichBlock | null {
 }
 
 function buttonRowBlock(block: TdObject): RichBlock | null {
-  const raw: TdObject[] = Array.isArray(block.buttons) ? block.buttons : []
+  const raw: TdObject[] = asArray(block.buttons)
   const row = raw
     .map((button) => inlineButtonOf(button, richText(button?.text).text))
     .filter((button): button is NonNullable<typeof button> => button !== null)
@@ -201,7 +203,7 @@ function buttonRowBlock(block: TdObject): RichBlock | null {
 }
 
 function galleryBlock(block: TdObject): RichBlock | null {
-  const raw: TdObject[] = Array.isArray(block.blocks) ? block.blocks : []
+  const raw: TdObject[] = asArray(block.blocks)
   const items: RichMedia[] = []
   for (const child of raw) {
     const media = mediaOf(child)
@@ -229,17 +231,17 @@ function mediaOf(block: TdObject | undefined): RichMedia | null {
   if (!block) return null
   switch (block._) {
     case 'pageBlockPhoto':
-      return photoMedia(block.photo)
+      return asMedia('photo', photoMedia(block.photo))
     case 'pageBlockVideo':
-      return videoMedia(block.video, 'video')
+      return asMedia('video', videoMedia(block.video, 'video'))
     case 'pageBlockAnimation':
-      return videoMedia(block.animation, 'animation')
+      return asMedia('video', videoMedia(block.animation, 'animation'))
     case 'pageBlockAudio':
-      return documentMedia(block.audio)
+      return asMedia('file', documentMedia(block.audio))
     case 'pageBlockDocument':
-      return documentMedia(block.document)
+      return asMedia('file', documentMedia(block.document))
     case 'pageBlockVoiceNote':
-      return voiceMedia(block.voice_note)
+      return asMedia('voice', voiceMedia(block.voice_note))
     default:
       return null
   }
@@ -251,83 +253,9 @@ function captionOf(caption: TdObject | undefined): RichFormatted | undefined {
   return text.text.trim() ? text : undefined
 }
 
-function photoMedia(photo: TdObject | undefined): RichMedia | null {
-  if (!photo) return null
-  const sizes: TdObject[] = Array.isArray(photo.sizes) ? photo.sizes : []
-  const display = pickLargest(sizes)
-  const fileId = Number(display?.photo?.id ?? 0)
-  if (!fileId) return null
-  const thumb = pickSmallestAtLeast(sizes, 160) ?? display
-  const thumbId = Number(thumb?.photo?.id ?? 0)
-  return {
-    kind: 'photo',
-    media: {
-      fileId,
-      ...(thumb !== display && thumbId ? { thumbFileId: thumbId } : {}),
-      ...(display?.width ? { width: Number(display.width) } : {}),
-      ...(display?.height ? { height: Number(display.height) } : {}),
-      ...(photo.minithumbnail?.data ? { minithumbnail: photo.minithumbnail.data } : {}),
-      ...mediaUrls(display?.photo, thumb?.photo),
-    },
-  }
-}
-
-function videoMedia(value: TdObject | undefined, field: 'video' | 'animation'): RichMedia | null {
-  if (!value) return null
-  const file = value[field]
-  const fileId = Number(file?.id ?? 0)
-  if (!fileId) return null
-  const thumbFileId = Number(value.thumbnail?.file?.id ?? 0)
-  return {
-    kind: 'video',
-    media: {
-      fileId,
-      ...(thumbFileId ? { thumbFileId } : {}),
-      ...(value.duration ? { duration: Number(value.duration) } : {}),
-      ...(value.width ? { width: Number(value.width) } : {}),
-      ...(value.height ? { height: Number(value.height) } : {}),
-      ...(value.file_name ? { fileName: value.file_name } : {}),
-      ...(value.mime_type ? { mimeType: value.mime_type } : {}),
-      ...(value.minithumbnail?.data ? { minithumbnail: value.minithumbnail.data } : {}),
-      ...mediaUrls(file, value.thumbnail?.file),
-    },
-  }
-}
-
-function documentMedia(value: TdObject | undefined): RichMedia | null {
-  if (!value) return null
-  const file = value.document ?? value.audio
-  const fileId = Number(file?.id ?? 0)
-  if (!fileId) return null
-  const thumbFileId = Number(value.thumbnail?.file?.id ?? 0)
-  const fileName = value.file_name ?? value.title
-  return {
-    kind: 'file',
-    media: {
-      fileId,
-      ...(thumbFileId ? { thumbFileId } : {}),
-      ...(typeof fileName === 'string' && fileName ? { fileName } : {}),
-      ...(file?.size ? { size: Number(file.size) } : {}),
-      ...(value.mime_type ? { mimeType: value.mime_type } : {}),
-      ...(value.minithumbnail?.data ? { minithumbnail: value.minithumbnail.data } : {}),
-      ...mediaUrls(file, value.thumbnail?.file),
-    },
-  }
-}
-
-function voiceMedia(value: TdObject | undefined): RichMedia | null {
-  if (!value) return null
-  const fileId = Number(value.voice?.id ?? 0)
-  if (!fileId) return null
-  return {
-    kind: 'voice',
-    media: {
-      fileId,
-      mimeType: value.mime_type ?? 'audio/ogg',
-      ...(value.duration ? { duration: Number(value.duration) } : {}),
-      ...mediaUrls(value.voice),
-    },
-  }
+/** A mapped media is a rich item only when it points at a real file. */
+function asMedia(kind: RichMedia['kind'], media: MessageMedia): RichMedia | null {
+  return media.fileId ? { kind, media } : null
 }
 
 /* ---------- flattening ---------- */

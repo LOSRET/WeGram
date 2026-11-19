@@ -3,6 +3,7 @@ import type { ChatSummary, Message } from '@wegram/protocol'
 import { useCallback, useMemo, useRef, useState } from 'react'
 
 import { isSameDay } from '../../lib/format'
+import { selfIdentity } from '../../lib/self'
 import { useAnchoredScroll } from '../../lib/useAnchoredScroll'
 import { useAppStore } from '../../store/useAppStore'
 import type { UnreadMarker } from '../../store/useAppStore'
@@ -68,6 +69,8 @@ export interface MessageListProps {
   onDelete: (message: Message) => void
   onForward: (message: Message) => void
   onCopy: (message: Message) => void
+  /** Opens the full-pane comment view of the message (design doc §9.8). */
+  onOpenComments: (message: Message) => void
 }
 
 interface MenuState {
@@ -119,6 +122,7 @@ export function MessageList({
   onDelete,
   onForward,
   onCopy,
+  onOpenComments,
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const hostRef = useRef<HTMLDivElement | null>(null)
@@ -131,17 +135,7 @@ export function MessageList({
   const userAvatars = useAppStore((state) => state.userAvatars)
   // Memoised because every rendered row takes it as a prop: a fresh object per
   // render would re-render all of them and defeat `memo` in `MessageRow`.
-  const self = useMemo(
-    () =>
-      auth.kind === 'ready'
-        ? {
-            id: auth.me.id,
-            name: [auth.me.firstName, auth.me.lastName].filter(Boolean).join(''),
-            avatarUrl: auth.me.avatarUrl,
-          }
-        : { id: 1000, name: '我', avatarUrl: undefined },
-    [auth],
-  )
+  const self = useMemo(() => selfIdentity(auth), [auth])
 
   /**
    * Albums folded into rows (design doc §8.6). Derived, never stored: a page that
@@ -316,6 +310,7 @@ export function MessageList({
                   avatarUrl={senderAvatarUrl(first, chat, self, userAvatars)}
                   readOutboxMaxId={chat.lastReadOutboxMessageId ?? 0}
                   onOpenMenu={openMenu}
+                  onOpenComments={onOpenComments}
                 />
               </div>
             )

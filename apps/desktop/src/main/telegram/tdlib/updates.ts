@@ -4,10 +4,11 @@ import { registerMediaFile } from '../../media/registry'
 import type { Logger } from '../../util'
 import type { AdapterEvent } from '../adapter'
 import type { TdObject } from './client'
+import { asArray } from './json'
 import { mapConnectionState } from './map/chat'
 import type { MapperContext } from './map/context'
 import { isTranscriptRemoval } from './map/deletion'
-import { mapMessage } from './map/message'
+import { mapInteraction, mapMessage } from './map/message'
 
 /** What the update stream needs from the adapter. */
 export interface UpdateDeps {
@@ -76,8 +77,31 @@ export function createUpdateHandler(deps: UpdateDeps): (update: TdObject) => Pro
         }
         return
       }
+      /**
+       * Engagement counters moved (views, forwards, replies). The update carries
+       * no message content and fires on every view, so the whole message is not
+       * remapped: a cheap `interaction` op patches the row instead.
+       */
+      case 'updateMessageInteractionInfo': {
+        const interaction = mapInteraction({ interaction_info: update.interaction_info }) ?? {
+          comments: 0,
+        }
+        deps.emit({
+          type: 'messages',
+          chatId: update.chat_id,
+          ops: [
+            {
+              op: 'interaction',
+              chatId: update.chat_id,
+              messageId: update.message_id,
+              interaction,
+            },
+          ],
+        })
+        return
+      }
       case 'updateDeleteMessages': {
-        const messageIds: number[] = Array.isArray(update.message_ids) ? update.message_ids : []
+        const messageIds: number[] = asArray<number>(update.message_ids)
         if (messageIds.length === 0) return
         /**
          * TDLib also reports *cache evictions* here: while the app sat idle in the

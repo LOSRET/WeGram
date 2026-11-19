@@ -1,13 +1,11 @@
-import { join } from 'node:path'
+import type { BrowserWindow } from 'electron'
 
-import { app, BrowserWindow, shell } from 'electron'
-
+import { attachNavigationPolicy, createAppWindow } from './app-window'
 import type { UiDatabase } from './store/ui-db'
 import { createLogger } from './util'
 import { hideViewerWithShell, showViewerWithShell } from './viewer'
 
 const logger = createLogger('windows')
-const isDev = !app.isPackaged
 
 /**
  * Brings the shell window forward above the standalone viewer.
@@ -25,28 +23,13 @@ export function raiseShellAboveViewer(win: BrowserWindow): void {
 }
 
 export function createMainWindow(theme: 'light' | 'dark'): BrowserWindow {
-  const win = new BrowserWindow({
+  const win = createAppWindow({
     width: 1000,
     height: 680,
     minWidth: 880,
     minHeight: 600,
-    show: false,
     backgroundColor: theme === 'dark' ? '#1e1e1f' : '#fbfbfb',
-    titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      // Must match --wx-rail / --wx-rail-icon, or the strip reads as a seam.
-      color: theme === 'dark' ? '#2d2d2e' : '#e0e0e0',
-      symbolColor: theme === 'dark' ? '#969697' : '#191919',
-      height: 32,
-    },
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      webSecurity: true,
-      spellcheck: false,
-    },
+    overlay: shellTitleBarOverlay(theme),
   })
 
   win.once('ready-to-show', () => {
@@ -59,37 +42,17 @@ export function createMainWindow(theme: 'light' | 'dark'): BrowserWindow {
   win.on('minimize', hideViewerWithShell)
   win.on('restore', showViewerWithShell)
 
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    openExternal(url)
-    return { action: 'deny' }
-  })
-
-  win.webContents.on('will-navigate', (event, url) => {
-    const rendererUrl = process.env['ELECTRON_RENDERER_URL']
-    if (rendererUrl && url.startsWith(rendererUrl)) return
-    event.preventDefault()
-    openExternal(url)
-  })
-
-  if (isDev && process.env['ELECTRON_RENDERER_URL']) {
-    void win.loadURL(process.env['ELECTRON_RENDERER_URL'])
-  } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'))
-  }
+  attachNavigationPolicy(win, { links: 'open-external', label: 'shell' })
 
   return win
 }
 
-/** Only https and tg: links leave the app (design doc §8.3). */
-/** Only https and tg: links leave the app (design doc §8.3). */
-function openExternal(url: string): void {
-  try {
-    const parsed = new URL(url)
-    if (parsed.protocol === 'https:' || parsed.protocol === 'tg:') {
-      void shell.openExternal(url)
-    }
-  } catch {
-    logger.warn('refused to open malformed URL')
+/** The shell's native window-controls strip; must match --wx-rail / --wx-rail-icon. */
+function shellTitleBarOverlay(theme: 'light' | 'dark'): Electron.TitleBarOverlay {
+  return {
+    color: theme === 'dark' ? '#2d2d2e' : '#e0e0e0',
+    symbolColor: theme === 'dark' ? '#969697' : '#191919',
+    height: 32,
   }
 }
 
@@ -104,11 +67,7 @@ export function storedTheme(uiDb: UiDatabase | null): 'light' | 'dark' {
 export function applyTitleBarTheme(win: BrowserWindow | null, theme: 'light' | 'dark'): void {
   if (!win || win.isDestroyed()) return
   try {
-    win.setTitleBarOverlay({
-      color: theme === 'dark' ? '#2d2d2e' : '#e0e0e0',
-      symbolColor: theme === 'dark' ? '#969697' : '#191919',
-      height: 32,
-    })
+    win.setTitleBarOverlay(shellTitleBarOverlay(theme))
   } catch (error) {
     logger.warn(
       'setTitleBarOverlay failed:',
@@ -116,4 +75,3 @@ export function applyTitleBarTheme(win: BrowserWindow | null, theme: 'light' | '
     )
   }
 }
-

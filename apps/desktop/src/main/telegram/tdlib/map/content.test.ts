@@ -6,6 +6,7 @@ import {
   pickLargest,
   pickSmallestAtLeast,
   previewContent,
+  previewSpoilers,
   serviceText,
 } from './content'
 
@@ -230,6 +231,53 @@ describe('previewContent', () => {
 
   it('returns an empty preview for a missing content object', () => {
     expect(previewContent(undefined)).toBe('')
+  })
+})
+
+describe('previewSpoilers', () => {
+  it('reports the spoiler offsets of a text preview', () => {
+    expect(
+      previewSpoilers({
+        _: 'messageText',
+        text: {
+          text: '剧透：答案是 42',
+          entities: [{ type: { _: 'textEntityTypeSpoiler' }, offset: 3, length: 3 }],
+        },
+      }),
+    ).toEqual([[3, 6]])
+  })
+
+  it('reads a spoiler off the caption, which is the whole photo preview', () => {
+    expect(
+      previewSpoilers({
+        _: 'messagePhoto',
+        caption: {
+          text: 'wwww',
+          entities: [{ type: { _: 'textEntityTypeSpoiler' }, offset: 0, length: 4 }],
+        },
+      }),
+    ).toEqual([[0, 4]])
+  })
+
+  it('has nothing to mask in a label or a service line', () => {
+    expect(previewSpoilers({ _: 'messagePhoto' })).toEqual([])
+    expect(previewSpoilers({ _: 'messageChatChangeTitle' })).toEqual([])
+    expect(previewSpoilers(undefined)).toEqual([])
+  })
+
+  it('drops entities that are not spoilers and ranges past the text', () => {
+    expect(
+      previewSpoilers({
+        _: 'messageText',
+        text: {
+          text: 'ab',
+          entities: [
+            { type: { _: 'textEntityTypeBold' }, offset: 0, length: 1 },
+            { type: { _: 'textEntityTypeSpoiler' }, offset: 0, length: 9 },
+          ],
+        },
+      }),
+    ).toEqual([])
   })
 })
 

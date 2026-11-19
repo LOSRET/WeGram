@@ -1,3 +1,4 @@
+import { composeCommentAccess, nextReadState, pageAround, pageNewer, pageOlder } from '@wegram/mock-session'
 import type {
   AppSettings,
   AuthState,
@@ -14,17 +15,21 @@ import type {
   ViewerItem,
 } from '@wegram/protocol'
 
+import { RECENT_EMOJI_LIMIT } from '../emoji'
 import { stickerMedia } from '../stickerMedia'
 import {
   ME,
   chats,
+  contacts,
   info,
   media,
   messagesByChat,
   msg,
   now,
   previewFiles,
+  previewCommentAccess,
   previewStickerSet,
+  previewThreads,
   PREVIEW_STICKERS,
   channelPostRights,
 } from './fixtures'
@@ -72,7 +77,6 @@ function clearQrTimer(): void {
   qrTimer = null
 }
 
-
 /**
  * The adapter's read rule in three lines: the marker only moves forward, and
  * `unread` is whatever is still newer than it. `upTo === null` means "the newest
@@ -81,12 +85,10 @@ function clearQrTimer(): void {
 function applyPreviewRead(chatId: number, upTo: number | null): void {
   const chat = chats.find((item) => item.id === chatId)
   if (!chat) return
-  const list = messagesByChat[chatId] ?? []
-  const marker = upTo ?? list[list.length - 1]?.id ?? null
-  if (marker !== null) chat.lastReadInboxMessageId = marker
-  chat.unread = list.filter(
-    (message) => !message.outgoing && message.id > (chat.lastReadInboxMessageId ?? 0),
-  ).length
+  const state = nextReadState(chat, messagesByChat[chatId] ?? [], upTo ?? undefined)
+  if (!state) return
+  chat.lastReadInboxMessageId = state.lastReadInboxMessageId
+  chat.unread = state.unread
   emit('evt:chats', { ops: [{ op: 'upsert', chat: { ...chat } }] })
 }
 
@@ -169,40 +171,92 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       emit('evt:chats', { ops: [{ op: 'upsert', chat: { ...chat } }] })
       return { ...chat }
     }
+    case 'chats:openPrivate': {
+      const chat = chats.find((item) => item.kind === 'private' && item.userId === store.userId)
+      if (!chat) throw { code: 'internal', message: 'unknown preview contact' }
+      return { ...chat }
+    }
+    case 'contacts:list':
+      return contacts
     case 'messages:read': {
       const upTo = Number(store.upToMessageId)
       if (Number.isFinite(upTo)) applyPreviewRead(Number(store.chatId), upTo)
       return undefined
     }
-    case 'messages:history': {
-      const all = messagesByChat[store.chatId] ?? []
-      const fromId = store.fromMessageId as number | undefined
-      const limit = Number(store.limit ?? 50)
-      const older = fromId === undefined ? all : all.filter((item) => item.id < fromId)
-      const page = older.slice(Math.max(0, older.length - limit))
-      return { messages: page, hasMore: older.length > page.length }
-    }
-    case 'messages:around': {
-      const all = messagesByChat[store.chatId] ?? []
-      const messageId = Number(store.messageId)
-      const limit = Number(store.limit ?? 25)
-      const found = all.findIndex((item) => item.id === messageId)
-      const center = found >= 0 ? found : all.findIndex((item) => item.id > messageId)
-      if (center < 0) return { messages: [], hasMore: true, hasNewer: false }
-      const start = Math.max(0, center - limit)
-      const end = Math.min(all.length, center + limit + 1)
-      return {
-        messages: all.slice(start, end),
-        hasMore: start > 0,
-        hasNewer: end < all.length,
+    case 'messages:history':
+      return pageOlder(
+        messagesByChat[store.chatId] ?? [],
+        store.fromMessageId as number | undefined,
+        Number(store.limit ?? 50),
+      )
+    case 'messages:around':
+      return pageAround(
+        messagesByChat[store.chatId] ?? [],
+        Number(store.messageId),
+        Number(store.limit ?? 25),
+      )
+    case 'messages:newer':
+      return pageNewer(
+        messagesByChat[store.chatId] ?? [],
+        Number(store.fromMessageId),
+        Number(store.limit ?? 50),
+      )
+    case 'messages:comments':
+      return pageOlder(
+        previewThreads[`${store.chatId}:${store.messageId}`] ?? [],
+        store.fromMessageId as number | undefined,
+        Number(store.limit ?? 30),
+      )
+    case 'messages:commentInfo': {
+      const key = `${store.chatId}:${store.messageId}`
+      if (!previewThreads[key]) {
+        throw { code: 'not_implemented', message: '这个帖子还没有讨论群组，不能评论' }
       }
+      return composeCommentAccess(previewCommentAccess[key])
     }
-    case 'messages:newer': {
-      const all = messagesByChat[store.chatId] ?? []
-      const fromId = Number(store.fromMessageId)
-      const limit = Number(store.limit ?? 50)
-      const newer = all.filter((item) => item.id > fromId)
-      return { messages: newer.slice(0, limit), hasNewer: newer.length > limit }
+    case 'messages:joinCommentGroup': {
+      const key = `${store.chatId}:${store.messageId}`
+      const access = previewCommentAccess[key] ?? {}
+      if (access.joinByRequest) return { joined: false, requestSent: true }
+      previewCommentAccess[key] = { ...access, joined: true, canComment: true }
+      return { joined: true, requestSent: false }
+    }
+    case 'messages:sendComment': {
+      const chatId = Number(store.chatId)
+      const messageId = Number(store.messageId)
+      const thread = previewThreads[`${chatId}:${messageId}`]
+      if (!thread) throw { code: 'not_implemented', message: '这个帖子还没有讨论群组，不能评论' }
+      const message: Message = {
+        id: thread.reduce((max, item) => Math.max(max, item.id), 0) + 1,
+        chatId,
+        senderId: ME.id,
+        senderName: '我',
+        outgoing: true,
+        date: now(),
+        kind: 'text',
+        text: String(store.text),
+      }
+      thread.push(message)
+      const target = (messagesByChat[chatId] ?? []).find((item) => item.id === messageId)
+      if (target) {
+        target.interaction = {
+          ...target.interaction,
+          comments: thread.length,
+          canOpen: true,
+        }
+        emit('evt:messages', {
+          chatId,
+          ops: [
+            {
+              op: 'interaction',
+              chatId,
+              messageId,
+              interaction: target.interaction,
+            },
+          ],
+        })
+      }
+      return { message }
     }
     case 'messages:send': {
       const list = messagesByChat[store.chatId] ?? []
@@ -309,7 +363,7 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'ui:saveRecentEmoji': {
       const list: unknown = store.emoji
       recentEmoji = Array.isArray(list)
-        ? list.filter((item): item is string => typeof item === 'string').slice(0, 10)
+        ? list.filter((item): item is string => typeof item === 'string').slice(0, RECENT_EMOJI_LIMIT)
         : []
       return undefined
     }

@@ -146,16 +146,12 @@
   background: rgba(255, 255, 255, 0.06);
 }
 
+/* The selected tab is the one coloured glyph in the rail: brand green, the same
+   accent the client fills its active tab with. */
 .wx-rail__btn--active,
 .wx-rail__btn--active:hover {
   background: transparent;
   color: var(--wx-rail-icon-active);
-}
-
-/* The 聊天 tab's Telegram mark is the one coloured glyph in the rail: it is the
-   active section, so it carries the brand green instead of the icon grey. */
-.wx-rail__brand {
-  color: var(--wx-brand);
 }
 
 .wx-rail__badge {

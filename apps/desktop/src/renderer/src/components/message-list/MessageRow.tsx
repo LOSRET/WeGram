@@ -1,7 +1,8 @@
 import type { ChatSummary, Message } from '@wegram/protocol'
 import { memo, type MouseEvent } from 'react'
 
-import { avatarColor, formatMessageTime, initials, messagePreview } from '../../lib/format'
+import { formatMessageTime, messagePreview } from '../../lib/format'
+import { Avatar } from '../Avatar'
 import { MediaBubble } from '../MediaBubble'
 import { ContactCard } from './ContactCard'
 import { InlineButtons } from './InlineButtons'
@@ -9,6 +10,7 @@ import { RichMessage } from './RichMessage'
 import { RichText } from '../RichText'
 import { StickerRenderer } from '../StickerRenderer'
 import { AlbumBubble } from './AlbumBubble'
+import { CommentBar } from './CommentBar'
 import { isEmojiOnly } from './emoji'
 
 export interface MessageRowProps {
@@ -33,6 +35,8 @@ export interface MessageRowProps {
    * stable callback: a per-row arrow function made `memo` useless.
    */
   onOpenMenu: (message: Message, x: number, y: number) => void
+  /** Opens Telegram's full-pane discussion view for that message's thread. */
+  onOpenComments: (message: Message) => void
 }
 
 /**
@@ -65,6 +69,7 @@ export const MessageRow = memo(
     avatarUrl,
     readOutboxMaxId,
     onOpenMenu,
+    onOpenComments,
   }: MessageRowProps) {
     const first = messages[0]
     const last = messages[messages.length - 1]
@@ -108,26 +113,14 @@ export const MessageRow = memo(
 
     return (
       <div className={`wx-message-row${first.outgoing ? ' wx-message-row--self' : ''}`}>
-        <div
+        <Avatar
           className="wx-avatar wx-avatar--small"
-          style={
-            avatarUrl
-              ? undefined
-              : {
-                  background: avatarColor(
-                    first.outgoing
-                      ? (self.id ?? 1000)
-                      : first.senderChatId || first.senderId || chat.id,
-                  ),
-                }
+          url={avatarUrl}
+          name={first.outgoing ? self.name : first.senderName}
+          colorId={
+            first.outgoing ? (self.id ?? 1000) : first.senderChatId || first.senderId || chat.id
           }
-        >
-          {avatarUrl ? (
-            <img className="wx-avatar__img" src={avatarUrl} alt="" draggable={false} />
-          ) : (
-            initials(first.outgoing ? self.name : first.senderName)
-          )}
-        </div>
+        />
 
         <div className={`wx-message-stack${first.outgoing ? ' wx-message-stack--self' : ''}`}>
           {showSender && first.senderName && first.senderName !== self.name ? (
@@ -200,6 +193,11 @@ export const MessageRow = memo(
               {buttons ? <InlineButtons rows={buttons} /> : null}
             </div>
           )}
+          {/* 评论 N 条 (design doc §9.8): just the handle — the thread opens in the
+              full-pane CommentPanel, like Telegram's discussion view. */}
+          {first.interaction?.comments ? (
+            <CommentBar interaction={first.interaction} onOpen={() => onOpenComments(first)} />
+          ) : null}
           <span className="wx-message__meta">
             {formatMessageTime(last.date)}
             {last.edited ? ' · 已编辑' : ''}
@@ -227,5 +225,6 @@ export const MessageRow = memo(
     previous.readOutboxMaxId === next.readOutboxMaxId &&
     previous.repliedTo === next.repliedTo &&
     previous.onOpenMenu === next.onOpenMenu &&
+    previous.onOpenComments === next.onOpenComments &&
     sameRow(previous.messages, next.messages),
 )

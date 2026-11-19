@@ -5,6 +5,7 @@ import { loadLatestWindow } from '../lib/anchoredWindow'
 import { searchEmoji } from '../lib/emoji'
 import { errorMessage, invoke } from '../lib/ipc'
 import { pageForIndex } from '../lib/pickerTabs'
+import { containsText, normalizeQuery } from '../lib/search'
 import { useAppStore } from '../store/useAppStore'
 import { EmojiBody } from './picker/EmojiBody'
 import { PickerTabs } from './picker/PickerTabs'
@@ -20,7 +21,11 @@ import { useStickerSets } from './picker/useStickerSets'
  * The composer's expression picker (design doc §9.3), rebuilt against the client's
  * own 表情 panel: a 464×464 card floating above the input, 最近使用 over a 10-column
  * 所有表情 grid, and the tab strip (搜索 / 表情 / installed sets / 下一页) pinned to
- * the bottom. Emoji are inserted into the draft; a sticker is sent on click.
+ * the bottom. Emoji are inserted into the draft; a sticker from a set tab is sent
+ * on click.
+ *
+ * The panel always opens on 表情. The set tabs in the strip are the only way to
+ * stickers: the composer's cube is 收藏, not a second expression entry.
  *
  * Sticker sets are fetched for the tab strip only; a set's stickers are fetched
  * when its tab is opened (and cached for the life of the panel), so opening the
@@ -29,35 +34,15 @@ import { useStickerSets } from './picker/useStickerSets'
  * This file owns the tab state and the composition; each concern has its own
  * module under `picker/`.
  */
-export function ExpressionPicker({
-  chatId,
-  mode,
-  onPickEmoji,
-  onSent,
-  onClose,
-}: ExpressionPickerProps) {
-  const { sets, setsLoaded, setsError } = useStickerSets()
-  const [tab, setTab] = useState<PickerTab>(() =>
-    mode === 'emoji' ? { kind: 'emoji' } : { kind: 'empty' },
-  )
+export function ExpressionPicker({ chatId, onPickEmoji, onSent, onClose }: ExpressionPickerProps) {
+  const { sets } = useStickerSets()
+  const [tab, setTab] = useState<PickerTab>({ kind: 'emoji' })
   const [page, setPage] = useState(0)
   const [query, setQuery] = useState('')
   const { recent, remember } = useRecentEmoji()
 
   const panelRef = usePickerDismiss(onClose)
   const bodyRef = useRef<HTMLDivElement>(null)
-  const autoOpened = useRef(false)
-
-  // The 贴纸 toolbar button opens the first installed set once the list arrives;
-  // switching to 表情 afterwards must not be undone by this effect.
-  useEffect(() => {
-    if (mode !== 'stickers' || autoOpened.current || !setsLoaded) return
-    autoOpened.current = true
-    // Only the placeholder gives way: a reader who already clicked 表情 keeps it.
-    if (tab.kind !== 'empty') return
-    const first = sets[0]
-    setTab(first ? { kind: 'set', id: first.id } : { kind: 'empty' })
-  }, [mode, sets, setsLoaded, tab.kind])
 
   const activeSetId = tab.kind === 'set' ? tab.id : null
   const { activeSet, setLoading, setError, reportError } = useActiveStickerSet(activeSetId)
@@ -103,13 +88,12 @@ export function ExpressionPicker({
     setQuery('')
   }
 
-  const needle = query.trim()
+  const needle = normalizeQuery(query)
   const hits = useMemo(() => {
     if (!needle) return { emoji: [], sets: [] }
-    const lower = needle.toLowerCase()
     return {
       emoji: searchEmoji(needle),
-      sets: sets.filter((set) => set.title.toLowerCase().includes(lower)),
+      sets: sets.filter((set) => containsText(set.title, needle)),
     }
   }, [needle, sets])
 
@@ -126,7 +110,7 @@ export function ExpressionPicker({
             onPick={pickEmoji}
             onOpenSet={openSet}
           />
-        ) : tab.kind === 'set' ? (
+        ) : (
           <StickerBody
             title={activeSetTitle}
             loading={setLoading}
@@ -134,12 +118,6 @@ export function ExpressionPicker({
             set={activeSet}
             onSend={(sticker) => void send(sticker)}
           />
-        ) : !setsLoaded ? (
-          <div className="wx-picker__state">
-            <span className="wx-spinner" />
-          </div>
-        ) : (
-          <div className="wx-picker__state">{setsError ?? '这个账号还没有安装贴纸包'}</div>
         )}
       </div>
 

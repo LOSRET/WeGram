@@ -1,6 +1,8 @@
 /* ---------- Chat pane ---------- */
 
 .wx-chat {
+  /* The comment panel is absolutely positioned inside the pane. */
+  position: relative;
   display: flex;
   flex-direction: column;
   flex: 1;

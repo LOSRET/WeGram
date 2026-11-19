@@ -1,6 +1,7 @@
 import type { Sticker, StickerSet, StickerSetSummary } from '@wegram/protocol'
 
 import type { TdObject } from './client'
+import { asArray } from './json'
 import type { MapperContext } from './map/context'
 import { mapStickerFormat, mapStickerThumbnail, mapStickerThumbnailFormat } from './map/sticker'
 
@@ -14,9 +15,9 @@ export async function listStickerSets(deps: StickerDeps): Promise<StickerSetSumm
     _: 'getInstalledStickerSets',
     sticker_type: { _: 'stickerTypeRegular' },
   })
-  const sets: TdObject[] = Array.isArray(response?.sets) ? response.sets : []
+  const sets: TdObject[] = asArray(response?.sets)
   return sets.map((set) => {
-    const cover = setCover(deps.mapper, set, Array.isArray(set?.covers) ? set.covers : [])
+    const cover = setCover(deps.mapper, set, asArray(set?.covers))
     return {
       id: String(set.id),
       title: set.title ?? '',
@@ -27,7 +28,7 @@ export async function listStickerSets(deps: StickerDeps): Promise<StickerSetSumm
 
 export async function getStickerSet(deps: StickerDeps, setId: string): Promise<StickerSet> {
   const response = await deps.invoke({ _: 'getStickerSet', set_id: setId })
-  const stickers: TdObject[] = Array.isArray(response?.stickers) ? response.stickers : []
+  const stickers: TdObject[] = asArray(response?.stickers)
   const cover = setCover(deps.mapper, response, stickers)
   return {
     id: String(response.id),

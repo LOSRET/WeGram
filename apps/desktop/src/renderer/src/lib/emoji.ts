@@ -1,3 +1,5 @@
+import { containsText, normalizeQuery } from './search'
+
 /**
  * The picker's emoji catalogue (design doc §9.3): the Unicode emoji this client
  * actually sends in text — WeChat's own 表情 are a closed emoticon set, while a
@@ -19,7 +21,15 @@ export interface EmojiItem {
   keywords?: string
 }
 
-/** One row of the 最近使用 section, exactly as the client fits it. */
+/**
+ * One row of the 最近使用 section, exactly as the client fits it.
+ *
+ * Equal to the protocol's `RECENT_EMOJI_LIMIT` (which caps the request and what
+ * main stores). It is declared again instead of imported because a *value*
+ * import from `@wegram/protocol` pulls zod and every DTO schema into the
+ * renderer bundle — measured at +212 kB. `scripts/limits-contract.test.ts` keeps
+ * the two numbers equal.
+ */
 export const RECENT_EMOJI_LIMIT = 10
 
 export const EMOJI: readonly EmojiItem[] = [
@@ -320,10 +330,10 @@ export const EMOJI: readonly EmojiItem[] = [
  * matches nothing (the tab shows the hint instead).
  */
 export function searchEmoji(query: string): EmojiItem[] {
-  const needle = query.trim().toLowerCase()
+  const needle = normalizeQuery(query)
   if (!needle) return []
   return EMOJI.filter((item) =>
-    `${item.name} ${item.keywords ?? ''} ${item.char}`.toLowerCase().includes(needle),
+    containsText(`${item.name} ${item.keywords ?? ''} ${item.char}`, needle),
   )
 }
 

@@ -1,20 +1,28 @@
 import { useAppStore } from '@renderer/store/useAppStore'
-import type { MouseEvent } from 'react'
+import type { MouseEvent, ReactNode } from 'react'
 
 import {
+  ContactsTabFilledIcon,
   ContactsTabIcon,
+  CubeTabFilledIcon,
   CubeTabIcon,
   DeviceIcon,
   MenuIcon,
+  MomentsTabFilledIcon,
   MomentsTabIcon,
   TelegramLogo,
 } from './Icon'
 import { avatarColor, initials } from '../lib/format'
 
+/** The four sections the rail can switch between. */
+export type ShellSection = 'chats' | 'contacts' | 'favorites' | 'moments'
+
 interface SideRailProps {
+  section: ShellSection
+  onSectionChange: (section: ShellSection) => void
   /** Opens the app menu (settings / theme / sign out) under the pressed button. */
   onOpenMenu: (anchor: { x: number; y: number }) => void
-  /** Sections the protocol does not cover yet. */
+  /** Entries the protocol does not cover yet. */
   onUnavailable: (label: string) => void
 }
 
@@ -22,10 +30,11 @@ interface SideRailProps {
  * The 61 px icon rail on the far left of WeChat: avatar on top, the four
  * sections under it, device + settings pinned to the bottom.
  *
- * Only 聊天 has a working view; the other sections report that they are not
- * wired up yet instead of pretending to navigate.
+ * Every tab is selectable and the selected one carries the brand green, like the
+ * client's filled tab. 聊天 and 通讯录 switch the shell; 收藏 and 朋友圈 own a
+ * placeholder pane because the protocol carries no data for them yet.
  */
-export function SideRail({ onOpenMenu, onUnavailable }: SideRailProps) {
+export function SideRail({ section, onSectionChange, onOpenMenu, onUnavailable }: SideRailProps) {
   const auth = useAppStore((state) => state.auth)
   const connection = useAppStore((state) => state.connection)
   const chats = useAppStore((state) => state.chats)
@@ -58,21 +67,45 @@ export function SideRail({ onOpenMenu, onUnavailable }: SideRailProps) {
       </button>
 
       <div className="wx-rail__nav">
-        <button className="wx-rail__btn wx-rail__btn--active" title="聊天" aria-current="page">
-          <TelegramLogo size={21} className="wx-rail__brand" />
+        <RailTab
+          active={section === 'chats'}
+          title="聊天"
+          onSelect={() => onSectionChange('chats')}
+        >
+          <TelegramLogo size={21} />
           {unread > 0 ? (
             <span className="wx-rail__badge">{unread > 99 ? '99+' : unread}</span>
           ) : null}
-        </button>
-        <button className="wx-rail__btn" title="通讯录" onClick={() => onUnavailable('通讯录')}>
-          <ContactsTabIcon size={24} />
-        </button>
-        <button className="wx-rail__btn" title="收藏" onClick={() => onUnavailable('收藏')}>
-          <CubeTabIcon size={24} />
-        </button>
-        <button className="wx-rail__btn" title="朋友圈" onClick={() => onUnavailable('朋友圈')}>
-          <MomentsTabIcon size={24} />
-        </button>
+        </RailTab>
+        <RailTab
+          active={section === 'contacts'}
+          title="通讯录"
+          onSelect={() => onSectionChange('contacts')}
+        >
+          {section === 'contacts' ? (
+            <ContactsTabFilledIcon size={24} />
+          ) : (
+            <ContactsTabIcon size={24} />
+          )}
+        </RailTab>
+        <RailTab
+          active={section === 'favorites'}
+          title="收藏"
+          onSelect={() => onSectionChange('favorites')}
+        >
+          {section === 'favorites' ? <CubeTabFilledIcon size={24} /> : <CubeTabIcon size={24} />}
+        </RailTab>
+        <RailTab
+          active={section === 'moments'}
+          title="朋友圈"
+          onSelect={() => onSectionChange('moments')}
+        >
+          {section === 'moments' ? (
+            <MomentsTabFilledIcon size={24} />
+          ) : (
+            <MomentsTabIcon size={24} />
+          )}
+        </RailTab>
       </div>
 
       <div className="wx-rail__bottom">
@@ -84,6 +117,30 @@ export function SideRail({ onOpenMenu, onUnavailable }: SideRailProps) {
         </button>
       </div>
     </nav>
+  )
+}
+
+/** One rail tab: the selected one is painted brand green through `--active`. */
+function RailTab({
+  active,
+  title,
+  onSelect,
+  children,
+}: {
+  active: boolean
+  title: string
+  onSelect: () => void
+  children: ReactNode
+}) {
+  return (
+    <button
+      className={`wx-rail__btn${active ? ' wx-rail__btn--active' : ''}`}
+      title={title}
+      aria-current={active ? 'page' : undefined}
+      onClick={onSelect}
+    >
+      {children}
+    </button>
   )
 }
 

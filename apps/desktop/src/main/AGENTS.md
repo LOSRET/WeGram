@@ -9,14 +9,24 @@ adds what is specific to this layer.
 ```
 index.ts            app lifecycle, adapter wiring, media scheme, login↔shell hand-over
                     (syncWindowsToAuth / showMainWindow)
-windows.ts          the shell BrowserWindow factory, title-bar theme, link handling
+app-window.ts       the ONE BrowserWindow factory (security webPreferences, route load,
+                    navigation policy) + the shell's title-bar overlay
+windows.ts          the shell window: geometry, theme repaint, minimize↔viewer wiring
 login-window.ts     the frameless 280×373 login BrowserWindow (#login), close/refocus
-ipc/router.ts       per-channel zod validation, Result envelope
+viewer.ts           the 图片和视频 window; unowned on purpose (see below), pins/hides it
+ipc/router.ts       per-channel zod validation, typed handler map, Result envelope
 ipc/handlers.ts     one handler per invoke channel
 telegram/           adapter.ts (the seam) / tdlib/ (real adapter) / mock/ (fixtures) /
-                    updates.ts / events.ts
+                    updates.ts / events.ts / comment-access.ts (the comment permission rule)
+telegram/mock/      fixtures.ts is a thin adapter over @wegram/mock-fixtures (the account
+                    data, shared with the browser preview); transcript.ts is the one
+                    "append and announce" writer, effects.ts drives read/transfer; paging,
+                    read, comment and list-order rules come from @wegram/mock-session
+telegram/tdlib/     client / updates / json.ts (the one "missing array" read) / map/* (content,
+                    rich, media.ts holds the one media field table)
 telegram/tdlib/actions/  TDLib requests as functions over ActionDeps, grouped into
-                    chats / history / files / send / search (index.ts re-exports)
+                    chats / history / files / send / comments (index.ts re-exports);
+                    message-input.ts holds the one send envelope
 media/              registry.ts (token → path) / protocol.ts (wx-media://) / image-size.ts
 store/              ui-db.ts (all SQL) / settings.ts (proxy only)
 proxy*.ts           proxy DTO ↔ stored config

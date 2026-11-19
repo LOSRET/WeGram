@@ -1,29 +1,38 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
+import {
+  placeAgainstAnchor,
+  placeAtPoint,
+  type PopupAnchor,
+  type PopupPlacement,
+  type PopupPosition,
+  type PopupSize,
+} from '../lib/popupPlacement'
+
 export interface MenuItem {
   label: string
   danger?: boolean
   onSelect: () => void
 }
 
-interface PopupProps {
-  x: number
-  y: number
-  onClose: () => void
-  children: ReactNode
-  /**
-   * Treat `x` as the anchor's centre instead of its left edge. WeChat's "+" card
-   * hangs centred under the round button rather than left-aligned to it.
-   */
-  centerX?: boolean
+function viewport(): { width: number; height: number } {
+  return { width: window.innerWidth, height: window.innerHeight }
 }
 
-/** Gap between the card and the window edge. */
-const EDGE = 8
+interface PopupCardProps {
+  /** Where the card wants to be, given the size it just measured. */
+  compute: (size: PopupSize) => PopupPosition
+  /** Re-place when the thing it is anchored to moves. */
+  placementKey: string
+  /** Where to paint before the first measurement lands. */
+  initial: PopupPosition
+  onClose: () => void
+  children: ReactNode
+}
 
 /**
- * Anchored popup in the shape of a WeChat right-click menu: white card, hairline
+ * An anchored popup in the shape of a WeChat right-click menu: white card, hairline
  * border, 6 px radius. It closes on Escape, on a pointer-down anywhere outside,
  * and when the window loses focus.
  *
@@ -34,9 +43,11 @@ const EDGE = 8
  * the wrong rectangle. As a direct child of the body the clamp below is the
  * viewport's, which is what the numbers are compared against.
  */
-export function Popup({ x, y, onClose, children, centerX = false }: PopupProps) {
+function PopupCard({ compute, placementKey, initial, onClose, children }: PopupCardProps) {
   const ref = useRef<HTMLDivElement | null>(null)
-  const [pos, setPos] = useState({ left: x, top: y })
+  const computeRef = useRef(compute)
+  computeRef.current = compute
+  const [pos, setPos] = useState<PopupPosition>(initial)
 
   /**
    * Clamped from a ResizeObserver, not once on mount: the first pass measures
@@ -47,24 +58,19 @@ export function Popup({ x, y, onClose, children, centerX = false }: PopupProps) 
     const el = ref.current
     if (!el) return
 
-    const clamp = (): void => {
+    const place = (): void => {
       const rect = el.getBoundingClientRect()
-      const wanted = centerX ? x - rect.width / 2 : x
-      const left = Math.max(EDGE, Math.min(wanted, window.innerWidth - rect.width - EDGE))
-      const top =
-        y + rect.height > window.innerHeight - EDGE
-          ? Math.max(EDGE, y - rect.height)
-          : Math.min(y, window.innerHeight - rect.height - EDGE)
+      const next = computeRef.current({ width: rect.width, height: rect.height })
       setPos((previous) =>
-        previous.left === left && previous.top === top ? previous : { left, top },
+        previous.left === next.left && previous.top === next.top ? previous : next,
       )
     }
 
-    clamp()
-    const observer = new ResizeObserver(clamp)
+    place()
+    const observer = new ResizeObserver(place)
     observer.observe(el)
     return () => observer.disconnect()
-  }, [x, y, centerX])
+  }, [placementKey])
 
   useEffect(() => {
     /**
@@ -121,6 +127,69 @@ export function Popup({ x, y, onClose, children, centerX = false }: PopupProps) 
       {children}
     </div>,
     document.body,
+  )
+}
+
+interface PopupProps {
+  x: number
+  y: number
+  onClose: () => void
+  children: ReactNode
+  /**
+   * Treat `x` as the anchor's centre instead of its left edge. WeChat's "+" card
+   * hangs centred under the round button rather than left-aligned to it.
+   */
+  centerX?: boolean
+}
+
+/** A card opened at a point: a mouse event, or a fixed spot. */
+export function Popup({ x, y, onClose, children, centerX = false }: PopupProps) {
+  return (
+    <PopupCard
+      placementKey={`${x}:${y}:${String(centerX)}`}
+      initial={{ left: x, top: y }}
+      compute={(size) => placeAtPoint({ x, y }, size, { centerX }, viewport())}
+      onClose={onClose}
+    >
+      {children}
+    </PopupCard>
+  )
+}
+
+interface AnchoredPopupProps {
+  /** The rectangle the card belongs to (its button). */
+  anchor: PopupAnchor
+  placement?: PopupPlacement
+  onClose: () => void
+  children: ReactNode
+}
+
+/**
+ * A card opened against an element: "hangs below this button, right-aligned".
+ *
+ * The alternative — `x: rect.right - 232` — is what the call sites used to do,
+ * with a constant that matched no stylesheet value.
+ */
+export function AnchoredPopup({ anchor, placement, onClose, children }: AnchoredPopupProps) {
+  const key = [
+    anchor.left,
+    anchor.right,
+    anchor.top,
+    anchor.bottom,
+    placement?.side ?? '',
+    placement?.align ?? '',
+    placement?.gap ?? '',
+  ].join(':')
+
+  return (
+    <PopupCard
+      placementKey={key}
+      initial={{ left: anchor.left, top: anchor.bottom }}
+      compute={(size) => placeAgainstAnchor(anchor, size, placement ?? {}, viewport())}
+      onClose={onClose}
+    >
+      {children}
+    </PopupCard>
   )
 }
 

@@ -18,16 +18,34 @@ store/                zustand: data defaults (initialState.ts), pure reducers, s
 components/message-list/  virtualiser + MessageRow + Divider + the scroll hooks:
                          useInitialPosition / usePrependRestore / useAnchorSave /
                          useLandingSave / useJumpToLatest / useLocateScroll / useViewportSeen;
-                         RichMessage (page blocks), ContactCard (vCards), InlineButtons
-components/chat-pane/     render tree + useChatHistory (history/ modules) + messageActions
+                         RichMessage (page blocks), ContactCard (vCards), InlineButtons,
+                         CommentBar (评论 N 条 handle, §9.8)
+components/chat-pane/     render tree + useChatHistory (history/ modules) + messageActions +
+                         CommentPanel (full-pane discussion view, slides in from the right;
+                         chat-style rows + the composer card, posts via messages:sendComment;
+                         non-members get the official client's 加入/申请加入 gate instead)
+components/contacts/      通讯录: ContactsList (service rows + address book by initial) +
+                         ContactDetail (the card)
 components/picker/        the expression panel's data hooks and body components
 components/ExpressionPicker.tsx  the picker's state + composition
 components/viewer/        the 图片和视频 window: MediaViewer shell + useViewerItem /
                          useViewerZoom + ViewerToolbar / ViewerGrid + viewerMenu / viewerActions
+components/Avatar.tsx    the ONE avatar box (photo or initials); the box class it is given
+                        is the positioned element, which is the rule that once cost a session
+components/SearchField.tsx  the ONE search pill (label + input + optional trailing control)
 components/           the remaining visual concerns (Composer, MediaBubble, …)
 lib/ipc.ts            thin `window.tg` wrapper
 lib/clipboard.ts      text copy for the contact card (navigator.clipboard + execCommand fallback)
 lib/format.ts         time / preview / avatar helpers (pure, unit-tested)
+lib/search.ts         normalizeQuery / containsText — the ONE reading of a search box
+lib/self.ts           SelfIdentity + selfIdentity(auth); one placeholder id (1000)
+lib/popupPlacement.ts (pure, unit-tested) "which edge does this card hang from"
+lib/mediaBox.ts       (pure, unit-tested) the reserved media box + percent text
+lib/unreadBoundary.ts (type only) the snapshot a chat opens with; `UnreadMarker` is an alias
+lib/listMetrics.ts    (pure, unit-tested via scripts/style-contract) the virtualised row height
+lib/composerInput.ts  (pure, unit-tested) Enter / Shift+Enter / IME rule
+lib/useComposerInput.ts  composition ref + textarea props, shared by both composers
+lib/contacts.ts       通讯录 initial/grouping, pinyin via ICU (pure, unit-tested)
 lib/entities.ts       TL entity → text segments (pure, unit-tested)
 lib/useAnchoredScroll.ts  ready gate, stick-to-bottom, resize compensation
 lib/scrollGeometry.ts (pure, unit-tested) the ONE "is the reader at the bottom" rule
@@ -39,7 +57,8 @@ lib/player.ts         video player-bar maths: clocks, seek clamp, progress (pure
 lib/tgs.ts            gzip guards + Lottie decode cache
 lib/stickerMedia.ts   Sticker → MessageMedia (shared by the picker and the preview)
 lib/preview-bridge.ts DEV-ONLY entry point (re-exports lib/preview)
-lib/preview/          browser-preview session + invoke switch (index.ts) and fixtures
+lib/preview/          browser-preview session + invoke switch (index.ts); fixtures.ts is a
+                      thin adapter over @wegram/mock-fixtures (data: URLs + gradient faces)
 ```
 
 `styles/index.css` is the entry point only: it imports `styles/*.css` in source order
@@ -52,6 +71,11 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
 
 ## Rules that have already cost a debugging session
 
+- **An avatar box needs `position: relative`.** `.wx-avatar__img` is absolutely
+  positioned with `inset: 0` so a photo fills its rounded square; a new wrapper that
+  draws one (the comment rows did) without `position: relative` throws the photo out
+  to the nearest positioned ancestor — the message row — where it paints over the whole
+  bubble at full row size. The comment avatar has its own containing block for this.
 - **A prop read inside an async decode must go through a ref.** `TgsSticker` played
   from the lottie load callback using the render-time `active`: a sticker whose file
   was already cached mounted in the same commit as the visibility measurement, the
@@ -63,6 +87,11 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
 - **Never gate content visibility on `requestAnimationFrame` alone.** Electron
   throttles rAF while the window is occluded, so the pane stays invisible with
   its data loaded. Always pair a frame-based reveal with a `setTimeout` fallback.
+- **A CSS slide needs the element mounted closed first, and the parent must delay the
+  unmount.** `CommentPanel` renders at `translateX(100%)` and flips `is-open` on the
+  next tick (a 20 ms timeout, since rAF is throttled while occluded); on close the
+  pane keeps it mounted for `COMMENT_PANEL_ANIM_MS` (250 ms) or the panel vanishes
+  mid-slide. Any future full-pane push view follows the same two rules.
 - **A programmatic `scrollTop` write desyncs `@tanstack/react-virtual`** (it
   re-reads its offset only on real scroll events). After every programmatic
   scroll, dispatch one `scroll` event so the virtualizer re-measures — otherwise
@@ -143,6 +172,14 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   "as big as the window". `.wx-viewer__image` therefore carries `flex: none;
   max-width: none; max-height: none;`; any future element sized from
   `lib/zoom.ts` needs the same reset.
+- **通讯录 is the Telegram address book, not the chat list.** `contacts:list`
+  (`getContacts` + `getUser` in main) returns `Contact[]` — people, not
+  conversations — so a contact you never wrote to has a card but no chat; 发消息
+  calls `chats:openPrivate` and TDLib creates the private chat then. The list is
+  re-read whenever the rail switches to 通讯录 (TDLib answers from its local cache).
+  Grouping stays in `lib/contacts.ts` (ICU pinyin boundaries); do not swap it for a
+  pinyin dependency without asking. Photos arrive through `evt:avatars`
+  (`userAvatars[userId]`), the same pool the transcript uses.
 - **Long panes use `components/OverlayScrollbar.tsx`**, never a native scrollbar:
   Chromium gives native bars a layout gutter, so rows re-flow when the bar
   appears. Popovers keep native thin bars on purpose.

@@ -3,7 +3,8 @@ import type { StickerSetSummary } from '@wegram/protocol'
 import type { EmojiItem } from '../../lib/emoji'
 import { stickerMedia } from '../../lib/stickerMedia'
 import { StickerRenderer } from '../StickerRenderer'
-import { MicIcon, SearchIcon } from '../WechatIcons'
+import { SearchField } from '../SearchField'
+import { MicIcon } from '../WechatIcons'
 import { EmojiGrid } from './EmojiGrid'
 
 /**
@@ -25,27 +26,26 @@ export function SearchBody({
   const needle = query.trim()
   return (
     <div className="wx-picker__search">
-      <div className="wx-search">
-        <SearchIcon size={15} />
-        <input
-          autoFocus
-          value={query}
-          placeholder="搜索表情"
-          onChange={(event) => onQueryChange(event.target.value)}
-        />
-        {/* The client's box grows a voice button while it has focus. There is
-            no speech recognition behind it, so it stays disabled instead of
-            being a dead control. */}
-        <button
-          type="button"
-          className="wx-search__mic"
-          disabled
-          title="语音搜索暂不支持"
-          aria-label="语音搜索暂不支持"
-        >
-          <MicIcon size={17} />
-        </button>
-      </div>
+      <SearchField
+        value={query}
+        onValueChange={onQueryChange}
+        placeholder="搜索表情"
+        autoFocus
+        trailing={
+          // The client's box grows a voice button while it has focus. There is
+          // no speech recognition behind it, so it stays disabled instead of
+          // being a dead control.
+          <button
+            type="button"
+            className="wx-search__mic"
+            disabled
+            title="语音搜索暂不支持"
+            aria-label="语音搜索暂不支持"
+          >
+            <MicIcon size={17} />
+          </button>
+        }
+      />
       {needle ? (
         hits.emoji.length > 0 || hits.sets.length > 0 ? (
           <>

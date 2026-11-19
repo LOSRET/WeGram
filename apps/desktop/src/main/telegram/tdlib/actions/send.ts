@@ -3,38 +3,15 @@ import type { Message } from '@wegram/protocol'
 
 import { probeImageSize } from '../../../media/image-size'
 import type { MediaKind } from '../../adapter'
-import type { TdObject } from '../client'
-import { mapMessage } from '../map/message'
 import type { ActionDeps } from './deps'
 import { history } from './history'
-
-function replyTo(messageId?: number): TdObject | null {
-  return messageId === undefined ? null : { _: 'inputMessageReplyToMessage', message_id: messageId }
-}
-
-function formattedText(text: string | undefined): TdObject {
-  return { _: 'formattedText', text: text ?? '', entities: [] }
-}
+import { formattedText, inputText, sendAndMap } from './message-input'
 
 export async function sendText(
   deps: ActionDeps,
   input: { chatId: number; text: string; replyTo?: number },
 ): Promise<{ localId: string; message: Message }> {
-  const response = await deps.invoke({
-    _: 'sendMessage',
-    chat_id: input.chatId,
-    reply_to:
-      input.replyTo === undefined
-        ? null
-        : { _: 'inputMessageReplyToMessage', message_id: input.replyTo },
-    input_message_content: {
-      _: 'inputMessageText',
-      text: { _: 'formattedText', text: input.text },
-      clear_draft: true,
-    },
-  })
-  const message = await mapMessage(deps.mapper, input.chatId, response)
-  return { localId: `td-${message.id}`, message }
+  return sendAndMap(deps, input.chatId, inputText(input.text, true), { replyTo: input.replyTo })
 }
 
 export async function editText(
@@ -45,10 +22,7 @@ export async function editText(
     _: 'editMessageText',
     chat_id: input.chatId,
     message_id: input.messageId,
-    input_message_content: {
-      _: 'inputMessageText',
-      text: { _: 'formattedText', text: input.text },
-    },
+    input_message_content: inputText(input.text),
   })
   const page = await history(deps, {
     chatId: input.chatId,
@@ -143,15 +117,7 @@ export async function sendMedia(
           caption: formattedText(input.caption),
         }
 
-  const response = await deps.invoke({
-    _: 'sendMessage',
-    chat_id: input.chatId,
-    reply_to: replyTo(input.replyTo),
-    options: null,
-    input_message_content: content,
-  })
-  const message = await mapMessage(deps.mapper, input.chatId, response)
-  return { localId: `td-${message.id}`, message }
+  return sendAndMap(deps, input.chatId, content, { replyTo: input.replyTo, options: null })
 }
 
 /** Sends an existing sticker by file id, as the picker does (design doc §9.4). */
@@ -161,12 +127,10 @@ export async function sendSticker(
 ): Promise<{ localId: string; message: Message }> {
   // Dimensions were cached when the set was mapped; 512 is the sticker default.
   const size = deps.mapper.stickerSizes.get(input.fileId) ?? { width: 512, height: 512 }
-  const response = await deps.invoke({
-    _: 'sendMessage',
-    chat_id: input.chatId,
-    reply_to: replyTo(input.replyTo),
-    options: null,
-    input_message_content: {
+  return sendAndMap(
+    deps,
+    input.chatId,
+    {
       _: 'inputMessageSticker',
       sticker: {
         _: 'inputSticker',
@@ -177,7 +141,6 @@ export async function sendSticker(
       },
       emoji: '',
     },
-  })
-  const message = await mapMessage(deps.mapper, input.chatId, response)
-  return { localId: `td-${message.id}`, message }
+    { replyTo: input.replyTo, options: null },
+  )
 }

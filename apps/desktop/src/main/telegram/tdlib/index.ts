@@ -3,6 +3,7 @@ import type {
   AuthState,
   ChatSummary,
   ConnectionState,
+  Contact,
   Message,
   ProxyConfig,
   ProxyTestResult,
@@ -102,7 +103,11 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
       prefetchUserAvatars: (userIds) => this.avatars.prefetchUsers(userIds),
       resolveFullRichMessage: async (chatId, messageId) => {
         try {
-          return await this.invoke({ _: 'getFullRichMessage', chat_id: chatId, message_id: messageId })
+          return await this.invoke({
+            _: 'getFullRichMessage',
+            chat_id: chatId,
+            message_id: messageId,
+          })
         } catch (error) {
           // A deleted or edited-away page is not worth failing the row for.
           this.logger.warn(
@@ -343,6 +348,11 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     return actions.setChatMuted(this.actionDeps, chatId, muted)
   }
 
+  /** The account's Telegram address book (通讯录); see `actions.listContacts`. */
+  async listContacts(): Promise<Contact[]> {
+    return actions.listContacts(this.actionDeps)
+  }
+
   async history(input: {
     chatId: number
     fromMessageId?: number
@@ -365,6 +375,26 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     limit: number
   }): Promise<{ messages: Message[]; hasNewer: boolean }> {
     return actions.historyNewer(this.actionDeps, input)
+  }
+
+  /** One page of a message's comment thread; see `actions/comments.ts`. */
+  async comments(input: Parameters<typeof actions.comments>[1]) {
+    return actions.comments(this.actionDeps, input)
+  }
+
+  /** Whether this account may comment on the message; see `actions/comments.ts`. */
+  async commentInfo(input: Parameters<typeof actions.commentInfo>[1]) {
+    return actions.commentInfo(this.actionDeps, input)
+  }
+
+  /** Joins the thread's discussion group, or sends a join request. */
+  async joinCommentGroup(input: Parameters<typeof actions.joinCommentGroup>[1]) {
+    return actions.joinCommentGroup(this.actionDeps, input)
+  }
+
+  /** Posts a comment into a message's thread; see `actions/comments.ts`. */
+  async sendComment(input: Parameters<typeof actions.sendComment>[1]) {
+    return actions.sendComment(this.actionDeps, input)
   }
 
   async sendText(input: {

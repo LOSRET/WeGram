@@ -136,7 +136,6 @@ describe('mapMessage', () => {
     expect(message.text).toBe('[暂不支持的消息]')
   })
 
-
   it('carries a rich message body into the DTO, not just its flattened text', async () => {
     const message = await mapMessage(makeContext(), 9, {
       id: 7,
@@ -271,5 +270,64 @@ describe('mapMessage', () => {
       phone: '+86 132 8826 1857',
       userId: 4242,
     })
+  })
+  it('maps views, forwards and the comment count into the DTO', async () => {
+    const message = await mapMessage(makeContext(), 8, {
+      id: 3,
+      date: 10,
+      sender_id: { _: 'messageSenderChat', chat_id: 55 },
+      content: { _: 'messageText', text: { text: 'post' } },
+      interaction_info: {
+        _: 'messageInteractionInfo',
+        view_count: 12_400,
+        forward_count: 96,
+        reply_info: {
+          _: 'messageReplyInfo',
+          reply_count: 78,
+          recent_replier_ids: [],
+          last_read_inbox_message_id: 0,
+          last_read_outbox_message_id: 0,
+          last_message_id: 0,
+        },
+      },
+      properties: { _: 'messageProperties', can_get_message_thread: true },
+    })
+
+    expect(message.interaction).toEqual({
+      comments: 78,
+      views: 12_400,
+      forwards: 96,
+      canOpen: true,
+    })
+  })
+
+  it('keeps a comments-only interaction and drops an all-zero one', async () => {
+    const commented = await mapMessage(makeContext(), 2, {
+      id: 4,
+      date: 10,
+      sender_id: { _: 'messageSenderUser', user_id: 42 },
+      content: { _: 'messageText', text: { text: 'hi' } },
+      interaction_info: {
+        _: 'messageInteractionInfo',
+        view_count: 0,
+        forward_count: 0,
+        reply_info: { _: 'messageReplyInfo', reply_count: 3 },
+      },
+    })
+    expect(commented.interaction).toEqual({ comments: 3 })
+
+    const empty = await mapMessage(makeContext(), 2, {
+      id: 5,
+      date: 10,
+      sender_id: { _: 'messageSenderUser', user_id: 42 },
+      content: { _: 'messageText', text: { text: 'hi' } },
+      interaction_info: {
+        _: 'messageInteractionInfo',
+        view_count: 0,
+        forward_count: 0,
+        reply_info: { _: 'messageReplyInfo', reply_count: 0 },
+      },
+    })
+    expect(empty).not.toHaveProperty('interaction')
   })
 })

@@ -1,0 +1,71 @@
+import { describe, expect, it } from 'vitest'
+
+import type { MapperContext } from './context'
+import { mapContact } from './contact'
+
+function context(avatars: Record<number, string> = {}): MapperContext {
+  return {
+    chatTitles: new Map(),
+    chatAvatarUrls: new Map(),
+    userAvatarUrls: new Map(Object.entries(avatars).map(([id, url]) => [Number(id), url])),
+    stickerSizes: new Map(),
+    resolveUserName: async (userId) => `user-${userId}`,
+    resolveChatTitle: async (chatId) => `chat-${chatId}`,
+    prefetchUserAvatars: () => undefined,
+  }
+}
+
+describe('mapContact', () => {
+  it('maps an address-book user into a contact row', () => {
+    const contact = mapContact(context({ 42: 'wx-media://f/avatar' }), {
+      _: 'user',
+      id: 42,
+      first_name: 'Ada',
+      last_name: 'Lovelace',
+      usernames: { _: 'usernames', active_usernames: ['ada'], editable_username: 'ada' },
+      phone_number: '+441234',
+    })
+    expect(contact).toEqual({
+      userId: 42,
+      title: 'Ada Lovelace',
+      username: 'ada',
+      phone: '+441234',
+      avatarUrl: 'wx-media://f/avatar',
+    })
+  })
+
+  it('drops the identity Telegram hides and keeps the name', () => {
+    expect(mapContact(context(), { _: 'user', id: 42, first_name: 'Ada' })).toEqual({
+      userId: 42,
+      title: 'Ada',
+    })
+  })
+
+  it('reads the data center from the profile photo', () => {
+    // type 1 (profile photo), DC 5, then an opaque tail — see `file-dc.ts`.
+    const contact = mapContact(context(), {
+      _: 'user',
+      id: 42,
+      first_name: 'Ada',
+      profile_photo: {
+        _: 'profilePhoto',
+        id: 7,
+        small: { _: 'file', id: 1, remote: { _: 'remoteFile', id: 'AQADBQADAQIDAQQ' } },
+        big: { _: 'file', id: 2, remote: { _: 'remoteFile', id: 'AQADBQADAQIDAQQ' } },
+      },
+    })
+    expect(contact.dcId).toBe(5)
+  })
+
+  it('falls back to the username, then the id, when the name is empty', () => {
+    expect(
+      mapContact(context(), {
+        _: 'user',
+        id: 42,
+        first_name: '',
+        usernames: { _: 'usernames', active_usernames: ['ada'], editable_username: 'ada' },
+      }).title,
+    ).toBe('ada')
+    expect(mapContact(context(), { _: 'user', id: 42, first_name: '' }).title).toBe('用户 42')
+  })
+})

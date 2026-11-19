@@ -1,20 +1,22 @@
 import type { ChatSummary } from '@wegram/protocol'
 
-import { Popup } from '../ContextMenu'
+import type { PopupAnchor } from '../../lib/popupPlacement'
+import { AnchoredPopup } from '../ContextMenu'
 import { kindLabel } from './labels'
 
 interface ChatInfoPopoverProps {
   chat: ChatSummary
   /** Messages currently in memory — a debugging aid, not a chat property. */
   loadedCount: number
-  position: { x: number; y: number }
+  /** The "…" button the card hangs from, right-aligned to its edge. */
+  anchor: PopupAnchor
   onClose: () => void
 }
 
 /** The "…" popover: what this build knows about the conversation. */
-export function ChatInfoPopover({ chat, loadedCount, position, onClose }: ChatInfoPopoverProps) {
+export function ChatInfoPopover({ chat, loadedCount, anchor, onClose }: ChatInfoPopoverProps) {
   return (
-    <Popup x={position.x} y={position.y} onClose={onClose}>
+    <AnchoredPopup anchor={anchor} placement={{ align: 'right' }} onClose={onClose}>
       <div className="wx-info-pop__row">
         <span>名称</span>
         <strong>{chat.title}</strong>
@@ -35,6 +37,6 @@ export function ChatInfoPopover({ chat, loadedCount, position, onClose }: ChatIn
         <span>已读回执</span>
         <strong>{chat.lastReadOutboxMessageId ? `#${chat.lastReadOutboxMessageId}` : '无'}</strong>
       </div>
-    </Popup>
+    </AnchoredPopup>
   )
 }

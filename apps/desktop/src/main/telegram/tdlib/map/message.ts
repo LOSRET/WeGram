@@ -1,4 +1,4 @@
-import type { Message } from '@wegram/protocol'
+import type { Message, MessageInteraction } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
 import { mapReplyMarkup } from './buttons'
@@ -10,7 +10,11 @@ import type { MapperContext } from './context'
  * full page is one extra round trip, and half an ad is worse than a slow row.
  * Any failure keeps the excerpt instead of dropping the row.
  */
-async function resolveContent(ctx: MapperContext, chatId: number, raw: TdObject): Promise<TdObject> {
+async function resolveContent(
+  ctx: MapperContext,
+  chatId: number,
+  raw: TdObject,
+): Promise<TdObject> {
   const content: TdObject = raw.content ?? {}
   if (content._ !== 'messageRichMessage' || !content.message) return content
   if (content.message.is_full !== false) return content
@@ -45,6 +49,7 @@ export async function mapMessage(
   const mapped = mapContent(content)
   const buttons = mapReplyMarkup(raw.reply_markup)
   const albumId = albumIdOf(raw)
+  const interaction = mapInteraction(raw)
   let text = mapped.text
   if (mapped.kind === 'service' && text === '') {
     text = SERVICE_CONTENT_TYPES.has(content._)
@@ -75,6 +80,32 @@ export async function mapMessage(
     ...(albumId ? { albumId } : {}),
     ...(raw.reply_to?.message_id ? { replyToId: raw.reply_to.message_id } : {}),
     ...(raw.edit_date ? { edited: true } : {}),
+    ...(interaction ? { interaction } : {}),
+  }
+}
+
+/**
+ * Views / forwards / comments under a message (design doc §9.8).
+ *
+ * TDLib only fills reply_info where a comment thread exists — a channel post
+ * with a linked discussion group, and the posts inside that group — so this is
+ * also the "does this row get a comment bar" test. An all-zero interaction is
+ * dropped instead of carried around as an empty object.
+ */
+export function mapInteraction(raw: TdObject): MessageInteraction | null {
+  const info = raw.interaction_info
+  if (!info || typeof info !== 'object') return null
+  const comments = Number(info.reply_info?.reply_count ?? 0)
+  const views = Number(info.view_count ?? 0)
+  const forwards = Number(info.forward_count ?? 0)
+  if (!Number.isFinite(comments) || (!comments && !views && !forwards)) return null
+  return {
+    comments: comments > 0 ? comments : 0,
+    ...(views > 0 ? { views } : {}),
+    ...(forwards > 0 ? { forwards } : {}),
+    // can_get_message_thread is the only reliable "the thread can be opened"
+    // signal; a stale counter without it must not offer the pull.
+    ...(raw.properties?.can_get_message_thread ? { canOpen: true } : {}),
   }
 }
 

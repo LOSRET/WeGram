@@ -1,6 +1,7 @@
 import type { Message } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
+import { asArray } from '../json'
 import { mapMessage } from '../map/message'
 import type { ActionDeps } from './deps'
 
@@ -72,7 +73,7 @@ export async function history(
       limit: limit - collected.length,
       only_local: false,
     })
-    const rawMessages: TdObject[] = Array.isArray(response.messages) ? response.messages : []
+    const rawMessages: TdObject[] = asArray(response.messages)
     const fresh = rawMessages.filter((raw) => {
       const id = Number(raw.id)
       if (!Number.isFinite(id) || seen.has(id)) return false
@@ -134,6 +135,34 @@ async function mapRawPage(
 }
 
 /**
+ * The messages strictly newer than `fromMessageId`.
+ *
+ * TDLib has no "history onwards" call: a *negative* offset on `getChatHistory`
+ * answers the messages after the anchor (measured in Spike 2, RESULTS.md #2.3).
+ * The anchor itself comes back excluded because `from_message_id` is exclusive,
+ * and the filter repeats the comparison instead of trusting the page's order.
+ */
+async function fetchNewerThan(
+  deps: Pick<ActionDeps, 'invoke' | 'mapper'>,
+  chatId: number,
+  fromMessageId: number,
+  size: number,
+): Promise<Message[]> {
+  const response = await deps.invoke({
+    _: 'getChatHistory',
+    chat_id: chatId,
+    from_message_id: fromMessageId,
+    offset: -size,
+    limit: size,
+    only_local: false,
+  })
+  const rawNewer = asArray(response.messages).filter(
+    (raw: TdObject) => Number(raw.id) > fromMessageId,
+  )
+  return mapRawPage(deps, chatId, rawNewer)
+}
+
+/**
  * A contiguous window centred on one message, for a reading position or an
  * unread boundary that is older than the newest page.
  *
@@ -165,18 +194,7 @@ export async function historyAround(
     }),
   ])
 
-  const newerResponse = await deps.invoke({
-    _: 'getChatHistory',
-    chat_id: input.chatId,
-    from_message_id: input.messageId,
-    offset: -size,
-    limit: size,
-    only_local: false,
-  })
-  const rawNewer = (Array.isArray(newerResponse.messages) ? newerResponse.messages : []).filter(
-    (raw: TdObject) => Number(raw.id) > input.messageId,
-  )
-  const newer = await mapRawPage(deps, input.chatId, rawNewer)
+  const newer = await fetchNewerThan(deps, input.chatId, input.messageId, size)
 
   let anchor: Message | null = null
   try {
@@ -216,18 +234,7 @@ export async function historyNewer(
 ): Promise<{ messages: Message[]; hasNewer: boolean }> {
   const size = Math.min(Math.max(input.limit, 1), 100)
   const lastId = await newestMessageId(deps, input.chatId)
-  const response = await deps.invoke({
-    _: 'getChatHistory',
-    chat_id: input.chatId,
-    from_message_id: input.fromMessageId,
-    offset: -size,
-    limit: size,
-    only_local: false,
-  })
-  const rawNewer = (Array.isArray(response.messages) ? response.messages : []).filter(
-    (raw: TdObject) => Number(raw.id) > input.fromMessageId,
-  )
-  const messages = await mapRawPage(deps, input.chatId, rawNewer)
+  const messages = await fetchNewerThan(deps, input.chatId, input.fromMessageId, size)
   const newest = messages.at(-1)?.id ?? input.fromMessageId
   return { messages, hasNewer: lastId > 0 && newest < lastId }
 }

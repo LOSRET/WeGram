@@ -1,4 +1,5 @@
-import type { ChatSummary, Message, Self } from '@wegram/protocol'
+import type { FixtureSeed } from '@wegram/mock-fixtures'
+import type { Message, Self } from '@wegram/protocol'
 
 export const ME: Self = {
   id: 1000,
@@ -43,12 +44,12 @@ export const MOCK_AVATAR_COLORS: readonly (readonly [
   ],
 ]
 
-export interface Fixture {
-  chat: ChatSummary
-  messages: Message[]
-  /** Channels only: whether this account may post there (TDLib: admin right). */
-  canPost?: boolean
-}
+/**
+ * The mock's name for one conversation. The data itself lives in
+ * `@wegram/mock-fixtures`, so the mock and the browser preview serve exactly
+ * the same account (they used to drift).
+ */
+export type Fixture = FixtureSeed
 
 export interface MockFile {
   fileId: number

@@ -85,6 +85,17 @@ describe('mapChat', () => {
     expect(ctx.chatTitles.get(5)).toBe('Remembered')
   })
 
+  it('carries the peer user id of a private chat for the contact list', () => {
+    const chat = mapChat(makeContext(), {
+      id: 5,
+      title: 'Ada',
+      type: { _: 'chatTypePrivate', user_id: 42 },
+    })
+
+    expect(chat.userId).toBe(42)
+    expect(chat.kind).toBe('private')
+  })
+
   it('attaches a downloaded avatar URL from the cache', () => {
     const ctx = makeContext({ chatAvatarUrls: new Map([[5, 'wx-media://f/abc']]) })
     const chat = mapChat(ctx, { id: 5, title: 'x', type: { _: 'chatTypePrivate' } })
@@ -98,6 +109,8 @@ describe('mapChat', () => {
     expect(chat).not.toHaveProperty('lastMessageText')
     expect(chat).not.toHaveProperty('lastMessageAt')
     expect(chat).not.toHaveProperty('avatarUrl')
+    // A private chat whose object carries no peer id must not emit NaN.
+    expect(chat).not.toHaveProperty('userId')
     // 0 is "nothing read yet", not message 0: the unread divider needs the null.
     expect(chat).not.toHaveProperty('lastReadInboxMessageId')
     expect(chat.unread).toBe(0)

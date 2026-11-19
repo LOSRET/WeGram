@@ -1,13 +1,28 @@
-import type { Message } from '@wegram/protocol'
+import type { ChatSummary, Message } from '@wegram/protocol'
+
+/** `[start, end)` spoiler runs of a preview, as `ChatSummary` carries them. */
+type SpoilerRuns = NonNullable<ChatSummary['lastMessageSpoilers']>
+
+/**
+ * Whole days between `seconds` and today in local calendar terms (0 = today).
+ *
+ * Rounded rather than floored on purpose: a DST day is 23 or 25 hours long, so
+ * the raw difference for "yesterday" can be 0.958 or 1.042 days. Both time
+ * stamps (list row, day separator) and `isSameDay` read this one rule.
+ */
+export function calendarDaysAgo(seconds: number, now: Date = new Date()): number {
+  const date = new Date(seconds * 1000)
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const day = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+  return Math.round((startOfToday - day) / 86_400_000)
+}
 
 /** WeChat stamps a list row: HH:MM today, 昨天 HH:MM, 星期X within the week, then MM/DD. */
 export function formatChatTime(seconds: number | undefined): string {
   if (!seconds) return ''
   const date = new Date(seconds * 1000)
   const now = new Date()
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-  const day = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
-  const diffDays = Math.round((startOfToday - day) / 86_400_000)
+  const diffDays = calendarDaysAgo(seconds, now)
 
   if (diffDays === 0) return formatClock(date)
   if (diffDays === 1) return `昨天 ${formatClock(date)}`
@@ -43,23 +58,25 @@ export function avatarColor(id: number): string {
   return AVATAR_HUES[index] ?? AVATAR_HUES[0]!
 }
 
+/**
+ * The international form of a phone number. Telegram hands the number over
+ * without the leading `+` (`8613800000000`); WeChat's card always shows it.
+ */
+export function formatPhone(phone: string): string {
+  const trimmed = phone.trim()
+  if (!trimmed) return ''
+  return trimmed.startsWith('+') ? trimmed : `+${trimmed}`
+}
+
 export function isSameDay(a: number, b: number): boolean {
-  const first = new Date(a * 1000)
-  const second = new Date(b * 1000)
-  return (
-    first.getFullYear() === second.getFullYear() &&
-    first.getMonth() === second.getMonth() &&
-    first.getDate() === second.getDate()
-  )
+  return calendarDaysAgo(b, new Date(a * 1000)) === 0
 }
 
 /** WeChat day separators: 今天 / 昨天 / 周三 / 2026年11月17日. */
 export function formatDaySeparator(seconds: number): string {
   const date = new Date(seconds * 1000)
   const now = new Date()
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-  const day = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
-  const diffDays = Math.round((startOfToday - day) / 86_400_000)
+  const diffDays = calendarDaysAgo(seconds, now)
 
   if (diffDays === 0) return `今天 ${formatClock(date)}`
   if (diffDays === 1) return `昨天 ${formatClock(date)}`
@@ -78,6 +95,47 @@ export function formatDuration(seconds: number | undefined): string {
   const minutes = Math.floor(total / 60)
   const rest = total % 60
   return `${minutes}:${String(rest).padStart(2, '0')}`
+}
+
+/**
+ * Split a chat-list preview into plain and spoiler runs.
+ *
+ * `lastMessageSpoilers` carries the spoiler offsets of the preview string, so the
+ * row can mask exactly the words the transcript masks. Out-of-range, inverted and
+ * overlapping ranges are clamped and merged, and the segments always concatenate
+ * back to `text` — the block must never eat or duplicate a character.
+ */
+export function previewSegments(
+  text: string,
+  runs: SpoilerRuns | undefined,
+): { text: string; spoiler: boolean }[] {
+  if (!text) return []
+  const clamped = (runs ?? [])
+    .map(([start, end]) => ({
+      start: Math.min(Math.max(start, 0), text.length),
+      end: Math.min(Math.max(end, 0), text.length),
+    }))
+    .filter((range) => range.end > range.start)
+    .sort((a, b) => a.start - b.start)
+  if (clamped.length === 0) return [{ text, spoiler: false }]
+
+  const merged: { start: number; end: number }[] = []
+  for (const range of clamped) {
+    const last = merged[merged.length - 1]
+    if (last && range.start <= last.end) last.end = Math.max(last.end, range.end)
+    else merged.push({ ...range })
+  }
+
+  const segments: { text: string; spoiler: boolean }[] = []
+  let cursor = 0
+  for (const range of merged) {
+    if (range.start > cursor)
+      segments.push({ text: text.slice(cursor, range.start), spoiler: false })
+    segments.push({ text: text.slice(range.start, range.end), spoiler: true })
+    cursor = range.end
+  }
+  if (cursor < text.length) segments.push({ text: text.slice(cursor), spoiler: false })
+  return segments
 }
 
 /** Short one-line representation of any message, used by replies and quotes. */

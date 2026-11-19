@@ -288,8 +288,8 @@ clean apart from the known `node:sqlite` experimental warning.
 
 ### Batch 5 — done as P1-3 in the 2026-11-19 session (see above; layout differs slightly)
 
-`index.ts` (adapter), `fixtures.ts` (chats + messages), `assets.ts` (`addFile`, `mediaOf`,
-media half of `buildFixtures`), `traffic.ts` (`simulateTraffic`). `mock-assets.ts` stays.
+`index.ts` (adapter), `fixtures.ts` (now a thin adapter over `@wegram/mock-fixtures`),
+`assets.ts` (`addFile`, `mediaOf`), `traffic.ts` (`simulateTraffic`). `mock-assets.ts` stays.
 Low risk; the mock is what keeps UI work possible without the real account.
 
 ### Batch 6 — done as the preview split above (`lib/preview/` + entry-point shim)
@@ -310,6 +310,12 @@ import-order sensitive: `pnpm build`, then compare a screenshot of the mock app.
 
 Per-domain modules re-exported from `index.ts` — the export surface must stay identical
 (preload bundles the protocol index, 190 kB). Optional / lowest value.
+
+**Partially done 2026-11-20**: the comment/interaction DTO pushed `dto.ts` over the
+550-line cap, so `settings.ts` (MASK / proxy / app settings / `app:info`) and
+`viewer.ts` (the 图片和视频 payloads, importing `appSettingsSchema`) were split out and
+`channels.ts` now imports from those two. `dto.ts` is at ~470 lines; the message schemas
+still live in it, so the rest of this batch is unchanged.
 
 Files over 200 lines that are **not** in the plan: `WechatIcons.tsx` (458, generated
 artwork — leave it), `Composer.tsx` (283), `MediaBubble.tsx` (261), `main/index.ts` (250),
@@ -350,6 +356,76 @@ artwork — leave it), `Composer.tsx` (283), `MediaBubble.tsx` (261), `main/inde
 8. **The real account in `spikes/tdlib/data` is read-only.** Never send/edit/delete/forward
    against it; `-Mock` / `WEGRAM_ADAPTER=mock` for anything that writes.
 
+## Dedupe pass (2026-11-20)
+
+A read-only duplication audit (a 7-line block scan plus three deep passes over main,
+renderer and protocol/preview) became one branch, one commit per item. What moved:
+
+| Was duplicated | Now lives in |
+|---|---|
+| the three `BrowserWindow` factories | `main/app-window.ts` (`createAppWindow`, `attachNavigationPolicy`); the viewer's missing `will-navigate` guard was a separate commit |
+| "append a message and announce it" in the mock (4 copies) | `main/telegram/mock/transcript.ts` (`outgoingMessage`, `appendMessage`) |
+| the send envelope + the thread resolver | `main/telegram/tdlib/actions/message-input.ts`; one `resolveThread` with `requireRoot` |
+| the media field table (photo/video/animation/document/voice) | `main/telegram/tdlib/map/media.ts` |
+| "a missing array means empty" (24 sites) | `main/telegram/tdlib/json.ts` (`asArray`) |
+| the newer-messages page | `history.ts` → `fetchNewerThan` |
+| avatar boxes (7 copies, one already lost `draggable`) | `components/Avatar.tsx` |
+| the search pill + the query rule (4 panels) | `components/SearchField.tsx`, `lib/search.ts` |
+| Enter / Shift+Enter / IME | `lib/composerInput.ts` + `lib/useComposerInput.ts` |
+| floating-card placement (`rect.right - 232`, `rect.top - 92`) | `lib/popupPlacement.ts` + `AnchoredPopup` |
+| the reserved media box + percent text | `lib/mediaBox.ts` |
+| the signed-in identity (two placeholder ids) | `lib/self.ts` (1000; the comment panel used 0) |
+| calendar-day maths | `lib/format.ts` → `calendarDaysAgo` |
+| the fake session's paging / read / comment rules | new package `@wegram/mock-session`, wired into both tsconfigs, both vite configs, eslint's `max-lines` list and the version scripts |
+| the demo account's data (two ~450-line copies that had drifted) | new package `@wegram/mock-fixtures`: chats, messages, threads and contact fields, with each fake injecting `mediaOf` and its clock |
+
+**Deliberately NOT merged** — the audit concluded these only *look* duplicated:
+
+- mock adapter vs TDLib adapter: two implementations of `TelegramAdapter` is the design.
+- `TelegramAdapter` → `TdlibAdapter` forwarding → `actions/*`: that is the seam.
+- `store/settings.ts` vs `store/ui-db.ts`, and the three `proxy` modules: different
+  formats by rule (JSON+DPAPI vs SQL; URL parse vs sealed config vs TDLib call).
+- the two `map/*` dispatch switches: two different TDLib type trees.
+- `setError(errorMessage(e))` at ~28 sites: where an error goes depends on the call site
+  (`ProxyPanel` hands the login window its own error line — there is no store there).
+- per-panel empty/loading skeletons and CSS declaration blocks: `wx-*` is a measured contract.
+- `preview/index.ts`'s invoke switch vs `main/ipc/handlers.ts`: handlers need Electron and
+  the preview may not import main; only the pure rules are shared (that is the package).
+
+**Fixtures** — the demo account itself was still two copies when this batch landed.
+The contract pass below merged it into `@wegram/mock-fixtures`.
+
+## Contract pass (2026-11-20, the audit's "B class")
+
+Second batch from the same audit: the places where one contract was written more than
+once. Same branch, one commit per item.
+
+| Was mirrored | Now |
+|---|---|
+| invoke request shapes: zod schema + a handler cast + the adapter signature | one: the `channels.ts` schema. `IpcHandlerMap` is keyed by channel and typed `InvokeRequest<C>`, the adapter's inputs are `InvokeRequest<...>` as well, and the only cast left is the channel loop in `router.ts`. |
+| the comment contract (four inline zod objects, six hand-written interfaces) | `packages/protocol/src/comment.ts`; the adapter re-exports the types |
+| `AppErrorCode` (a hand-written union beside `code: z.string()`) | `appErrorCodeSchema` + `z.infer`; `IpcResult.error` and the renderer guard use `AppErrorShape` |
+| `EventBus.publish(channel, payload: unknown)` | `publish<C extends EventChannel>(channel: C, payload: EventPayload<C>)`, so `events.ts` is checked against the event schemas |
+| row height 65 (TS) vs `--wx-list-item-h` (CSS); panel slide 250 ms vs `0.25s` | constants moved to `lib/listMetrics.ts` / `lib/comments.ts`; `apps/desktop/scripts/style-contract.test.ts` reads the stylesheets and fails on drift |
+| `RECENT_EMOJI_LIMIT` (10 in three places, 24 in the schema), the sticker-format enum (three literals), the viewer strip bound (two copies), `UnreadBoundary`/`UnreadMarker` (two declarations) | one constant / schema / type each |
+
+**Found by removing the casts**: `ui:saveDraft` declared an `entities` field that no
+caller sent and no store kept — invisible while the handler carried `payload as {...}`.
+The field is gone until something needs it.
+
+**The fixture data is merged too.** `packages/mock-fixtures` holds the account —
+chats, messages, comment threads, contact fields — and each fake injects only its
+environment: `mediaOf` (`wx-media://` tokens under `userData` vs `data:` URLs) and
+`now`. The preview gained what it was missing (chat 11, chat 1's read markers, the
+stress chat's exact ids), the mock gained digit-only phone numbers, and the
+chat-list order became one rule (`@wegram/mock-session` → `sortChatList`). The
+parity test and the `__WEGRAM_VERSION__` shim it needed are deleted: with one
+source there is nothing left to reconcile.
+
+**Not done, on purpose**: the mock adapter and the TDLib adapter still each implement
+`TelegramAdapter`; the three `proxy` modules and the two stores keep their own formats;
+`setError(errorMessage(e))` stays at its call sites. The audit's C class lists why —
+see the dedupe section above.
 ## Start-here checklist for the next session
 
 ```powershell

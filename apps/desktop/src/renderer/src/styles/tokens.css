@@ -33,6 +33,9 @@
 
   /* Text */
   --wx-text: #191919;
+  /* Spoiler mask: a solid black block over the hidden text, revealed on click.
+     Deliberately not a blur and deliberately not themed (design doc §8.3). */
+  --wx-spoiler: #000000;
   --wx-text-secondary: #9a9a9a;
   --wx-text-tertiary: #b7b7b7;
   --wx-text-on-active: #ffffff;
@@ -70,12 +73,23 @@
      grey than the #8a8a8a this used to carry, which is why the icons read both
      thinner and smaller than the client's at the same line width). */
   --wx-rail-icon: #5c5c5c;
-  /* Active rail section (not the brand-coloured 聊天 tab). */
-  --wx-rail-icon-active: #6a6a6a;
+  /* Active rail section: the client fills the selected tab's glyph with brand
+     green; the other tabs keep the grey outline. */
+  --wx-rail-icon-active: var(--wx-brand);
   /* Pane-header, composer-toolbar and other UI glyphs, plus the list header's
      round "+". Both measured off the client in each theme. */
   --wx-icon: #6f6f6f;
   --wx-icon-strong: #8a8a8a;
+  /* 通讯录 (contacts), measured on the client's address book (2026-11-19):
+     the detail pane's blue actions #304b82, section labels / chevrons / 微信号
+     #6e6e73, trailing counts #9f9fa6 and the hairline #f0f0f0. The selected
+     contact row is a neutral grey — WeChat reserves the green row for chats. */
+  --wx-link: #304b82;
+  --wx-link-active: #253a66;
+  --wx-contact-muted: #6e6e73;
+  --wx-contact-count: #9f9fa6;
+  --wx-contact-rule: #f0f0f0;
+  --wx-row-selected: rgba(0, 0, 0, 0.08);
   /* Search field: the client fills it with the pane colour in light mode and
      with a lifted #454547 pill in dark mode. */
   --wx-field: #fbfbfb;
@@ -154,9 +168,16 @@
   --wx-divider: rgba(255, 255, 255, 0.07);
   --wx-brand-weak: rgba(7, 193, 96, 0.16);
   --wx-rail-icon: #969697;
-  --wx-rail-icon-active: #e1e1e5;
   --wx-icon: #a5a5a5;
   --wx-icon-strong: #b1b1b1;
+  /* No dark contact pane has been measured yet; these follow the shell's dark
+     scheme (the link blue is the login window's dark link). */
+  --wx-link: #7d90b8;
+  --wx-link-active: #93a6cc;
+  --wx-contact-muted: #7b7b80;
+  --wx-contact-count: #7b7b80;
+  --wx-contact-rule: #2f2f30;
+  --wx-row-selected: rgba(255, 255, 255, 0.1);
   --wx-field: #454547;
   --wx-field-line: #454547;
   /* No measured dark picker yet; it follows the shell's lifted surfaces. */

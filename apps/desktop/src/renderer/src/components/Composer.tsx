@@ -2,18 +2,13 @@ import type { Message } from '@wegram/protocol'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { loadLatestWindow } from '../lib/anchoredWindow'
+import { useComposerInput } from '../lib/useComposerInput'
 import { errorMessage, invoke } from '../lib/ipc'
 import { messagePreview } from '../lib/format'
 import { useAppStore } from '../store/useAppStore'
-import { Popup } from './ContextMenu'
-import {
-  ChevronDownIcon,
-  EmojiIcon,
-  FolderIcon,
-  MicIcon,
-  ScissorsIcon,
-  StickerCubeIcon,
-} from './Icon'
+import { anchorOf, type PopupAnchor } from '../lib/popupPlacement'
+import { AnchoredPopup } from './ContextMenu'
+import { ChevronDownIcon, CubeTabIcon, EmojiIcon, FolderIcon, MicIcon, ScissorsIcon } from './Icon'
 import { ExpressionPicker } from './ExpressionPicker'
 
 export interface ComposerEditing {
@@ -48,9 +43,8 @@ export function Composer({
 }: ComposerProps) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
-  const [picker, setPicker] = useState<'emoji' | 'stickers' | null>(null)
-  const [attachAt, setAttachAt] = useState<{ x: number; y: number } | null>(null)
-  const composingRef = useRef(false)
+  const [picker, setPicker] = useState<'emoji' | null>(null)
+  const [attachAnchor, setAttachAnchor] = useState<PopupAnchor | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const draftTimer = useRef<number | null>(null)
   /** Where the next render should put the caret after an emoji pick. */
@@ -126,13 +120,19 @@ export function Composer({
     }
   }
 
+  /** Enter sends, Shift+Enter breaks the line, IME never sends (§8.4). */
+  const { inputHandlers } = useComposerInput({
+    onSend: () => void submit(),
+    onEscape: editing ? onCancelEdit : undefined,
+  })
+
   /**
    * Picks local files and sends them straight away, like WeChat's + panel. The
    * picker lives in the main process (native dialog), so the renderer never
    * touches the filesystem.
    */
   const attach = async (kind: 'photo' | 'file'): Promise<void> => {
-    setAttachAt(null)
+    setAttachAnchor(null)
     if (busy) return
     try {
       const picked = await invoke('media:pick', { kind })
@@ -215,24 +215,7 @@ export function Composer({
           title="Enter 发送 · Shift+Enter 换行"
           value={text}
           onChange={(event) => setText(event.target.value)}
-          onCompositionStart={() => {
-            composingRef.current = true
-          }}
-          onCompositionEnd={() => {
-            composingRef.current = false
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape' && editing) {
-              event.preventDefault()
-              onCancelEdit()
-              return
-            }
-            // Never send while an IME composition is active (design doc §8.4).
-            if (event.key !== 'Enter' || event.shiftKey) return
-            if (composingRef.current || event.nativeEvent.isComposing) return
-            event.preventDefault()
-            void submit()
-          }}
+          {...inputHandlers}
         />
 
         <div className="wx-composer__actions">
@@ -246,22 +229,27 @@ export function Composer({
             >
               <EmojiIcon size={21} />
             </button>
+            {/*
+              The client's cube is 收藏, not a second expression entry: the sticker
+              sets live as tabs inside the 表情 panel (docs/UI-HANDOFF.md, §5 delta 1).
+              Favourites have no protocol source yet, so this reports that like the
+              other unwired toolbar entries do.
+            */}
             <button
-              className={`wx-tool-button${picker === 'stickers' ? ' wx-tool-button--active' : ''}`}
-              onClick={() => setPicker((current) => (current === 'stickers' ? null : 'stickers'))}
+              className="wx-tool-button"
+              onClick={() => notWired('收藏')}
               disabled={busy || Boolean(editing)}
-              title="贴纸"
-              aria-label="贴纸集合"
+              title="收藏"
+              aria-label="收藏"
             >
-              <StickerCubeIcon size={21} />
+              <CubeTabIcon size={21} />
             </button>
             <button
               className="wx-tool-button"
               onPointerDown={(event) => event.stopPropagation()}
-              onClick={(event) => {
-                const rect = event.currentTarget.getBoundingClientRect()
-                setAttachAt({ x: rect.left, y: rect.top - 92 })
-              }}
+              onClick={(event) =>
+                setAttachAnchor(anchorOf(event.currentTarget.getBoundingClientRect()))
+              }
               disabled={busy || Boolean(editing)}
               title="发送文件"
               aria-label="发送图片或文件"
@@ -313,22 +301,24 @@ export function Composer({
         </div>
       </div>
 
-      {attachAt ? (
-        <Popup x={attachAt.x} y={attachAt.y} onClose={() => setAttachAt(null)}>
+      {attachAnchor ? (
+        <AnchoredPopup
+          anchor={attachAnchor}
+          placement={{ side: 'above' }}
+          onClose={() => setAttachAnchor(null)}
+        >
           <button className="wx-context-menu__item" onClick={() => void attach('photo')}>
             发送图片
           </button>
           <button className="wx-context-menu__item" onClick={() => void attach('file')}>
             发送文件
           </button>
-        </Popup>
+        </AnchoredPopup>
       ) : null}
 
       {picker ? (
         <ExpressionPicker
-          key={picker}
           chatId={chatId}
-          mode={picker}
           onPickEmoji={insertEmoji}
           onSent={stickerSent}
           onClose={closePicker}
