@@ -9,6 +9,7 @@ import {
   withoutCommentBar,
 } from '../../lib/comments'
 import { messagePreview } from '../../lib/format'
+import { selfIdentity } from '../../lib/self'
 import { useComposerInput } from '../../lib/useComposerInput'
 import { errorMessage, invoke } from '../../lib/ipc'
 import { useAppStore } from '../../store/useAppStore'
@@ -107,11 +108,7 @@ export function CommentPanel({
   const auth = useAppStore((state) => state.auth)
   const userAvatars = useAppStore((state) => state.userAvatars)
 
-  const self = useMemo(() => {
-    if (auth.kind !== 'ready') return { id: 0, name: '我', avatarUrl: undefined }
-    const name = [auth.me.firstName, auth.me.lastName].filter(Boolean).join('')
-    return { id: auth.me.id, name, avatarUrl: auth.me.avatarUrl }
-  }, [auth])
+  const self = useMemo(() => selfIdentity(auth), [auth])
 
   /**
    * One pseudo chat for every row: the comments live in the discussion group, not

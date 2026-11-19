@@ -3,6 +3,7 @@ import type { ChatSummary, Message } from '@wegram/protocol'
 import { useCallback, useMemo, useRef, useState } from 'react'
 
 import { isSameDay } from '../../lib/format'
+import { selfIdentity } from '../../lib/self'
 import { useAnchoredScroll } from '../../lib/useAnchoredScroll'
 import { useAppStore } from '../../store/useAppStore'
 import type { UnreadMarker } from '../../store/useAppStore'
@@ -134,17 +135,7 @@ export function MessageList({
   const userAvatars = useAppStore((state) => state.userAvatars)
   // Memoised because every rendered row takes it as a prop: a fresh object per
   // render would re-render all of them and defeat `memo` in `MessageRow`.
-  const self = useMemo(
-    () =>
-      auth.kind === 'ready'
-        ? {
-            id: auth.me.id,
-            name: [auth.me.firstName, auth.me.lastName].filter(Boolean).join(''),
-            avatarUrl: auth.me.avatarUrl,
-          }
-        : { id: 1000, name: '我', avatarUrl: undefined },
-    [auth],
-  )
+  const self = useMemo(() => selfIdentity(auth), [auth])
 
   /**
    * Albums folded into rows (design doc §8.6). Derived, never stored: a page that

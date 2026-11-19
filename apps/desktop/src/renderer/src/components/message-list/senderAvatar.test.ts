@@ -2,7 +2,7 @@ import type { ChatSummary, Message } from '@wegram/protocol'
 import { describe, expect, it } from 'vitest'
 
 import { senderAvatarUrl } from './senderAvatar'
-import type { SelfIdentity } from './senderAvatar'
+import type { SelfIdentity } from '../../lib/self'
 
 const SELF: SelfIdentity = { id: 1000, name: '我', avatarUrl: 'wx-media://f/me' }
 const CHAT: ChatSummary = {

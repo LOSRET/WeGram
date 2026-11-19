@@ -1,11 +1,6 @@
 import type { ChatSummary, Message } from '@wegram/protocol'
 
-/** The signed-in account as the transcript sees it. */
-export interface SelfIdentity {
-  id: number
-  name: string
-  avatarUrl: string | undefined
-}
+import type { SelfIdentity } from '../../lib/self'
 
 /**
  * Which profile photo a transcript row draws, or `undefined` for the initials
