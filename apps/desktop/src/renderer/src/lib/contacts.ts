@@ -1,10 +1,10 @@
-import type { ChatSummary } from '@wegram/protocol'
+import type { Contact } from '@wegram/protocol'
 
 /** One alphabet section of the 通讯录: a heading and its contact rows. */
 export interface ContactGroup {
   /** A–Z, or '#' for names that do not start with a Latin letter. */
   initial: string
-  contacts: ChatSummary[]
+  contacts: Contact[]
 }
 
 const LATIN_INITIAL = /^[a-z]$/i
@@ -45,21 +45,6 @@ const PINYIN_STARTS: ReadonlyArray<readonly [string, string]> = [
 ]
 
 /**
- * The conversations the 通讯录 lists as contacts: private chats, minus our own
- * Saved Messages conversation (TDLib turns it into a private chat with ourselves).
- *
- * A chat without `userId` is kept on purpose: an adapter that does not know the
- * peer id must not make the whole address book disappear.
- */
-export function contactChats(chats: ChatSummary[], selfUserId: number | null): ChatSummary[] {
-  return chats.filter(
-    (chat) =>
-      chat.kind === 'private' &&
-      !(selfUserId !== null && chat.userId !== undefined && chat.userId === selfUserId),
-  )
-}
-
-/**
  * The section a name belongs to: A–Z for Latin initials, the pinyin initial for
  * Han names (the client sorts Chinese friends the same way) and '#' for anything
  * else — digits, emoji and other scripts.
@@ -81,13 +66,13 @@ export function contactInitial(title: string): string {
  * the '#' bucket last; names inside a bucket use the Chinese collation so people
  * sharing an initial keep a stable, locale-correct order.
  */
-export function groupContacts(contacts: ChatSummary[]): ContactGroup[] {
-  const buckets = new Map<string, ChatSummary[]>()
-  for (const chat of contacts) {
-    const initial = contactInitial(chat.title)
+export function groupContacts(contacts: Contact[]): ContactGroup[] {
+  const buckets = new Map<string, Contact[]>()
+  for (const contact of contacts) {
+    const initial = contactInitial(contact.title)
     const bucket = buckets.get(initial)
-    if (bucket) bucket.push(chat)
-    else buckets.set(initial, [chat])
+    if (bucket) bucket.push(contact)
+    else buckets.set(initial, [contact])
   }
 
   return [...buckets.entries()]

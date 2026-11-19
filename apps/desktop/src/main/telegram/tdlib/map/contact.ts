@@ -1,22 +1,29 @@
-import type { ContactProfile } from '@wegram/protocol'
+import type { Contact } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
+import type { MapperContext } from './context'
 import { mapUser } from './user'
 
 /**
- * Chat peer → the identity the 通讯录 detail pane shows.
+ * One address-book row: a TDLib `user` seen as a 通讯录 entry.
  *
- * Kept beside `mapUser` because it is the same TDLib `user` object seen from a
- * chat: the pane needs the username and the phone, not the display name (the
- * chat summary already carries the title).
+ * The title is the person's name because the 通讯录 groups by it; the private
+ * chat (and with it the chat title, which may be an alias) is not needed until
+ * the card's 发消息 is pressed. The photo comes from the avatar cache when it
+ * has already been downloaded — otherwise the row draws initials until
+ * `evt:avatars` hands the picture over.
  */
-export function mapContactProfile(chatId: number, user: TdObject | undefined): ContactProfile {
-  if (!user) return { chatId }
+export function mapContact(ctx: MapperContext, user: TdObject): Contact {
   const mapped = mapUser(user)
+  const name = [mapped.firstName, mapped.lastName]
+    .filter((part): part is string => Boolean(part))
+    .join(' ')
+  const avatarUrl = ctx.userAvatarUrls.get(mapped.id)
   return {
-    chatId,
-    ...(typeof user.id === 'number' ? { userId: user.id } : {}),
+    userId: mapped.id,
+    title: name || mapped.username || `用户 ${mapped.id}`,
     ...(mapped.username ? { username: mapped.username } : {}),
     ...(mapped.phone ? { phone: mapped.phone } : {}),
+    ...(avatarUrl ? { avatarUrl } : {}),
   }
 }

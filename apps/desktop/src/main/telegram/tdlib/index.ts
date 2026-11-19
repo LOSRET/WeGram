@@ -3,7 +3,7 @@ import type {
   AuthState,
   ChatSummary,
   ConnectionState,
-  ContactProfile,
+  Contact,
   Message,
   ProxyConfig,
   ProxyTestResult,
@@ -23,7 +23,6 @@ import { configureTdlib, safeVersion } from './client'
 import type { TdClientLike, TdObject } from './client'
 import type { MapperContext } from './map/context'
 import { mapChat } from './map/chat'
-import { mapContactProfile } from './map/contact'
 import { mapUser } from './map/user'
 import { applyProxy, setProxy as applyProxyConfig, testProxy as testProxyConfig } from './proxy'
 import type { ProxyDeps } from './proxy'
@@ -349,27 +348,9 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     return actions.setChatMuted(this.actionDeps, chatId, muted)
   }
 
-  /**
-   * The 微信号 line and the 更多信息 block of the contact pane. `getChat` gives
-   * the peer's user id (a private chat only); `getUser` gives the identity.
-   * A deleted or inaccessible peer is not an error for the pane — it keeps the
-   * chat id and shows the fields it has.
-   */
-  async contactProfile(chatId: number): Promise<ContactProfile> {
-    const chat = await this.invoke({ _: 'getChat', chat_id: chatId })
-    const userId: number | undefined = chat?.type?.user_id
-    if (!userId) return { chatId }
-    try {
-      const user = await this.invoke({ _: 'getUser', user_id: userId })
-      return mapContactProfile(chatId, user)
-    } catch (error) {
-      this.logger.warn(
-        `contact profile ${chatId} could not be resolved: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      )
-      return { chatId, userId }
-    }
+  /** The account's Telegram address book (通讯录); see `actions.listContacts`. */
+  async listContacts(): Promise<Contact[]> {
+    return actions.listContacts(this.actionDeps)
   }
 
   async history(input: {

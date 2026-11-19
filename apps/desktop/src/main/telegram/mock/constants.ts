@@ -49,8 +49,8 @@ export interface Fixture {
   /** Channels only: whether this account may post there (TDLib: admin right). */
   canPost?: boolean
   /**
-   * Private chats only: the peer identity the 通讯录 detail pane shows. The
-   * real adapter reads the same fields from TDLib's `user`.
+   * Private chats only: the person's address-book identity (微信号 / phone).
+   * The real adapter reads the same fields from TDLib's `getContacts` + `user`.
    */
   contact?: { username?: string; phone?: string }
 }

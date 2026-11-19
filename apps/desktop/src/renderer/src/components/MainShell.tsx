@@ -1,4 +1,4 @@
-import type { ChatSummary } from '@wegram/protocol'
+import type { ChatSummary, Contact } from '@wegram/protocol'
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react'
 
 import { AppMenu } from './AppMenu'
@@ -9,7 +9,7 @@ import { ContactDetail, ContactsList } from './contacts'
 import { PlusMenu } from './PlusMenu'
 import { ProxyPanel } from './ProxyPanel'
 import { SideRail, type ShellSection } from './SideRail'
-import { invoke } from '../lib/ipc'
+import { errorMessage, invoke } from '../lib/ipc'
 import { activateChat } from '../lib/openChat'
 import { useAppStore } from '../store/useAppStore'
 
@@ -40,8 +40,10 @@ export function MainShell() {
   const [plusMenu, setPlusMenu] = useState<Anchor | null>(null)
   /** Which rail section owns the middle + right columns. */
   const [section, setSection] = useState<ShellSection>('chats')
+  /** The account's address book; null until the first `contacts:list` lands. */
+  const [contacts, setContacts] = useState<Contact[] | null>(null)
   /** The contact whose card the right pane shows (通讯录 only). */
-  const [contactId, setContactId] = useState<number | null>(null)
+  const [contactUserId, setContactUserId] = useState<number | null>(null)
   /**
    * The 通讯录 search stays here, not inside the list, so switching to 聊天 and
    * back does not silently drop the filter the reader typed.
@@ -56,19 +58,66 @@ export function MainShell() {
     return () => window.clearTimeout(timer)
   }, [toast])
 
-  /** The selected contact is resolved from the live list: a deleted chat closes the card. */
+  /**
+   * The address book is read every time the rail switches to 通讯录, not once at
+   * start-up: a contact added on another device then shows up without a restart.
+   * TDLib answers from its local cache, so the repeat read is cheap.
+   */
+  useEffect(() => {
+    if (section !== 'contacts') return
+    let live = true
+    void invoke('contacts:list')
+      .then((list) => {
+        if (live) setContacts(list)
+      })
+      .catch((cause) => {
+        if (!live) return
+        setError(errorMessage(cause))
+        // Stop claiming "正在加载…": the error bar already says what went wrong.
+        setContacts([])
+      })
+    return () => {
+      live = false
+    }
+  }, [section, setError])
+
+  /** The selected contact is resolved from the live list: a removed one closes the card. */
   const selectedContact = useMemo(
-    () => chats.find((chat) => chat.id === contactId && chat.kind === 'private') ?? null,
-    [chats, contactId],
+    () => contacts?.find((contact) => contact.userId === contactUserId) ?? null,
+    [contacts, contactUserId],
+  )
+
+  /** 公众号、服务号 is still a chat-list fact, not an address-book one. */
+  const channelCount = useMemo(
+    () => chats.filter((chat) => chat.kind === 'channel').length,
+    [chats],
   )
 
   const showUnavailable = useCallback((label: string) => setToast(`${label}还没有接入`), [setToast])
 
-  /** 发消息 on a contact card: open the conversation and return to 聊天. */
-  const openContactChat = useCallback((chat: ChatSummary) => {
-    activateChat(chat)
-    setSection('chats')
-  }, [])
+  /**
+   * 发消息 on a contact card: TDLib creates the private chat on first use and
+   * answers with it (`chats:openPrivate`), then the shell switches to 聊天.
+   */
+  const openContactChat = useCallback(
+    (contact: Contact) => {
+      void (async () => {
+        try {
+          const chat = await invoke('chats:openPrivate', { userId: contact.userId })
+          // Put the row in the list before the pane mounts: for a contact with no
+          // conversation yet this is the first time the chat exists at all, and
+          // the batched `evt:chats` upsert would land a frame too late (the pane
+          // would flash its placeholder).
+          useAppStore.getState().applyChatOps([{ op: 'upsert', chat }])
+          activateChat(chat)
+          setSection('chats')
+        } catch (cause) {
+          setError(errorMessage(cause))
+        }
+      })()
+    },
+    [setError],
+  )
 
   const filteredChats = useMemo(() => {
     const needle = deferredQuery.trim().toLowerCase()
@@ -134,19 +183,21 @@ export function MainShell() {
           />
         ) : (
           <ContactsList
-            chats={chats}
-            activeChatId={contactId}
+            contacts={contacts ?? []}
+            activeUserId={contactUserId}
             query={contactQuery}
             onQueryChange={setContactQuery}
-            onSelect={(chat) => setContactId(chat.id)}
+            onSelect={(contact) => setContactUserId(contact.userId)}
             onUnavailable={showUnavailable}
+            channelCount={channelCount}
+            loading={contacts === null}
           />
         )}
         {section === 'chats' ? (
           <ChatPane />
         ) : selectedContact ? (
           <ContactDetail
-            chat={selectedContact}
+            contact={selectedContact}
             onOpenChat={openContactChat}
             onUnavailable={showUnavailable}
           />

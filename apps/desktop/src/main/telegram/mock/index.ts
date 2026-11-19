@@ -7,7 +7,7 @@ import type {
   AuthState,
   ChatSummary,
   ConnectionState,
-  ContactProfile,
+  Contact,
   Message,
   MessageMedia,
   ProxyConfig,
@@ -22,6 +22,7 @@ import { registerMediaFile } from '../../media/registry'
 import { AdapterEmitter, type MediaKind, type TelegramAdapter } from '../adapter'
 import { MockAssets } from './assets'
 import { MockAvatars } from './avatars'
+import { listMockContacts } from './contacts'
 import {
   ME,
   MOCK_CODE,
@@ -216,15 +217,9 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     return { ...fixture.chat }
   }
 
-  /** The 通讯录 detail pane's identity block, from the fixture's `contact`. */
-  async contactProfile(chatId: number): Promise<ContactProfile> {
-    const fixture = this.requireFixture(chatId)
-    return {
-      chatId,
-      ...(fixture.chat.userId ? { userId: fixture.chat.userId } : {}),
-      ...(fixture.contact?.username ? { username: fixture.contact.username } : {}),
-      ...(fixture.contact?.phone ? { phone: fixture.contact.phone } : {}),
-    }
+  /** The mock address book; see `listMockContacts`. */
+  async listContacts(): Promise<Contact[]> {
+    return listMockContacts(this.fixtures)
   }
 
   async history(input: {

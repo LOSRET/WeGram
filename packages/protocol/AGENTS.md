@@ -6,8 +6,8 @@ Scope: the IPC contract shared by main, preload and renderer. Read the root
 ## What belongs here
 
 Every value that crosses IPC is declared here **first**: `dto.ts` (the core zod
-schemas + inferred types), `contact.ts` (the 通讯录 card's identity block, split out
-when `dto.ts` reached its 550-line budget), `channels.ts` (channel tables and their
+schemas + inferred types), `contact.ts` (the 通讯录 `Contact` row, split out when
+`dto.ts` reached its 550-line budget), `channels.ts` (channel tables and their
 request/response schemas) and `errors.ts` (`AppError`). The package is exported
 straight from source (`src/index.ts`, no build step), so `pnpm typecheck` in the
 consumer is the only build.

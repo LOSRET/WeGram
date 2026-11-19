@@ -278,8 +278,8 @@ The card's layout is exact: avatar top 91, header rule 170, 朋友资料 label 1
 更多信息 label 273, 来源 303, 添加时间 329, action icons 397 and labels 429 — all CSS px
 from the window top. Our DOM measures 91 / 170 / 191 / 219 / 273 / 301 / 367 (actions
 padding start) with the same section paddings. The one deliberate change is the second
-更多信息 row: Telegram has no 添加时间, so 用户 ID (and 手机号 when `contacts:profile`
-exposes it) takes its place, and 来源 says `Telegram`.
+更多信息 row: Telegram has no 添加时间, so 用户 ID (and 手机号 when the contact
+carries one) takes its place, and 来源 says `Telegram`.
 
 ---
 
@@ -576,12 +576,13 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
 26. **The 280×373 login window is fixed.** The client's window is the same size and also
     not resizable; ours is centred on the primary display every time (the client
     remembers where you left it) — one less piece of window state to persist.
-27. **The contacts list only sees the loaded chat page.** `chats:list` asks for 100
-    chats (schema max 200); an account with more private chats than that has contacts
-    that never appear. The contacts column has no pagination or virtualiser yet (a few
-    hundred rows are fine — the chat list already paints 526), and bots are not
-    filtered: `ChatSummary` has no bot flag, and `getContacts` would be the honest
-    source if the address book ever needs to be exact.
+27. **The contacts list is the Telegram address book, not the chat list.** It comes
+    from `getContacts` + `getUser` (`contacts:list`), so a person with no conversation
+    still appears and the list is no longer capped by the loaded chat page (the old
+    design only saw the first 100 chats). `getContacts` has no paging: it returns every
+    id at once, so the column still has no virtualiser (a few hundred rows are fine —
+    the chat list already paints 526). Bots appear only if they were added to the
+    address book; Telegram's real address book is the honest source.
 28. **Chinese names get pinyin initials from ICU, not a pinyin table.** `contactInitial`
     compares the first Han character against 23 boundary characters ("阿" for A, "八"
     for B … "匝" for Z) with `Intl.Collator('zh-Hans-CN')`; the last boundary it sorts
@@ -594,9 +595,10 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
     the shape is faithful, the action says 还没有接入.
 30. **The contact card's 微信号 is the Telegram username.** WeChat's 微信号 / 来源 /
     添加时间 do not exist in Telegram: the card shows `username` (or 未设置), 来源
-    `Telegram`, and 用户 ID / 手机号 from `contacts:profile`. A phone number appears only
-    when TDLib exposes it (the peer must be in the address book). 发消息 opens the
-    conversation and switches back to 聊天; 语音聊天 / 视频聊天 toast (no call path).
+    `Telegram`, and 用户 ID / 手机号 from the `contacts:list` row itself. A phone number
+    appears only when TDLib exposes it (the person must be in the address book). 发消息
+    opens the private chat (`chats:openPrivate` creates it on first use) and switches
+    back to 聊天; 语音聊天 / 视频聊天 toast (no call path).
 
 ---
 
@@ -607,10 +609,9 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
    from payloads now. Left over: identify the client's sixth composer glyph (◎) and the
    voice-input circle, which has no payload. (The chats tab no longer needs one — it is
    the Telegram mark now.)
-2. ~~通讯录 panel~~ — done 2026-11-19 (§2.4): private chats grouped by pinyin initial,
-   the client's service rows and the contact card. Follow-ups: paginate past the first
-   `chats:list` page, virtualise past ~300 contacts, filter bots, and (optionally) take
-   the card's identity from Telegram's real address book (`getContacts`).
+2. ~~通讯录 panel~~ — done 2026-11-19 (§2.4): the Telegram address book
+   (`getContacts`) grouped by pinyin initial, the client's service rows and the
+   contact card. Remaining follow-up: virtualise past ~300 contacts.
 3. Chat-info popover → real side panel (members, mute/pin controls) — the protocol
    already has `muted`/`pinned`.
 4. Global search overlay (W4) and in-chat search.

@@ -1,50 +1,55 @@
-import type { ChatSummary } from '@wegram/protocol'
+import type { Contact } from '@wegram/protocol'
 import { useRef, useState } from 'react'
 
-import { contactChats, groupContacts } from '../../lib/contacts'
+import { groupContacts } from '../../lib/contacts'
 import { avatarColor, initials } from '../../lib/format'
 import { useAppStore } from '../../store/useAppStore'
 import { ChevronDownIcon, ContactsManageIcon, SearchIcon } from '../Icon'
 import { OverlayScrollbar } from '../OverlayScrollbar'
 
 interface ContactsListProps {
-  chats: ChatSummary[]
-  activeChatId: number | null
+  /** The account's Telegram address book, as `contacts:list` answered it. */
+  contacts: Contact[]
+  activeUserId: number | null
   query: string
   onQueryChange: (value: string) => void
-  onSelect: (chat: ChatSummary) => void
+  onSelect: (contact: Contact) => void
   /** Service rows Telegram has no data for (新的朋友 / 企业微信 / 管理). */
   onUnavailable: (label: string) => void
+  /** Channels this account can see; the 公众号、服务号 row only counts them. */
+  channelCount: number
+  /** The first `contacts:list` answer is still on its way. */
+  loading: boolean
 }
 
 /**
  * The 通讯录 column: search field, the 通讯录管理 card, WeChat's service rows and
- * the address book built from private chats.
+ * the address book from `contacts:list`.
  *
  * Row heights follow the client's contacts column (85 px header stack, 36 px
  * service rows, 54 px contact rows), not the 65 px conversation rows: the two
  * columns are different lists in WeChat too.
  */
 export function ContactsList({
-  chats,
-  activeChatId,
+  contacts,
+  activeUserId,
   query,
   onQueryChange,
   onSelect,
   onUnavailable,
+  channelCount,
+  loading,
 }: ContactsListProps) {
-  const selfUserId = useAppStore((state) => (state.auth.kind === 'ready' ? state.auth.me.id : null))
+  const userAvatars = useAppStore((state) => state.userAvatars)
   const [contactsOpen, setContactsOpen] = useState(true)
 
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
-  const contacts = contactChats(chats, selfUserId)
-  const channels = chats.filter((chat) => chat.kind === 'channel')
   const needle = query.trim().toLowerCase()
   const searching = needle.length > 0
   const filtered = searching
-    ? contacts.filter((chat) => chat.title.toLowerCase().includes(needle))
+    ? contacts.filter((contact) => contact.title.toLowerCase().includes(needle))
     : contacts
   const groups = groupContacts(filtered)
 
@@ -78,11 +83,12 @@ export function ContactsList({
               {filtered.length === 0 ? (
                 <div className="wx-contacts__empty">没有找到相关联系人</div>
               ) : (
-                filtered.map((chat) => (
+                filtered.map((contact) => (
                   <ContactRow
-                    key={chat.id}
-                    chat={chat}
-                    active={chat.id === activeChatId}
+                    key={contact.userId}
+                    contact={contact}
+                    avatarUrl={contact.avatarUrl ?? userAvatars[contact.userId]}
+                    active={contact.userId === activeUserId}
                     onSelect={onSelect}
                   />
                 ))
@@ -94,7 +100,7 @@ export function ContactsList({
                 <Entry label="新的朋友" onClick={() => onUnavailable('新的朋友')} />
                 <Entry
                   label="公众号、服务号"
-                  count={channels.length}
+                  count={channelCount}
                   onClick={() => onUnavailable('公众号、服务号')}
                 />
                 <Entry label="企业微信联系人" onClick={() => onUnavailable('企业微信联系人')} />
@@ -109,17 +115,18 @@ export function ContactsList({
 
               {contactsOpen ? (
                 contacts.length === 0 ? (
-                  <div className="wx-contacts__empty">还没有联系人</div>
+                  <div className="wx-contacts__empty">{loading ? '正在加载…' : '还没有联系人'}</div>
                 ) : (
                   <div className="wx-contacts__groups">
                     {groups.map((group) => (
                       <div key={group.initial}>
                         <div className="wx-contacts__group-head">{group.initial}</div>
-                        {group.contacts.map((chat) => (
+                        {group.contacts.map((contact) => (
                           <ContactRow
-                            key={chat.id}
-                            chat={chat}
-                            active={chat.id === activeChatId}
+                            key={contact.userId}
+                            contact={contact}
+                            avatarUrl={contact.avatarUrl ?? userAvatars[contact.userId]}
+                            active={contact.userId === activeUserId}
                             onSelect={onSelect}
                           />
                         ))}
@@ -170,32 +177,34 @@ function Entry({
 }
 
 function ContactRow({
-  chat,
+  contact,
+  avatarUrl,
   active,
   onSelect,
 }: {
-  chat: ChatSummary
+  contact: Contact
+  avatarUrl: string | undefined
   active: boolean
-  onSelect: (chat: ChatSummary) => void
+  onSelect: (contact: Contact) => void
 }) {
   return (
     <button
       type="button"
       className={`wx-contacts__row${active ? ' wx-contacts__row--active' : ''}`}
-      onClick={() => onSelect(chat)}
+      onClick={() => onSelect(contact)}
       aria-pressed={active}
     >
       <span
         className="wx-avatar wx-contacts__avatar"
-        style={chat.avatarUrl ? undefined : { background: avatarColor(chat.id) }}
+        style={avatarUrl ? undefined : { background: avatarColor(contact.userId) }}
       >
-        {chat.avatarUrl ? (
-          <img className="wx-avatar__img" src={chat.avatarUrl} alt="" draggable={false} />
+        {avatarUrl ? (
+          <img className="wx-avatar__img" src={avatarUrl} alt="" draggable={false} />
         ) : (
-          initials(chat.title)
+          initials(contact.title)
         )}
       </span>
-      <span className="wx-contacts__name">{chat.title}</span>
+      <span className="wx-contacts__name">{contact.title}</span>
     </button>
   )
 }

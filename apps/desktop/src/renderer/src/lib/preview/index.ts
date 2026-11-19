@@ -18,7 +18,7 @@ import { stickerMedia } from '../stickerMedia'
 import {
   ME,
   chats,
-  contactProfiles,
+  contacts,
   info,
   media,
   messagesByChat,
@@ -174,10 +174,8 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       if (!chat) throw { code: 'internal', message: 'unknown preview contact' }
       return { ...chat }
     }
-    case 'contacts:profile': {
-      const chatId = Number(store.chatId)
-      return contactProfiles[chatId] ?? { chatId }
-    }
+    case 'contacts:list':
+      return contacts
     case 'messages:read': {
       const upTo = Number(store.upToMessageId)
       if (Number.isFinite(upTo)) applyPreviewRead(Number(store.chatId), upTo)

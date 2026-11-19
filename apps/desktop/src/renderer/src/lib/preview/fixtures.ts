@@ -1,7 +1,7 @@
 import type {
   AppInfo,
   ChatSummary,
-  ContactProfile,
+  Contact,
   Message,
   MessageMedia,
   Self,
@@ -426,17 +426,17 @@ export function media(fileId: number, extra: Partial<MessageMedia> = {}): Messag
 export const channelPostRights: Record<number, boolean> = { 6: true }
 
 /**
- * The identity the 通讯录 detail pane asks for (`contacts:profile`). Keyed by
- * chat id; a chat without an entry answers with just its id, like a Telegram
- * peer that hides its username and phone.
+ * The browser preview's address book (`contacts:list`). A real account's
+ * address book also holds people with no conversation at all; these four are
+ * the preview's private-chat peers so 发消息 can open a transcript.
  */
-export const contactProfiles: Record<number, ContactProfile> = {
-  3: { chatId: 3, userId: 37, username: 'mama_wegram', phone: '+86 138 0000 0000' },
-  7: { chatId: 7, userId: 21, username: 'ada_lovelace' },
-  8: { chatId: 8, userId: 22, username: 'ben_carter' },
-  9: { chatId: 9, userId: 23, username: 'chenchen' },
-  10: { chatId: 10, userId: 24, username: 'dvolkov' },
-}
+export const contacts: Contact[] = [
+  { userId: 21, title: 'Ada Lovelace', username: 'ada_lovelace' },
+  { userId: 22, title: 'Ben Carter', username: 'ben_carter' },
+  { userId: 23, title: '陈晨', username: 'chenchen' },
+  { userId: 24, title: 'Dmitri Volkov', username: 'dvolkov' },
+  { userId: 37, title: '妈', username: 'mama_wegram', phone: '+86 138 0000 0000' },
+]
 
 export const info: AppInfo = {
   version: __WEGRAM_VERSION__,

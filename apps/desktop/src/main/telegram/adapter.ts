@@ -3,7 +3,7 @@ import type {
   ChatOp,
   ChatSummary,
   ConnectionState,
-  ContactProfile,
+  Contact,
   Message,
   MessageOp,
   ProxyConfig,
@@ -87,11 +87,13 @@ export interface TelegramAdapter {
   /** Mutes / unmutes a chat and answers the refreshed summary. */
   setChatMuted(chatId: number, muted: boolean): Promise<ChatSummary>
   /**
-   * The Telegram identity behind a private chat: username / phone / user id.
-   * The 通讯录 detail pane asks once per selected contact; the chat summary has
-   * the name and photo but not the identity.
+   * The account's Telegram address book (`getContacts`), one row per person.
+   *
+   * The 通讯录 is built from this, not from the chat list: a contact you never
+   * wrote to has no private chat yet, and `openPrivateChat` creates it when the
+   * card's 发消息 is pressed.
    */
-  contactProfile(chatId: number): Promise<ContactProfile>
+  listContacts(): Promise<Contact[]>
 
   history(input: {
     chatId: number

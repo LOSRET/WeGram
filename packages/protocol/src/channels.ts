@@ -20,7 +20,7 @@ import {
   viewerItemSchema,
   viewerStateSchema,
 } from './dto'
-import { contactProfileSchema } from './contact'
+import { contactSchema } from './contact'
 import { appErrorSchema } from './errors'
 
 /**
@@ -57,8 +57,12 @@ export const invokeChannels = [
   'chats:canPost',
   /** 静音 / 取消静音 for the channel bar; answers the refreshed summary. */
   'chats:setMuted',
-  /** The Telegram identity behind a private chat (the 通讯录 detail pane). */
-  'contacts:profile',
+  /**
+   * The account's Telegram address book (通讯录). People, not conversations:
+   * the list comes from TDLib's `getContacts`, so a contact without a private
+   * chat still appears, and 发消息 creates the chat on demand.
+   */
+  'contacts:list',
   'messages:history',
   /**
    * One window centred on a message, for a reading position or unread boundary
@@ -149,10 +153,7 @@ export const invokeSchemas = {
     request: z.object({ chatId: z.number().int(), muted: z.boolean() }),
     response: chatSummarySchema,
   },
-  'contacts:profile': {
-    request: z.object({ chatId: z.number().int() }),
-    response: contactProfileSchema,
-  },
+  'contacts:list': { request: noPayload, response: z.array(contactSchema) },
   'messages:history': {
     request: z.object({
       chatId: z.number().int(),

@@ -1,44 +1,15 @@
-import type { ChatSummary } from '@wegram/protocol'
+import type { Contact } from '@wegram/protocol'
 import { describe, expect, it } from 'vitest'
 
-import { contactChats, contactInitial, groupContacts } from './contacts'
+import { contactInitial, groupContacts } from './contacts'
 
-function chat(overrides: Partial<ChatSummary>): ChatSummary {
+function contact(overrides: Partial<Contact>): Contact {
   return {
-    id: 1,
+    userId: 1,
     title: 'Ada',
-    kind: 'private',
-    unread: 0,
-    pinned: false,
-    muted: false,
     ...overrides,
   }
 }
-
-describe('contactChats', () => {
-  it('keeps private chats and drops groups, channels and Saved Messages', () => {
-    const result = contactChats(
-      [
-        chat({ id: 1, title: 'Ada' }),
-        chat({ id: 2, title: 'Team', kind: 'group' }),
-        chat({ id: 3, title: 'News', kind: 'channel' }),
-        chat({ id: 4, title: 'Saved Messages', userId: 1000 }),
-        chat({ id: 5, title: 'Ben', userId: 42 }),
-      ],
-      1000,
-    )
-
-    expect(result.map((item) => item.id)).toEqual([1, 5])
-  })
-
-  it('keeps a chat whose peer id the adapter did not fill in', () => {
-    expect(contactChats([chat({ id: 1, userId: undefined })], 1000)).toHaveLength(1)
-  })
-
-  it('does not filter anything before the account id is known', () => {
-    expect(contactChats([chat({ id: 1, userId: 1000 })], null)).toHaveLength(1)
-  })
-})
 
 describe('contactInitial', () => {
   it('upper-cases a Latin initial and ignores surrounding spaces', () => {
@@ -64,11 +35,11 @@ describe('contactInitial', () => {
 describe('groupContacts', () => {
   it('orders A–Z, puts # last and sorts inside a bucket', () => {
     const groups = groupContacts([
-      chat({ id: 1, title: 'Zoe' }),
-      chat({ id: 2, title: '陈晨' }),
-      chat({ id: 3, title: 'Ada' }),
-      chat({ id: 4, title: 'Ben' }),
-      chat({ id: 5, title: '🎉 群' }),
+      contact({ userId: 1, title: 'Zoe' }),
+      contact({ userId: 2, title: '陈晨' }),
+      contact({ userId: 3, title: 'Ada' }),
+      contact({ userId: 4, title: 'Ben' }),
+      contact({ userId: 5, title: '🎉 群' }),
     ])
 
     expect(groups.map((group) => group.initial)).toEqual(['A', 'B', 'C', 'Z', '#'])
@@ -78,7 +49,10 @@ describe('groupContacts', () => {
   })
 
   it('keeps two people sharing an initial in one group', () => {
-    const groups = groupContacts([chat({ id: 1, title: 'Anna' }), chat({ id: 2, title: 'Abe' })])
+    const groups = groupContacts([
+      contact({ userId: 1, title: 'Anna' }),
+      contact({ userId: 2, title: 'Abe' }),
+    ])
 
     expect(groups).toHaveLength(1)
     expect(groups[0]?.contacts.map((item) => item.title)).toEqual(['Abe', 'Anna'])

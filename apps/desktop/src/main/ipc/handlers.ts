@@ -113,7 +113,7 @@ export function createHandlers({
       const { chatId, muted } = payload as { chatId: number; muted: boolean }
       return adapter.setChatMuted(chatId, muted)
     },
-    'contacts:profile': (payload) => adapter.contactProfile((payload as { chatId: number }).chatId),
+    'contacts:list': () => adapter.listContacts(),
 
     'messages:history': (payload) =>
       adapter.history(payload as { chatId: number; fromMessageId?: number; limit: number }),
