@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   avatarColor,
+  calendarDaysAgo,
   formatChatTime,
   formatClock,
   formatDaySeparator,
@@ -132,6 +133,20 @@ describe('isSameDay', () => {
   it('compares calendar days, not instants', () => {
     expect(isSameDay(seconds(2026, 10, 17, 0, 0), seconds(2026, 10, 17, 23, 59))).toBe(true)
     expect(isSameDay(seconds(2026, 10, 17, 23, 59), seconds(2026, 10, 18, 0, 1))).toBe(false)
+  })
+})
+
+describe('calendarDaysAgo', () => {
+  const now = new Date(2026, 10, 17, 12, 0)
+
+  it('counts whole local days, not 24-hour spans', () => {
+    expect(calendarDaysAgo(seconds(2026, 10, 17, 0, 0), now)).toBe(0)
+    expect(calendarDaysAgo(seconds(2026, 10, 16, 23, 59), now)).toBe(1)
+    expect(calendarDaysAgo(seconds(2026, 10, 10, 8, 0), now)).toBe(7)
+  })
+
+  it('goes negative for a day in the future', () => {
+    expect(calendarDaysAgo(seconds(2026, 10, 18, 1, 0), now)).toBe(-1)
   })
 })
 

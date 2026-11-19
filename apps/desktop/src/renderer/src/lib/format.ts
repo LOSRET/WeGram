@@ -3,14 +3,26 @@ import type { ChatSummary, Message } from '@wegram/protocol'
 /** `[start, end)` spoiler runs of a preview, as `ChatSummary` carries them. */
 type SpoilerRuns = NonNullable<ChatSummary['lastMessageSpoilers']>
 
+/**
+ * Whole days between `seconds` and today in local calendar terms (0 = today).
+ *
+ * Rounded rather than floored on purpose: a DST day is 23 or 25 hours long, so
+ * the raw difference for "yesterday" can be 0.958 or 1.042 days. Both time
+ * stamps (list row, day separator) and `isSameDay` read this one rule.
+ */
+export function calendarDaysAgo(seconds: number, now: Date = new Date()): number {
+  const date = new Date(seconds * 1000)
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+  const day = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+  return Math.round((startOfToday - day) / 86_400_000)
+}
+
 /** WeChat stamps a list row: HH:MM today, 昨天 HH:MM, 星期X within the week, then MM/DD. */
 export function formatChatTime(seconds: number | undefined): string {
   if (!seconds) return ''
   const date = new Date(seconds * 1000)
   const now = new Date()
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-  const day = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
-  const diffDays = Math.round((startOfToday - day) / 86_400_000)
+  const diffDays = calendarDaysAgo(seconds, now)
 
   if (diffDays === 0) return formatClock(date)
   if (diffDays === 1) return `昨天 ${formatClock(date)}`
@@ -57,22 +69,14 @@ export function formatPhone(phone: string): string {
 }
 
 export function isSameDay(a: number, b: number): boolean {
-  const first = new Date(a * 1000)
-  const second = new Date(b * 1000)
-  return (
-    first.getFullYear() === second.getFullYear() &&
-    first.getMonth() === second.getMonth() &&
-    first.getDate() === second.getDate()
-  )
+  return calendarDaysAgo(b, new Date(a * 1000)) === 0
 }
 
 /** WeChat day separators: 今天 / 昨天 / 周三 / 2026年11月17日. */
 export function formatDaySeparator(seconds: number): string {
   const date = new Date(seconds * 1000)
   const now = new Date()
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-  const day = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
-  const diffDays = Math.round((startOfToday - day) / 86_400_000)
+  const diffDays = calendarDaysAgo(seconds, now)
 
   if (diffDays === 0) return `今天 ${formatClock(date)}`
   if (diffDays === 1) return `昨天 ${formatClock(date)}`
