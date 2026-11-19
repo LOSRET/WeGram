@@ -36,8 +36,13 @@ lib/viewer.ts         which messages become one viewer strip (pure, unit-tested)
 lib/player.ts         video player-bar maths: clocks, seek clamp, progress (pure, unit-tested)
 lib/tgs.ts            gzip guards + Lottie decode cache
 lib/stickerMedia.ts   Sticker → MessageMedia (shared by the picker and the preview)
-lib/preview-bridge.ts DEV-ONLY fake IPC for the browser preview
+lib/preview-bridge.ts DEV-ONLY entry point (re-exports lib/preview)
+lib/preview/          browser-preview session + invoke switch (index.ts) and fixtures
 ```
+
+`styles/index.css` is the entry point only: it imports `styles/*.css` in source order
+(tokens first). Keep that order — it is load-bearing — and see the tokens header before
+changing a colour or a `wx-*` class.
 
 The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
 (lint-enforced). It only speaks the `window.tg` contract from

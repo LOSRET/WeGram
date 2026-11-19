@@ -7,8 +7,9 @@ adds what is specific to this layer.
 ## Layering
 
 ```
-index.ts            app lifecycle, main-window creation, adapter wiring, media scheme,
-                    login↔shell hand-over (syncWindowsToAuth / showMainWindow)
+index.ts            app lifecycle, adapter wiring, media scheme, login↔shell hand-over
+                    (syncWindowsToAuth / showMainWindow)
+windows.ts          the shell BrowserWindow factory, title-bar theme, link handling
 login-window.ts     the frameless 280×373 login BrowserWindow (#login), close/refocus
 ipc/router.ts       per-channel zod validation, Result envelope
 ipc/handlers.ts     one handler per invoke channel

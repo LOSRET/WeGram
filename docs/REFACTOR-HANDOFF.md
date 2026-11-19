@@ -61,11 +61,23 @@ Acceptance run for this session:
 - `pnpm tdlib:smoke` (read-only, real session): adapter started, `getMe`, 20 chats,
   history 10 messages with `hasMore=true`, channel `senderChatId` names.
 
-Still open from the original plan: **batch 6** (`preview-bridge.ts`, still 775 lines),
-**batch 7** (`styles/index.css`, still 3206 lines) and optional **batch 8**
-(`packages/protocol`). Two new candidates for a later pass: `main/index.ts` (409,
-window hand-over has closed-over module state) and `WechatIcons.tsx` (generated artwork —
-leave it).
+Second batch, same day (after the P0/P1 report): **preview-bridge** (775) became
+`lib/preview/` — `index.ts` (session + invoke switch + installer) and `fixtures.ts`
+(data, helpers) behind a two-line `preview-bridge.ts` entry point so the dev-only
+import stays visible; **styles/index.css** (3206) became 14 files under `styles/`
+imported in source order from `index.css` (the compiled CSS came out byte-identical,
+same hash, 60.32 kB — that is the check to repeat if the order is ever edited);
+**main/index.ts**'s window factory moved to `main/windows.ts` (createMainWindow,
+openExternal, storedTheme, applyTitleBarTheme, raiseShellAboveViewer), leaving the
+lifecycle/hand-over in `index.ts`; the mock's read marker and transfer simulation
+moved to `mock/effects.ts`; and ESLint now enforces `max-lines: 550` on app and
+protocol sources (generated `WechatIcons.tsx` exempt) so the tree cannot silently grow
+back to 1000-line files.
+
+Still open from the original plan: optional **batch 8** (`packages/protocol` split by
+domain; the export surface must stay identical because preload bundles it). The two
+files that remain above the 550 cap are gone; `mock/index.ts` (540) is the adapter
+surface and `WechatIcons.tsx` (513) is generated artwork.
 
 ## Commits from this session (oldest first)
 
@@ -211,7 +223,7 @@ Deliberate invariants you must not undo while working here:
   `.cache/app.log` held no errors (only Node's `node:sqlite` experimental warning).
 - The Electron window was **closed** afterwards; nothing is left running.
 
-## Remaining batches (batch 5 is done — see the 2026-11-19 section above)
+## Remaining batches (batches 5–7 are done — see the 2026-11-19 section above)
 
 Order matters less now: batch 4 was the only high-risk one and the only code verified
 exclusively against the real account. Batches 5–7 are renderer/mock work; 8 is optional.
@@ -272,13 +284,13 @@ clean apart from the known `node:sqlite` experimental warning.
 media half of `buildFixtures`), `traffic.ts` (`simulateTraffic`). `mock-assets.ts` stays.
 Low risk; the mock is what keeps UI work possible without the real account.
 
-### Batch 6 — `renderer/src/lib/preview-bridge.ts` (519) → `lib/preview/`
+### Batch 6 — done as the preview split above (`lib/preview/` + entry-point shim)
 
 `index.ts` (install), `invoke.ts` (channel → fake response switch), `fixtures/*.ts`
 (chats, messages, media, stickers, svg). Dev-only: add a one-line README stating that app
 logic must never import it (`eslint.config.mjs` currently has it in the global `ignores`).
 
-### Batch 7 — `renderer/src/styles/index.css` (2122) → `styles/*.css`
+### Batch 7 — done above (`styles/*.css`, 14 files, import order preserved)
 
 `tokens.css` (the `:root` block, must be imported first), `base.css`, `shell.css`,
 `chat.css`, `composer.css`, `controls.css`, `media.css`, `stickers.css`,
