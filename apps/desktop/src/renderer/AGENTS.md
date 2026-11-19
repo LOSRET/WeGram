@@ -57,7 +57,8 @@ lib/player.ts         video player-bar maths: clocks, seek clamp, progress (pure
 lib/tgs.ts            gzip guards + Lottie decode cache
 lib/stickerMedia.ts   Sticker → MessageMedia (shared by the picker and the preview)
 lib/preview-bridge.ts DEV-ONLY entry point (re-exports lib/preview)
-lib/preview/          browser-preview session + invoke switch (index.ts) and fixtures
+lib/preview/          browser-preview session + invoke switch (index.ts); fixtures.ts is a
+                      thin adapter over @wegram/mock-fixtures (data: URLs + gradient faces)
 ```
 
 `styles/index.css` is the entry point only: it imports `styles/*.css` in source order

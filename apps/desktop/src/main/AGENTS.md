@@ -18,8 +18,10 @@ ipc/router.ts       per-channel zod validation, typed handler map, Result envelo
 ipc/handlers.ts     one handler per invoke channel
 telegram/           adapter.ts (the seam) / tdlib/ (real adapter) / mock/ (fixtures) /
                     updates.ts / events.ts / comment-access.ts (the comment permission rule)
-telegram/mock/      fixtures + transcript.ts (the one "append and announce" writer) + effects;
-                    its paging/read/comment rules come from @wegram/mock-session
+telegram/mock/      fixtures.ts is a thin adapter over @wegram/mock-fixtures (the account
+                    data, shared with the browser preview); transcript.ts is the one
+                    "append and announce" writer, effects.ts drives read/transfer; paging,
+                    read, comment and list-order rules come from @wegram/mock-session
 telegram/tdlib/     client / updates / json.ts (the one "missing array" read) / map/* (content,
                     rich, media.ts holds the one media field table)
 telegram/tdlib/actions/  TDLib requests as functions over ActionDeps, grouped into

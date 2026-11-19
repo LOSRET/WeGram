@@ -288,8 +288,8 @@ clean apart from the known `node:sqlite` experimental warning.
 
 ### Batch 5 — done as P1-3 in the 2026-11-19 session (see above; layout differs slightly)
 
-`index.ts` (adapter), `fixtures.ts` (chats + messages), `assets.ts` (`addFile`, `mediaOf`,
-media half of `buildFixtures`), `traffic.ts` (`simulateTraffic`). `mock-assets.ts` stays.
+`index.ts` (adapter), `fixtures.ts` (now a thin adapter over `@wegram/mock-fixtures`),
+`assets.ts` (`addFile`, `mediaOf`), `traffic.ts` (`simulateTraffic`). `mock-assets.ts` stays.
 Low risk; the mock is what keeps UI work possible without the real account.
 
 ### Batch 6 — done as the preview split above (`lib/preview/` + entry-point shim)
@@ -377,6 +377,7 @@ renderer and protocol/preview) became one branch, one commit per item. What move
 | the signed-in identity (two placeholder ids) | `lib/self.ts` (1000; the comment panel used 0) |
 | calendar-day maths | `lib/format.ts` → `calendarDaysAgo` |
 | the fake session's paging / read / comment rules | new package `@wegram/mock-session`, wired into both tsconfigs, both vite configs, eslint's `max-lines` list and the version scripts |
+| the demo account's data (two ~450-line copies that had drifted) | new package `@wegram/mock-fixtures`: chats, messages, threads and contact fields, with each fake injecting `mediaOf` and its clock |
 
 **Deliberately NOT merged** — the audit concluded these only *look* duplicated:
 
@@ -391,12 +392,8 @@ renderer and protocol/preview) became one branch, one commit per item. What move
 - `preview/index.ts`'s invoke switch vs `main/ipc/handlers.ts`: handlers need Electron and
   the preview may not import main; only the pure rules are shared (that is the package).
 
-**Still open** — the fixtures themselves are still two copies
-(`main/telegram/mock/fixtures.ts` ↔ `renderer/src/lib/preview/fixtures.ts`) and have
-drifted (a `lastRead*` pair, one phone format, file ids). Merging them means a shared
-fixture module with each side's `mediaOf` injected; until then
-`apps/desktop/scripts/fixture-parity.test.ts` is the cheap guard (see the contract
-pass below).
+**Fixtures** — the demo account itself was still two copies when this batch landed.
+The contract pass below merged it into `@wegram/mock-fixtures`.
 
 ## Contract pass (2026-11-20, the audit's "B class")
 
@@ -416,13 +413,14 @@ once. Same branch, one commit per item.
 caller sent and no store kept — invisible while the handler carried `payload as {...}`.
 The field is gone until something needs it.
 
-**Still open**: the fixture *data* (see the note above). Until it is merged,
-`apps/desktop/scripts/fixture-parity.test.ts` asserts that the preview is a subset of
-the mock, that every shared row agrees on title/kind/unread/pinned/muted, that every
-mock row parses as its protocol schema, and it pins the one known gap (chat 11,
-Eva Müller) so neither side can drift silently. That test needed
-`__WEGRAM_VERSION__` in `vitest.config.ts`, because the preview module reads the
-build-time constant when it is imported.
+**The fixture data is merged too.** `packages/mock-fixtures` holds the account —
+chats, messages, comment threads, contact fields — and each fake injects only its
+environment: `mediaOf` (`wx-media://` tokens under `userData` vs `data:` URLs) and
+`now`. The preview gained what it was missing (chat 11, chat 1's read markers, the
+stress chat's exact ids), the mock gained digit-only phone numbers, and the
+chat-list order became one rule (`@wegram/mock-session` → `sortChatList`). The
+parity test and the `__WEGRAM_VERSION__` shim it needed are deleted: with one
+source there is nothing left to reconcile.
 
 **Not done, on purpose**: the mock adapter and the TDLib adapter still each implement
 `TelegramAdapter`; the three `proxy` modules and the two stores keep their own formats;

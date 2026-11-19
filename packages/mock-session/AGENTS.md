@@ -15,6 +15,8 @@ Pure rules that both fakes must answer identically:
   still newer and incoming.
 - `comments.ts` — `composeCommentAccess` (the fake stand-in for the real
   `comment-access.ts` rule) and `threadInteraction`.
+- `chatList.ts` — `sortChatList`: the chat list's order (pinned first, then newest
+  activity), which both fakes serve.
 
 The package imports nothing — no zod, no Node, no Electron, no React — because the
 renderer is a sandboxed page and `@wegram/mock-session` is bundled into it. Keep it
@@ -25,8 +27,8 @@ import would drag the whole DTO layer into the preview.
 
 Fixtures, media generation and event wiring stay in each fake: the mock writes real
 PNG/WebP/TGS files under `userData` and mints `wx-media://` tokens, while the
-preview uses `data:` URLs. The data itself is still mirrored, so only the *rules* live here.
-`apps/desktop/scripts/fixture-parity.test.ts` guards what the two copies must agree on.
+preview uses `data:` URLs. The *account data* is shared, but it lives in
+`@wegram/mock-fixtures` — this package stays dependency-free and rule-only.
 
 ## Verify
 
