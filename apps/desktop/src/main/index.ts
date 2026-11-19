@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import type { AppInfo, AuthState } from '@wegram/protocol'
-import { app, BrowserWindow, dialog, shell } from 'electron'
+import { app, BrowserWindow, dialog } from 'electron'
 
 import { parseApiCredentials } from './credentials'
 import { createHandlers } from './ipc/handlers'
@@ -20,10 +20,15 @@ import { EventBus } from './telegram/updates'
 import { createLogger } from './util'
 import {
   closeViewer,
-  hideViewerWithShell,
   setViewerTheme,
-  showViewerWithShell,
 } from './viewer'
+import {
+  applyTitleBarTheme,
+  createMainWindow,
+  raiseShellAboveViewer,
+  storedTheme,
+} from './windows'
+
 
 const logger = createLogger('main')
 const isDev = !app.isPackaged
@@ -242,20 +247,6 @@ function showMainWindow(theme: 'light' | 'dark', closeLogin: 'immediate' | 'afte
   }
 }
 
-/**
- * Brings the shell window forward above the standalone viewer.
- *
- * Both are plain top-level windows, so `moveTop()` is what puts the chat on top of
- * the still-open picture (design: the viewer is not owned by the shell, which is
- * what keeps the task bar looking like WeChat's — one WeGram button with both
- * windows in its hover preview).
- */
-function raiseShellAboveViewer(win: BrowserWindow): void {
-  if (win.isMinimized()) win.restore()
-  if (!win.isVisible()) win.show()
-  win.moveTop()
-  win.focus()
-}
 
 /**
  * Authorization can leave `ready` without the renderer asking: TDLib may close
@@ -280,97 +271,6 @@ function syncWindowsToAuth(state: AuthState): void {
   mainWindow.close()
 }
 
-function createMainWindow(theme: 'light' | 'dark'): BrowserWindow {
-  const win = new BrowserWindow({
-    width: 1000,
-    height: 680,
-    minWidth: 880,
-    minHeight: 600,
-    show: false,
-    backgroundColor: theme === 'dark' ? '#1e1e1f' : '#fbfbfb',
-    titleBarStyle: 'hidden',
-    titleBarOverlay: {
-      // Must match --wx-rail / --wx-rail-icon, or the strip reads as a seam.
-      color: theme === 'dark' ? '#2d2d2e' : '#e0e0e0',
-      symbolColor: theme === 'dark' ? '#969697' : '#191919',
-      height: 32,
-    },
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      webSecurity: true,
-      spellcheck: false,
-    },
-  })
-
-  win.once('ready-to-show', () => {
-    applyTitleBarTheme(win, theme)
-    win.show()
-  })
-
-  // The viewer is not owned by this window any more, so its "put the picture away
-  // with the chat" behaviour is explicit here (see main/viewer.ts).
-  win.on('minimize', hideViewerWithShell)
-  win.on('restore', showViewerWithShell)
-
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    openExternal(url)
-    return { action: 'deny' }
-  })
-
-  win.webContents.on('will-navigate', (event, url) => {
-    const rendererUrl = process.env['ELECTRON_RENDERER_URL']
-    if (rendererUrl && url.startsWith(rendererUrl)) return
-    event.preventDefault()
-    openExternal(url)
-  })
-
-  if (isDev && process.env['ELECTRON_RENDERER_URL']) {
-    void win.loadURL(process.env['ELECTRON_RENDERER_URL'])
-  } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'))
-  }
-
-  return win
-}
-
-/** Only https and tg: links leave the app (design doc §8.3). */
-function openExternal(url: string): void {
-  try {
-    const parsed = new URL(url)
-    if (parsed.protocol === 'https:' || parsed.protocol === 'tg:') {
-      void shell.openExternal(url)
-    }
-  } catch {
-    logger.warn('refused to open malformed URL')
-  }
-}
-
-function storedTheme(uiDb: UiDatabase | null): 'light' | 'dark' {
-  return uiDb?.getSetting('theme') === 'dark' ? 'dark' : 'light'
-}
-
-/**
- * titleBarOverlay is drawn by Windows, not by CSS, so it must be repainted when
- * the theme changes — otherwise a dark UI keeps a light window-controls strip.
- */
-function applyTitleBarTheme(win: BrowserWindow | null, theme: 'light' | 'dark'): void {
-  if (!win || win.isDestroyed()) return
-  try {
-    win.setTitleBarOverlay({
-      color: theme === 'dark' ? '#2d2d2e' : '#e0e0e0',
-      symbolColor: theme === 'dark' ? '#969697' : '#191919',
-      height: 32,
-    })
-  } catch (error) {
-    logger.warn(
-      'setTitleBarOverlay failed:',
-      error instanceof Error ? error.message : String(error),
-    )
-  }
-}
 
 /**
  * Minimal .env support for development: credentials must never be hard-coded
@@ -407,3 +307,4 @@ app.on('before-quit', () => {
   uiDb?.close()
   uiDb = null
 })
+
