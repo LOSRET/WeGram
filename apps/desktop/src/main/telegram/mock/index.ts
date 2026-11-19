@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { stat } from 'node:fs/promises'
 import { basename } from 'node:path'
 
-import { pageAround, pageNewer, pageOlder } from '@wegram/mock-session'
+import { pageAround, pageNewer, pageOlder, sortChatList } from '@wegram/mock-session'
 import { AppError } from '@wegram/protocol'
 import type {
   AuthState,
@@ -186,11 +186,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   }
 
   async listChats(input: { limit: number; offset: number }): Promise<ChatSummary[]> {
-    const all = [...this.fixtures.values()].map((fixture) => fixture.chat)
-    all.sort((a, b) => {
-      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
-      return (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0)
-    })
+    const all = sortChatList([...this.fixtures.values()].map((fixture) => fixture.chat))
     return all.slice(input.offset, input.offset + input.limit)
   }
 

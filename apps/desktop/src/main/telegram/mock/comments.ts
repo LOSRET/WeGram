@@ -1,3 +1,4 @@
+import { buildCommentThread } from '@wegram/mock-fixtures'
 import { composeCommentAccess, pageOlder } from '@wegram/mock-session'
 import { AppError } from '@wegram/protocol'
 import type { Message } from '@wegram/protocol'
@@ -11,7 +12,7 @@ import type {
   CommentSendQuery,
   CommentTarget,
 } from '../adapter'
-import { at, type Fixture } from './constants'
+import type { Fixture } from './constants'
 import { outgoingMessage } from './transcript'
 
 /**
@@ -23,38 +24,11 @@ import { outgoingMessage } from './transcript'
  * "open the thread" path is exercised without a second chat.
  */
 
-const AUTHORS: ReadonlyArray<{ id: number; name: string }> = [
-  { id: 4101, name: '小满' },
-  { id: 4102, name: '阿星' },
-  { id: 4103, name: '林深' },
-  { id: 4104, name: '周末不加班' },
-  { id: 4105, name: 'Cathy' },
-  { id: 4106, name: '老周' },
-  { id: 4107, name: '海边的卡夫卡' },
-  { id: 4108, name: 'K' },
-]
-
-const BODIES: readonly string[] = [
-  '这条我先收藏了，晚点对着改。',
-  '同问 +1，我也卡在这一步。',
-  '已经踩过这个坑了，按你说的顺序调整就好了。',
-  '能否再展开讲讲第二种格式？',
-  '实测有效，感谢分享。',
-  '我把这段转给同事了，正好用得上。',
-  '这个思路可以，不过要注意旧版本兼容。',
-  '支持，等这个功能很久了。',
-  '哈哈哈，这就是我上周的翻车现场。',
-  '细节问一下：滚动条是自绘的吗？',
-]
-
-/** Ids of mock comments start well above the transcript's, so paging is unambiguous. */
-const COMMENT_ID_BASE = 900_000
-
 /**
  * One mock thread: `count` comments on `messageId`, oldest first.
  *
- * `minutesAgo` is when the commented message was posted; comments trail it by
- * two minutes each, always staying newer than the post.
+ * The authors, bodies and id formula live in `@wegram/mock-fixtures` so the
+ * browser preview's threads are the same ones; only the clock is this process's.
  */
 export function mockThread(
   chatId: number,
@@ -62,22 +36,13 @@ export function mockThread(
   count: number,
   minutesAgo: number,
 ): Message[] {
-  const messages: Message[] = []
-  const start = COMMENT_ID_BASE + messageId * 100
-  for (let index = 0; index < count; index += 1) {
-    const author = AUTHORS[index % AUTHORS.length] ?? { id: 4101, name: '小满' }
-    messages.push({
-      id: start + index,
-      chatId,
-      senderId: author.id,
-      senderName: author.name,
-      outgoing: false,
-      date: at(Math.max(1, minutesAgo - index * 2)),
-      kind: 'text',
-      text: BODIES[index % BODIES.length] ?? '👍',
-    })
-  }
-  return messages
+  return buildCommentThread({
+    chatId,
+    messageId,
+    count,
+    minutesAgo,
+    now: () => Math.floor(Date.now() / 1000),
+  })
 }
 
 /**

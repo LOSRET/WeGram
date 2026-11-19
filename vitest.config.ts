@@ -10,10 +10,6 @@ import { defineConfig } from 'vitest/config'
  * reproduce (see docs/HANDOFF.md "Non-obvious facts").
  */
 export default defineConfig({
-  // The renderer bundle gets this from electron.vite.config.ts / vite.web.config.ts.
-  // Tests that import renderer modules (the fixture parity check) need the same
-  // substitution, or the module throws on an undefined global.
-  define: { __WEGRAM_VERSION__: JSON.stringify('0.0.0-test') },
   test: {
     include: [
       'packages/*/src/**/*.test.ts',

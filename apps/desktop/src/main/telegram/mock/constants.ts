@@ -1,4 +1,5 @@
-import type { ChatSummary, Message, Self } from '@wegram/protocol'
+import type { FixtureSeed } from '@wegram/mock-fixtures'
+import type { Message, Self } from '@wegram/protocol'
 
 export const ME: Self = {
   id: 1000,
@@ -43,34 +44,12 @@ export const MOCK_AVATAR_COLORS: readonly (readonly [
   ],
 ]
 
-export interface Fixture {
-  chat: ChatSummary
-  messages: Message[]
-  /** Channels only: whether this account may post there (TDLib: admin right). */
-  canPost?: boolean
-  /**
-   * Private chats only: the person's address-book identity (微信号 / phone).
-   * The real adapter reads the same fields from TDLib's `getContacts` + `user`.
-   */
-  contact?: { username?: string; phone?: string; dcId?: number }
-  /**
-   * Comment threads by message id (design doc §9.8). TDLib keeps them in the
-   * message thread — a channel's linked discussion group — not in the transcript,
-   * so the mock does too; `messages:comments` serves them.
-   */
-  comments?: Record<number, Message[]>
-  /**
-   * Comment permissions for the mock's discussion groups (design doc §9.8).
-   * Defaults to "joined and allowed"; a thread can require a join first.
-   */
-  commentAccess?: {
-    joined?: boolean
-    canComment?: boolean
-    joinByRequest?: boolean
-    slowModeSeconds?: number
-    banned?: boolean
-  }
-}
+/**
+ * The mock's name for one conversation. The data itself lives in
+ * `@wegram/mock-fixtures`, so the mock and the browser preview serve exactly
+ * the same account (they used to drift).
+ */
+export type Fixture = FixtureSeed
 
 export interface MockFile {
   fileId: number

@@ -20,6 +20,7 @@ const TARGETS = [
   'apps/desktop/package.json',
   'packages/protocol/package.json',
   'packages/mock-session/package.json',
+  'packages/mock-fixtures/package.json',
 ]
 
 function readManifest(relative) {

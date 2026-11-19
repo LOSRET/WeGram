@@ -4,6 +4,7 @@
     "lib": ["ES2023"],
     "types": ["node"],
     "paths": {
+      "@wegram/mock-fixtures": ["../../packages/mock-fixtures/src/index.ts"],
       "@wegram/mock-session": ["../../packages/mock-session/src/index.ts"],
       "@wegram/protocol": ["../../packages/protocol/src/index.ts"]
     }
@@ -14,6 +15,7 @@
     "src/main/**/*.ts",
     "src/preload/**/*.ts",
     "scripts/**/*.ts",
+    "../../packages/mock-fixtures/src/**/*.ts",
     "../../packages/mock-session/src/**/*.ts",
     "../../packages/protocol/src/**/*.ts"
   ]

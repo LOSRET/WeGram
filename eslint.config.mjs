@@ -65,6 +65,7 @@ export default tseslint.config(
       'apps/desktop/src/**/*.{ts,tsx}',
       'packages/protocol/src/**/*.ts',
       'packages/mock-session/src/**/*.ts',
+      'packages/mock-fixtures/src/**/*.ts',
     ],
     ignores: ['apps/desktop/src/renderer/src/components/WechatIcons.tsx'],
     rules: {
