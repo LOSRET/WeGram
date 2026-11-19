@@ -1,0 +1,175 @@
+/* ---------- Chat pane ---------- */
+
+.wx-chat {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  background: var(--wx-pane);
+}
+
+.wx-chat__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--wx-pane-head-h);
+  flex: 0 0 var(--wx-pane-head-h);
+  padding: 0 14px 0 18px;
+  border-bottom: 1px solid var(--wx-pane-line);
+  background: var(--wx-pane);
+  user-select: none;
+}
+
+.wx-chat__title {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--wx-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wx-chat__typing {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--wx-brand-text);
+}
+
+.wx-chat__subtitle {
+  display: none;
+}
+
+.wx-chat__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.wx-ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 30px;
+  height: 28px;
+  padding: 0 4px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--wx-icon);
+}
+
+.wx-ghost-btn:hover:not(:disabled) {
+  background: var(--wx-row-hover);
+  color: var(--wx-text);
+}
+
+.wx-ghost-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.wx-messages-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.wx-messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-anchor: none;
+  /* Symmetric and generous, like the client: the transcript is inset from both
+     pane edges by the same amount (measured 21–25 px on the client; the outgoing
+     column used to sit 8 px from the edge, which read as "glued to the wall"). */
+  padding: 10px 22px 4px 22px;
+  position: relative;
+  /* The virtualizer positions rows absolutely; keep block flow, not flex. */
+}
+
+.wx-messages--pending {
+  visibility: hidden;
+}
+
+.wx-messages__sizer {
+  position: relative;
+  width: 100%;
+}
+
+.wx-message-slot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+}
+
+/* 定位到聊天位置: the row the viewer pointed at flashes once and fades out — the
+   highlight is a moment, never a state the message carries. The tint comes from
+   the brand token so light and dark themes both read as "this is the one". */
+.wx-message-slot.is-located .wx-message-row {
+  border-radius: 6px;
+  animation: wx-locate-flash 1.6s ease-out;
+}
+
+@keyframes wx-locate-flash {
+  0%,
+  45% {
+    background: color-mix(in srgb, var(--wx-brand) 14%, transparent);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+.wx-messages__loading {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--wx-elevated);
+  border: 1px solid var(--wx-line);
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  pointer-events: none;
+}
+
+/* "跳转到最新消息" — measured off the client's own pill: white, no border, soft
+   shadow, green double chevron + green 13 px label, ~29 px tall, 16 px from the
+   right edge of the transcript and 14 px above its bottom. It is shown whenever the
+   reader is not at the newest message, not only when something arrived. */
+.wx-buoy {
+  position: absolute;
+  /* Aligned with the transcript's right inset, i.e. with the outgoing avatars. */
+  right: 22px;
+  bottom: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 29px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--wx-elevated);
+  color: var(--wx-brand-text);
+  font-size: 13px;
+  line-height: 1;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+}
+
+.wx-buoy__icon {
+  flex: none;
+}

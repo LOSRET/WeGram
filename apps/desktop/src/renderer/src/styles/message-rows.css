@@ -1,0 +1,191 @@
+/* ---------- Message rows ---------- */
+
+.wx-message-row {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  padding-bottom: 14px;
+  position: relative;
+}
+
+.wx-message-row--self {
+  flex-direction: row-reverse;
+}
+
+.wx-message-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  /* max-width must live here: a percentage max-width on the bubble would
+     resolve against this stack's content size and collapse to min-content. */
+  max-width: min(560px, 66%);
+}
+
+.wx-message-stack--self {
+  align-items: flex-end;
+}
+
+.wx-sender {
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--wx-text-secondary);
+  padding: 0 2px 2px;
+}
+
+.wx-bubble {
+  max-width: 100%;
+  width: fit-content;
+  padding: 8px 12px;
+  border-radius: var(--wx-bubble-radius);
+  background: var(--wx-bubble-other);
+  color: var(--wx-text);
+  font-size: 14px;
+  line-height: var(--wx-lh-body);
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.wx-bubble--self {
+  background: var(--wx-bubble-self);
+  color: #191919;
+}
+
+/* Time / edited / read receipt: WeChat keeps the transcript clean, so the
+   metadata only appears while the row is hovered. It is absolutely positioned so
+   it never adds a gap between bubbles. */
+.wx-message__meta {
+  position: absolute;
+  bottom: 1px;
+  left: 47px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(251, 251, 251, 0.94);
+  font-size: 11px;
+  line-height: 15px;
+  color: var(--wx-text-tertiary);
+  text-align: right;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.wx-message-row--self .wx-message__meta {
+  left: auto;
+  right: 47px;
+}
+
+[data-theme='dark'] .wx-message__meta {
+  background: rgba(30, 30, 31, 0.94);
+}
+
+.wx-message-row:hover .wx-message__meta {
+  opacity: 1;
+}
+
+.wx-message-more {
+  align-self: center;
+  border: none;
+  background: transparent;
+  color: var(--wx-text-secondary);
+  font-size: 15px;
+  line-height: 1;
+  padding: 0 4px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.wx-message-row:hover .wx-message-more {
+  opacity: 1;
+}
+
+.wx-message-more:hover {
+  background: var(--wx-row-hover);
+  color: var(--wx-text);
+}
+
+.wx-quote {
+  margin-bottom: 5px;
+  padding: 4px 8px;
+  border-left: 2px solid var(--wx-line-strong);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.045);
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 420px;
+}
+
+.wx-bubble__empty {
+  color: var(--wx-text-secondary);
+  font-size: 12px;
+}
+
+/* ---------- Day separator / unread divider / service ---------- */
+
+.wx-day-separator {
+  display: block;
+  width: fit-content;
+  margin: 6px auto 10px;
+  font-size: 12px;
+  color: var(--wx-text-tertiary);
+  text-align: center;
+}
+
+.wx-unread-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 12px;
+  font-size: 11px;
+  color: var(--wx-text-tertiary);
+}
+
+.wx-unread-divider::before,
+.wx-unread-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--wx-divider);
+}
+
+.wx-unread-divider > span {
+  padding: 0 4px;
+}
+
+.wx-service {
+  margin: 2px auto 12px;
+  width: fit-content;
+  max-width: 80%;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--wx-divider);
+  font-size: 11px;
+  color: var(--wx-text-secondary);
+  text-align: center;
+}
+
+/* ---------- Empty pane ---------- */
+
+.wx-empty-chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--wx-text-secondary);
+  font-size: 13px;
+}
+
+.wx-empty-chat__logo {
+  color: #efefef;
+}
+
+[data-theme='dark'] .wx-empty-chat__logo {
+  color: #2a2a2c;
+}

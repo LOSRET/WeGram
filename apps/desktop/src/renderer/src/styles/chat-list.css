@@ -1,0 +1,245 @@
+/* ---------- Conversation list ---------- */
+
+.wx-list {
+  display: flex;
+  flex-direction: column;
+  width: var(--wx-sidebar-w);
+  flex: 0 0 var(--wx-sidebar-w);
+  min-height: 0;
+  background: var(--wx-list);
+}
+
+.wx-list__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--wx-list-head-h);
+  flex: 0 0 var(--wx-list-head-h);
+  padding: 0 10px 0 9px;
+}
+
+.wx-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  height: 29px;
+  padding: 0 8px;
+  border: 1px solid var(--wx-field-line);
+  border-radius: 5px;
+  background: var(--wx-field);
+  color: var(--wx-text-tertiary);
+}
+
+.wx-search:focus-within {
+  border-color: var(--wx-brand);
+}
+
+.wx-search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--wx-text);
+}
+
+.wx-search input::placeholder {
+  color: var(--wx-text-tertiary);
+}
+
+.wx-list__plus {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--wx-icon-strong);
+}
+
+.wx-list__plus:hover {
+  color: var(--wx-text);
+}
+
+.wx-list__body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+/* The scroller is its own layer so the overlay bar can float above it without
+   being part of the scrolling content. */
+.wx-list__view {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* The conversation rows are absolutely positioned by the virtualiser (fixed 65 px
+   rows, so there is nothing to measure): the sizer carries the total height and the
+   view keeps scrolling natively, which is what the overlay bar mirrors. */
+.wx-list__sizer {
+  position: relative;
+  width: 100%;
+}
+
+.wx-list__slot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+}
+
+.wx-list__empty {
+  padding: 28px 16px;
+  font-size: 13px;
+  color: var(--wx-text-secondary);
+  text-align: center;
+}
+
+.wx-chat-item {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  height: var(--wx-list-item-h);
+  padding: 0 10px 0 9px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.wx-chat-item--pinned {
+  background: var(--wx-row-pinned);
+}
+
+.wx-chat-item:hover {
+  background: var(--wx-row-hover);
+}
+
+.wx-chat-item--active,
+.wx-chat-item--active:hover {
+  background: var(--wx-row-active);
+}
+
+.wx-avatar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--wx-avatar);
+  height: var(--wx-avatar);
+  flex: 0 0 var(--wx-avatar);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+  overflow: hidden;
+  letter-spacing: 0.5px;
+}
+
+/* Chat photo, cropped into the 40 px rounded square. */
+.wx-avatar__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wx-avatar--small {
+  width: var(--wx-avatar-msg);
+  height: var(--wx-avatar-msg);
+  flex: 0 0 var(--wx-avatar-msg);
+  font-size: 13px;
+}
+
+.wx-chat-item__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.wx-chat-item__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.wx-chat-item__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--wx-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wx-chat-item__time {
+  flex: 0 0 auto;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--wx-text-tertiary);
+}
+
+.wx-chat-item__preview {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--wx-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wx-chat-item--active .wx-chat-item__title {
+  color: var(--wx-text-on-active);
+}
+
+.wx-chat-item--active .wx-chat-item__time {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.wx-chat-item--active .wx-chat-item__preview {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.wx-badge {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--wx-badge);
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  flex: 0 0 auto;
+}
+
+.wx-chat-item--active .wx-badge {
+  background: rgba(0, 0, 0, 0.28);
+}
+
+/* 免打扰 chats still say how much is waiting; only the fill turns grey, so the
+   count stays where the reader looks for it. The selected row darkens its
+   badges like the red one. */
+.wx-badge--muted {
+  background: var(--wx-badge-muted);
+}
+
+.wx-chat-item--active .wx-badge--muted {
+  background: rgba(0, 0, 0, 0.28);
+}

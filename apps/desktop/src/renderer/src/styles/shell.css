@@ -1,0 +1,175 @@
+/* ---------- App shell ---------- */
+
+.wx-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--wx-pane);
+}
+
+.wx-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* ---------- Title bar ----------
+   WeChat paints a single flat strip above all three columns; the window
+   controls are drawn over the right end by Windows (titleBarOverlay). */
+
+.wx-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  height: var(--wx-titlebar-h);
+  flex: 0 0 var(--wx-titlebar-h);
+  padding: 0 6px;
+  /* Reserve the strip the native window controls occupy (WCO env vars). */
+  padding-right: calc(6px + (100% - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100%)));
+  background: var(--wx-rail);
+  -webkit-app-region: drag;
+  user-select: none;
+  overflow: hidden;
+}
+
+.wx-titlebar__brand {
+  display: none;
+}
+
+.wx-titlebar__spacer {
+  flex: 1;
+  min-width: 0;
+}
+
+.wx-titlebar input,
+.wx-titlebar button {
+  -webkit-app-region: no-drag;
+}
+
+/* ---------- Side rail ---------- */
+
+.wx-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: var(--wx-rail-w);
+  flex: 0 0 var(--wx-rail-w);
+  padding: 8px 0 9px;
+  background: var(--wx-rail);
+  user-select: none;
+}
+
+.wx-rail__me {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  overflow: hidden;
+  flex: 0 0 32px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Real profile photo from `getMe`, cropped into the 32 px rail slot. */
+.wx-rail__me-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wx-rail__me-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--wx-rail);
+  border-radius: 50%;
+  background: var(--wx-muted-dot);
+}
+
+.wx-rail__me-dot--online {
+  background: var(--wx-brand);
+}
+
+.wx-rail__me-dot--connecting {
+  background: var(--wx-warning);
+}
+
+.wx-rail__me-dot--offline {
+  background: var(--wx-text-tertiary);
+}
+
+.wx-rail__nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.wx-rail__bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  margin-top: auto;
+}
+
+.wx-rail__btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--wx-rail-icon);
+}
+
+.wx-rail__btn:hover {
+  background: rgba(0, 0, 0, 0.055);
+}
+
+[data-theme='dark'] .wx-rail__btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.wx-rail__btn--active,
+.wx-rail__btn--active:hover {
+  background: transparent;
+  color: var(--wx-rail-icon-active);
+}
+
+/* The 聊天 tab's Telegram mark is the one coloured glyph in the rail: it is the
+   active section, so it carries the brand green instead of the icon grey. */
+.wx-rail__brand {
+  color: var(--wx-brand);
+}
+
+.wx-rail__badge {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--wx-badge);
+  color: #fff;
+  font-size: 10px;
+  line-height: 15px;
+  text-align: center;
+  font-weight: 500;
+}

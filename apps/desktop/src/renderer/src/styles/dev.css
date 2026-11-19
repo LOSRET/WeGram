@@ -1,0 +1,89 @@
+/* ---------- Dev-only acceptance panel ---------- */
+
+.wx-perf {
+  position: fixed;
+  right: 16px;
+  bottom: 56px;
+  z-index: 100;
+  font-size: 12px;
+}
+
+.wx-perf__toggle {
+  border: 1px solid var(--wx-line-strong);
+  background: var(--wx-elevated);
+  color: var(--wx-text);
+  border-radius: 999px;
+  padding: 6px 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+
+.wx-perf__panel {
+  margin-top: 8px;
+  width: 240px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--wx-elevated);
+  border: 1px solid var(--wx-line-strong);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wx-perf__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--wx-text-secondary);
+}
+
+.wx-perf__row strong {
+  color: var(--wx-text);
+  font-weight: 600;
+}
+
+.wx-perf__actions {
+  display: flex;
+  gap: 6px;
+}
+
+.wx-perf__actions .wx-button {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 12px;
+  height: auto;
+}
+
+.wx-perf__results {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wx-perf__pass {
+  color: var(--wx-brand-text) !important;
+}
+
+.wx-perf__fail {
+  color: var(--wx-danger) !important;
+}
+
+/* ---------- Chat info popover rows ---------- */
+
+.wx-info-pop__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 4px 9px;
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+  white-space: nowrap;
+}
+
+.wx-info-pop__row strong {
+  color: var(--wx-text);
+  font-weight: 500;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

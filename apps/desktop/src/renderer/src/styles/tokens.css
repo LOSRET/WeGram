@@ -1,0 +1,184 @@
+/* ==========================================================================
+   WeChat design tokens.
+
+   Every value below was read off the real WeChat 4.x desktop client running at
+   125% scaling: colours by sampling the window, sizes by measuring control
+   boxes. The app therefore looks the same next to WeChat on this machine, and
+   every colour in the UI must come from this block (design doc §9.1).
+   ========================================================================== */
+
+:root {
+  /* Brand */
+  --wx-brand: #07c160;
+  --wx-brand-active: #06ad56;
+  --wx-brand-weak: #e8f7ee;
+  --wx-brand-text: #07c160;
+
+  /* Chrome */
+  --wx-rail: #e0e0e0;
+  --wx-list: #e7e7e9;
+  --wx-pane: #fbfbfb;
+  --wx-card: #fcfcfc;
+  --wx-elevated: #ffffff;
+
+  /* The selected conversation row is a softer green than the brand colour. */
+  --wx-row-active: #15ad70;
+  --wx-row-hover: rgba(0, 0, 0, 0.045);
+  --wx-row-pinned: rgba(0, 0, 0, 0.028);
+
+  /* Bubbles */
+  --wx-bubble-self: #95ec69;
+  --wx-bubble-other: #eeeef0;
+  --wx-bubble-radius: 6px;
+
+  /* Text */
+  --wx-text: #191919;
+  --wx-text-secondary: #9a9a9a;
+  --wx-text-tertiary: #b7b7b7;
+  --wx-text-on-active: #ffffff;
+  --wx-text-on-brand: #ffffff;
+
+  /* Lines and status */
+  --wx-divider: rgba(0, 0, 0, 0.06);
+  --wx-line: #ececec;
+  --wx-line-strong: #dedede;
+  --wx-pane-line: #f2f2f2;
+  --wx-danger: #fa5151;
+  --wx-warning: #ffc300;
+  --wx-muted-dot: #b2b2b2;
+  --wx-badge: #fa5151;
+  /* A muted chat keeps the count: same badge shape, grey instead of red. */
+  --wx-badge-muted: #b2b2b2;
+
+  /* Overlay scrollbar: WeChat floats a translucent pill over the rows. */
+  --wx-scrollbar-thumb: rgba(0, 0, 0, 0.22);
+  --wx-scrollbar-thumb-active: rgba(0, 0, 0, 0.38);
+
+  /* Typography — WeChat on Windows renders with YaHei UI. */
+  --wx-font: 'Microsoft YaHei UI', 'Microsoft YaHei', 'Segoe UI', 'PingFang SC', sans-serif;
+  --wx-fs-body: 14px;
+  --wx-lh-body: 1.45;
+  --wx-fs-caption: 12px;
+
+  /* Sizes (WeChat 4.x metrics) */
+  --wx-titlebar-h: 32px;
+  --wx-rail-w: 61px;
+  /* Rail glyph grey: measured #5a–#5d on the client's core pixels (a 30 % darker
+     grey than the #8a8a8a this used to carry, which is why the icons read both
+     thinner and smaller than the client's at the same line width). */
+  --wx-rail-icon: #5c5c5c;
+  /* Active rail section (not the brand-coloured 聊天 tab). */
+  --wx-rail-icon-active: #6a6a6a;
+  /* Pane-header, composer-toolbar and other UI glyphs, plus the list header's
+     round "+". Both measured off the client in each theme. */
+  --wx-icon: #6f6f6f;
+  --wx-icon-strong: #8a8a8a;
+  /* Search field: the client fills it with the pane colour in light mode and
+     with a lifted #454547 pill in dark mode. */
+  --wx-field: #fbfbfb;
+  --wx-field-line: #dedede;
+  /* Expression picker (measured on the client's 表情 panel): the #fbfbfb card
+     and the #ececec pill behind the selected tab. */
+  --wx-picker: #fbfbfb;
+  --wx-tab-active: #ececec;
+  /* Disabled fills and their ink (the send button, disabled dialog buttons). */
+  --wx-fill-disabled: #ececec;
+  --wx-text-disabled: #b7b7b7;
+  --wx-sidebar-w: 238px;
+  --wx-list-head-h: 43px;
+  --wx-list-item-h: 65px;
+  --wx-avatar: 40px;
+  --wx-avatar-msg: 38px;
+  --wx-pane-head-h: 46px;
+
+  /* Standalone image viewer (design doc §9.5). The client's viewer is a lighter
+     strip than the shell chrome: #e6e6e6 bar over a #f7f7f7 canvas. */
+  --wx-viewer-bar: #e6e6e6;
+  --wx-viewer-canvas: #f7f7f7;
+  /* Toolbar glyphs and the group hairlines; the dark column was measured on a
+     live dark viewer window (2026-11-18). */
+  --wx-viewer-icon: #191919;
+  --wx-viewer-sep: #dedede;
+  --wx-viewer-bar-h: 40px;
+
+  /* Login window (design doc §9.6), measured on the client's 280×373 sheet:
+     #fafafa paper, #00c375 action green (bluer than --wx-brand), #304b82 links,
+     #6e6e73 strip text, 1.2 px #4d4d4d chrome glyphs. */
+  --wx-login-bg: #fafafa;
+  --wx-login-green: #00c375;
+  --wx-login-green-active: #06b269;
+  --wx-login-link: #304b82;
+  --wx-login-ink: #6e6e73;
+  --wx-login-glyph: #4d4d4d;
+  --wx-login-field: #ffffff;
+  --wx-login-field-line: #e6e6e6;
+  /* The login QR is deliberately not themed: a dark code on the dark sheet
+     would not scan, so both themes keep it near-black on white. */
+  --wx-login-qr-light: #ffffff;
+  --wx-login-qr-dark: #2d2d2d;
+}
+
+[data-theme='dark'] {
+  /* Re-measured 2026-11-18 off the running client (Windows dark mode) by
+     capturing the window with PrintWindow and taking a pixel histogram per
+     surface, so every value below is the client's own ink. The dark theme is a
+     *lifted* grey scheme — #2D2D2E rail, #3B3B3D conversation list, #1E1E1F pane —
+     not the near-black one this block used to carry, and its accents are the
+     vivid light-theme greens (selected row #0DA869, own bubble #35D28D). */
+  --wx-rail: #2d2d2e;
+  --wx-list: #3b3b3d;
+  --wx-pane: #1e1e1f;
+  /* The composer card is not a separate surface in dark mode: same fill as the
+     pane, told apart by its 1 px #2F2F30 border (--wx-line). */
+  --wx-card: #1e1e1f;
+  --wx-elevated: #2f2f30;
+  --wx-row-active: #0da869;
+  --wx-row-hover: rgba(255, 255, 255, 0.06);
+  --wx-row-pinned: rgba(255, 255, 255, 0.035);
+  --wx-bubble-self: #35d28d;
+  --wx-bubble-other: #2f2f30;
+  --wx-text: #e1e1e5;
+  --wx-text-secondary: #7b7b80;
+  /* The client uses the same #7B7B80 for day labels, timestamps and the search
+     placeholder in dark mode; there is no third, lighter grey. */
+  --wx-text-tertiary: #7b7b80;
+  /* Muted unread badge: grey instead of the light theme's red. */
+  --wx-badge-muted: #5c5c5e;
+  --wx-line: #2f2f30;
+  --wx-line-strong: #3a3a3c;
+  /* No divider under the pane header in dark mode — it is one flat surface. */
+  --wx-pane-line: #1e1e1f;
+  --wx-divider: rgba(255, 255, 255, 0.07);
+  --wx-brand-weak: rgba(7, 193, 96, 0.16);
+  --wx-rail-icon: #969697;
+  --wx-rail-icon-active: #e1e1e5;
+  --wx-icon: #a5a5a5;
+  --wx-icon-strong: #b1b1b1;
+  --wx-field: #454547;
+  --wx-field-line: #454547;
+  /* No measured dark picker yet; it follows the shell's lifted surfaces. */
+  --wx-picker: #2f2f30;
+  --wx-tab-active: #3a3a3c;
+  --wx-fill-disabled: #29292a;
+  --wx-text-disabled: #6a6a6a;
+  --wx-scrollbar-thumb: rgba(255, 255, 255, 0.22);
+  --wx-scrollbar-thumb-active: rgba(255, 255, 255, 0.38);
+  /* The viewer is the one window whose dark surfaces are *lighter* than the
+     shell's: a #3B3B3D toolbar over a #242424 canvas, glyphs #B1B1B1 and the
+     group hairlines #4F4F51 (measured on a live dark viewer window). */
+  --wx-viewer-bar: #3b3b3d;
+  --wx-viewer-canvas: #242424;
+  --wx-viewer-icon: #b1b1b1;
+  --wx-viewer-sep: #4f4f51;
+
+  /* The login window has no measured dark counterpart yet; these follow the
+     shell's dark scheme (design doc §9.6 notes the same). */
+  --wx-login-bg: #1e1e1f;
+  --wx-login-green: #07c160;
+  --wx-login-green-active: #06ad56;
+  --wx-login-link: #7d90b8;
+  --wx-login-ink: #7b7b80;
+  --wx-login-glyph: #b1b1b1;
+  --wx-login-field: #2f2f30;
+  --wx-login-field-line: #3a3a3c;
+}

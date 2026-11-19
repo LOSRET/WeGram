@@ -1,0 +1,47 @@
+/* ---------- Overlay scrollbar ---------- */
+
+/* WeChat reserves no gutter: its bar floats over the rows and fades in on
+   hover, so the list never re-flows when the bar appears and the unread
+   badges keep their width. */
+.wx-scrollbar {
+  position: absolute;
+  right: 2px;
+  width: 6px;
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.wx-scrollbar__thumb {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  border-radius: 3px;
+  background: var(--wx-scrollbar-thumb);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 140ms ease,
+    background-color 140ms ease;
+}
+
+.wx-scrollbar[data-visible='true'] .wx-scrollbar__thumb {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.wx-scrollbar__thumb:hover,
+.wx-scrollbar__thumb[data-dragging='true'] {
+  background: var(--wx-scrollbar-thumb-active);
+}
+
+/* The panes that carry the overlay bar hide their native one. */
+.wx-list__view,
+.wx-messages {
+  scrollbar-width: none;
+}
+
+.wx-list__view::-webkit-scrollbar,
+.wx-messages::-webkit-scrollbar {
+  display: none;
+}

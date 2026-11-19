@@ -1,0 +1,191 @@
+/* ---------- Rich text (TL entities, design doc §8.3) ---------- */
+
+.wx-link {
+  color: #576b95;
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.wx-link:hover {
+  text-decoration: underline;
+}
+
+.wx-entity-mention {
+  color: #576b95;
+}
+
+.wx-code {
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.07);
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 0.92em;
+}
+
+.wx-pre {
+  margin: 4px 0;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.07);
+  font-family: Consolas, 'Courier New', monospace;
+  font-size: 12.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-x: auto;
+}
+
+.wx-spoiler {
+  border-radius: 3px;
+  background: currentColor;
+  color: transparent;
+  cursor: pointer;
+}
+
+.wx-spoiler > * {
+  color: transparent;
+}
+
+.wx-spoiler--revealed {
+  background: transparent;
+  color: inherit;
+}
+
+.wx-inline-emoji {
+  font-size: 1.15em;
+  line-height: 1;
+}
+
+/* Telegram emoji-only messages render as a large glyph without a bubble,
+   the way WeChat shows big emoji. */
+.wx-big-emoji {
+  font-size: 48px;
+  line-height: 1.15;
+  cursor: default;
+}
+
+/* ---------- Media bubbles ---------- */
+
+.wx-bubble--media {
+  padding: 4px;
+}
+
+.wx-bubble--media .wx-caption {
+  padding: 5px 7px 2px;
+}
+
+/* A photo with a caption is image plus a separate bubble, exactly like WeChat. */
+.wx-bubble--photo .wx-caption,
+.wx-bubble--video .wx-caption,
+.wx-bubble--album .wx-caption {
+  margin-top: 4px;
+  padding: 8px 12px;
+  border-radius: var(--wx-bubble-radius);
+  background: var(--wx-bubble-other);
+  font-size: 14px;
+}
+
+.wx-bubble--photo.wx-bubble--self .wx-caption,
+.wx-bubble--video.wx-bubble--self .wx-caption,
+.wx-bubble--album.wx-bubble--self .wx-caption {
+  background: var(--wx-bubble-self);
+}
+
+/* Photos and videos sit on the wallpaper, not inside a chat bubble (WeChat). */
+.wx-bubble--photo,
+.wx-bubble--video {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.wx-bubble--photo.wx-bubble--self,
+.wx-bubble--video.wx-bubble--self {
+  background: transparent;
+}
+
+/* ---------- Albums (Telegram media groups, design doc §8.6) ---------- */
+
+/* The bubble is only a frame: the grid draws the media, the caption sits under it
+   like a photo's, and the row keeps one avatar / one meta line for the group. */
+.wx-bubble--album {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.wx-bubble--album.wx-bubble--self {
+  background: transparent;
+}
+
+.wx-album {
+  display: grid;
+  grid-template-columns: repeat(2, 116px);
+  gap: 3px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.wx-album__cell {
+  display: block;
+  min-width: 0;
+}
+
+.wx-album .wx-photo,
+.wx-album .wx-video {
+  width: 100%;
+  height: 116px;
+  border-radius: 0;
+}
+
+/* An odd last cell fills the row, the way Telegram's 3-up album reads. */
+.wx-album__cell:last-child:nth-child(odd) {
+  grid-column: span 2;
+}
+
+.wx-photo {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.05);
+  cursor: zoom-in;
+}
+
+.wx-photo__thumb,
+.wx-photo__image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wx-photo__thumb {
+  filter: blur(10px);
+  transform: scale(1.06);
+}
+
+.wx-photo__pending {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+  background: var(--wx-list);
+}
+
+.wx-photo__upload {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 1px 7px;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 11px;
+  line-height: 16px;
+}
