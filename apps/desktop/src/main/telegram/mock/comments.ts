@@ -132,4 +132,3 @@ export function createMockComments(
       postComment({ fixtures, emit }, input),
   }
 }
-
