@@ -6,6 +6,8 @@
 
 ---
 
+> ⚠️ **This project is at a very early stage.** It is a personal client still under active development: features, the IPC contract, data structures and the UI can change at any time with no compatibility guarantee, and the installer has not been code-signed or test-installed yet. Please don't treat it as something fit for daily use, and don't try it with an account you care about.
+
 ## What this is
 
 WeGram is a personal Telegram desktop client: Telegram's official TDLib (`tdl` + `prebuilt-tdlib`) behind an Electron shell, dressed in the WeChat 4.x look. Every token and metric in the UI — rail and list widths, row height, bubble colours, radii, icons — was measured off the real WeChat client on this machine (see `docs/UI-HANDOFF.md`); none of it is guessed.
