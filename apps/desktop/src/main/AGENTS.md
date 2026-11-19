@@ -12,7 +12,10 @@ index.ts            app lifecycle, main-window creation, adapter wiring, media s
 login-window.ts     the frameless 280×373 login BrowserWindow (#login), close/refocus
 ipc/router.ts       per-channel zod validation, Result envelope
 ipc/handlers.ts     one handler per invoke channel
-telegram/           adapter.ts (the seam) / tdlib/ (real adapter) / mock.ts / updates.ts / events.ts
+telegram/           adapter.ts (the seam) / tdlib/ (real adapter) / mock/ (fixtures) /
+                    updates.ts / events.ts
+telegram/tdlib/actions/  TDLib requests as functions over ActionDeps, grouped into
+                    chats / history / files / send / search (index.ts re-exports)
 media/              registry.ts (token → path) / protocol.ts (wx-media://) / image-size.ts
 store/              ui-db.ts (all SQL) / settings.ts (proxy only)
 proxy*.ts           proxy DTO ↔ stored config

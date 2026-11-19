@@ -9,12 +9,20 @@ only adds what is specific to this layer.
 ```
 main.tsx              route by hash: plain = shell, #viewer = viewer, #login = login window
 App.tsx               shell only (auth ready) + the ONE place that subscribes to evt:*
-screens/LoginWindow.tsx  the standalone login window (QR, phone fallback, profile, sheets)
+screens/LoginWindow.tsx  the standalone login window: chrome + its four bodies
+screens/login/           useLoginFlow (the whole sign-in flow) + QrStep / ProfileStep /
+                         PhoneForm / LoginFooter / LoginHelp + loginCopy (pure copy table)
 components/QrCode.tsx    login QR: one SVG path from the qrcode matrix
 lib/qr.ts                QR matrix + path helpers (pure, unit-tested)
 store/                zustand: data defaults (initialState.ts), pure reducers, slices
-components/message-list/  virtualiser + MessageRow + Divider + the three scroll hooks
-components/chat-pane/     render tree + useChatHistory + messageActions + placeholders
+components/message-list/  virtualiser + MessageRow + Divider + the scroll hooks:
+                         useInitialPosition / usePrependRestore / useAnchorSave /
+                         useLandingSave / useJumpToLatest / useLocateScroll / useViewportSeen
+components/chat-pane/     render tree + useChatHistory (history/ modules) + messageActions
+components/picker/        the expression panel's data hooks and body components
+components/ExpressionPicker.tsx  the picker's state + composition
+components/viewer/        the 图片和视频 window: MediaViewer shell + useViewerItem /
+                         useViewerZoom + ViewerToolbar / ViewerGrid + viewerMenu / viewerActions
 components/           the remaining visual concerns (Composer, MediaBubble, …)
 lib/ipc.ts            thin `window.tg` wrapper
 lib/format.ts         time / preview / avatar helpers (pure, unit-tested)
@@ -27,6 +35,7 @@ lib/media.ts          one-download-per-file dedupe
 lib/viewer.ts         which messages become one viewer strip (pure, unit-tested)
 lib/player.ts         video player-bar maths: clocks, seek clamp, progress (pure, unit-tested)
 lib/tgs.ts            gzip guards + Lottie decode cache
+lib/stickerMedia.ts   Sticker → MessageMedia (shared by the picker and the preview)
 lib/preview-bridge.ts DEV-ONLY fake IPC for the browser preview
 ```
 

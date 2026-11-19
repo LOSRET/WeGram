@@ -24,6 +24,49 @@ Audience: the next agent session. Everything below was measured or executed, not
   `styles/index.css`, `packages/protocol`. See "Remaining batches" for the exact target
   layout and the risks.
 
+## Session 2026-11-19 — P0 + P1 of the agent-maintainability split (done)
+
+Second refactor session. Branch `refactor/agent-friendly-split`, one commit per batch,
+each one verified before it was committed. `pnpm verify` is green: **38 test files /
+322 tests**, lint 0 warnings, typecheck and build clean. Tree clean.
+
+What moved (the tree had grown past batches 0–4; these were the files an agent could no
+longer load in one go):
+
+| Was | Now |
+| --- | --- |
+| `viewer/MediaViewer.tsx` (586) | `MediaViewer.tsx` (~190) + `useViewerItem` (download/progress), `useViewerZoom` (fit/zoom/rotate/pan), `useViewerNotice`, `ViewerToolbar`, `ViewerGrid`, `viewerActions` (IPC), `viewerMenu` (menu as data, tested) |
+| `components/ExpressionPicker.tsx` (449) | `ExpressionPicker.tsx` (state + composition) + `picker/`: `useStickerSets`, `useActiveStickerSet`, `useRecentEmoji`, `usePickerDismiss`, `EmojiBody`, `SearchBody`, `StickerBody`, `PickerTabs`, `EmojiGrid`, `types` |
+| `screens/LoginWindow.tsx` (491) | `LoginWindow.tsx` (chrome + 4 bodies) + `login/`: `useLoginFlow`, `QrStep`, `ProfileStep`, `PhoneForm`, `LoginFooter`, `LoginHelp`, `loginCopy` (pure, tested) |
+| duplicated `Sticker → MessageMedia` | `lib/stickerMedia.ts` (tested), used by the picker and the browser preview |
+| `message-list/index.tsx` (476) | `index.tsx` (composition + render) + `useJumpToLatest`, `useLocateScroll`, `useLandingSave`, `useViewportSeen` |
+| `chat-pane/useChatHistory.ts` (557) | `useChatHistory.ts` + `history/`: `readFirstPage`, `types`, `useLocateRequest`, `usePrefetchOlder`, `usePaging` |
+| `telegram/mock.ts` (1122) | `mock/`: `index` (adapter), `fixtures`, `assets` (MockAssets), `avatars` (MockAvatars), `traffic`, `constants` |
+| `tdlib/actions.ts` (606) | `tdlib/actions/`: `chats`, `history`, `files`, `send`, `search`, `deps`; `index.ts` re-exports (import path `./actions` unchanged) |
+
+Behaviour was not changed: every doc comment moved with its code, no channel/DTO/`wx-*`
+name was touched, and no scroll timing was rewritten. New pure tests: `viewerMenu`,
+`loginCopy`, `stickerMedia`.
+
+Acceptance run for this session:
+
+- `pnpm verify` after the last batch (lint → typecheck → 322 tests → build).
+- Mock Electron pass (`launch-detached.ps1 -NoSandbox -Mock`): login window (QR, help
+  sheet, phone fallback through `auth:reset`, code step, two-step step, shell hand-over),
+  expression panel (emoji tab, search tab with results, sticker grid, sending a sticker),
+  viewer (open, zoom in, rotate, 预览 board, "…" menu entries, 定位到聊天位置), the
+  5000-message chat (jump to latest, scroll up with continuous rows, paging, buoy,
+  unread divider), send text. `.cache/app.log` clean apart from the known
+  `node:sqlite` experimental warning.
+- `pnpm tdlib:smoke` (read-only, real session): adapter started, `getMe`, 20 chats,
+  history 10 messages with `hasMore=true`, channel `senderChatId` names.
+
+Still open from the original plan: **batch 6** (`preview-bridge.ts`, still 775 lines),
+**batch 7** (`styles/index.css`, still 3206 lines) and optional **batch 8**
+(`packages/protocol`). Two new candidates for a later pass: `main/index.ts` (409,
+window hand-over has closed-over module state) and `WechatIcons.tsx` (generated artwork —
+leave it).
+
 ## Commits from this session (oldest first)
 
 | Commit | Content |
@@ -168,7 +211,7 @@ Deliberate invariants you must not undo while working here:
   `.cache/app.log` held no errors (only Node's `node:sqlite` experimental warning).
 - The Electron window was **closed** afterwards; nothing is left running.
 
-## Remaining batches (approved scope: 5–8, not started)
+## Remaining batches (batch 5 is done — see the 2026-11-19 section above)
 
 Order matters less now: batch 4 was the only high-risk one and the only code verified
 exclusively against the real account. Batches 5–7 are renderer/mock work; 8 is optional.
@@ -223,7 +266,7 @@ mock Electron pass (login → chat list with avatars → 5000-message chat pagin
 send text → sticker picker, send sticker → chat-info popover `已加载 101 条`), `.cache/app.log`
 clean apart from the known `node:sqlite` experimental warning.
 
-### Batch 5 — `main/telegram/mock.ts` (884) → `mock/`
+### Batch 5 — done as P1-3 in the 2026-11-19 session (see above; layout differs slightly)
 
 `index.ts` (adapter), `fixtures.ts` (chats + messages), `assets.ts` (`addFile`, `mediaOf`,
 media half of `buildFixtures`), `traffic.ts` (`simulateTraffic`). `mock-assets.ts` stays.
