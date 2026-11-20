@@ -3,13 +3,7 @@ import type { Message, MessageEntity, RichBlock } from '@wegram/protocol'
 import type { TdObject } from '../client'
 import { asArray } from '../json'
 import { mapEntities } from './entities'
-import {
-  documentMedia,
-  mediaUrls,
-  photoMedia,
-  videoMedia,
-  voiceMedia,
-} from './media'
+import { documentMedia, mediaUrls, photoMedia, videoMedia, voiceMedia } from './media'
 import { mapRichMessage, richPreview } from './rich'
 import { mapStickerFormat } from './sticker'
 
@@ -94,14 +88,40 @@ export function mapContent(content: TdObject): {
     }
     case 'messagePoll':
       return { kind: 'poll', text: content.poll?.question?.text ?? '', entities: [] }
-    // Telegram's animated emoji: a message that is a single (usually animated)
-    // emoji. Keep the glyph and let the renderer size it like WeChat big emoji.
-    case 'messageAnimatedEmoji':
+    // Telegram's animated emoji: a message that is exactly one emoji. TDLib has
+    // already resolved the "AnimatedEmoji" sticker for it, so the body is that
+    // sticker (TGS / WebM / WebP) and the glyph only remains the text — previews,
+    // quotes and 复制 need it. A custom emoji whose sticker TDLib does not know
+    // yet carries no file: keep the glyph, and the renderer sizes it like a big
+    // emoji until the sticker arrives (`updateMessageContent` remaps the row).
+    case 'messageAnimatedEmoji': {
+      const emoji = typeof content.emoji === 'string' ? content.emoji : ''
+      const animated = content.animated_emoji ?? {}
+      const sticker = animated.sticker ?? {}
+      const fileId = Number(sticker.sticker?.id ?? 0)
+      if (!fileId) return { kind: 'text', text: emoji, entities: [] }
+      // `sticker_*` is the real artwork; the `animatedEmoji` dimensions are the
+      // expected box TDLib reports while the sticker is still unknown.
+      const width = Number(sticker.width) || Number(animated.sticker_width) || 0
+      const height = Number(sticker.height) || Number(animated.sticker_height) || 0
       return {
-        kind: 'text',
-        text: typeof content.emoji === 'string' ? content.emoji : '',
+        kind: 'emoji',
+        text: emoji,
         entities: [],
+        media: {
+          fileId,
+          ...(sticker.thumbnail?.file?.id
+            ? { thumbFileId: Number(sticker.thumbnail.file.id) }
+            : {}),
+          stickerFormat: mapStickerFormat(sticker.format?._),
+          ...(emoji ? { stickerEmoji: emoji } : {}),
+          ...(width ? { width } : {}),
+          ...(height ? { height } : {}),
+          ...(animated.sound?.id ? { soundFileId: Number(animated.sound.id) } : {}),
+          ...mediaUrls(sticker.sticker, sticker.thumbnail?.file),
+        },
       }
+    }
     // Dice / basketball etc. carry their emoji; the thrown value is a TDLib
     // update, not part of the message, so we show the emoji itself.
     case 'messageDice':
@@ -291,6 +311,9 @@ function mapContentLabel(content: TdObject | undefined): string {
       return '[视频]'
     case 'messageSticker':
       return '[贴纸]'
+    case 'messageAnimatedEmoji':
+      // One emoji is the whole message, so the list shows the emoji itself.
+      return typeof content.emoji === 'string' ? content.emoji : ''
     case 'messageVoiceNote':
       return '[语音]'
     case 'messageDocument':

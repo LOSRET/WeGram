@@ -220,8 +220,8 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
       unread: 12,
       pinned: true,
       muted: false,
-      lastMessageText: '[贴纸] ✨',
-      lastMessageAt: at(1),
+      lastMessageText: '✨',
+      lastMessageAt: at(0),
       lastReadInboxMessageId: 204,
       lastReadOutboxMessageId: 202,
     },
@@ -276,6 +276,13 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
           width: 128,
           height: 128,
         }),
+      },
+      // One emoji with an animated version: Telegram draws the animated sticker
+      // without a bubble, and a tap replays it with its click sound (§8.5).
+      {
+        ...text(2, 208, 0, '✨', false),
+        kind: 'emoji',
+        media: mediaOf(7003, { stickerFormat: 'tgs', stickerEmoji: '✨', soundFileId: 7004 }),
       },
     ],
   }

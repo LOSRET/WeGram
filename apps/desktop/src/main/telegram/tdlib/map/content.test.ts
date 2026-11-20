@@ -152,11 +152,43 @@ describe('mapContent', () => {
     ).toMatchObject({ kind: 'poll', text: 'which one?' })
   })
 
-  it('renders animated emoji and dice as their glyph', () => {
-    expect(mapContent({ _: 'messageAnimatedEmoji', emoji: '🎉' })).toMatchObject({
-      kind: 'text',
-      text: '🎉',
+  it('maps an animated emoji to its sticker and keeps the glyph as text', () => {
+    expect(
+      mapContent({
+        _: 'messageAnimatedEmoji',
+        emoji: '✨',
+        animated_emoji: {
+          sticker: {
+            sticker: { id: 61 },
+            thumbnail: { file: { id: 62 } },
+            format: { _: 'stickerFormatTgs' },
+            width: 512,
+            height: 512,
+          },
+          sticker_width: 512,
+          sticker_height: 512,
+          sound: { id: 63 },
+        },
+      }),
+    ).toMatchObject({
+      kind: 'emoji',
+      text: '✨',
+      media: {
+        fileId: 61,
+        thumbFileId: 62,
+        stickerFormat: 'tgs',
+        stickerEmoji: '✨',
+        soundFileId: 63,
+        width: 512,
+        height: 512,
+      },
     })
+  })
+
+  it('keeps the glyph when an animated emoji has no sticker yet', () => {
+    expect(
+      mapContent({ _: 'messageAnimatedEmoji', emoji: '🎉', animated_emoji: { sticker: null } }),
+    ).toMatchObject({ kind: 'text', text: '🎉' })
     expect(mapContent({ _: 'messageDice', emoji: '🎲' })).toMatchObject({
       kind: 'text',
       text: '🎲',

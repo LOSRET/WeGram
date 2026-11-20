@@ -150,6 +150,9 @@ export function messagePreview(message: Message): string {
       return text ? `[文件] ${text}` : `[文件] ${message.media?.fileName ?? ''}`.trim()
     case 'sticker':
       return '[贴纸]'
+    case 'emoji':
+      // The glyph is the whole message; Telegram's list preview shows it too.
+      return text || '[表情]'
     case 'voice':
       return `[语音] ${formatDuration(message.media?.duration)}`.trim()
     case 'poll':

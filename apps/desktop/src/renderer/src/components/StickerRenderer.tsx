@@ -2,6 +2,7 @@ import type { MessageMedia } from '@wegram/protocol'
 import lottie, { type AnimationItem } from 'lottie-web'
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 
+import { playEmojiSound } from '../lib/emojiSound'
 import { progressRatio, useFileProgress, useMediaUrl } from '../lib/media'
 import { resolveStickerFormat } from '../lib/stickerFormat'
 import { loadTgsAnimation, markTgsFailure } from '../lib/tgs'
@@ -18,6 +19,13 @@ interface StickerRendererProps {
    * as the first paint while the real file downloads.
    */
   preview?: boolean
+  /**
+   * 'loop' (default) keeps a sticker running for as long as it is on screen, which
+   * is what a sticker message does. 'once' plays a single pass and replays it (with
+   * the emoji's click sound) when tapped — Telegram's animated-emoji message, where
+   * a transcript of forever-looping emoji would read as noise.
+   */
+  playback?: 'loop' | 'once'
 }
 
 /**
@@ -32,8 +40,16 @@ interface StickerRendererProps {
  * animation pauses whenever it scrolls out of view, which is what keeps a long
  * chat or a full 表情 grid at 60 fps.
  */
-export function StickerRenderer({ media, size = 120, preview = false }: StickerRendererProps) {
+export function StickerRenderer({
+  media,
+  size = 120,
+  preview = false,
+  playback = 'loop',
+}: StickerRendererProps) {
   const [ref, view] = useInView<HTMLDivElement>()
+  const once = playback === 'once'
+  /** Bumped by a tap; the artwork component replays the animation from frame 0. */
+  const [replay, setReplay] = useState(0)
 
   const width = media.width ?? 128
   const height = media.height ?? 128
@@ -62,6 +78,11 @@ export function StickerRenderer({ media, size = 120, preview = false }: StickerR
   // In the picker the artwork may be the thumbnail, so its own format decides.
   const format = preview ? resolveStickerFormat(media, true) : (media.stickerFormat ?? 'webp')
   const label = media.stickerEmoji ?? '贴纸'
+
+  const replayEmoji = (): void => {
+    setReplay((count) => count + 1)
+    if (media.soundFileId) void playEmojiSound(media.soundFileId)
+  }
 
   let content: ReactNode
   if (!artworkUrl) {
@@ -94,10 +115,21 @@ export function StickerRenderer({ media, size = 120, preview = false }: StickerR
         emoji={media.stickerEmoji}
         label={label}
         active={view.visible}
+        once={once}
+        replay={replay}
       />
     )
   } else if (format === 'webm') {
-    content = <WebmSticker url={artworkUrl} box={box} label={label} active={view.visible} />
+    content = (
+      <WebmSticker
+        url={artworkUrl}
+        box={box}
+        label={label}
+        active={view.visible}
+        once={once}
+        replay={replay}
+      />
+    )
   } else {
     content = (
       <img
@@ -112,7 +144,7 @@ export function StickerRenderer({ media, size = 120, preview = false }: StickerR
   }
 
   return (
-    <div ref={ref} style={box}>
+    <div ref={ref} style={box} onClick={once ? replayEmoji : undefined}>
       {content}
     </div>
   )
@@ -125,9 +157,13 @@ interface AnimatedProps {
   emoji?: string | undefined
   /** Playback follows the cell's visibility, measured by the parent. */
   active: boolean
+  /** One pass only — see `StickerRendererProps.playback`. */
+  once: boolean
+  /** A tap's counter; any change replays the animation from frame 0. */
+  replay: number
 }
 
-function TgsSticker({ url, box, label, emoji, active }: AnimatedProps) {
+function TgsSticker({ url, box, label, emoji, active, once, replay }: AnimatedProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const animationRef = useRef<AnimationItem | null>(null)
   /**
@@ -139,21 +175,27 @@ function TgsSticker({ url, box, label, emoji, active }: AnimatedProps) {
    * the reader came back to stayed on its first frame.
    */
   const activeRef = useRef(active)
+  /** Set once the single pass is over; scrolling back must not restart it. */
+  const doneRef = useRef(false)
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {
     let cancelled = false
+    doneRef.current = false
     void loadTgsAnimation(url)
       .then((data) => {
         if (cancelled || !containerRef.current) return
         const animation = lottie.loadAnimation({
           container: containerRef.current,
           renderer: 'svg',
-          loop: true,
+          loop: !once,
           autoplay: false,
           animationData: data,
         })
         animationRef.current = animation
+        animation.addEventListener('complete', () => {
+          doneRef.current = true
+        })
         if (activeRef.current) animation.play()
       })
       .catch(() => {
@@ -167,17 +209,26 @@ function TgsSticker({ url, box, label, emoji, active }: AnimatedProps) {
       animationRef.current = null
     }
     // Loaded once per URL; visibility is applied through `activeRef` and the
-    // effect below, so `active` is not a dependency here.
-  }, [url])
+    // effect below, so `active` is not a dependency here. `once` is fixed for
+    // the life of a row — `playback` is a prop, never state.
+  }, [url, once])
 
   useEffect(() => {
     activeRef.current = active
     // No animation yet: the decode callback applies this ref when it lands.
     const animation = animationRef.current
     if (!animation) return
-    if (active) animation.play()
-    else animation.pause()
-  }, [active])
+    if (!active) animation.pause()
+    else if (!once || !doneRef.current) animation.play()
+  }, [active, once])
+
+  useEffect(() => {
+    if (replay === 0) return
+    const animation = animationRef.current
+    if (!animation) return
+    doneRef.current = false
+    animation.goToAndPlay(0, true)
+  }, [replay])
 
   if (failed) {
     return (
@@ -199,25 +250,29 @@ function TgsSticker({ url, box, label, emoji, active }: AnimatedProps) {
   )
 }
 
-function WebmSticker({
-  url,
-  box,
-  label,
-  active,
-}: {
-  url: string
-  box: { width: number; height: number }
-  label: string
-  active: boolean
-}) {
+function WebmSticker({ url, box, label, active, once, replay }: AnimatedProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  /** Set once the single pass is over; scrolling back must not restart it. */
+  const doneRef = useRef(false)
 
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
-    if (active) void video.play().catch(() => undefined)
-    else video.pause()
-  }, [active])
+    if (!active) {
+      video.pause()
+      return
+    }
+    if (once && doneRef.current) return
+    void video.play().catch(() => undefined)
+  }, [active, once])
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video || replay === 0) return
+    doneRef.current = false
+    video.currentTime = 0
+    void video.play().catch(() => undefined)
+  }, [replay])
 
   return (
     <video
@@ -226,10 +281,13 @@ function WebmSticker({
       style={box}
       src={url}
       muted
-      loop
+      loop={!once}
       playsInline
       preload="metadata"
       aria-label={label}
+      onEnded={() => {
+        doneRef.current = true
+      }}
     />
   )
 }

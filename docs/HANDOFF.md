@@ -630,6 +630,32 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
   `videoWidth === 0` → blank, 120/120 cells of a WebM pack). Chat bubbles were fine because
   they draw the full file. Static WebP packs were the only ones that ever worked in the
   picker — that is the whole "some packs load, some don't" symptom.
+- **One emoji is not a text message.** TDLib's `can_be_animated_emoji` (client side, in
+  `MessageContent.cpp`) turns a message whose whole text is one emoji — or one custom-emoji
+  entity covering it all — into `messageAnimatedEmoji`, carrying the AnimatedEmoji sticker
+  (`animated_emoji.sticker`, TGS/WebM/WebP) plus a click sound (`animated_emoji.sound`, an
+  OGG/Opus file that is downloaded only on the first click). The renderer draws it
+  bubble-less at 112 px, plays one pass and replays on click (`playback="once"`), which is
+  what Telegram's animated-emojis doc asks for; looping forever, as a sticker does, reads as
+  noise in a transcript. A custom emoji whose sticker TDLib has not resolved yet comes back
+  with no sticker file and falls back to the glyph (kind 'text'); `updateMessageContent`
+  remaps the row once the sticker lands. The glyph stays in `text`, so previews, quotes and
+  复制 keep working — and the chat list shows the emoji, not a label.
+- **The media scheme must be CORS-enabled, or every TGS sticker fails.** `wx-media://` was
+  registered with `supportFetchAPI` but without `corsEnabled`, and a renderer loaded from
+  `file://` counts as another origin: Chromium refused the `fetch()` outright ("Cross origin
+  requests are only supported for protocol schemes…", measured 2026-11-20). `lib/tgs.ts` then
+  marked the TGS failed and every animated sticker — the new animated emoji included — fell
+  back to its emoji glyph, which reads as "the sticker never loaded". Registration now sets
+  `corsEnabled: true` and the handler answers `access-control-allow-origin: *`; a real
+  account's ❤️ sticker then decoded through lottie-web.
+- **Not every emoji has an animated version.** TDLib replaces a one-emoji message with
+  `messageAnimatedEmoji` only when the emoji resolves in the AnimatedEmoji set; otherwise
+  the message stays `messageText` (measured on the test DC: ❤️, 🎉, 🔥, 💩, 👍, 👏 and 😭
+  resolve, while ✨, 😀 and 🥺 answer 404 from `getAnimatedEmoji`). Those messages are
+  correctly drawn as the 48 px big emoji — not a mapping failure. None of the resolved ones
+  carried a click `sound` on the test DC, so the sound path is exercised by the mock's
+  generated WAV instead.
 - **`updateChatAction` is a one-shot event.** It has no "stopped typing" notification you
   can rely on, so the renderer schedules an expiry timer from `until`; without it the
   header claims "对方正在输入…" forever.
@@ -767,9 +793,11 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
    - **WebM stickers** are implemented (`<video>` + offscreen pause) but no fixture
      exercises them: this machine has no VP8 encoder (ffmpeg absent) and the mock only
      generates WebP/TGS. Verify with a real account or a recorded `.webm` sticker.
-   - **Custom emoji** entities render as their base glyph, not the sticker image. Needs
-     `getCustomEmojiStickers` plus an inline sticker cache; the rendering seam
-     (`RichText`'s `customEmoji` case) is already there.
+   - **Custom emoji** *entities inside text* still render as their base glyph, not the
+     sticker image. Needs `getCustomEmojiStickers` plus an inline sticker cache; the
+     rendering seam (`RichText`'s `customEmoji` case) is already there. A message that is
+     one custom emoji is not part of this gap: TDLib reports it as `messageAnimatedEmoji`
+     and it already renders as its sticker (kind 'emoji').
    - Media is sent immediately after the picker; no caption dialog and no album
      *sending* (received albums are grouped into one bubble now, design doc §8.6),
      no drag & drop / paste. Captions are supported end-to-end in the adapter

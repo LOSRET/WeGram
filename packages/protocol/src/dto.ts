@@ -140,6 +140,11 @@ export const messageMediaSchema = z.object({
   stickerThumbFormat: stickerFormatSchema.optional(),
   /** Emoji the sticker matches, used as its alt text and in the picker. */
   stickerEmoji: z.string().optional(),
+  /**
+   * Click sound of an animated emoji (TDLib `animatedEmoji.sound`, OGG/Opus). It is
+   * fetched on the first click, so an emoji the reader never taps costs no download.
+   */
+  soundFileId: z.number().int().optional(),
   fileName: z.string().optional(),
   size: z.number().int().optional(),
   localUrl: z.string().optional(),
@@ -373,6 +378,13 @@ export const messageKindSchema = z.enum([
   'video',
   'file',
   'sticker',
+  /**
+   * Telegram's animated emoji: a message that is exactly one emoji (`messageAnimatedEmoji`).
+   * `media` is the animated sticker drawn instead of the glyph, `text` keeps the glyph
+   * for previews, quotes and 复制; a custom emoji whose sticker is not known yet falls
+   * back to kind 'text'.
+   */
+  'emoji',
   'voice',
   'poll',
   'service',

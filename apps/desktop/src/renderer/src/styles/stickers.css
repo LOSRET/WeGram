@@ -5,6 +5,14 @@
   line-height: 0;
 }
 
+/* A single-emoji message: Telegram's animated sticker on the wallpaper, no bubble.
+   It plays once and replays (with its click sound) when tapped — see
+   StickerRenderer's `playback` prop. */
+.wx-animated-emoji {
+  padding: 2px;
+  line-height: 0;
+}
+
 .wx-sticker {
   display: block;
   object-fit: contain;

@@ -186,6 +186,11 @@ describe('messagePreview', () => {
     expect(messagePreview(message({ kind: 'poll', text: '投票吗' }))).toBe('[投票] 投票吗')
   })
 
+  it('previews an animated emoji as its glyph', () => {
+    expect(messagePreview(message({ kind: 'emoji', text: '🎉' }))).toBe('🎉')
+    expect(messagePreview(message({ kind: 'emoji', text: '' }))).toBe('[表情]')
+  })
+
   it('falls back to the file name when a file has no caption', () => {
     expect(
       messagePreview(

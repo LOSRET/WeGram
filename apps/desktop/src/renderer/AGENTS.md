@@ -54,6 +54,7 @@ lib/scrollGeometry.ts (pure, unit-tested) the ONE "is the reader at the bottom" 
 lib/jumpSettle.ts    (pure, unit-tested) "has the jump to the newest message landed?"
 lib/history.ts       (pure, unit-tested) the ONE "may this empty page be cached" rule
 lib/media.ts          one-download-per-file dedupe
+lib/emojiSound.ts     an animated emoji's click sound, fetched on the first click
 lib/viewer.ts         which messages become one viewer strip (pure, unit-tested)
 lib/player.ts         video player-bar maths: clocks, seek clamp, progress (pure, unit-tested)
 lib/tgs.ts            gzip guards + Lottie decode cache

@@ -37,8 +37,7 @@ const PREVIEW_AVATAR_COLORS: readonly (readonly [string, string])[] = [
 
 /** A face for a preview chat or sender: rows draw it like a real photo. */
 function face(id: number): string {
-  const pair =
-    PREVIEW_AVATAR_COLORS[Math.abs(id) % PREVIEW_AVATAR_COLORS.length] ??
+  const pair = PREVIEW_AVATAR_COLORS[Math.abs(id) % PREVIEW_AVATAR_COLORS.length] ??
     PREVIEW_AVATAR_COLORS[0] ?? ['#4C9AFF', '#1B3C8C']
   return svgUrl(96, 96, pair[0], pair[1])
 }
@@ -54,12 +53,54 @@ const PREVIEW_TGS =
  * PNG/WebP/TGS/WebM files, the browser gets SVG and data URLs so the same rows,
  * stickers and progress paths render without a protocol handler.
  */
+/**
+ * The animated emoji's click sound, as a data URL: the same 0.18 s 880 Hz beep the
+ * mock writes under userData (main/telegram/mock-assets.ts). The browser preview has
+ * no `wx-media://` handler, so the WAV travels inside the URL — `media-src` allows
+ * `data:`, and `new Audio(url)` plays it exactly like the Electron path.
+ */
+function beepWav(): string {
+  const sampleRate = 22_050
+  const samples = Math.round(sampleRate * 0.18)
+  const pcmBytes = samples * 2
+  const buffer = new ArrayBuffer(44 + pcmBytes)
+  const view = new DataView(buffer)
+  const ascii = (offset: number, text: string): void => {
+    for (let index = 0; index < text.length; index += 1) {
+      view.setUint8(offset + index, text.charCodeAt(index))
+    }
+  }
+  ascii(0, 'RIFF')
+  view.setUint32(4, 36 + pcmBytes, true)
+  ascii(8, 'WAVE')
+  ascii(12, 'fmt ')
+  view.setUint32(16, 16, true) // PCM header size
+  view.setUint16(20, 1, true) // format: PCM
+  view.setUint16(22, 1, true) // mono
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * 2, true) // byte rate
+  view.setUint16(32, 2, true) // block align
+  view.setUint16(34, 16, true) // bits per sample
+  ascii(36, 'data')
+  view.setUint32(40, pcmBytes, true)
+  for (let index = 0; index < samples; index += 1) {
+    // Fade the edges so the click does not start or end with a pop.
+    const fade = Math.min(1, Math.min(index, samples - index) / (sampleRate * 0.01))
+    const wave = Math.sin((2 * Math.PI * 880 * index) / sampleRate)
+    view.setInt16(44 + index * 2, Math.round(wave * fade * 0.25 * 32_767), true)
+  }
+  let binary = ''
+  for (const byte of new Uint8Array(buffer)) binary += String.fromCharCode(byte)
+  return 'data:audio/wav;base64,' + btoa(binary)
+}
+
 export function previewFiles(): Record<number, string> {
   const store = globalThis as typeof globalThis & { __wxPreviewFiles?: Record<number, string> }
   store.__wxPreviewFiles ??= {
     7001: stickerSvg('😀', '#FFD75E'),
     7002: stickerSvg('❤️', '#FF9F43'),
     7003: PREVIEW_TGS,
+    7004: beepWav(),
     7101: svgUrl(1200, 800, '#22427c', '#eca860'),
     7102: svgUrl(900, 1200, '#faaa46', '#5a1e6e'),
     7201: 'data:text/markdown;utf8,%23%20%E9%9C%80%E6%B1%82%E8%AF%B4%E6%98%8E%0A%0A-%20%E5%AA%92%E4%BD%93%E6%94%B6%E5%8F%91',

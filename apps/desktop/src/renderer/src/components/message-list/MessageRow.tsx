@@ -20,6 +20,12 @@ import { AlbumBubble } from './AlbumBubble'
 import { CommentBar } from './CommentBar'
 import { isEmojiOnly } from './emoji'
 
+/**
+ * Longest edge of an animated emoji. Telegram draws the one emoji of a message at
+ * this size — larger than our 48 px text emoji, prized as the message's whole body.
+ */
+const ANIMATED_EMOJI_SIZE = 112
+
 export interface MessageRowProps {
   chat: ChatSummary
   /**
@@ -107,6 +113,8 @@ export const MessageRow = memo(
         ? first.kind
         : null
     const isSticker = !album && first.kind === 'sticker' && Boolean(media)
+    // Telegram's animated emoji: one emoji drawn as its sticker, no bubble.
+    const animatedEmoji = !album && first.kind === 'emoji' ? media : undefined
     const bigEmoji = !album && first.kind === 'text' && !mediaKind && isEmojiOnly(first.text)
     // A rich message is a page of blocks; its `text` is only the flattened
     // words kept for previews and 复制, so it must not be rendered as a body.
@@ -212,6 +220,15 @@ export const MessageRow = memo(
               {buttons ? <InlineButtons rows={buttons} /> : null}
               {channel ? commentBar : null}
             </div>
+          ) : animatedEmoji ? (
+            // One emoji: Telegram's animated sticker, no bubble. It plays once when
+            // it arrives and replays with its sound on click (playback="once").
+            <>
+              <div className="wx-animated-emoji" onContextMenu={openMenu}>
+                <StickerRenderer media={animatedEmoji} size={ANIMATED_EMOJI_SIZE} playback="once" />
+              </div>
+              {channelMeta(true)}
+            </>
           ) : bigEmoji ? (
             // Emoji-only message: no bubble, large glyph, like WeChat big emoji.
             <>
@@ -268,7 +285,7 @@ export const MessageRow = memo(
               nobody has commented in yet keeps the handle too (写评论), or the reader
               could never be the first one. In a channel the handle lives inside the
               post's bubble; a bubble-less post (sticker, big emoji) keeps it outside. */}
-          {channel ? (isSticker || bigEmoji ? commentBar : null) : commentBar}
+          {channel ? (isSticker || bigEmoji || animatedEmoji ? commentBar : null) : commentBar}
           {channel ? null : (
             <span className="wx-message__meta">
               {formatMessageTime(last.date)}

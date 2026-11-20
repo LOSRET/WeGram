@@ -20,7 +20,20 @@ export function registerMediaScheme(): void {
   protocol.registerSchemesAsPrivileged([
     {
       scheme: MEDIA_SCHEME,
-      privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true },
+      privileges: {
+        standard: true,
+        secure: true,
+        supportFetchAPI: true,
+        stream: true,
+        /**
+         * TGS is `fetch()`ed by the renderer (then gunzipped in `lib/tgs.ts`), and a
+         * renderer loaded from `file://` is a different origin. Without this Chromium
+         * refuses the request outright ("Cross origin requests are only supported for
+         * protocol schemes…") and every TGS sticker — animated emoji included — falls
+         * back to its emoji glyph.
+         */
+        corsEnabled: true,
+      },
     },
   ])
 }
@@ -85,6 +98,8 @@ export function installMediaProtocol(): void {
             'content-length': String(end - start + 1),
             'content-range': `bytes ${start}-${end}/${info.size}`,
             'cache-control': 'no-cache',
+            // The scheme is CORS-enabled so the renderer may fetch TGS bytes.
+            'access-control-allow-origin': '*',
           },
         })
       }
@@ -97,6 +112,8 @@ export function installMediaProtocol(): void {
           'accept-ranges': 'bytes',
           'content-length': String(info.size),
           'cache-control': 'no-cache',
+          // The scheme is CORS-enabled so the renderer may fetch TGS bytes.
+          'access-control-allow-origin': '*',
         },
       })
     } catch (error) {

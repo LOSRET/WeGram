@@ -13,6 +13,7 @@ import {
   STICKER_HEART_WEBP,
   STICKER_WAVE_TGS,
   createGradientPng,
+  createToneWav,
 } from '../mock-assets'
 
 /**
@@ -48,6 +49,8 @@ export class MockAssets {
     await writeFile(wavePath, Buffer.from(STICKER_WAVE_TGS, 'base64'))
     const clipPath = join(mediaDir, 'sample-video.webm')
     await writeFile(clipPath, Buffer.from(SAMPLE_VIDEO_WEBM, 'base64'))
+    const clickPath = join(mediaDir, 'emoji-click.wav')
+    await writeFile(clickPath, createToneWav())
 
     const avatarPath = join(mediaDir, 'self-avatar.png')
     await writeFile(avatarPath, createGradientPng(256, 256, [7, 193, 96], [24, 96, 180]))
@@ -60,6 +63,9 @@ export class MockAssets {
     this.addFile(7102, sunsetPath, 'sunset.png', 'image/png', 900, 1200)
     this.addFile(7201, specPath, '需求说明.md', 'text/markdown')
     this.addFile(7301, clipPath, 'sample-video.webm', 'video/webm', 270, 480)
+    // The animated emoji's click sound (design doc §8.5): a real file, so the click
+    // path is exercised without an account.
+    this.addFile(7004, clickPath, 'emoji-click.wav', 'audio/wav')
 
     this.stickers.push(
       { fileId: 7001, format: 'webp', emoji: '😀', width: 128, height: 128, thumbFileId: 7001 },
