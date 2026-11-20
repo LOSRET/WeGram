@@ -124,6 +124,7 @@ pnpm dev                 # Electron 开发窗口
 ```powershell
 scripts\start-real.cmd          # out\ 不存在时先构建
 scripts\start-real.cmd build    # 强制重建
+scripts\start-test.cmd          # 连测试 DC（WEGRAM_TDLIB_TEST_DC=1，复用 spikes\tdlib\test-data）
 ```
 
 日志落在 `.cache\app.log`。

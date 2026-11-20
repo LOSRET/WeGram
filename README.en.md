@@ -124,6 +124,7 @@ Or use the one-click launcher (reuses the real session in `spikes\tdlib\data`, d
 ```powershell
 scripts\start-real.cmd          # builds first when out\ is missing
 scripts\start-real.cmd build    # force a rebuild
+scripts\start-test.cmd          # test DCs (WEGRAM_TDLIB_TEST_DC=1, reuses spikes\tdlib\test-data)
 ```
 
 Logs land in `.cache\app.log`.
