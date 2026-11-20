@@ -186,6 +186,14 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   "as big as the window". `.wx-viewer__image` therefore carries `flex: none;
   max-width: none; max-height: none;`; any future element sized from
   `lib/zoom.ts` needs the same reset.
+- **The viewer strip belongs to the pane, not to `messagesByChat`.** `lib/viewer.ts`
+  builds the strip from the rows the reader can see, and reading only the chat store
+  meant a photo or a video in a channel post's comments did nothing: those rows are the
+  *discussion group's* messages, held in `CommentPanel`'s own state, so their `chatId`
+  has no store entry and `buildViewerStrip` answered "not in the strip" (silently — the
+  click just returned). Any pane with its own list must hand that list to viewers through
+  `lib/viewerSource.ts` (`<ViewerSource value={rows}>`); `MediaBubble` reads it and
+  `openViewer` prefers it over the store.
 - **通讯录 is the Telegram address book, not the chat list.** `contacts:list`
   (`getContacts` + `getUser` in main) returns `Contact[]` — people, not
   conversations — so a contact you never wrote to has a card but no chat; 发消息

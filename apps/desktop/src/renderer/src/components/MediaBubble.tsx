@@ -6,6 +6,7 @@ import { formatDuration } from '../lib/format'
 import { percentOf, reserveBox } from '../lib/mediaBox'
 import { errorMessage, invoke } from '../lib/ipc'
 import { openPhotoViewer, openVideoViewer } from '../lib/viewer'
+import { useViewerSource } from '../lib/viewerSource'
 import { PlayIcon } from './viewer/ViewerIcons'
 import { useAppStore } from '../store/useAppStore'
 
@@ -126,6 +127,8 @@ function PhotoBubble({
   const { ratio } = useBubbleProgress(media)
   const progress = useFileProgress(media.fileId)
   const uploading = Boolean(progress && !progress.completed && ratio !== undefined)
+  // The pane this bubble is drawn in, for panes that do not live in the chat store.
+  const source = useViewerSource()
 
   const box = inAlbum
     ? undefined
@@ -141,7 +144,7 @@ function PhotoBubble({
       className={`wx-photo${inAlbum ? ' wx-photo--album' : ''}`}
       style={box}
       // The client opens the photo in its own window, not in an overlay.
-      onClick={() => openPhotoViewer(chatId, messageId)}
+      onClick={() => openPhotoViewer(chatId, messageId, source)}
       title="查看大图"
     >
       {media.minithumbnail ? (
@@ -183,6 +186,7 @@ function VideoBubble({
 }) {
   const url = useMediaUrl(media, 6)
   const { ratio } = useBubbleProgress(media)
+  const source = useViewerSource()
 
   const box = inAlbum
     ? undefined
@@ -199,7 +203,7 @@ function VideoBubble({
       type="button"
       className={`wx-video wx-video--poster${inAlbum ? ' wx-video--album' : ''}`}
       style={box}
-      onClick={() => openVideoViewer(chatId, messageId)}
+      onClick={() => openVideoViewer(chatId, messageId, source)}
       title="播放视频"
     >
       {media.minithumbnail ? (

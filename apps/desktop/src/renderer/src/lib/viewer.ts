@@ -9,10 +9,11 @@ export type ViewerKind = 'photo' | 'video'
 /**
  * Which messages become one strip of the viewer (pure).
  *
- * The viewer pages through the media of one kind that is already loaded in that
- * chat — the strip the reader can see — so it never has to ask the adapter for
- * history of its own. `messageId` names the item that was clicked and becomes the
- * start index; a message that is not in the strip means "do not open".
+ * The viewer pages through the media of one kind that is already loaded in the
+ * pane the reader clicked in — the strip the reader can see — so it never has to
+ * ask the adapter for history of its own. `messageId` names the item that was
+ * clicked and becomes the start index; a message that is not in the strip means
+ * "do not open".
  */
 export function buildViewerStrip(
   messages: readonly Message[],
@@ -43,9 +44,20 @@ export function buildViewerStrip(
   return { items, index }
 }
 
-function openViewer(chatId: number, messageId: number, kind: ViewerKind): void {
+/**
+ * `source` is the pane's own list when the clicked row is not part of the open
+ * chat's transcript (the comment panel — see `lib/viewerSource.ts`); `null` or
+ * omitted keeps the usual "the chat store's history" reading.
+ */
+function openViewer(
+  chatId: number,
+  messageId: number,
+  kind: ViewerKind,
+  source?: readonly Message[] | null,
+): void {
   const store = useAppStore.getState()
-  const strip = buildViewerStrip(store.messagesByChat[chatId] ?? [], kind, messageId)
+  const messages = source ?? store.messagesByChat[chatId] ?? []
+  const strip = buildViewerStrip(messages, kind, messageId)
   if (!strip) return
   // The conversation travels with the strip: 定位到聊天位置 in the viewer hands it
   // back to the shell, which has to know which chat to open.
@@ -55,11 +67,19 @@ function openViewer(chatId: number, messageId: number, kind: ViewerKind): void {
 }
 
 /** Opens the standalone viewer on one photo of a conversation. */
-export function openPhotoViewer(chatId: number, messageId: number): void {
-  openViewer(chatId, messageId, 'photo')
+export function openPhotoViewer(
+  chatId: number,
+  messageId: number,
+  source?: readonly Message[] | null,
+): void {
+  openViewer(chatId, messageId, 'photo', source)
 }
 
 /** Opens the same window on one video — the client keeps both in 图片和视频. */
-export function openVideoViewer(chatId: number, messageId: number): void {
-  openViewer(chatId, messageId, 'video')
+export function openVideoViewer(
+  chatId: number,
+  messageId: number,
+  source?: readonly Message[] | null,
+): void {
+  openViewer(chatId, messageId, 'video', source)
 }

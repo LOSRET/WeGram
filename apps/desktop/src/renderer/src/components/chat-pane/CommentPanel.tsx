@@ -13,6 +13,7 @@ import { messagePreview } from '../../lib/format'
 import { selfIdentity } from '../../lib/self'
 import { useComposerInput } from '../../lib/useComposerInput'
 import { errorMessage, invoke } from '../../lib/ipc'
+import { ViewerSource } from '../../lib/viewerSource'
 import { useAppStore } from '../../store/useAppStore'
 import { Avatar } from '../Avatar'
 import { MessageRow } from '../message-list/MessageRow'
@@ -427,7 +428,12 @@ export function CommentPanel({
             ) : shown.length === 0 ? (
               <div className="wx-comments-panel__hint">还没有评论</div>
             ) : (
-              <>
+              /**
+               * The rows are the panel's own list, not a chat's history: the media
+               * viewer's strip has to be built from it (lib/viewerSource.ts), or a
+               * photo or a video in the comments opens nothing at all.
+               */
+              <ViewerSource value={shown}>
                 {page.hasMore && loading ? (
                   <div className="wx-comments-panel__hint">正在加载更早的评论…</div>
                 ) : null}
@@ -450,7 +456,7 @@ export function CommentPanel({
                     />
                   </div>
                 ))}
-              </>
+              </ViewerSource>
             )}
           </div>
         </div>
