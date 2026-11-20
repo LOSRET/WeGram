@@ -39,8 +39,8 @@ listed in "Known deltas" is a deliberate, documented difference.
 | `renderer/src/components/Icon.tsx` | Payload re-exports, the design-system compass, and `TelegramLogo` — the Simple Icons roundel that serves as the rail's 聊天 tab, the login mark and the empty-pane watermark (tinted through `currentColor`). Also the three `*TabFilledIcon` selected-state glyphs, rebuilt from the outlined tab geometry because this build's payload set has no filled tab art (the cube's face seams are a mask, the compass's needle is an even-odd hole). |
 | `renderer/src/components/WechatIcons.tsx` | **Generated** from `Weixin.dll` payloads — see §3. Never hand-edit; regenerate. |
 | `renderer/src/screens/LoginWindow.tsx` | **The standalone login window** (`#login` route): self-drawn title strip (WeGram / 齿轮 / ×), the QR screen, the phone → code → 2FA fallback, the profile step with 进入 WeGram, footer links, proxy and help sheets. |
-| `renderer/src/components/QrCode.tsx` | The login QR: `qrcode`'s matrix as one SVG path (350-ish dark modules in a single element), never themed. |
-| `renderer/src/lib/qr.ts` | QR matrix + path helpers (pure, unit-tested). |
+| `renderer/src/components/QrCode.tsx` | The login QR: `qrcode`'s matrix as one SVG path (350-ish dark modules in a single element) inside its own white quiet zone, never themed. |
+| `renderer/src/lib/qr.ts` | QR matrix, path and quiet-zone geometry (pure, unit-tested). |
 | `main/login-window.ts` | The login `BrowserWindow`: frameless 280×373, fixed size, centred on the primary work area, loads the renderer with `#login`, closes/re-focuses itself. |
 | `renderer/src/components/viewer/MediaViewer.tsx` | **The standalone 图片和视频 window** (`#viewer` route): toolbar strip, photo canvas, 预览 board, 更多 menu, notice pill; picks the video canvas for a `video` item. |
 | `renderer/src/components/viewer/VideoCanvas.tsx` | The video half: fitted `<video>`, the client's translucent player bar (play/pause, timeline, times, 倍速, mute), idle hiding, Space/←/→/M keys. |
@@ -170,7 +170,9 @@ screenshot px ÷ 1.25**; both windows are 350×466 device px):
   are 1.2 px `#4d4d4d` hairlines in 28 px hit boxes on a 44 px pitch (centres at 214 and
   258), 8 px from the right edge. The whole strip drags the window.
 - **QR step**: QR 136 × 136 at (72, 80); green `扫码登录` 14 px `#00c375`, centred at
-  y 255; footer link 14 px `#304b82`, centred at y 341.
+  y 255; footer link 14 px `#304b82`, centred at y 341. Our 136 px is the **whole
+  square, quiet zone included** — the client's code can borrow its white sheet, ours
+  cannot (see item 21).
 - **Profile step**: avatar 80 × 80, radius 12, at (100, 70); name 16 px `#191919` at
   y 180; **168 × 36, radius 6, `#00c375`** button with 16 px white text at (56, 272);
   footer `切换账号 | 仅传输文件` at y 341, 1 px `#dedede` divider, 17 px gaps.
@@ -566,9 +568,12 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
 21. **The login QR is generated locally from TDLib's link.** `requestQrCodeAuthentication`
     answers with `tg://login?token=…` (`AuthState.waitQr`, refreshed every few
     seconds); the approved `qrcode` dependency turns it into one SVG path. The token
-    never leaves the app — no third-party QR service. Unit tests pin the matrix shape
-    and the dark-module count; a real phone scan is still on the verification list
-    (design doc §14). The code is deliberately **not** inverted in dark mode.
+    never leaves the app — no third-party QR service. Unit tests pin the matrix shape,
+    the dark-module count and the quiet-zone offset; a real phone scan is still on the
+    verification list (design doc §14). The code is deliberately **not** inverted in
+    dark mode, and the four-module white quiet zone is drawn **inside** the 136 px
+    square (`qrDrawing`), because the login sheet behind it is `#fafafa` / `#1e1e1f`
+    and a code whose modules touch that edge does not scan at all.
 22. **The phone form is a fallback, and switching to it rebuilds the client.** TDLib
     refuses `setAuthenticationPhoneNumber` in `waitOtherDeviceConfirmation` and has no
     cancel call, so `auth:reset` destroys and recreates the auth client (nothing is

@@ -166,7 +166,9 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   `tg://login?token=…` string that TDLib re-issues by itself — just re-render it;
   never cache it as "the" QR. The phone fallback must go through `auth:reset`
   (main restarts TDLib), not a direct `auth:start`. Keep the QR unstyled by theme:
-  a dark-on-dark code does not scan.
+  a dark-on-dark code does not scan, and keep its **four-module white quiet zone
+  inside** the 136 px square (`qrDrawing`) — the sheet behind it is `#fafafa` /
+  `#1e1e1f`, so "the page is the margin" leaves the code unscannable.
 - **A viewer photo must be allowed to outgrow the canvas.** Tailwind's preflight
   caps every `img` at `max-width: 100 %`, and an `img` is also a flex item (it
   shrinks by default), so the zoomed picture stopped dead at the window width —

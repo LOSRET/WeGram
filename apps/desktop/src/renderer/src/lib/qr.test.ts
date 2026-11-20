@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { qrMatrix, qrPath } from './qr'
+import { qrDrawing, qrMatrix, qrPath, QR_QUIET_ZONE } from './qr'
 
 const LOGIN_LINK = 'tg://login?token=A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6'
 
@@ -45,5 +45,35 @@ describe('qrPath', () => {
 
   it('is deterministic for the same link', () => {
     expect(qrPath(qrMatrix(LOGIN_LINK))).toBe(qrPath(qrMatrix(LOGIN_LINK)))
+  })
+})
+
+describe('qrDrawing', () => {
+  it('frames the module grid with the four-module quiet zone', () => {
+    const matrix = qrMatrix(LOGIN_LINK)
+    const drawing = qrDrawing(matrix)
+    expect(drawing.quietZone).toBe(QR_QUIET_ZONE)
+    expect(QR_QUIET_ZONE).toBe(4)
+    expect(drawing.box).toBe(matrix.size + QR_QUIET_ZONE * 2)
+  })
+
+  it('keeps every dark module inside the padding', () => {
+    const drawing = qrDrawing(qrMatrix(LOGIN_LINK))
+    const modules = [...drawing.path.matchAll(/M(\d+) (\d+)h1v1h-1z/g)].map((match) => ({
+      column: Number(match[1]),
+      row: Number(match[2]),
+    }))
+    expect(modules.length).toBeGreaterThan(0)
+    const limit = drawing.box - 1
+    for (const { column, row } of modules) {
+      expect(column).toBeGreaterThanOrEqual(QR_QUIET_ZONE)
+      expect(row).toBeGreaterThanOrEqual(QR_QUIET_ZONE)
+      expect(column).toBeLessThanOrEqual(limit - QR_QUIET_ZONE)
+      expect(row).toBeLessThanOrEqual(limit - QR_QUIET_ZONE)
+    }
+  })
+
+  it('leaves the unpadded path untouched', () => {
+    expect(qrPath(qrMatrix(LOGIN_LINK), 0)).toBe(qrPath(qrMatrix(LOGIN_LINK)))
   })
 })

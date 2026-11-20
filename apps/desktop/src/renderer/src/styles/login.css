@@ -241,6 +241,8 @@
   padding-top: 48px;
 }
 
+/* 136 px square, quiet zone included: the white margin is part of the drawing
+   (components/QrCode.tsx), because the sheet behind it is #fafafa, not white. */
 .wx-qr {
   display: block;
   flex: 0 0 auto;
