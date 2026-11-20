@@ -83,6 +83,12 @@ export interface TelegramAdapter {
   submitPhone(phone: string): Promise<AuthState>
   submitCode(code: string): Promise<AuthState>
   submitPassword(password: string): Promise<AuthState>
+  /**
+   * Registers a number Telegram does not know yet: TDLib answers the code step
+   * with `waitRegistration` and only creates the account once a name is sent.
+   * The test data centers hit this on every new `99966XYYYY` number.
+   */
+  signUp(input: { firstName: string; lastName?: string }): Promise<AuthState>
   /** Requests QR-code login; the `waitQr` state arrives through the event stream. */
   requestQrCode(): Promise<AuthState>
   /**

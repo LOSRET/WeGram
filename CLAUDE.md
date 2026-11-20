@@ -121,6 +121,7 @@ pnpm build                       # electron-vite build → apps/desktop/out
 cd apps\desktop; pnpm dev       # Electron dev (needs ELECTRON_RUN_AS_NODE unset, see below)
 cd apps\desktop; pnpm web       # renderer-only preview at http://localhost:5174 (?perf=1 → W2 acceptance panel)
 cd apps\desktop; pnpm tdlib:smoke   # headless real-TDLib check (see below)
+cd apps\desktop; pnpm tdlib:test-dc # READ/WRITE check against Telegram's test data centers
 cd apps\desktop; pnpm ui:db-check   # headless ui.db check (node:sqlite)
 cd apps\desktop; pwsh scripts\launch-detached.ps1 -NoSandbox   # only way Electron starts here (-Mock for the fake adapter, -RemoteDebugPort 9224 for CDP checks)
 ```
@@ -132,6 +133,26 @@ cd apps\desktop; pwsh scripts\launch-detached.ps1 -NoSandbox   # only way Electr
 - `WEGRAM_TDLIB_DIR` — session dir override, used by both the app and the smoke script (the script defaults to `spikes/tdlib/data`, i.e. the session created by `login.mjs`, so no second login is needed).
 - `TDLIB_PROXY` — `socks5://host:port`, `socks5://user:pass@host:port` or `mtproto://host:port?secret=...`. Without a proxy `getChats` hangs even though `getMe` succeeds.
 - `SMOKE_DEBUG=1` — extra per-chat/history diagnostics.
+- `WEGRAM_TDLIB_TEST_DC=1` — points the smoke script (and the app) at Telegram's test
+  data centers: a separate account space where send / edit / delete cannot reach a real
+  chat. The session is its own directory (`userData/tdlib/test`, or
+  `spikes/tdlib/test-data` for the scripts). `pnpm tdlib:test-dc` drives the write
+  paths there, but see the note below.
+
+**Test-DC accounts are created by an official app, then used by TDLib (verified
+end-to-end 2026-11-20).** The reserved `99966XYYYY` numbers on
+core.telegram.org/api/auth#test-accounts are dead — TDLib's maintainer on tdlib/td#3083:
+*"Test accounts were disabled due to extensive abuse of them. Now a real phone number is
+required to create an account in Test DC"* and *"an official mobile application is
+required to create an account"* (iOS Debug menu, Android beta; Telegram Desktop beta
+works too). A real number gets `authenticationCodeTypeTelegramMessage`, so the code is
+delivered into the **test-DC session of that official app** and `resend` is refused for
+that type. Recipe: hold Alt+Shift, right click "Add account" → **Test server** in Telegram
+Desktop (beta build), sign the number in there; then
+`WEGRAM_TEST_PHONE=+... WEGRAM_TEST_ALLOW_REAL_PHONE=1 pnpm tdlib:test-dc` drives the
+TDLib login and, with `WEGRAM_TEST_CODE=<the 6-digit code from that session>`, runs the
+write checks. Measured on a fresh test account: authorization → `ready`, 3 chats,
+send → edit → photo upload → delete all pass.
 
 Spike commands (unchanged):
 

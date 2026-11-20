@@ -18,6 +18,8 @@ import { AdapterEmitter } from '../adapter'
 import type { MediaKind, TelegramAdapter } from '../adapter'
 import * as actions from './actions'
 import type { ActionDeps } from './actions'
+import * as auth from './auth'
+import type { AuthDeps } from './auth'
 import { AvatarCache } from './avatar-cache'
 import { configureTdlib, safeVersion } from './client'
 import type { TdClientLike, TdObject } from './client'
@@ -37,6 +39,11 @@ export interface TdlibAdapterOptions {
   initialProxy: ProxyConfig | null
   /** Sent as TDLib's `application_version`; main passes app.getVersion(). */
   applicationVersion?: string
+  /**
+   * TDLib's `use_test_dc`: Telegram's separate test account space, where the
+   * write paths are proven. Its database directory must be its own.
+   */
+  useTestDc?: boolean
 }
 
 /**
@@ -45,9 +52,9 @@ export interface TdlibAdapterOptions {
  * Authorization is driven manually instead of `client.login()`, because the UI
  * needs explicit steps (`auth:start` → `auth:code` → `auth:password`).
  *
- * This file owns lifecycle, the auth state machine, connection state and the
- * `invoke` wrapper; the protocol work itself lives in the sibling modules
- * (`actions`, `updates`, `avatar-cache`, `stickers`, `proxy`, `map/*`).
+ * This file owns lifecycle, connection state and the `invoke` wrapper; the
+ * protocol work itself lives in the sibling modules (`auth` for the sign-in
+ * steps, `actions`, `updates`, `avatar-cache`, `stickers`, `proxy`, `map/*`).
  */
 export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   readonly kind = 'tdlib' as const
@@ -69,6 +76,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   private readonly avatars: AvatarCache
   private readonly mapper: MapperContext
   private readonly actionDeps: ActionDeps
+  private readonly authDeps: AuthDeps
   private readonly proxyDeps: ProxyDeps
   private readonly handleUpdate: (update: TdObject) => Promise<void>
 
@@ -127,6 +135,12 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
       prefetchChatAvatars: (chatIds) => this.avatars.prefetch(chatIds),
     }
 
+    this.authDeps = {
+      invoke: (method) => this.invoke(method),
+      getAuth: () => this.auth,
+      resetClient: () => this.resetClient(),
+    }
+
     this.proxyDeps = {
       invoke: (method) => this.invoke(method),
       logger: this.logger,
@@ -170,6 +184,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
       apiHash: this.options.apiHash,
       databaseDirectory: this.options.databaseDirectory,
       filesDirectory: this.options.filesDirectory,
+      useTestDc: this.options.useTestDc === true,
       tdlibParameters: {
         use_message_database: true,
         use_secret_chats: false,
@@ -236,41 +251,31 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   }
 
   async submitPhone(phone: string): Promise<AuthState> {
-    await this.invoke({ _: 'setAuthenticationPhoneNumber', phone_number: phone, settings: null })
-    return this.auth
+    return auth.submitPhone(this.authDeps, phone)
   }
 
   async submitCode(code: string): Promise<AuthState> {
-    await this.invoke({ _: 'checkAuthenticationCode', code })
-    return this.auth
+    return auth.submitCode(this.authDeps, code)
   }
 
   async submitPassword(password: string): Promise<AuthState> {
-    await this.invoke({ _: 'checkAuthenticationPassword', password })
-    return this.auth
+    return auth.submitPassword(this.authDeps, password)
   }
 
-  /**
-   * TDLib's QR login: valid in `waitPhoneNumber`; the answer arrives as an
-   * `updateAuthorizationState` with `authorizationStateWaitOtherDeviceConfirmation`
-   * and a fresh `tg://login?token=…` link, which the mapper turns into `waitQr`.
-   */
+  async signUp(input: { firstName: string; lastName?: string }): Promise<AuthState> {
+    return auth.signUp(this.authDeps, input)
+  }
+
   async requestQrCode(): Promise<AuthState> {
-    await this.invoke({ _: 'requestQrCodeAuthentication' })
-    return this.auth
+    return auth.requestQrCode(this.authDeps)
   }
 
-  /**
-   * Switch from QR to the phone form. TDLib has no call to cancel a pending
-   * `waitOtherDeviceConfirmation` (setAuthenticationPhoneNumber refuses that
-   * state), so the only way is to destroy the instance and start a fresh one.
-   * Nothing is stored yet at this point, so destroying the database is safe.
-   */
   async restartAuth(): Promise<AuthState> {
-    if (this.auth.kind === 'ready') {
-      throw new AppError('invalid_payload', 'Already signed in')
-    }
+    return auth.restartAuth(this.authDeps)
+  }
 
+  /** `destroy` deletes the database: the replacement waits for the old `close`. */
+  private async resetClient(): Promise<void> {
     const client = this.client
     if (client) {
       // Detach first: the old client's close/update callbacks must not fire into
@@ -284,15 +289,15 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
       } catch (error) {
         this.logger.warn('destroy failed:', error instanceof Error ? error.message : String(error))
       }
-      // `destroy` deletes the local database; wait for TDLib to close the
-      // instance before a new client opens the same directories.
-      await Promise.race([closed, delay(5_000)])
+      await Promise.race([
+        closed,
+        new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
+      ])
     }
 
     this.selfUserId = null
     this.setAuth({ kind: 'idle' })
     await this.start()
-    return this.auth
   }
 
   async logout(): Promise<void> {
@@ -542,6 +547,3 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   }
 }
 
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}

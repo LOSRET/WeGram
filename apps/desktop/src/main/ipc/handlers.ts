@@ -105,6 +105,10 @@ export function createHandlers({
       onAuthInteraction()
       return adapter.submitPassword(payload.password)
     },
+    'auth:signup': (payload) => {
+      onAuthInteraction()
+      return adapter.signUp(payload)
+    },
     'auth:qr': () => {
       onAuthInteraction()
       return adapter.requestQrCode()

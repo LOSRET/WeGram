@@ -141,6 +141,14 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     return this.auth
   }
 
+  /**
+   * The mock's phone → code → password flow always ends in a ready account, so
+   * it never reaches `waitRegistration`; refuse instead of inventing a step.
+   */
+  async signUp(): Promise<AuthState> {
+    throw new AppError('invalid_payload', 'Mock 适配器没有注册步骤')
+  }
+
   async submitPassword(password: string): Promise<AuthState> {
     if (password !== MOCK_PASSWORD) {
       throw new AppError('auth_failed', 'Wrong mock password, use "wegram"')

@@ -46,6 +46,8 @@ export const invokeChannels = [
   'auth:start',
   'auth:code',
   'auth:password',
+  /** Registers a number Telegram does not know yet (`waitRegistration`). */
+  'auth:signup',
   /** Requests QR-code login; the answer arrives as `evt:auth` with `waitQr`. */
   'auth:qr',
   /**
@@ -159,6 +161,10 @@ export const invokeSchemas = {
   'auth:code': { request: z.object({ code: z.string().min(1) }), response: authStateSchema },
   'auth:password': {
     request: z.object({ password: z.string().min(1) }),
+    response: authStateSchema,
+  },
+  'auth:signup': {
+    request: z.object({ firstName: z.string().min(1), lastName: z.string().optional() }),
     response: authStateSchema,
   },
   'auth:qr': { request: noPayload, response: authStateSchema },

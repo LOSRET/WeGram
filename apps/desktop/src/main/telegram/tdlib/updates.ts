@@ -260,6 +260,10 @@ async function handleAuthorizationState(
       })
       return
     }
+    case 'authorizationStateWaitRegistration':
+      // A number with no account behind it: the login window asks for a name.
+      deps.setAuth({ kind: 'waitRegistration' })
+      return
     case 'authorizationStateWaitPassword':
       deps.setAuth({
         kind: 'waitPassword',

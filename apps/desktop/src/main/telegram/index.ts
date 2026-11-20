@@ -6,6 +6,9 @@ import type { TelegramAdapter } from './adapter'
 import { MockAdapter } from './mock'
 import { TdlibAdapter } from './tdlib'
 
+/** `WEGRAM_TDLIB_TEST_DC` accepts 1/true/yes/on, like the other dev switches. */
+const TEST_DC_ON = /^(1|true|yes|on)$/i
+
 export interface CreateAdapterOptions {
   apiId?: number
   apiHash?: string
@@ -43,12 +46,18 @@ export function createAdapter(options: CreateAdapterOptions): TelegramAdapter {
     // example the one created by spikes/tdlib/login.mjs) instead of logging in
     // again inside the app.
     const override = process.env['WEGRAM_TDLIB_DIR']?.trim()
-    const sessionDir = override || join(options.userDataDir, 'tdlib', 'default')
+    // WEGRAM_TDLIB_TEST_DC=1 talks to the test data centers: a separate account
+    // space where sending, editing and deleting cannot reach a real chat. The
+    // session is its own directory — a test-DC client cannot open the
+    // production database, and a real session must never be touched by accident.
+    const testDc = TEST_DC_ON.test(process.env['WEGRAM_TDLIB_TEST_DC']?.trim() ?? '')
+    const sessionDir = override || join(options.userDataDir, 'tdlib', testDc ? 'test' : 'default')
     return new TdlibAdapter({
       apiId: options.apiId,
       apiHash: options.apiHash,
       databaseDirectory: join(sessionDir, 'db'),
       filesDirectory: join(sessionDir, 'files'),
+      useTestDc: testDc,
       initialProxy: options.initialProxy,
       ...(options.applicationVersion
         ? { applicationVersion: options.applicationVersion }

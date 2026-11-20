@@ -426,6 +426,30 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
   and there is no cancel call, so the login window's phone fallback restarts the
   client (`auth:reset` → `destroy` + new client). Do not replace that with a direct
   phone submit — it fails at the TDLib boundary.
+- **Test-DC accounts can only be created from an official app, not from TDLib
+  (measured 2026-11-20, confirmed upstream).** `WEGRAM_TDLIB_TEST_DC=1` → `use_test_dc`
+  does connect to the test environment (test DC 1 `149.154.175.10:443`, binlog
+  `td_test.binlog`; `99966XYYYY` numbers are even validated, `X` 4–5 →
+  `PHONE_NUMBER_INVALID`). But the reserved-number derived code (DC id ×5/×6, still
+  documented on core.telegram.org/api/auth#test-accounts and in Telethon/Pyrogram) is
+  answered with `PHONE_CODE_INVALID` — with this project's `api_id` and with the public
+  test `api_id` 17349, and after `resendAuthenticationCode`. TDLib's maintainer says why
+  in tdlib/td#3083: *"Test accounts were disabled due to extensive abuse of them. Now a
+  real phone number is required to create an account in Test DC"* and *"an official
+  mobile application is required to create an account"* (iOS Debug menu / Android beta;
+  Telegram Desktop beta can also switch to the test server). A real number gets
+  `authenticationCodeTypeTelegramMessage` (6 digits) instead of SMS: the code is
+  delivered into an **already authorized test-DC session**, and `resend` is refused for
+  that type — so with no session on the test server there is nowhere for the code to go.
+  Path forward (proven end-to-end 2026-11-20): log the number into the test server with
+  an official app first — Telegram Desktop beta, Alt+Shift + right click "Add account" →
+  **Test server** — then the TDLib login's 6-digit code arrives as a Telegram service
+  message inside that session and `WEGRAM_TEST_CODE` completes the sign-in. Measured on a
+  fresh test account: `ready`, 3 chats, send → edit → photo upload → delete all pass.
+  Also measured: `sendMessage` answers with TDLib's **local** message id, and
+  `editMessageText`/`deleteMessages` on that id fail with "Message not found" until
+  `updateMessageSendSucceeded` swaps in the server id (`td-5242881` → `6291456`) — any
+  headless write check must wait for the row's id to stop changing.
 - **The dark palette is a *lifted* grey scheme, not near-black — measured 2026-11-18.**
   Captured the running client with `PrintWindow(hwnd, dc, 2)` and took a pixel histogram
   per surface: title strip / rail **#2D2D2E**, conversation list **#3B3B3D**, chat pane

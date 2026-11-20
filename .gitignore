@@ -14,6 +14,7 @@ release/
 
 # TDLib 运行时数据(session、消息库、下载缓存)
 spikes/*/data/
+spikes/*/test-data/
 spikes/*/_probe_db/
 spikes/*/_probe_files/
 **/tdlib-data/

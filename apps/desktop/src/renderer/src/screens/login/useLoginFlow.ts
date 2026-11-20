@@ -161,7 +161,9 @@ export function useLoginFlow(): LoginFlow {
           ? await invoke('auth:start', { phone: value.trim() })
           : step === 'code'
             ? await invoke('auth:code', { code: value.trim() })
-            : await invoke('auth:password', { password: value })
+            : step === 'register'
+              ? await invoke('auth:signup', { firstName: value.trim() })
+              : await invoke('auth:password', { password: value })
       setAuth(next)
       setValue('')
     } catch (cause) {

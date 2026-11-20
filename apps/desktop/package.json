@@ -12,6 +12,7 @@
     "package:win": "electron-vite build && electron-builder --win --publish never",
     "preview": "electron-vite preview",
     "tdlib:smoke": "tsx scripts/tdlib-smoke.ts",
+    "tdlib:test-dc": "tsx scripts/tdlib-test-dc.ts",
     "ui:db-check": "tsx scripts/ui-db-check.ts",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
   },

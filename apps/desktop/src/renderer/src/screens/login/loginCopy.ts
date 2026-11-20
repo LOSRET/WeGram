@@ -30,6 +30,14 @@ export function loginCopy(step: LoginStep, auth: AuthState | null): LoginCopy {
         action: '确认',
         label: '验证码',
       }
+    case 'register':
+      return {
+        title: '创建新账号',
+        subtitle: '这个号码还没有 Telegram 账号，填一个名字即可创建。',
+        placeholder: '名字',
+        action: '创建账号',
+        label: '名字',
+      }
     case 'password':
       return {
         title: '两步验证',

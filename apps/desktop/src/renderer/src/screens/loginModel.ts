@@ -1,10 +1,10 @@
 import type { AuthState, Self } from '@wegram/protocol'
 
 /** Which form the login window shows for an authorization state. */
-export type LoginStep = 'phone' | 'code' | 'password'
+export type LoginStep = 'phone' | 'code' | 'password' | 'register'
 
 /**
- * The window's three sign-in steps. `idle`/`closed` never render a form (the
+ * The window's four sign-in steps. `idle`/`closed` never render a form (the
  * component shows its boot/closed panel instead), but they still answer 'phone'
  * so callers need no second branch.
  */
@@ -12,6 +12,8 @@ export function stepOf(auth: AuthState): LoginStep {
   switch (auth.kind) {
     case 'waitCode':
       return 'code'
+    case 'waitRegistration':
+      return 'register'
     case 'waitPassword':
       return 'password'
     default:

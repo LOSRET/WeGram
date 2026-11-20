@@ -9,11 +9,11 @@
  *   cd apps\desktop
  *   pnpm tdlib:smoke
  */
-import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 import { TdlibAdapter } from '../src/main/telegram/tdlib'
 import { parseProxyUrl } from '../src/main/proxy-url'
+import { isOn, loadDotEnv } from './dotenv'
 
 loadDotEnv(join(process.cwd(), '.env'))
 
@@ -25,9 +25,14 @@ if (!apiId || !apiHash) {
   process.exit(2)
 }
 
-const sessionDir = process.env['TDLIB_SESSION_DIR']?.trim() || resolve('../../spikes/tdlib/data')
+/** `WEGRAM_TDLIB_TEST_DC=1` points this run at the test data centers instead. */
+const useTestDc = isOn(process.env['WEGRAM_TDLIB_TEST_DC'])
+const sessionDir =
+  process.env['TDLIB_SESSION_DIR']?.trim() ||
+  resolve(useTestDc ? '../../spikes/tdlib/test-data' : '../../spikes/tdlib/data')
 const initialProxy = parseProxyUrl(process.env['TDLIB_PROXY'])
 console.log(`session dir: ${sessionDir}`)
+console.log(`test dc    : ${useTestDc ? 'yes' : 'no'}`)
 console.log(
   `proxy      : ${initialProxy ? `${initialProxy.type} ${initialProxy.host}:${initialProxy.port}` : '(none)'}`,
 )
@@ -38,6 +43,7 @@ const adapter = new TdlibAdapter({
   databaseDirectory: join(sessionDir, 'db'),
   filesDirectory: join(sessionDir, 'files'),
   initialProxy,
+  useTestDc,
 })
 
 const states: string[] = []
@@ -170,15 +176,3 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   ])
 }
 
-function loadDotEnv(file: string): void {
-  try {
-    for (const line of readFileSync(file, 'utf8').split(/\r?\n/)) {
-      const match = /^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/.exec(line)
-      if (!match?.[1]) continue
-      if (process.env[match[1]]) continue
-      process.env[match[1]] = (match[2] ?? '').replace(/^["']|["']$/g, '')
-    }
-  } catch {
-    // No .env is reported by the credential check above.
-  }
-}

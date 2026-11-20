@@ -71,6 +71,14 @@ change belongs in the adapter.
   `hide()/show()`s the viewer with its own minimize/restore, and `closeViewer()`s on
   teardown (`window-all-closed` would otherwise leave an orphan viewer and the app would
   never quit).
+- **The test data centers are a separate account space, and they get their own
+  session directory.** `WEGRAM_TDLIB_TEST_DC=1` (`telegram/index.ts`) sets TDLib's
+  `use_test_dc` and defaults the session to `userData/tdlib/test`; a test-DC client
+  cannot open the production database, and pointing it at the real session is the one
+  mistake that matters. The authorization steps live in `tdlib/auth.ts`
+  (phone/code/password/sign-up/QR/restart) so `index.ts` stays under its size budget;
+  `waitRegistration` → `auth:signup` is how a brand-new number finishes. Sign-in on the
+  test DC is currently blocked — see the note in the root `CLAUDE.md`.
 - **Credentials are build-time, and mock is development-only.** `bootstrap()` resolves
   `TELEGRAM_API_ID`/`TELEGRAM_API_HASH` from the environment first, then from
   `__WEGRAM_API_CREDENTIALS__` (inlined by `electron.vite.config.ts`); a packaged build
@@ -85,6 +93,7 @@ pnpm typecheck
 pnpm test
 cd apps\desktop; pnpm ui:db-check     # headless ui.db check (node:sqlite)
 cd apps\desktop; pnpm tdlib:smoke     # READ-ONLY real TDLib: getMe/getChats/history
+cd apps\desktop; pnpm tdlib:test-dc   # test data centers: send/edit/upload/delete
 pwsh apps\desktop\scripts\launch-detached.ps1 -Mock   # Electron + mock adapter
 ```
 

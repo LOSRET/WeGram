@@ -22,6 +22,12 @@ describe('loginCopy', () => {
     )
   })
 
+  it('asks for a name when the number has no account yet', () => {
+    const copy = loginCopy('register', { kind: 'waitRegistration' })
+    expect(copy.title).toBe('创建新账号')
+    expect(copy.action).toBe('创建账号')
+  })
+
   it('shows the account hint on the two-step step', () => {
     expect(loginCopy('password', { kind: 'waitPassword', hint: '生日' }).subtitle).toBe(
       '需要两步验证密码（提示：生日）',

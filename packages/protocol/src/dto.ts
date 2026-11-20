@@ -33,6 +33,12 @@ export const authStateSchema = z.discriminatedUnion('kind', [
     hint: z.string().optional(),
     codeLength: z.number().int().optional(),
   }),
+  /**
+   * A number Telegram does not know yet. TDLib asks for a first name before the
+   * account exists (`authorizationStateWaitRegistration`); every fresh test-DC
+   * number starts here, which is why the test environment needs this step.
+   */
+  z.object({ kind: z.literal('waitRegistration') }),
   z.object({ kind: z.literal('waitPassword'), hint: z.string().optional() }),
   /**
    * QR login: TDLib's `authorizationStateWaitOtherDeviceConfirmation`. The link is
