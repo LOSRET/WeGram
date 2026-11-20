@@ -94,6 +94,8 @@ function applyPreviewRead(chatId: number, upTo: number | null): void {
 
 const drafts: Record<number, string> = {}
 const anchors: Record<number, { messageId: number; offset: number }> = {}
+/** Comment-thread positions, keyed `chatId:messageId` like the `ui.db` row (§9.8). */
+const commentAnchors: Record<string, { messageId: number; offset: number }> = {}
 /** The picker's 最近使用 row; the shell keeps it in ui.db. */
 let recentEmoji: string[] = []
 
@@ -356,6 +358,18 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       const messageId = store.messageId as number | null
       if (messageId === null) delete anchors[store.chatId]
       else anchors[store.chatId] = { messageId, offset: Number(store.offset ?? 0) }
+      return undefined
+    }
+    case 'ui:getCommentAnchor': {
+      const key = `${store.chatId}:${store.messageId}`
+      return commentAnchors[key] ?? null
+    }
+    case 'ui:saveCommentAnchor': {
+      const key = `${store.chatId}:${store.messageId}`
+      commentAnchors[key] = {
+        messageId: Number(store.anchorMessageId),
+        offset: Number(store.offset ?? 0),
+      }
       return undefined
     }
     case 'ui:getRecentEmoji':

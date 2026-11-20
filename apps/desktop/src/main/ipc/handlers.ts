@@ -192,6 +192,15 @@ export function createHandlers({
       )
     },
     'ui:getAnchor': (payload) => uiDb.getScrollAnchor(payload.chatId),
+    'ui:saveCommentAnchor': (payload) => {
+      uiDb.saveCommentAnchor(
+        payload.chatId,
+        payload.messageId,
+        payload.anchorMessageId,
+        payload.offset,
+      )
+    },
+    'ui:getCommentAnchor': (payload) => uiDb.getCommentAnchor(payload.chatId, payload.messageId),
     'ui:getRecentEmoji': () => readRecentEmoji(uiDb),
     'ui:saveRecentEmoji': (payload) => {
       uiDb.setSetting(RECENT_EMOJI_KEY, JSON.stringify(payload.emoji.slice(0, RECENT_EMOJI_LIMIT)))

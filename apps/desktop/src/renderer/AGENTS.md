@@ -25,7 +25,9 @@ components/message-list/  virtualiser + MessageRow + Divider + the scroll hooks:
 components/chat-pane/     render tree + useChatHistory (history/ modules) + messageActions +
                          CommentPanel (full-pane discussion view, slides in from the right;
                          chat-style rows + the composer card, posts via messages:sendComment;
-                         non-members get the official client's 加入/申请加入 gate instead)
+                         non-members get the official client's 加入/申请加入 gate instead;
+                         opens at the top of the thread) + useCommentAnchor (that thread's
+                         reading position in ui.db; the default landing is the top)
 components/contacts/      通讯录: ContactsList (service rows + address book by initial) +
                          ContactDetail (the card)
 components/picker/        the expression panel's data hooks and body components

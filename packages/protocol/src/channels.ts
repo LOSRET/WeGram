@@ -122,6 +122,12 @@ export const invokeChannels = [
   'ui:getDraft',
   'ui:saveAnchor',
   'ui:getAnchor',
+  /**
+   * Where the reader stopped inside one message's comment thread (§9.8). Keyed by
+   * the commented message, so a channel's own reading position is never touched.
+   */
+  'ui:saveCommentAnchor',
+  'ui:getCommentAnchor',
   /** Emoji the reader picked recently, newest first (the picker's 最近使用 row). */
   'ui:getRecentEmoji',
   'ui:saveRecentEmoji',
@@ -345,6 +351,24 @@ export const invokeSchemas = {
   },
   'ui:getAnchor': {
     request: z.object({ chatId: z.number().int() }),
+    response: scrollAnchorSchema.nullable(),
+  },
+  /**
+   * The discussion view's reading position (§9.8), keyed by the commented message.
+   * Unlike a chat's anchor there is no "bottom" sentinel: a thread with no stored
+   * row opens at its top, and a stored row is restored when it is still loaded.
+   */
+  'ui:saveCommentAnchor': {
+    request: z.object({
+      chatId: z.number().int(),
+      messageId: z.number().int(),
+      anchorMessageId: z.number().int(),
+      offset: z.number().int(),
+    }),
+    response: noPayload,
+  },
+  'ui:getCommentAnchor': {
+    request: z.object({ chatId: z.number().int(), messageId: z.number().int() }),
     response: scrollAnchorSchema.nullable(),
   },
   'ui:getRecentEmoji': { request: noPayload, response: z.array(z.string()) },

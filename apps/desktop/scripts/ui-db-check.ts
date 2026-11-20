@@ -41,6 +41,12 @@ try {
   db.saveScrollAnchor(42, 12345, 12)
   check('scroll anchor', db.getScrollAnchor(42), { messageId: 12345, offset: 12 })
 
+  check('no comment anchor yet', db.getCommentAnchor(42, 900), null)
+  db.saveCommentAnchor(42, 900, 4711, -8)
+  check('comment anchor', db.getCommentAnchor(42, 900), { messageId: 4711, offset: -8 })
+  check('another thread is untouched', db.getCommentAnchor(42, 901), null)
+  check('the chat anchor is untouched', db.getScrollAnchor(42), { messageId: 12345, offset: 12 })
+
   db.close()
 
   // Reopen: everything must survive a restart.
@@ -48,6 +54,10 @@ try {
   reopened.open()
   check('setting after reopen', reopened.getSetting('theme'), 'dark')
   check('anchor after reopen', reopened.getScrollAnchor(42), { messageId: 12345, offset: 12 })
+  check('comment anchor after reopen', reopened.getCommentAnchor(42, 900), {
+    messageId: 4711,
+    offset: -8,
+  })
   reopened.close()
 } finally {
   rmSync(dir, { recursive: true, force: true })

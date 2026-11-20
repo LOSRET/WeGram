@@ -44,6 +44,19 @@ CREATE TABLE IF NOT EXISTS chat_ui_state (
   last_painted_at  INTEGER
 );
 
+-- One reading position per comment thread (§9.8). The key is the *commented*
+-- message, because a chat's own anchor must stay untouched, and one channel can
+-- hold many open threads. Missing row = the reader never scrolled: the panel
+-- opens at the top of the thread.
+CREATE TABLE IF NOT EXISTS comment_ui_state (
+  chat_id          INTEGER NOT NULL,
+  message_id       INTEGER NOT NULL,
+  anchor_id        INTEGER NOT NULL,
+  anchor_offset    INTEGER NOT NULL DEFAULT 0,
+  last_painted_at  INTEGER NOT NULL,
+  PRIMARY KEY (chat_id, message_id)
+);
+
 CREATE TABLE IF NOT EXISTS app_settings (
   k TEXT PRIMARY KEY,
   v TEXT NOT NULL
@@ -146,6 +159,39 @@ export class UiDatabase {
            last_painted_at = excluded.last_painted_at`,
       )
       .run(chatId, messageId, offset, Date.now())
+  }
+
+  /**
+   * Reading position inside one message's comment thread (§9.8). Keyed by the
+   * commented message: the same chat can have many threads, and a channel's own
+   * scroll position is a different row in `chat_ui_state`.
+   *
+   * No row at all is the default: the discussion view opens at its top.
+   */
+  saveCommentAnchor(chatId: number, messageId: number, anchorId: number, offset = 0): void {
+    this.require()
+      .prepare(
+        `INSERT INTO comment_ui_state (chat_id, message_id, anchor_id, anchor_offset, last_painted_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(chat_id, message_id) DO UPDATE SET
+           anchor_id = excluded.anchor_id,
+           anchor_offset = excluded.anchor_offset,
+           last_painted_at = excluded.last_painted_at`,
+      )
+      .run(chatId, messageId, anchorId, offset, Date.now())
+  }
+
+  getCommentAnchor(
+    chatId: number,
+    messageId: number,
+  ): { messageId: number; offset: number } | null {
+    const row = this.require()
+      .prepare(
+        'SELECT anchor_id, anchor_offset FROM comment_ui_state WHERE chat_id = ? AND message_id = ?',
+      )
+      .get(chatId, messageId) as { anchor_id: number; anchor_offset: number | null } | undefined
+    if (row == null) return null
+    return { messageId: Number(row.anchor_id), offset: Number(row.anchor_offset ?? 0) }
   }
 
   getScrollAnchor(chatId: number): { messageId: number; offset: number } | null {

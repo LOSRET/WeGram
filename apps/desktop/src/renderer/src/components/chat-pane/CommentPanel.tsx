@@ -8,6 +8,7 @@ import {
   mergeComments,
   withoutCommentBar,
 } from '../../lib/comments'
+import { resolveCommentLanding } from '../../lib/commentAnchor'
 import { messagePreview } from '../../lib/format'
 import { selfIdentity } from '../../lib/self'
 import { useComposerInput } from '../../lib/useComposerInput'
@@ -18,6 +19,7 @@ import { MessageRow } from '../message-list/MessageRow'
 import { senderAvatarUrl } from '../message-list/senderAvatar'
 import { OverlayScrollbar } from '../OverlayScrollbar'
 import { RichText } from '../RichText'
+import { useCommentAnchor } from './useCommentAnchor'
 
 type CommentAccess = InvokeResponse<'messages:commentInfo'>
 
@@ -60,9 +62,11 @@ function BackIcon() {
  * stripped. The input at the bottom is the chat composer's card: Enter sends through
  * `messages:sendComment`, which posts into the thread's own supergroup.
  *
- * The panel owns its own transcript: it opens at the newest page, loads older pages
- * when the reader reaches the top (preserving their position), and keeps fetched
- * pages in a session cache. `open` drives the animation; the parent keeps the panel
+ * The panel owns its own transcript: it opens at the top of the thread — the oldest
+ * comment loaded, like a channel's comments in WeChat — loads older pages when the
+ * reader reaches the top (preserving their position), and keeps fetched pages in a
+ * session cache. A position this reader left is restored from `ui.db` like a chat's
+ * (`useCommentAnchor`). `open` drives the animation; the parent keeps the panel
  * mounted until the slide-out has finished and then unmounts it.
  */
 export function CommentPanel({
@@ -103,6 +107,7 @@ export function CommentPanel({
   const [slowLeft, setSlowLeft] = useState(0)
 
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  const listRef = useRef<HTMLDivElement | null>(null)
   const hostRef = useRef<HTMLDivElement | null>(null)
   const backRef = useRef<HTMLButtonElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
@@ -116,6 +121,14 @@ export function CommentPanel({
   const userAvatars = useAppStore((state) => state.userAvatars)
 
   const self = useMemo(() => selfIdentity(auth), [auth])
+
+  /** The stored reading position of this thread, and its default-on-scroll writer. */
+  const { anchor, anchorKnown, scheduleSave } = useCommentAnchor({
+    chatId: message.chatId,
+    messageId: message.id,
+    scrollRef,
+    listRef,
+  })
 
   /**
    * One pseudo chat for every row: the comments live in the discussion group, not
@@ -231,8 +244,8 @@ export function CommentPanel({
     [key, message.chatId, message.id],
   )
 
-  // The first page: the cache answers instantly, otherwise one request. The list
-  // lands on the newest comment, where a discussion is read from.
+  // The first page: the cache answers instantly, otherwise one request. Where the
+  // list lands is decided once, in the layout effect below (a saved row or the top).
   useEffect(() => {
     if (page === null && !loadingRef.current && error === null) void load()
   }, [error, load, page])
@@ -273,13 +286,33 @@ export function CommentPanel({
       el.scrollTop = pending.top + (el.scrollHeight - pending.height)
       return
     }
-    if (!landedRef.current && page !== null) {
-      landedRef.current = true
-      el.scrollTop = el.scrollHeight
+    if (landedRef.current || page === null || !anchorKnown) return
+    landedRef.current = true
+    /**
+     * Default landing: the top of the thread. A channel's comments are read from
+     * there, unlike a chat, which opens on its newest message. A stored row wins
+     * while it is still inside the loaded window (`resolveCommentLanding`).
+     */
+    const landing = resolveCommentLanding(page.messages, anchor)
+    const row =
+      landing && listRef.current
+        ? listRef.current.querySelector<HTMLElement>(`[data-message-id="${landing.messageId}"]`)
+        : null
+    if (!landing || !row) {
+      el.scrollTop = 0
+      return
     }
-  }, [page])
+    el.scrollTop = Math.max(
+      0,
+      el.scrollTop +
+        row.getBoundingClientRect().top -
+        el.getBoundingClientRect().top -
+        landing.offset,
+    )
+  }, [anchor, anchorKnown, page])
 
   const onScroll = (): void => {
+    scheduleSave()
     const el = scrollRef.current
     if (!el || !page?.hasMore || loadingRef.current) return
     if (el.scrollTop > LOAD_OLDER_AT) return
@@ -378,7 +411,7 @@ export function CommentPanel({
         </div>
 
         <div className="wx-comments-panel__scroll" ref={scrollRef} onScroll={onScroll}>
-          <div className="wx-comments-panel__list">
+          <div className="wx-comments-panel__list" ref={listRef}>
             {error ? (
               <div className="wx-comments-panel__hint">
                 <span>{error}</span>
@@ -399,17 +432,23 @@ export function CommentPanel({
                   <div className="wx-comments-panel__hint">正在加载更早的评论…</div>
                 ) : null}
                 {shown.map((comment) => (
-                  <MessageRow
-                    key={comment.id}
-                    chat={discussionChat}
-                    messages={[comment]}
-                    repliedTo={null}
-                    self={self}
-                    avatarUrl={senderAvatarUrl(comment, discussionChat, self, userAvatars)}
-                    readOutboxMaxId={Number.MAX_SAFE_INTEGER}
-                    onOpenMenu={noopMenu}
-                    onOpenComments={noopComments}
-                  />
+                  /**
+                   * The wrapper is the anchor slot: `useCommentAnchor` measures the
+                   * first visible `data-message-id` row, so it must exist for every
+                   * comment (a service row carries none and is simply skipped).
+                   */
+                  <div key={comment.id} data-message-id={comment.id}>
+                    <MessageRow
+                      chat={discussionChat}
+                      messages={[comment]}
+                      repliedTo={null}
+                      self={self}
+                      avatarUrl={senderAvatarUrl(comment, discussionChat, self, userAvatars)}
+                      readOutboxMaxId={Number.MAX_SAFE_INTEGER}
+                      onOpenMenu={noopMenu}
+                      onOpenComments={noopComments}
+                    />
+                  </div>
                 ))}
               </>
             )}

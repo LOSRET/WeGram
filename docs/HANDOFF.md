@@ -83,9 +83,12 @@ Greenfield → working skeleton in three milestones:
   resolves it from the clicked message). Whether the input is offered at all follows
   the official desktop client: `messages:commentInfo` composes membership, join-to-send
   and permissions into canComment/canJoin (pure rule in `telegram/comment-access.ts`),
-  and a non-member gets 加入讨论组 / 申请加入讨论组 instead of the composer. Reaching the
-  top loads an older page (with scroll compensation); Esc / ‹ closes with the reverse
-  slide. The bar's numbers come from
+  and a non-member gets 加入讨论组 / 申请加入讨论组 instead of the composer. The list opens
+  at the top of the thread — WeChat reads a channel's comments from there — and each
+  thread remembers the row the reader left (`ui:saveCommentAnchor` → `comment_ui_state`,
+  keyed by the commented message so a channel's own anchor stays untouched). Reaching
+  the top loads an older page (with scroll compensation); Esc / ‹ closes with the
+  reverse slide. The bar's numbers come from
   `message.interaction_info` (comments, plus 阅读/转发 for channels) and live updates patch
   the counter through the new `interaction` message op instead of remapping the message.
   New channel `messages:comments`; new DTO `MessageInteraction`; mock fixtures carry two
