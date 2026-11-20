@@ -126,7 +126,10 @@ cd apps\desktop; pnpm ui:db-check   # headless ui.db check (node:sqlite)
 cd apps\desktop; pwsh scripts\launch-detached.ps1 -NoSandbox   # only way Electron starts here (-Mock for the fake adapter, -RemoteDebugPort 9224 for CDP checks)
 ```
 
-`WEGRAM_ADAPTER=mock` forces the mock adapter even when credentials exist — use it for any UI work that must not touch the real account (the launch script exposes it as `-Mock`).
+`WEGRAM_ADAPTER=mock` forces the mock adapter even when credentials exist (the launch
+script exposes it as `-Mock`). It is the fixture path for UI work — browser preview,
+demos, a machine with no credentials. Write-path checks against real TDLib belong on the
+test DCs now, see the three tiers under Environment quirks.
 
 `tdlib:smoke` reads `apps/desktop/.env` (`TELEGRAM_API_ID` / `TELEGRAM_API_HASH`) and these optional variables:
 
@@ -170,7 +173,14 @@ node login.mjs    # interactive; requires TELEGRAM_API_ID / TELEGRAM_API_HASH in
 - pnpm 12 reads build-script permissions from `allowBuilds:` in `pnpm-workspace.yaml` (a name → bool map), not from the old `pnpm` field in `package.json`.
 - The pnpm store and lock files live outside the workspace; installing needs full filesystem access.
 - Editors save atomically through `*.tmpdir` folders. Vite's watcher dies with `EBUSY` on those, so both Vite configs ignore `**/*.tmpdir/**` and `**/*.tmp`.
-- **Real-account safety:** the session in `spikes/tdlib/data` is a real Telegram account. Never send messages, delete, forward or mark-as-read against it while testing — use the mock adapter or the browser preview. Reading (getMe/getChats/getChatHistory) is acceptable.
+- **Writes never touch the real account.** Three tiers: (1) the session in
+  `spikes/tdlib/data` is a real Telegram account and stays **read-only** — `getMe` /
+  `getChats` / `getChatHistory` only; (2) anything that sends, edits, deletes, forwards or
+  marks read with real TDLib runs on Telegram's test DCs (`pnpm tdlib:test-dc`, or
+  `WEGRAM_TDLIB_TEST_DC=1` for the app) — a separate account space that can never reach a
+  real chat; (3) the mock adapter (`WEGRAM_ADAPTER=mock` / the launch script's `-Mock` /
+  the browser preview) is now only the UI-fixture path, for work that should not talk to a
+  Telegram account at all.
 
 ## Architecture rules
 

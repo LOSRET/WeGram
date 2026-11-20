@@ -185,10 +185,13 @@ correctly after the visibility fix. The Electron window is left running.
 
 ## Hard rules
 
-1. **The Telegram account in `spikes/tdlib/data` is real and read-only.** Never send,
-   edit, delete, forward or mark-as-read against it while testing. Reading
-   (`getMe`/`getChats`/`getChatHistory`) is fine. For any UI work that could write,
-   force the fake adapter: `WEGRAM_ADAPTER=mock` (the launch script's `-Mock`).
+1. **Writes never touch the real account.** The Telegram account in
+   `spikes/tdlib/data` is real and **read-only** (`getMe`/`getChats`/`getChatHistory`).
+   Anything that sends, edits, deletes, forwards or marks read with real TDLib runs on
+   Telegram's test DCs — `pnpm tdlib:test-dc`, or `WEGRAM_TDLIB_TEST_DC=1` for the app
+   (its own session under `userData/tdlib/test`). The mock adapter
+   (`WEGRAM_ADAPTER=mock` / the launch script's `-Mock`, also the browser preview) is now
+   only the UI-fixture path, for work that should not talk to a Telegram account at all.
 2. **Never start Electron from the agent shell.** Shell commands run inside a Windows
    job object; Chromium aborts there (see Environment). Use
    `pwsh scripts/launch-detached.ps1`.

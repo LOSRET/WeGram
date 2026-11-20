@@ -77,8 +77,8 @@ change belongs in the adapter.
   cannot open the production database, and pointing it at the real session is the one
   mistake that matters. The authorization steps live in `tdlib/auth.ts`
   (phone/code/password/sign-up/QR/restart) so `index.ts` stays under its size budget;
-  `waitRegistration` → `auth:signup` is how a brand-new number finishes. Sign-in on the
-  test DC is currently blocked — see the note in the root `CLAUDE.md`.
+  `waitRegistration` → `auth:signup` is how a brand-new number finishes. Signing in
+  needs an account created by an official app first (see the root `CLAUDE.md`).
 - **Credentials are build-time, and mock is development-only.** `bootstrap()` resolves
   `TELEGRAM_API_ID`/`TELEGRAM_API_HASH` from the environment first, then from
   `__WEGRAM_API_CREDENTIALS__` (inlined by `electron.vite.config.ts`); a packaged build
@@ -97,9 +97,11 @@ cd apps\desktop; pnpm tdlib:test-dc   # test data centers: send/edit/upload/dele
 pwsh apps\desktop\scripts\launch-detached.ps1 -Mock   # Electron + mock adapter
 ```
 
-`spikes/tdlib/data` is a **real account**. Never send, delete, forward or
-mark-read against it from a script — use the mock adapter (`-Mock`, or
-`WEGRAM_ADAPTER=mock`) for anything that writes.
+`spikes/tdlib/data` is a **real account and read-only** (`getMe` / `getChats` /
+`getChatHistory`). Writes with real TDLib go to Telegram's test DCs (`pnpm
+tdlib:test-dc`, or `WEGRAM_TDLIB_TEST_DC=1` for the app, whose session is its own);
+the mock adapter (`-Mock`, `WEGRAM_ADAPTER=mock`) is the UI-fixture path for work that
+should not talk to a Telegram account at all.
 
 Never start Electron from an agent shell: Chromium cannot initialise inside the
 job object. Use `launch-detached.ps1` (creates the process via WMI); logs land in
