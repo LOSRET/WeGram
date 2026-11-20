@@ -1,11 +1,17 @@
 import type { ChatSummary, Message } from '@wegram/protocol'
-import { memo, type MouseEvent } from 'react'
+import { memo, type MouseEvent, type ReactNode } from 'react'
 
 import { hasCommentBar } from '../../lib/comments'
 import { formatMessageTime, messagePreview } from '../../lib/format'
 import { Avatar } from '../Avatar'
-import { MediaBubble } from '../MediaBubble'
+import {
+  CHANNEL_MEDIA_INSET,
+  CHANNEL_MEDIA_LIMITS,
+  MediaBubble,
+  channelMediaWidth,
+} from '../MediaBubble'
 import { ContactCard } from './ContactCard'
+import { ChannelMeta } from './ChannelMeta'
 import { InlineButtons } from './InlineButtons'
 import { RichMessage } from './RichMessage'
 import { RichText } from '../RichText'
@@ -55,6 +61,12 @@ function sameRow(previous: readonly Message[], next: readonly Message[]): boolea
  * One transcript row: avatar, sender line, reply quote, media/text/sticker body,
  * the time/edit/read meta line and the hover "⋯" button.
  *
+ * A channel post keeps WeChat's bubble but takes Telegram's composition (see
+ * `styles/channel.css`): the media, its caption and the 评论 handle are ONE block
+ * — the photo sits inside the bubble, the caption under it, the handle as the
+ * bubble's last row — closed by the view counter and the time. A post with no
+ * bubble (a sticker, a big emoji) keeps that line under the body.
+ *
  * Purely presentational — all timing and windowing lives in `index.tsx`.
  *
  * Memoised: the list re-renders on every scroll measurement (the "seen" index moves
@@ -76,6 +88,7 @@ export const MessageRow = memo(
     const last = messages[messages.length - 1]
     if (!first || !last) return null
     const interaction = first.interaction
+    const channel = chat.kind === 'channel'
 
     if (first.kind === 'service') {
       return <div className="wx-service">{first.text || '系统消息'}</div>
@@ -105,6 +118,17 @@ export const MessageRow = memo(
     // Telegram puts an album's caption on one of its items (normally the first).
     const caption = messages.find((message) => message.text) ?? null
     const showSender = !first.outgoing && chat.kind !== 'private'
+    const channelBubble = channel ? ' wx-bubble--channel' : ''
+    /**
+     * A channel media post is as wide as its media, so the caption and the comment
+     * handle wrap inside that width. Left to `fit-content`, a long caption widened
+     * the bubble past the picture and left a strip of empty bubble on its right.
+     * The frame is the media bubble's own inset in `styles/channel.css`.
+     */
+    const channelMediaBox =
+      channel && !album && media && (mediaKind === 'photo' || mediaKind === 'video')
+        ? channelMediaWidth(mediaKind, media) + 2 * CHANNEL_MEDIA_INSET
+        : undefined
 
     const openMenu = (event: MouseEvent): void => {
       event.preventDefault()
@@ -112,6 +136,25 @@ export const MessageRow = memo(
     }
 
     const readReceipt = last.outgoing ? (readOutboxMaxId >= last.id ? ' · 已读' : ' · 未读') : ''
+
+    /**
+     * The channel footer: views and time in the bubble's bottom-right corner, or
+     * under a body that has no bubble (a sticker, a big emoji). A channel post has
+     * no read receipt — it is none of the reader's business.
+     */
+    const channelMeta = (outside = false): ReactNode =>
+      channel ? (
+        <ChannelMeta
+          time={last.date}
+          edited={last.edited}
+          views={interaction?.views}
+          outside={outside}
+        />
+      ) : null
+
+    const commentBar = hasCommentBar(interaction) ? (
+      <CommentBar interaction={interaction} onOpen={() => onOpenComments(first)} />
+    ) : null
 
     return (
       <div className={`wx-message-row${first.outgoing ? ' wx-message-row--self' : ''}`}>
@@ -129,12 +172,17 @@ export const MessageRow = memo(
             <span className="wx-sender">{first.senderName}</span>
           ) : null}
           {isSticker && media ? (
-            <div className="wx-sticker-wrap" onContextMenu={openMenu}>
-              <StickerRenderer media={media} size={140} />
-            </div>
+            <>
+              <div className="wx-sticker-wrap" onContextMenu={openMenu}>
+                <StickerRenderer media={media} size={140} />
+              </div>
+              {channelMeta(true)}
+            </>
           ) : rich ? (
             <div
-              className={`wx-bubble wx-bubble--rich${first.outgoing ? ' wx-bubble--self' : ''}`}
+              className={`wx-bubble wx-bubble--rich${
+                first.outgoing ? ' wx-bubble--self' : ''
+              }${channelBubble}`}
               onContextMenu={openMenu}
             >
               {repliedTo ? (
@@ -143,11 +191,15 @@ export const MessageRow = memo(
                 </div>
               ) : null}
               <RichMessage blocks={rich} chatId={chat.id} messageId={first.id} />
+              {channelMeta()}
               {buttons ? <InlineButtons rows={buttons} /> : null}
+              {channel ? commentBar : null}
             </div>
           ) : contact ? (
             <div
-              className={`wx-bubble wx-bubble--contact${first.outgoing ? ' wx-bubble--self' : ''}`}
+              className={`wx-bubble wx-bubble--contact${
+                first.outgoing ? ' wx-bubble--self' : ''
+              }${channelBubble}`}
               onContextMenu={openMenu}
             >
               {repliedTo ? (
@@ -156,22 +208,28 @@ export const MessageRow = memo(
                 </div>
               ) : null}
               <ContactCard contact={contact} />
+              {channelMeta()}
               {buttons ? <InlineButtons rows={buttons} /> : null}
+              {channel ? commentBar : null}
             </div>
           ) : bigEmoji ? (
             // Emoji-only message: no bubble, large glyph, like WeChat big emoji.
-            <div className="wx-big-emoji" onContextMenu={openMenu}>
-              <RichText text={first.text} entities={first.entities} />
-            </div>
+            <>
+              <div className="wx-big-emoji" onContextMenu={openMenu}>
+                <RichText text={first.text} entities={first.entities} />
+              </div>
+              {channelMeta(true)}
+            </>
           ) : (
             <div
-              className={`wx-bubble${first.outgoing ? ' wx-bubble--self' : ''}${
+              className={`wx-bubble${first.outgoing ? ' wx-bubble--self' : ''}${channelBubble}${
                 album
                   ? ' wx-bubble--media wx-bubble--album'
                   : mediaKind
                     ? ` wx-bubble--media wx-bubble--${mediaKind}`
                     : ''
               }`}
+              {...(channelMediaBox === undefined ? {} : { style: { width: channelMediaBox } })}
               onContextMenu={openMenu}
             >
               {repliedTo ? (
@@ -182,31 +240,42 @@ export const MessageRow = memo(
               {album ? (
                 <AlbumBubble chatId={chat.id} messages={messages} />
               ) : mediaKind && media ? (
-                <MediaBubble media={media} kind={mediaKind} chatId={chat.id} messageId={first.id} />
+                <MediaBubble
+                  media={media}
+                  kind={mediaKind}
+                  chatId={chat.id}
+                  messageId={first.id}
+                  // A channel post is Telegram's card, so its photo may grow past
+                  // WeChat's 240 px bubble photograph.
+                  {...(channel ? CHANNEL_MEDIA_LIMITS : {})}
+                />
               ) : null}
               {caption ? (
                 <div className={mediaKind || album ? 'wx-caption' : undefined}>
                   <RichText text={caption.text} entities={caption.entities} />
                 </div>
               ) : null}
+              {channelMeta()}
               {!album && !mediaKind && !first.text ? (
                 <span className="wx-bubble__empty">[不支持的消息]</span>
               ) : null}
               {buttons ? <InlineButtons rows={buttons} /> : null}
+              {channel ? commentBar : null}
             </div>
           )}
           {/* 评论 N 条 (design doc §9.8): just the handle — the thread opens in the
               full-pane CommentPanel, like Telegram's discussion view. A thread that
               nobody has commented in yet keeps the handle too (写评论), or the reader
-              could never be the first one. */}
-          {hasCommentBar(interaction) ? (
-            <CommentBar interaction={interaction} onOpen={() => onOpenComments(first)} />
-          ) : null}
-          <span className="wx-message__meta">
-            {formatMessageTime(last.date)}
-            {last.edited ? ' · 已编辑' : ''}
-            {readReceipt}
-          </span>
+              could never be the first one. In a channel the handle lives inside the
+              post's bubble; a bubble-less post (sticker, big emoji) keeps it outside. */}
+          {channel ? (isSticker || bigEmoji ? commentBar : null) : commentBar}
+          {channel ? null : (
+            <span className="wx-message__meta">
+              {formatMessageTime(last.date)}
+              {last.edited ? ' · 已编辑' : ''}
+              {readReceipt}
+            </span>
+          )}
         </div>
 
         <button

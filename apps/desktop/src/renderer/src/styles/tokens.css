@@ -30,6 +30,9 @@
   --wx-bubble-self: #95ec69;
   --wx-bubble-other: #eeeef0;
   --wx-bubble-radius: 6px;
+  /* Channel post (see styles/channel.css): the block's inner hairline, drawn in
+     the bubble's own ink so it reads on the grey bubble and on the green own one. */
+  --wx-channel-rule: rgba(0, 0, 0, 0.12);
 
   /* Text */
   --wx-text: #191919;
@@ -154,6 +157,8 @@
   --wx-row-pinned: rgba(255, 255, 255, 0.035);
   --wx-bubble-self: #35d28d;
   --wx-bubble-other: #2f2f30;
+  /* Channel post hairline: a light line on the lifted #2F2F30 bubble. */
+  --wx-channel-rule: rgba(255, 255, 255, 0.16);
   --wx-text: #e1e1e5;
   --wx-text-secondary: #7b7b80;
   /* The client uses the same #7B7B80 for day labels, timestamps and the search

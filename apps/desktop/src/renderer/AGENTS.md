@@ -19,7 +19,9 @@ components/message-list/  virtualiser + MessageRow + Divider + the scroll hooks:
                          useInitialPosition / usePrependRestore / useAnchorSave /
                          useLandingSave / useJumpToLatest / useLocateScroll / useViewportSeen;
                          RichMessage (page blocks), ContactCard (vCards), InlineButtons,
-                         CommentBar (评论 N 条 handle, §9.8)
+                         CommentBar (评论 N 条 handle, §9.8), ChannelMeta (a channel post's
+                         views/time footer; the one-bubble channel composition is
+                         styles/channel.css)
 components/chat-pane/     render tree + useChatHistory (history/ modules) + messageActions +
                          CommentPanel (full-pane discussion view, slides in from the right;
                          chat-style rows + the composer card, posts via messages:sendComment;
