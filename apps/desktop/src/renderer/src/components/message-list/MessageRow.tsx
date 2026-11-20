@@ -200,7 +200,6 @@ export const MessageRow = memo(
               ) : null}
               <RichMessage blocks={rich} chatId={chat.id} messageId={first.id} />
               {channelMeta()}
-              {buttons ? <InlineButtons rows={buttons} /> : null}
               {channel ? commentBar : null}
             </div>
           ) : contact ? (
@@ -217,7 +216,6 @@ export const MessageRow = memo(
               ) : null}
               <ContactCard contact={contact} />
               {channelMeta()}
-              {buttons ? <InlineButtons rows={buttons} /> : null}
               {channel ? commentBar : null}
             </div>
           ) : animatedEmoji ? (
@@ -276,10 +274,13 @@ export const MessageRow = memo(
               {!album && !mediaKind && !first.text ? (
                 <span className="wx-bubble__empty">[不支持的消息]</span>
               ) : null}
-              {buttons ? <InlineButtons rows={buttons} /> : null}
               {channel ? commentBar : null}
             </div>
           )}
+          {/* Telegram's inline keyboard is attached to the message, not to its
+              bubble: under it, on the transcript's own background, so the buttons
+              read as their own control strip instead of part of the body. */}
+          {buttons ? <InlineButtons rows={buttons} /> : null}
           {/* 评论 N 条 (design doc §9.8): just the handle — the thread opens in the
               full-pane CommentPanel, like Telegram's discussion view. A thread that
               nobody has commented in yet keeps the handle too (写评论), or the reader

@@ -23,8 +23,12 @@ export function InlineButtons({ rows }: InlineButtonsProps) {
           {row.map((button, index) => {
             const href = safeHref(button.url)
             // The bot's own style (primary / danger / success / link); the
-            // ordinary grey button carries no style at all.
-            const tint = button.style ? ' wx-inline-button--' + button.style : ''
+            // ordinary grey button — no style, or an explicit `default` — gets
+            // the plain fill. Every button therefore carries exactly one style
+            // class, so the plain fill (and its theme variant) can never
+            // out-cascade a coloured one.
+            const tone = button.style && button.style !== 'default' ? button.style : 'plain'
+            const tint = ' wx-inline-button--' + tone
             return href ? (
               <a
                 className={'wx-inline-button' + tint}
@@ -53,7 +57,5 @@ export function InlineButtons({ rows }: InlineButtonsProps) {
 }
 
 function explain(button: InlineButton): void {
-  useAppStore
-    .getState()
-    .setToast(button.callback ? '机器人按钮的回调暂未支持' : '这类按钮暂未支持')
+  useAppStore.getState().setToast(button.callback ? '机器人按钮的回调暂未支持' : '这类按钮暂未支持')
 }

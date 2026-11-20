@@ -61,11 +61,16 @@
   cursor: default;
 }
 
+/* Telegram's inline keyboard hangs under the message bubble, on the transcript
+   itself (MessageRow draws it as a sibling of the bubble). It spans the message's
+   width — the bubble's own width when the buttons are shorter — and keeps a 4 px
+   margin so the stack's 2 px gap reads as the 6 px Telegram leaves under a bubble. */
 .wx-inline-buttons {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-top: 6px;
+  width: 100%;
+  margin-top: 4px;
 }
 
 .wx-inline-buttons__row {
@@ -79,7 +84,6 @@
   padding: 6px 10px;
   border: none;
   border-radius: 6px;
-  background: rgba(0, 0, 0, 0.055);
   color: var(--wx-text);
   font-size: 13px;
   line-height: 1.35;
@@ -91,15 +95,24 @@
   cursor: pointer;
 }
 
-.wx-inline-button:hover {
+/* The ordinary grey button. The fill lives on this style class rather than on
+   `.wx-inline-button`, because a plain :hover / [data-theme] rule outranks the
+   bot's coloured classes (0,2,0 vs 0,1,0) and used to turn a green or blue
+   button grey under the pointer — and grey for every coloured button in dark
+   mode, white ink included. */
+.wx-inline-button--plain {
+  background: rgba(0, 0, 0, 0.055);
+}
+
+.wx-inline-button--plain:hover {
   background: rgba(0, 0, 0, 0.09);
 }
 
-[data-theme='dark'] .wx-inline-button {
+[data-theme='dark'] .wx-inline-button--plain {
   background: rgba(255, 255, 255, 0.08);
 }
 
-[data-theme='dark'] .wx-inline-button:hover {
+[data-theme='dark'] .wx-inline-button--plain:hover {
   background: rgba(255, 255, 255, 0.14);
 }
 
@@ -108,7 +121,7 @@
 }
 
 /* The bot's own button styles (TDLib buttonStyle*): a filled button keeps its
-   fill on both themes, only the default button follows the theme. */
+   fill on both themes, only the plain button follows the theme. */
 .wx-inline-button--primary {
   background: var(--wx-button-primary);
   color: #fff;
