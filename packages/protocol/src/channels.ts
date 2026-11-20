@@ -9,10 +9,9 @@ import {
   messageSchema,
   scrollAnchorSchema,
   selfSchema,
-  stickerSetSchema,
   userAvatarSchema,
-  stickerSetSummarySchema,
 } from './dto'
+import { customEmojiStickerSchema, stickerSetSchema, stickerSetSummarySchema } from './stickers'
 import {
   appInfoSchema,
   appSettingsSchema,
@@ -118,6 +117,8 @@ export const invokeChannels = [
   'media:send',
   'stickers:sets',
   'stickers:set',
+  /** Custom emoji art by entity id (Telegram Premium's inline stickers). */
+  'stickers:customEmoji',
   'ui:saveDraft',
   'ui:getDraft',
   'ui:saveAnchor',
@@ -319,6 +320,14 @@ export const invokeSchemas = {
   },
   'stickers:sets': { request: noPayload, response: z.array(stickerSetSummarySchema) },
   'stickers:set': { request: z.object({ setId: z.string().min(1) }), response: stickerSetSchema },
+  /**
+   * Up to 200 ids per call (TDLib's own limit). Unknown ids are simply absent from
+   * the answer, which the renderer draws as the base glyph.
+   */
+  'stickers:customEmoji': {
+    request: z.object({ ids: z.array(z.string().regex(/^\d+$/)).min(1).max(200) }),
+    response: z.array(customEmojiStickerSchema),
+  },
   /**
    * The draft is plain text: the composer has no formatting controls, so the
    * `entities` field that used to sit here was never sent, stored or read back —

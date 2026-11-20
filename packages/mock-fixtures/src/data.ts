@@ -1,6 +1,7 @@
 import { threadInteraction } from '@wegram/mock-session'
 import type { ChatSummary, Message, MessageMedia } from '@wegram/protocol'
 
+import { buildStressSeed } from './stress'
 import { buildCommentThread } from './threads'
 
 /**
@@ -229,7 +230,12 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
       text(2, 201, 120, 'TDLib 的登录链路已经通了', false),
       text(2, 202, 118, '那 UI 可以对着 mock 并行做', true),
       text(2, 203, 30, '贴纸三种格式记得一起做，别留到二期', false),
-      text(2, 204, 9, '虚拟列表的滚动锚定我这边先接', false),
+      {
+        // A Telegram Premium custom emoji (§8.5): the text keeps the glyph, the
+        // entity points at the ✨ TGS art both fakes serve.
+        ...text(2, 204, 9, '虚拟列表的滚动锚定我这边先接 ✨', false),
+        entities: [{ type: 'customEmoji', offset: 15, length: 1, customEmojiId: '7003' }],
+      },
       {
         id: 205,
         chatId: 2,
@@ -275,6 +281,9 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
           stickerEmoji: '✨',
           width: 128,
           height: 128,
+          // A Telegram Premium sticker (§8.5): one more file, the effect that
+          // Telegram paints once over the artwork at 1.49× its size.
+          premiumEffectFileId: 7005,
         }),
       },
       // One emoji with an animated version: Telegram draws the animated sticker
@@ -510,37 +519,8 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
     })
   }
 
-  // Stress fixture for the virtualised list (5000 messages). Its ids start at
-  // 10 000 so they never collide with the conversations above.
-  const bulk: Message[] = []
-  for (let index = 0; index < 5000; index += 1) {
-    const outgoing = index % 3 === 0
-    bulk.push({
-      id: 10_000 + index,
-      chatId: 99,
-      senderId: outgoing ? selfId : 30 + (index % 5),
-      senderName: outgoing ? '我' : '成员' + (index % 5),
-      outgoing,
-      date: at(600 - Math.floor(index / 10)),
-      kind: 'text',
-      text: '压测消息 #' + (index + 1) + '：这是一条用于验证虚拟滚动与锚定补偿的中等长度消息。',
-    })
-  }
-  fixtures.set(99, {
-    chat: {
-      id: 99,
-      title: '性能测试群 · 5000 条',
-      kind: 'group',
-      unread: 0,
-      pinned: false,
-      muted: true,
-      lastMessageText: bulk[bulk.length - 1]?.text ?? '',
-      lastMessageAt: at(0),
-      lastReadInboxMessageId: 10_000 + bulk.length - 1,
-      lastReadOutboxMessageId: 0,
-    },
-    messages: bulk,
-  })
+  // The virtualised list's 5000-message stress chat lives in `stress.ts`.
+  fixtures.set(99, buildStressSeed({ selfId, at }))
 
   return fixtures
 }

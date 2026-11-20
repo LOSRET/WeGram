@@ -2,6 +2,7 @@ import type { MessageEntity } from '@wegram/protocol'
 import { Fragment, useState, type ReactNode } from 'react'
 
 import { segmentText, type EntityAttributes } from '../lib/entities'
+import { CustomEmoji } from './CustomEmoji'
 
 interface RichTextProps {
   text: string
@@ -66,9 +67,13 @@ function wrap(entity: EntityAttributes, children: ReactNode): ReactNode {
     case 'spoiler':
       return <Spoiler>{children}</Spoiler>
     case 'customEmoji':
-      // The covered text is the base emoji glyph; rendering the actual sticker
-      // needs `getCustomEmojiStickers` and is still a gap (see HANDOFF).
-      return <span className="wx-inline-emoji">{children}</span>
+      // The covered text is the base emoji glyph. Telegram Premium draws the
+      // emoji's sticker art in its place; the glyph is the fallback.
+      return entity.customEmojiId === undefined ? (
+        <span className="wx-inline-emoji">{children}</span>
+      ) : (
+        <CustomEmoji id={entity.customEmojiId} glyph={String(children)} />
+      )
     case 'mention':
     case 'hashtag':
       return <span className="wx-entity-mention">{children}</span>

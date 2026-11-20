@@ -134,6 +134,34 @@ describe('mapContent', () => {
     })
   })
 
+  it("carries a premium sticker's effect only when TDLib says to play it", () => {
+    const premium = {
+      _: 'messageSticker',
+      is_premium: true,
+      sticker: {
+        sticker: { id: 71 },
+        format: { _: 'stickerFormatTgs' },
+        full_type: { _: 'stickerFullTypeRegular', premium_animation: { id: 72 } },
+      },
+    }
+    expect(mapContent(premium).media).toMatchObject({
+      fileId: 71,
+      stickerFormat: 'tgs',
+      premiumEffectFileId: 72,
+    })
+    // The flag is the message's "play it": a premium sticker message can arrive
+    // without it (the effect is not meant to run), so the file is dropped.
+    expect(mapContent({ ...premium, is_premium: false }).media?.premiumEffectFileId).toBeUndefined()
+    // And the animation itself may still be unknown (file id 0 is not drawable).
+    expect(
+      mapContent({
+        _: 'messageSticker',
+        is_premium: true,
+        sticker: { sticker: { id: 73 }, full_type: { _: 'stickerFullTypeRegular' } },
+      }).media?.premiumEffectFileId,
+    ).toBeUndefined()
+  })
+
   it('maps a voice note to an audio bubble', () => {
     const mapped = mapContent({
       _: 'messageVoiceNote',

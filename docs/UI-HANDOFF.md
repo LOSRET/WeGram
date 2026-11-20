@@ -309,6 +309,54 @@ because the row belongs to the transcript contract:
   the test DC) and the 48 px big emoji is then the **correct** rendering. Use ❤️ or 🎉 when
   checking the animated path against a real account.
 
+### 2.6 The premium-sticker effect (added 2026-11-20)
+
+Telegram Premium stickers are ordinary stickers plus a **second TGS** — the effect
+the official client paints over them. The measurements come from tdesktop's source,
+not from a WeChat screenshot, because the behaviour is Telegram's:
+
+- **Box = sticker × 1.49.** tdesktop's `history_view_sticker.cpp` carries
+  `kPremiumMultiplier = (1 + 0.245 * 2)` and paints the effect in a separate,
+  mouse-transparent overlay (`EffectType::PremiumSticker`), so the sparks may fly
+  past the artwork. Ours is a square of that size centred on the sticker: a 140 px
+  sticker row draws 209 × 209.
+- **Plays once per sticker instance, replays on tap.** The animation ends and stays
+  hidden (opacity transition, not an unmount) so a tap can replay it without
+  re-decoding; clicking the sticker is the trigger, exactly like tdesktop's
+  `premiumStickerClicked`.
+- **No badge in messages.** The official client marks premium stickers in the
+  picker and in sticker-set panels only; the transcript draws just the effect, so we
+  do too. (The picker mark is not implemented — no send path for premium packs yet.)
+- **It is decoration, never an error surface.** A bad or missing effect file hides
+  itself; the sticker underneath is unaffected.
+- Fixture: chat 2 (`WeGram 产品群`) message 207 — the ✨ TGS sticker plus a gold
+  spark burst (`mock-media/premium-sticker-effect.tgs`, generated in
+  `main/telegram/mock-assets.ts`). It opens at the unread divider, so scroll or hit
+  the "N 条新消息" buoy to see it play.
+- Verified in the browser preview over CDP on 2026-11-20: 209 × 209 box around a
+  140 px sticker, autoplay on appearance, replay on click, and opacity 0 after the
+  animation.
+
+### 2.7 会员自定义表情 in text (added 2026-11-20)
+
+Telegram Premium lets a message embed **custom emoji**: the text keeps the base
+glyph and a `customEmoji` entity points at sticker art. Measured on the real
+account (channel 在花🌻科技圈, 2026-11-20): every post carries them in the body or
+caption, and the app drew the bare glyph — the client draws a small sticker instead.
+
+- **20 px inside 14 px body text**, sitting 0.32 em below the baseline
+  (`.wx-custom-emoji`). The box is square because custom emoji stickers are
+  512 × 512; the line height does not change.
+- The glyph is the fallback *everywhere*: until the sticker arrives, when TDLib does
+  not know the id, and offline. Nothing is ever drawn as a hole.
+- Lookups are batched per frame and the sticker documents cached for the session —
+  a post with eight premium emoji costs one IPC call, and scrolling the row back in
+  costs none.
+- A message whose whole body is one custom emoji is a different path:
+  `messageAnimatedEmoji`, drawn at 112 px (§2.5).
+- Fixture: chat 2 (`WeGram 产品群`) message 204 carries the ✨ custom emoji; both
+  fakes answer id 7003 with the same TGS sticker.
+
 ## 3. Icon provenance (this is the part people get wrong)
 
 **Where the real artwork came from.** `C:\Program Files\Tencent\Weixin\4.2.0.13\Weixin.dll`

@@ -303,8 +303,8 @@ Anything that opens a chat also marks it read on the server — use it deliberat
 
 - The mock adapter writes its generated media to `userData/mock-media` on startup
   (`%APPDATA%\WeGram\mock-media`): `design-v3.png`, `sunset.png`, `需求说明.md`,
-  `sticker-face.webp`, `sticker-heart.webp`, `sticker-wave.tgs`. Delete that folder to
-  force regeneration.
+  `sticker-face.webp`, `sticker-heart.webp`, `sticker-wave.tgs`,
+  `premium-sticker-effect.tgs`. Delete that folder to force regeneration.
 - `-RemoteDebugPort` exposes the renderer over CDP (`http://127.0.0.1:9224/json`); that
   is how the prepend/FPS numbers above were measured without opening DevTools. rAF and
   `PerfPanel` only run while the window is actually visible, so focus it first.
@@ -644,6 +644,25 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
   with no sticker file and falls back to the glyph (kind 'text'); `updateMessageContent`
   remaps the row once the sticker lands. The glyph stays in `text`, so previews, quotes and
   复制 keep working — and the chat list shows the emoji, not a label.
+- **Custom emoji are stickers keyed by an id, not characters.** `textEntityTypeCustomEmoji`
+  carries only `custom_emoji_id`; the art comes from `getCustomEmojiStickers`, which
+  answers **in arbitrary order and only for the ids it knows** — so the response must
+  carry each id back (TDLib puts it in `full_type.custom_emoji_id`), never rely on
+  position. One call takes up to 200 ids. The entity's covered text is the base glyph,
+  which is why it stays the fallback for 复制, chat-list previews, unknown ids and
+  offline. On the real account (2026-11-20) a channel post carried six custom emoji in
+  its caption while the app drew six plain emoji — that is the symptom this fixes.
+- **A premium sticker's effect is a second file, and `is_premium` is the switch.**
+  TDLib ships the effect as `sticker.full_type.premium_animation` (a TGS) and marks the
+  message with `messageSticker.is_premium`; the mapper only carries
+  `MessageMedia.premiumEffectFileId` when both say yes, because the flag can stand while
+  the file is still unknown. The renderer draws it once at 1.49× the sticker
+  (tdesktop's `kPremiumMultiplier = 1 + 0.245 * 2`), fades it out and replays it on a tap.
+  The mock's generated effect is built from the same Lottie constructs as
+  `sticker-wave.tgs` on purpose: a first version using polystar/ellipse shapes with
+  animated position and scale parsed fine and drew **nothing** (every layer's bbox was
+  0 × 0), while rounded rects with animated opacity/rotation render as expected — keep
+  fixture TGS art to the constructs that fixture already proves.
 - **The media scheme must be CORS-enabled, or every TGS sticker fails.** `wx-media://` was
   registered with `supportFetchAPI` but without `corsEnabled`, and a renderer loaded from
   `file://` counts as another origin: Chromium refused the `fetch()` outright ("Cross origin
@@ -796,10 +815,11 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
    - **WebM stickers** are implemented (`<video>` + offscreen pause) but no fixture
      exercises them: this machine has no VP8 encoder (ffmpeg absent) and the mock only
      generates WebP/TGS. Verify with a real account or a recorded `.webm` sticker.
-   - **Custom emoji** *entities inside text* still render as their base glyph, not the
-     sticker image. Needs `getCustomEmojiStickers` plus an inline sticker cache; the
-     rendering seam (`RichText`'s `customEmoji` case) is already there. A message that is
-     one custom emoji is not part of this gap: TDLib reports it as `messageAnimatedEmoji`
+   - ~~**Custom emoji** *entities inside text* still render as their base glyph~~ —
+     **done 2026-11-20**: `stickers:customEmoji` (`getCustomEmojiStickers`), batched
+     lookups cached in `renderer/lib/customEmoji.ts`, drawn by `components/CustomEmoji`
+     at 20 px inside 14 px text with the glyph as the fallback. A message that is one
+     custom emoji is not part of this path: TDLib reports it as `messageAnimatedEmoji`
      and it already renders as its sticker (kind 'emoji').
    - Media is sent immediately after the picker; no caption dialog and no album
      *sending* (received albums are grouped into one bubble now, design doc §8.6),
@@ -810,6 +830,9 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
      still unused, so nothing bounds the disk usage yet.
    - Sticker panel only lists regular installed sets; no search/trending, no "recent".
      A set cover whose thumbnail is MPEG4 would render as a broken `<img>` (rare).
+   - Premium stickers play their effect in messages, but the picker draws no premium
+     mark (the official client does), and sending one without a Premium subscription is
+     left to TDLib's error.
    - `updateMessageContent`/`updateNewMessage` are mapped, but `updateMessageSendSucceeded`
      is not handled separately; message ids are server ids already, so it is cosmetic.
    - Search (global + in-chat) is W4 even though the adapter methods exist.

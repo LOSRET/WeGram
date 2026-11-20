@@ -171,6 +171,7 @@ export function createHandlers({
     'messages:sendSticker': (payload) => adapter.sendSticker(payload),
     'stickers:sets': () => adapter.listStickerSets(),
     'stickers:set': (payload) => adapter.getStickerSet(payload.setId),
+    'stickers:customEmoji': (payload) => adapter.customEmojiStickers(payload.ids),
 
     'ui:saveDraft': (payload) => {
       uiDb.saveDraft(

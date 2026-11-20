@@ -61,6 +61,17 @@
   line-height: 1;
 }
 
+/* A Telegram Premium custom emoji: its sticker art drawn inline, replacing the
+   base glyph that the fallback above still shows. The box is 20 px inside 14 px
+   body text, so it hangs slightly below the baseline and takes the glyph's place
+   without changing the line height (line-height: 0 on the box). */
+.wx-custom-emoji {
+  display: inline-block;
+  vertical-align: -0.32em;
+  line-height: 0;
+  margin: 0 0.5px;
+}
+
 /* Telegram emoji-only messages render as a large glyph without a bubble,
    the way WeChat shows big emoji. */
 .wx-big-emoji {

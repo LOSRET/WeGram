@@ -43,6 +43,9 @@ longer load in one go):
 | `chat-pane/useChatHistory.ts` (557) | `useChatHistory.ts` + `history/`: `readFirstPage`, `types`, `useLocateRequest`, `usePrefetchOlder`, `usePaging` |
 | `telegram/mock.ts` (1122) | `mock/`: `index` (adapter), `fixtures`, `assets` (MockAssets), `avatars` (MockAvatars), `traffic`, `constants` |
 | `tdlib/actions.ts` (606) | `tdlib/actions/`: `chats`, `history`, `files`, `send`, `search`, `deps`; `index.ts` re-exports (import path `./actions` unchanged) |
+| `protocol/dto.ts` at its cap (custom-emoji channel, 2026-11-20) | `protocol/stickers.ts`: format enum, `Sticker`, sticker sets, `CustomEmojiSticker`; `messageMediaSchema` stays in `dto.ts` and imports the format |
+| `mock-fixtures/data.ts` at its cap (custom-emoji fixture, 2026-11-20) | `stress.ts`: the 5000-message chat 99 as `buildStressSeed`; `data.ts` calls it |
+| `tdlib/index.ts` at its cap (custom-emoji channel, 2026-11-20) | `tdlib/map/resolvers.ts`: `createResolvers` (cached `getUser`/`getChat` lookups) over the adapter's maps |
 
 Behaviour was not changed: every doc comment moved with its code, no channel/DTO/`wx-*`
 name was touched, and no scroll timing was rewritten. New pure tests: `viewerMenu`,

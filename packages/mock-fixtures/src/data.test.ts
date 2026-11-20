@@ -28,6 +28,23 @@ describe('the fake account', () => {
     })
   })
 
+  it('carries one premium sticker message, with its effect file', () => {
+    const message = seeds.get(2)?.messages.find((item) => item.id === 207)
+    expect(message).toMatchObject({
+      kind: 'sticker',
+      media: { fileId: 7003, premiumEffectFileId: 7005 },
+    })
+  })
+
+  it('carries one custom emoji entity, with its base glyph still in the text', () => {
+    const message = seeds.get(2)?.messages.find((item) => item.id === 204)
+    const text = message?.text ?? ''
+    expect(text.endsWith('✨')).toBe(true)
+    expect(message?.entities).toEqual([
+      { type: 'customEmoji', offset: text.length - 1, length: 1, customEmojiId: '7003' },
+    ])
+  })
+
   it('carries comment counts on the posts and the threads beside them', () => {
     const group = seeds.get(2)
     const post = group?.messages.find((message) => message.id === 203)

@@ -20,15 +20,20 @@ export function mediaUrls(
   file: TdObject | undefined,
   thumb?: TdObject | undefined,
 ): { localUrl?: string; thumbUrl?: string } {
-  const localUrl = localUrlOf(file)
-  const thumbUrl = localUrlOf(thumb)
+  const localUrl = mediaFileUrl(file)
+  const thumbUrl = mediaFileUrl(thumb)
   return {
     ...(localUrl ? { localUrl } : {}),
     ...(thumbUrl ? { thumbUrl } : {}),
   }
 }
 
-function localUrlOf(file: TdObject | undefined): string | undefined {
+/**
+ * `wx-media://` for a file TDLib has already downloaded. Shared with the sticker
+ * mapper, whose premium effect is a *second* file that rides in its own DTO field
+ * instead of `localUrl`/`thumbUrl`.
+ */
+export function mediaFileUrl(file: TdObject | undefined): string | undefined {
   const local = file?.local
   if (!local?.is_downloading_completed) return undefined
   if (typeof local.path !== 'string' || local.path.length === 0) return undefined

@@ -50,7 +50,7 @@ describe('mapEntities', () => {
       type: 'customEmoji',
       offset: 12,
       length: 1,
-      customEmojiId: 900,
+      customEmojiId: '900',
     })
   })
 

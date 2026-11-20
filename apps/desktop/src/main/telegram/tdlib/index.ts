@@ -4,6 +4,7 @@ import type {
   ChatSummary,
   ConnectionState,
   Contact,
+  CustomEmojiSticker,
   Message,
   ProxyConfig,
   ProxyTestResult,
@@ -24,6 +25,7 @@ import { AvatarCache } from './avatar-cache'
 import { configureTdlib, safeVersion } from './client'
 import type { TdClientLike, TdObject } from './client'
 import type { MapperContext } from './map/context'
+import { createResolvers } from './map/resolvers'
 import { mapChat } from './map/chat'
 import { mapUser } from './map/user'
 import { applyProxy, setProxy as applyProxyConfig, testProxy as testProxyConfig } from './proxy'
@@ -73,6 +75,13 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   /** Our own user id, learnt from `getMe`; drives the rail avatar. */
   private selfUserId: number | null = null
 
+  /** Cached name/title lookups; built from the two maps above. */
+  private readonly resolvers = createResolvers({
+    invoke: (method) => this.invoke(method),
+    userNames: this.userNames,
+    chatTitles: this.chatTitles,
+  })
+
   private readonly avatars: AvatarCache
   private readonly mapper: MapperContext
   private readonly actionDeps: ActionDeps
@@ -106,8 +115,8 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
       chatAvatarUrls: this.avatars.urls,
       userAvatarUrls: this.avatars.userUrls,
       stickerSizes: this.stickerSizes,
-      resolveUserName: (userId) => this.resolveUserName(userId),
-      resolveChatTitle: (chatId) => this.resolveChatTitle(chatId),
+      resolveUserName: (userId) => this.resolvers.resolveUserName(userId),
+      resolveChatTitle: (chatId) => this.resolvers.resolveChatTitle(chatId),
       prefetchUserAvatars: (userIds) => this.avatars.prefetchUsers(userIds),
       resolveFullRichMessage: async (chatId, messageId) => {
         try {
@@ -485,40 +494,19 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     )
   }
 
+  async customEmojiStickers(ids: string[]): Promise<CustomEmojiSticker[]> {
+    return stickers.listCustomEmojiStickers(
+      { invoke: (method) => this.invoke(method), mapper: this.mapper },
+      ids,
+    )
+  }
+
   async setProxy(config: ProxyConfig | null): Promise<void> {
     return applyProxyConfig(this.proxyDeps, config)
   }
 
   async testProxy(config: ProxyConfig): Promise<ProxyTestResult> {
     return testProxyConfig(this.proxyDeps, config)
-  }
-
-  private async resolveUserName(userId: number): Promise<string> {
-    const cached = this.userNames.get(userId)
-    if (cached) return cached
-    try {
-      const user = await this.invoke({ _: 'getUser', user_id: userId })
-      const name = mapUser(user)
-      const label =
-        [name.firstName, name.lastName].filter(Boolean).join(' ') || name.username || '未知'
-      this.userNames.set(userId, label)
-      return label
-    } catch {
-      return '未知'
-    }
-  }
-
-  private async resolveChatTitle(chatId: number): Promise<string> {
-    const cached = this.chatTitles.get(chatId)
-    if (cached) return cached
-    try {
-      const chat = await this.invoke({ _: 'getChat', chat_id: chatId })
-      const title: string = chat?.title ?? ''
-      if (title) this.chatTitles.set(chatId, title)
-      return title || '未知'
-    } catch {
-      return '未知'
-    }
   }
 
   private async invoke(method: TdObject): Promise<any> {
@@ -546,4 +534,3 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     return this.connection === 'online'
   }
 }
-

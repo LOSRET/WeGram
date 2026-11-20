@@ -3,7 +3,7 @@ import type { Message, MessageEntity, RichBlock } from '@wegram/protocol'
 import type { TdObject } from '../client'
 import { asArray } from '../json'
 import { mapEntities } from './entities'
-import { documentMedia, mediaUrls, photoMedia, videoMedia, voiceMedia } from './media'
+import { documentMedia, mediaFileUrl, mediaUrls, photoMedia, videoMedia, voiceMedia } from './media'
 import { mapRichMessage, richPreview } from './rich'
 import { mapStickerFormat } from './sticker'
 
@@ -63,6 +63,13 @@ export function mapContent(content: TdObject): {
     }
     case 'messageSticker': {
       const sticker = content.sticker ?? {}
+      // A Telegram Premium sticker ships a second TGS — the effect Telegram plays
+      // over the sticker (TDLib `stickerFullTypeRegular.premium_animation`).
+      // `is_premium` is the message's "play it" flag, and it can stand while the
+      // effect file is still unknown, so both must agree before it travels.
+      const effect = content.is_premium === true ? sticker.full_type?.premium_animation : undefined
+      const effectFileId = Number(effect?.id ?? 0)
+      const effectUrl = mediaFileUrl(effect)
       return {
         kind: 'sticker',
         text: '',
@@ -74,6 +81,12 @@ export function mapContent(content: TdObject): {
           ...(sticker.emoji ? { stickerEmoji: sticker.emoji } : {}),
           ...(sticker.width ? { width: sticker.width } : {}),
           ...(sticker.height ? { height: sticker.height } : {}),
+          ...(effectFileId > 0
+            ? {
+                premiumEffectFileId: effectFileId,
+                ...(effectUrl ? { premiumEffectUrl: effectUrl } : {}),
+              }
+            : {}),
           ...mediaUrls(sticker.sticker, sticker.thumbnail?.file),
         },
       }

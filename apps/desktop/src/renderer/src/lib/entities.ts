@@ -4,7 +4,8 @@ export interface EntityAttributes {
   type: MessageEntity['type']
   url?: string
   language?: string
-  customEmojiId?: number
+  /** TDLib int64, kept as a string (see `MessageEntity.customEmojiId`). */
+  customEmojiId?: string
 }
 
 export interface TextSegment {

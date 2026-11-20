@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { MapperContext } from './map/context'
-import { getStickerSet, listStickerSets } from './stickers'
+import { getStickerSet, listCustomEmojiStickers, listStickerSets } from './stickers'
 
 function mapper(): MapperContext {
   return {
@@ -82,6 +82,55 @@ describe('listStickerSets tab icon', () => {
       deps({ sets: [{ id: 13, title: '贴吧', covers: [{ sticker: { id: 0 } }] }] }),
     )
     expect(sets).toEqual([{ id: '13', title: '贴吧' }])
+  })
+})
+
+describe('listCustomEmojiStickers', () => {
+  it('pairs each sticker with the id its own full_type carries', async () => {
+    const stickers = await listCustomEmojiStickers(
+      deps({
+        stickers: [
+          {
+            sticker: { id: 501 },
+            format: { _: 'stickerFormatTgs' },
+            width: 512,
+            height: 512,
+            full_type: {
+              _: 'stickerFullTypeCustomEmoji',
+              // Real custom emoji ids are int64 and outgrow Number.MAX_SAFE_INTEGER.
+              custom_emoji_id: '5909018290759408000',
+              needs_repainting: false,
+            },
+          },
+          // An id TDLib does not know comes back without a full_type; it is dropped.
+          { sticker: { id: 0 }, format: { _: 'stickerFormatWebp' } },
+        ],
+      }),
+      ['5909018290759408000', '1'],
+    )
+
+    expect(stickers).toEqual([
+      {
+        customEmojiId: '5909018290759408000',
+        sticker: { fileId: 501, format: 'tgs', width: 512, height: 512 },
+      },
+    ])
+  })
+
+  it('asks TDLib for nothing when there are no ids', async () => {
+    let called = false
+    const stickers = await listCustomEmojiStickers(
+      {
+        invoke: () => {
+          called = true
+          return Promise.resolve({})
+        },
+        mapper: mapper(),
+      },
+      [],
+    )
+    expect(stickers).toEqual([])
+    expect(called).toBe(false)
   })
 })
 

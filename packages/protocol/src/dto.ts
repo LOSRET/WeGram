@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { stickerFormatSchema } from './stickers'
+
 /**
  * Domain DTOs shared by main and renderer.
  *
@@ -108,7 +110,12 @@ export const messageEntitySchema = z.object({
   length: z.number().int().positive(),
   url: z.string().optional(),
   language: z.string().optional(),
-  customEmojiId: z.number().int().optional(),
+  /**
+   * The custom emoji's id (TDLib int64), as a **string**: real ids exceed
+   * `Number.MAX_SAFE_INTEGER` (measured 2026-11-20: 5909018290759408000), so a
+   * number would silently round the id and never match the sticker.
+   */
+  customEmojiId: z.string().optional(),
 })
 export type MessageEntity = z.infer<typeof messageEntitySchema>
 
@@ -120,10 +127,6 @@ export type MessageEntity = z.infer<typeof messageEntitySchema>
  * from the mock adapter). The renderer never receives a filesystem path and never
  * loads `file://`, which also keeps the browser preview working.
  */
-/** The three sticker formats the client renders (design doc §9.4). */
-export const stickerFormatSchema = z.enum(['webp', 'tgs', 'webm'])
-export type StickerFormat = z.infer<typeof stickerFormatSchema>
-
 export const messageMediaSchema = z.object({
   fileId: z.number().int(),
   thumbFileId: z.number().int().optional(),
@@ -145,6 +148,15 @@ export const messageMediaSchema = z.object({
    * fetched on the first click, so an emoji the reader never taps costs no download.
    */
   soundFileId: z.number().int().optional(),
+  /**
+   * A Telegram Premium sticker's effect (TDLib `stickerFullTypeRegular.premium_animation`,
+   * a TGS file). It is a second file, drawn once over the sticker when the message
+   * appears — the official client's behaviour. Present only when TDLib also set
+   * `messageSticker.is_premium`, i.e. when the effect is meant to play.
+   */
+  premiumEffectFileId: z.number().int().optional(),
+  /** `wx-media://` URL of an effect TDLib already downloaded (see above). */
+  premiumEffectUrl: z.string().optional(),
   fileName: z.string().optional(),
   size: z.number().int().optional(),
   localUrl: z.string().optional(),
@@ -181,38 +193,6 @@ export const contactCardSchema = z.object({
   userId: z.number().int().optional(),
 })
 export type ContactCard = z.infer<typeof contactCardSchema>
-
-/** One sticker from a set (design doc §9.4: WebP / TGS / WebM). */
-export const stickerSchema = z.object({
-  fileId: z.number().int(),
-  format: stickerFormatSchema,
-  emoji: z.string().optional(),
-  width: z.number().int().optional(),
-  height: z.number().int().optional(),
-  /** Static WebP/JPEG preview, used for grids so animations stay cheap. */
-  thumbFileId: z.number().int().optional(),
-  /** Format of `thumbFileId`; see `MessageMedia.stickerThumbFormat`. */
-  thumbFormat: stickerFormatSchema.optional(),
-})
-export type Sticker = z.infer<typeof stickerSchema>
-
-export const stickerSetSummarySchema = z.object({
-  /** TDLib ids are int64, so they cross IPC as strings. */
-  id: z.string(),
-  title: z.string(),
-  /**
-   * The tab's picture: the set's own cover when TDLib has one, else its first
-   * sticker (the installed list ships `covers`). Absent only when neither exists,
-   * and then the picker shows two characters of the title instead.
-   */
-  thumbnail: stickerSchema.optional(),
-})
-export type StickerSetSummary = z.infer<typeof stickerSetSummarySchema>
-
-export const stickerSetSchema = stickerSetSummarySchema.extend({
-  stickers: z.array(stickerSchema),
-})
-export type StickerSet = z.infer<typeof stickerSetSchema>
 
 /**
  * A run of text with the entities that style it (bold, links, mentions…). The

@@ -5,6 +5,7 @@ import type {
   AppInfo,
   ChatSummary,
   Contact,
+  CustomEmojiSticker,
   Message,
   MessageMedia,
   Self,
@@ -45,6 +46,15 @@ function face(id: number): string {
 /** A real gzip'd Lottie file, so the TGS path is exercised in the browser. */
 const PREVIEW_TGS =
   'data:application/gzip;base64,H4sIAGBJ+2oC/6VT226DMAz9Fz9HyIxLKb8y8ZBxKxoUlrB2COXfZyfRGB172SSIybF9jh2HFW6QQxKcghgENAryCAV0E+RkRjJnsnfIw6dMwMXb60A5d3mrWyUHSquqysZLretZQ/5cCOjlUiv+Xr/c3ZVsKGBeII89i36jfK0s/krhK4y8SAfY9NkmM1WISMwdB3zQFoOYtgs7CiNcosNTj2NhjLAMceIoouSvDOdvRRiOVr8Xiv8ViVIvMnkRdCJpLOhB9si9BwU6XO9xKlf4l1VAX+RUu7nwHKBVNIBu3gBV8kRtW/pA/KAoL6x2aJgZP2JVlzPY/pi+6Ym+fCAIMBIYnFJaokxsx7SxITqF0JM2Xd9vpDM3cVyVPESPD+lnF3hYiSl8Fa0a3yfg7cMfo91deBmYojCfs22fcmYDAAA='
+
+/**
+ * The premium sticker's effect, as a data URL: the same gzip'd Lottie file the
+ * mock writes to `premium-sticker-effect.tgs` (main/telegram/mock-assets.ts,
+ * generated there once). Duplicated instead of shared because the mock owns real
+ * files and the preview owns URLs — the account data only names file ids.
+ */
+const PREVIEW_PREMIUM_EFFECT =
+  'data:application/gzip;base64,H4sIAAAAAAACCu2ZbY+bMAyA/4s/e8gh4aX5Kyc+cC3coSstCty2quK/nxLoVe1lEmWatGX+kLbYxHZenprgM3wHDUmURQoQagNaEkLTgSaEYwda5Qg/QCciRnidvw8taOhM1Tbv7beqrqvtAAi73c71Kvu+GnrQTwXCvjxVxv4+f6qbww60QBhOoNVsq+9K80aA0Bune+tBn+FoP8pJ4EwMzoA1RwVCY9U/7UWkCoQT6CdRjDh1m+TpLKdiHNH1z6b+glZbUPElhNHea/5AkHbOXZTJ7KSbndDkRKUK4yRFsrryVkdIk7y/lQsinJv1A/1r2VXTytiVgBcD82K8mON7BwjNcNWarV1gN8o7u1KhVJ4Y5yjMjXQzzj6M3TJutNZ6vQeE7V28SFGeIEUKrxP2qRZEk3ExG6yb/f5qcLCD8QdUeqX+yfo6APpFJC6GwZSHvj6aFsZiLL5Q1E8747l1Zu6AiD1ACAZiKRAk0TYGIhggpAeImIFYCITNDjZLMBDBAKE8QEgGYiEQgjacIcICIvEAoRiIpY9MOR8hwuIh9fCQMA8PJAjbGIhggMg8QKQMxCNHiJx5CIeH3MNDxjw88I6JE0RQQGzWViHS39xrQoZARELpX3OGEDmKfCkRyWNEbFKkKMv/CyQErS1EMBPunzkXqDLJTITEhFhbi2Am3IpJZiI4JuK15QhmwjrhJ6fgiJBr6xFMxCVLyA0jERISam1JgpG4HCYYiX8aiWL8ACY4TQJiKwAA'
 
 /**
  * The preview's media, keyed by the *same* file ids the mock's assets use.
@@ -101,6 +111,8 @@ export function previewFiles(): Record<number, string> {
     7002: stickerSvg('❤️', '#FF9F43'),
     7003: PREVIEW_TGS,
     7004: beepWav(),
+    // The premium sticker's effect (§8.5): a second file, fetched lazily.
+    7005: PREVIEW_PREMIUM_EFFECT,
     7101: svgUrl(1200, 800, '#22427c', '#eca860'),
     7102: svgUrl(900, 1200, '#faaa46', '#5a1e6e'),
     7201: 'data:text/markdown;utf8,%23%20%E9%9C%80%E6%B1%82%E8%AF%B4%E6%98%8E%0A%0A-%20%E5%AA%92%E4%BD%93%E6%94%B6%E5%8F%91',
@@ -231,6 +243,17 @@ export const PREVIEW_STICKERS: Sticker[] = [
   { fileId: 7002, format: 'webp', emoji: '❤️', width: 128, height: 128, thumbFileId: 7002 },
   { fileId: 7003, format: 'tgs', emoji: '✨', width: 128, height: 128 },
 ]
+
+/**
+ * Custom emoji art by entity id. The fixture uses one `customEmoji` entity whose
+ * id is the ✨ TGS sticker's own file id; the preview answers it like TDLib would.
+ */
+export function previewCustomEmoji(ids: string[]): CustomEmojiSticker[] {
+  return ids.flatMap((customEmojiId) => {
+    const sticker = PREVIEW_STICKERS.find((item) => String(item.fileId) === customEmojiId)
+    return sticker ? [{ customEmojiId, sticker }] : []
+  })
+}
 
 export function previewStickerSet(): StickerSet {
   return {

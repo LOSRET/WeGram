@@ -9,6 +9,7 @@ import { registerMediaFile } from '../../media/registry'
 import type { MockFile } from './constants'
 import {
   SAMPLE_VIDEO_WEBM,
+  PREMIUM_EFFECT_TGS,
   STICKER_FACE_WEBP,
   STICKER_HEART_WEBP,
   STICKER_WAVE_TGS,
@@ -25,6 +26,8 @@ import {
 export class MockAssets {
   readonly files = new Map<number, MockFile>()
   readonly stickers: Sticker[] = []
+  /** Custom emoji: the id a text entity carries → the sticker it draws. */
+  readonly customEmojis = new Map<string, Sticker>()
   /** Generated avatar for the rail, so the mock exercises the real image path. */
   selfAvatarUrl: string | null = null
 
@@ -47,6 +50,8 @@ export class MockAssets {
     await writeFile(heartPath, Buffer.from(STICKER_HEART_WEBP, 'base64'))
     const wavePath = join(mediaDir, 'sticker-wave.tgs')
     await writeFile(wavePath, Buffer.from(STICKER_WAVE_TGS, 'base64'))
+    const premiumPath = join(mediaDir, 'premium-sticker-effect.tgs')
+    await writeFile(premiumPath, Buffer.from(PREMIUM_EFFECT_TGS, 'base64'))
     const clipPath = join(mediaDir, 'sample-video.webm')
     await writeFile(clipPath, Buffer.from(SAMPLE_VIDEO_WEBM, 'base64'))
     const clickPath = join(mediaDir, 'emoji-click.wav')
@@ -59,6 +64,8 @@ export class MockAssets {
     this.addFile(7001, facePath, '笑脸贴纸', 'image/webp', 128, 128)
     this.addFile(7002, heartPath, '爱心贴纸', 'image/webp', 128, 128)
     this.addFile(7003, wavePath, '旋转贴纸', 'application/gzip', 128, 128)
+    // The premium sticker's effect: a second file, like the real one.
+    this.addFile(7005, premiumPath, '会员贴纸特效', 'application/gzip', 512, 512)
     this.addFile(7101, designPath, 'design-v3.png', 'image/png', 1200, 800)
     this.addFile(7102, sunsetPath, 'sunset.png', 'image/png', 900, 1200)
     this.addFile(7201, specPath, '需求说明.md', 'text/markdown')
@@ -72,6 +79,11 @@ export class MockAssets {
       { fileId: 7002, format: 'webp', emoji: '❤️', width: 128, height: 128, thumbFileId: 7002 },
       { fileId: 7003, format: 'tgs', emoji: '✨', width: 128, height: 128 },
     )
+    // One custom emoji for the fixture transcript. The entity's id is the same
+    // number as the sticker file it draws (7003, the ✨ TGS); the fixture data in
+    // @wegram/mock-fixtures names it, and this is the art it resolves to.
+    const customEmoji = this.stickers.find((sticker) => sticker.fileId === 7003)
+    if (customEmoji) this.customEmojis.set('7003', customEmoji)
   }
 
   addFile(

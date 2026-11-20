@@ -6,9 +6,11 @@ Scope: the demo account both fakes serve — the Electron mock adapter
 
 ## What belongs here
 
-- `data.ts` — `buildFixtureSeeds`: chats 1–11 and the 5000-message stress chat 99,
-  their messages (albums, stickers, a channel post, the 通讯录 people), comment
+- `data.ts` — `buildFixtureSeeds`: chats 1–11, their messages (albums, stickers,
+  one premium sticker, one custom emoji, a channel post, the 通讯录 people), comment
   threads on the posts that own one, and the contact fields the address book reads.
+- `stress.ts` — the 5000-message stress chat 99 for the virtualised list. Split out
+  of `data.ts` when the custom-emoji fixture pushed it to its 550-line budget.
 - `threads.ts` — the comment authors, bodies and the id formula
   (`900 000 + messageId × 100 + index`), so a thread can never collide with a
   transcript id.

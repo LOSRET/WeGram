@@ -31,7 +31,8 @@ export function mapEntities(rawEntities: TdObject[] | undefined): MessageEntity[
       length: raw.length ?? 0,
       ...(raw.url ? { url: raw.url } : {}),
       ...(raw.language ? { language: raw.language } : {}),
-      ...(raw.type?.custom_emoji_id ? { customEmojiId: raw.type.custom_emoji_id } : {}),
+      // TDLib int64: keep it as the string tdl hands over, or the id rounds.
+      ...(raw.type?.custom_emoji_id ? { customEmojiId: String(raw.type.custom_emoji_id) } : {}),
     })
   }
   return result

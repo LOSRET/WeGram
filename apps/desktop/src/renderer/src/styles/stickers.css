@@ -1,8 +1,35 @@
 /* ---------- Stickers ---------- */
 
 .wx-sticker-wrap {
+  /* A premium sticker's effect is absolutely positioned inside this box; without
+     a containing block here it would centre on the nearest positioned ancestor
+     (the message row) and miss the artwork. */
+  position: relative;
   padding: 2px;
   line-height: 0;
+}
+
+/* A Telegram Premium sticker's effect (TDLib full_type.premium_animation): the
+   TGS the client paints 1.49× around the sticker, over it, once. It is decoration
+   — pointer-events stay off so the tap that replays it reaches the sticker — and
+   it fades itself out when the animation ends. */
+.wx-sticker-effect {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+}
+
+.wx-sticker-effect--done {
+  opacity: 0;
+}
+
+.wx-sticker-effect__art {
+  width: 100%;
+  height: 100%;
 }
 
 /* A single-emoji message: Telegram's animated sticker on the wallpaper, no bubble.

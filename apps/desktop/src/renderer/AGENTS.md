@@ -21,7 +21,8 @@ components/message-list/  virtualiser + MessageRow + Divider + the scroll hooks:
                          RichMessage (page blocks), ContactCard (vCards), InlineButtons,
                          CommentBar (评论 N 条 handle, §9.8), ChannelMeta (a channel post's
                          views/time footer; the one-bubble channel composition is
-                         styles/channel.css)
+                         styles/channel.css), PremiumStickerEffect (a Premium sticker's
+                         second TGS, painted once at 1.49× the sticker and replayed on tap)
 components/chat-pane/     render tree + useChatHistory (history/ modules) + messageActions +
                          CommentPanel (full-pane discussion view, slides in from the right;
                          chat-style rows + the composer card, posts via messages:sendComment;
@@ -36,6 +37,8 @@ components/viewer/        the 图片和视频 window: MediaViewer shell + useVie
                          useViewerZoom + ViewerToolbar / ViewerGrid + viewerMenu / viewerActions
 components/Avatar.tsx    the ONE avatar box (photo or initials); the box class it is given
                         is the positioned element, which is the rule that once cost a session
+components/CustomEmoji.tsx  a Premium custom emoji in text: its sticker art at 20 px,
+                        with the base glyph as the fallback
 components/SearchField.tsx  the ONE search pill (label + input + optional trailing control)
 components/           the remaining visual concerns (Composer, MediaBubble, …)
 lib/ipc.ts            thin `window.tg` wrapper
@@ -61,6 +64,10 @@ lib/viewer.ts         which messages become one viewer strip (pure, unit-tested)
 lib/player.ts         video player-bar maths: clocks, seek clamp, progress (pure, unit-tested)
 lib/tgs.ts            gzip guards + Lottie decode cache
 lib/stickerMedia.ts   Sticker → MessageMedia (shared by the picker and the preview)
+lib/customEmoji.ts    custom emoji ids → sticker art: one batched lookup per frame,
+                      cached for the session (chunkIds is pure, tested)
+lib/stickerBox.ts     (pure, unit-tested) the on-screen sticker box + the 1.49× effect box
+lib/useInView.ts      the visibility gate a sticker and its effect share (geometry first)
 lib/preview-bridge.ts DEV-ONLY entry point (re-exports lib/preview)
 lib/preview/          browser-preview session + invoke switch (index.ts); fixtures.ts is a
                       thin adapter over @wegram/mock-fixtures (data: URLs + gradient faces)

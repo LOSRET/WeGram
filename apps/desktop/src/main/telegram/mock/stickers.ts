@@ -1,5 +1,5 @@
 import { AppError } from '@wegram/protocol'
-import type { StickerSet, StickerSetSummary } from '@wegram/protocol'
+import type { CustomEmojiSticker, StickerSet, StickerSetSummary } from '@wegram/protocol'
 
 import type { MockAssets } from './assets'
 import { MOCK_STICKER_SET_ID } from './constants'
@@ -21,6 +21,14 @@ export function listMockStickerSets(assets: MockAssets): StickerSetSummary[] {
       ...(cover ? { thumbnail: cover } : {}),
     },
   ]
+}
+
+/** Custom emoji art for the ids the fixture account names. */
+export function listMockCustomEmoji(assets: MockAssets, ids: string[]): CustomEmojiSticker[] {
+  return ids.flatMap((customEmojiId) => {
+    const sticker = assets.customEmojis.get(customEmojiId)
+    return sticker ? [{ customEmojiId, sticker }] : []
+  })
 }
 
 export function getMockStickerSet(assets: MockAssets, setId: string): StickerSet {

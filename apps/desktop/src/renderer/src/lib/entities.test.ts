@@ -86,9 +86,12 @@ describe('segmentText', () => {
   })
 
   it('keeps a custom-emoji id so the renderer can swap in the sticker', () => {
+    // int64 ids outgrow Number.MAX_SAFE_INTEGER, so they travel as strings.
     const [segment] = segmentText('x', [
-      { type: 'customEmoji', offset: 0, length: 1, customEmojiId: 5368324170671202286 },
+      { type: 'customEmoji', offset: 0, length: 1, customEmojiId: '5368324170671202286' },
     ])
-    expect(segment?.entities).toEqual([{ type: 'customEmoji', customEmojiId: 5368324170671202286 }])
+    expect(segment?.entities).toEqual([
+      { type: 'customEmoji', customEmojiId: '5368324170671202286' },
+    ])
   })
 })

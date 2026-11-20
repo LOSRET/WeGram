@@ -9,6 +9,7 @@ import type {
   ChatSummary,
   ConnectionState,
   Contact,
+  CustomEmojiSticker,
   Message,
   MessageMedia,
   ProxyConfig,
@@ -36,7 +37,7 @@ import {
 import { applyRead, simulateTransfer } from './effects'
 import { buildFixtures } from './fixtures'
 import { searchChats, searchMessages } from './search'
-import { getMockStickerSet, listMockStickerSets } from './stickers'
+import { getMockStickerSet, listMockCustomEmoji, listMockStickerSets } from './stickers'
 import { emitTraffic } from './traffic'
 import { appendMessage, outgoingMessage } from './transcript'
 
@@ -385,6 +386,10 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
 
   async getStickerSet(setId: string): Promise<StickerSet> {
     return getMockStickerSet(this.assets, setId)
+  }
+
+  async customEmojiStickers(ids: string[]): Promise<CustomEmojiSticker[]> {
+    return listMockCustomEmoji(this.assets, ids)
   }
 
   async editText(input: { chatId: number; messageId: number; text: string }): Promise<Message> {

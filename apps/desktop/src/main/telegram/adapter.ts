@@ -4,6 +4,7 @@ import type {
   ChatSummary,
   ConnectionState,
   Contact,
+  CustomEmojiSticker,
   Message,
   MessageOp,
   ProxyConfig,
@@ -167,6 +168,11 @@ export interface TelegramAdapter {
 
   listStickerSets(): Promise<StickerSetSummary[]>
   getStickerSet(setId: string): Promise<StickerSet>
+  /**
+   * Custom emoji (Telegram Premium's inline sticker art) by the id its text
+   * entity carries. Ids TDLib does not know are left out of the answer.
+   */
+  customEmojiStickers(ids: string[]): Promise<CustomEmojiSticker[]>
 
   searchGlobal(input: InvokeRequest<'search:global'>): Promise<ChatSummary[]>
   searchInChat(input: InvokeRequest<'search:inChat'>): Promise<Message[]>

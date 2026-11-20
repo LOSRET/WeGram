@@ -1,11 +1,13 @@
 import type { MessageMedia } from '@wegram/protocol'
 import lottie, { type AnimationItem } from 'lottie-web'
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { playEmojiSound } from '../lib/emojiSound'
 import { progressRatio, useFileProgress, useMediaUrl } from '../lib/media'
+import { stickerBox } from '../lib/stickerBox'
 import { resolveStickerFormat } from '../lib/stickerFormat'
 import { loadTgsAnimation, markTgsFailure } from '../lib/tgs'
+import { useInView } from '../lib/useInView'
 
 interface StickerRendererProps {
   media: MessageMedia
@@ -26,6 +28,11 @@ interface StickerRendererProps {
    * a transcript of forever-looping emoji would read as noise.
    */
   playback?: 'loop' | 'once'
+  /**
+   * Smallest side in px. Only inline custom emoji go below the picker's 24 px
+   * floor, because they are drawn inside a line of text.
+   */
+  minSize?: number
 }
 
 /**
@@ -45,19 +52,14 @@ export function StickerRenderer({
   size = 120,
   preview = false,
   playback = 'loop',
+  minSize,
 }: StickerRendererProps) {
   const [ref, view] = useInView<HTMLDivElement>()
   const once = playback === 'once'
   /** Bumped by a tap; the artwork component replays the animation from frame 0. */
   const [replay, setReplay] = useState(0)
 
-  const width = media.width ?? 128
-  const height = media.height ?? 128
-  const scale = Math.min(size / width, size / height)
-  const box = {
-    width: Math.max(24, Math.round(width * scale)),
-    height: Math.max(24, Math.round(height * scale)),
-  }
+  const box = stickerBox(media, size, minSize)
 
   // A sticker's thumbnail is a still frame (TDLib serves it as a WebP even for an
   // animated sticker); it is a separate file from the sticker itself.
@@ -290,60 +292,4 @@ function WebmSticker({ url, box, label, active, once, replay }: AnimatedProps) {
       }}
     />
   )
-}
-
-/** How far outside the viewport a cell still counts as "about to be read". */
-const PRELOAD_PX = 200
-
-interface InView {
-  /** On screen right now — it decides whether an animation plays. */
-  visible: boolean
-  /** Latched: once seen, the download may stay; it stays even after scrolling away. */
-  armed: boolean
-}
-
-/**
- * Visibility gate for one cell. `rootMargin` preloads a screen ahead so a sticker
- * does not visibly start from nothing when it scrolls into view.
- */
-function useInView<T extends Element>(): [RefObject<T | null>, InView] {
-  const ref = useRef<T | null>(null)
-  const [state, setState] = useState<InView>({ visible: false, armed: false })
-
-  useEffect(() => {
-    const node = ref.current
-    if (!node) return
-
-    const apply = (onScreen: boolean): void => {
-      setState((current) =>
-        current.visible === onScreen && (current.armed || !onScreen)
-          ? current
-          : { visible: onScreen, armed: current.armed || onScreen },
-      )
-    }
-    const check = (): void => {
-      const rect = node.getBoundingClientRect()
-      apply(rect.bottom > -PRELOAD_PX && rect.top < window.innerHeight + PRELOAD_PX)
-    }
-
-    // Geometry first: IntersectionObserver delivery rides the rendering pipeline and
-    // Electron throttles that while the window is occluded — the trap that once left
-    // the transcript invisible. A cell already on screen must not wait for a frame
-    // that may never come, so it is measured directly and once more after mount (the
-    // picker scrolls its body to the top in an effect that runs after this one).
-    check()
-    const retry = window.setTimeout(check, 250)
-
-    const observer = new IntersectionObserver(
-      (entries) => apply(Boolean(entries[0]?.isIntersecting)),
-      { rootMargin: `${PRELOAD_PX}px 0px` },
-    )
-    observer.observe(node)
-    return () => {
-      window.clearTimeout(retry)
-      observer.disconnect()
-    }
-  }, [])
-
-  return [ref, state]
 }

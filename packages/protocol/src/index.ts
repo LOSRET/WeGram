@@ -1,4 +1,5 @@
 export * from './dto'
+export * from './stickers'
 export * from './comment'
 export * from './contact'
 export * from './settings'

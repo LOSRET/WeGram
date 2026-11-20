@@ -19,6 +19,19 @@ export const STICKER_WAVE_TGS =
   'H4sIAGBJ+2oC/6VT226DMAz9Fz9HyIxLKb8y8ZBxKxoUlrB2COXfZyfRGB172SSIybF9jh2HFW6QQxKcghgENAryCAV0E+RkRjJnsnfIw6dMwMXb60A5d3mrWyUHSquqysZLretZQ/5cCOjlUiv+Xr/c3ZVsKGBeII89i36jfK0s/krhK4y8SAfY9NkmM1WISMwdB3zQFoOYtgs7CiNcosNTj2NhjLAMceIoouSvDOdvRRiOVr8Xiv8ViVIvMnkRdCJpLOhB9si9BwU6XO9xKlf4l1VAX+RUu7nwHKBVNIBu3gBV8kRtW/pA/KAoL6x2aJgZP2JVlzPY/pi+6Ym+fCAIMBIYnFJaokxsx7SxITqF0JM2Xd9vpDM3cVyVPESPD+lnF3hYiSl8Fa0a3yfg7cMfo91deBmYojCfs22fcmYDAAA='
 
 /**
+ * gzip(Lottie JSON) — the effect of the mock's Telegram Premium sticker (design
+ * doc §8.5): eight gold squares and six paler ones twinkling around the artwork,
+ * 48 frames at 30 fps on a 512 px square. It is deliberately different from the
+ * sticker it decorates, so a screenshot proves the second layer actually plays.
+ *
+ * Keep it to the Lottie constructs `sticker-wave.tgs` already uses (rounded
+ * rects with animated opacity/rotation): a first version with polystar/ellipse
+ * shapes and animated position/scale parsed fine and drew nothing at all.
+ */
+export const PREMIUM_EFFECT_TGS =
+  'H4sIAAAAAAACCu2ZbY+bMAyA/4s/e8gh4aX5Kyc+cC3coSstCty2quK/nxLoVe1lEmWatGX+kLbYxHZenprgM3wHDUmURQoQagNaEkLTgSaEYwda5Qg/QCciRnidvw8taOhM1Tbv7beqrqvtAAi73c71Kvu+GnrQTwXCvjxVxv4+f6qbww60QBhOoNVsq+9K80aA0Bune+tBn+FoP8pJ4EwMzoA1RwVCY9U/7UWkCoQT6CdRjDh1m+TpLKdiHNH1z6b+glZbUPElhNHea/5AkHbOXZTJ7KSbndDkRKUK4yRFsrryVkdIk7y/lQsinJv1A/1r2VXTytiVgBcD82K8mON7BwjNcNWarV1gN8o7u1KhVJ4Y5yjMjXQzzj6M3TJutNZ6vQeE7V28SFGeIEUKrxP2qRZEk3ExG6yb/f5qcLCD8QdUeqX+yfo6APpFJC6GwZSHvj6aFsZiLL5Q1E8747l1Zu6AiD1ACAZiKRAk0TYGIhggpAeImIFYCITNDjZLMBDBAKE8QEgGYiEQgjacIcICIvEAoRiIpY9MOR8hwuIh9fCQMA8PJAjbGIhggMg8QKQMxCNHiJx5CIeH3MNDxjw88I6JE0RQQGzWViHS39xrQoZARELpX3OGEDmKfCkRyWNEbFKkKMv/CyQErS1EMBPunzkXqDLJTITEhFhbi2Am3IpJZiI4JuK15QhmwjrhJ6fgiJBr6xFMxCVLyA0jERISam1JgpG4HCYYiX8aiWL8ACY4TQJiKwAA'
+
+/**
  * A 6 s WebM clip for the mock's video message: a phone-shaped box with a counter,
  * drawn on a canvas and recorded once through Chromium's MediaRecorder (VP8,
  * 270 × 480, 6 fps) — hence the tiny size. The mock has no encoder, and a binary

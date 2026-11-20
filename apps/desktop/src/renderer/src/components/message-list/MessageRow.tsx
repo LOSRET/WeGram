@@ -1,8 +1,9 @@
 import type { ChatSummary, Message } from '@wegram/protocol'
-import { memo, type MouseEvent, type ReactNode } from 'react'
+import { memo, useState, type MouseEvent, type ReactNode } from 'react'
 
 import { hasCommentBar } from '../../lib/comments'
 import { formatMessageTime, messagePreview } from '../../lib/format'
+import { stickerBox } from '../../lib/stickerBox'
 import { Avatar } from '../Avatar'
 import {
   CHANNEL_MEDIA_INSET,
@@ -18,6 +19,7 @@ import { RichText } from '../RichText'
 import { StickerRenderer } from '../StickerRenderer'
 import { AlbumBubble } from './AlbumBubble'
 import { CommentBar } from './CommentBar'
+import { PremiumStickerEffect } from './PremiumStickerEffect'
 import { isEmojiOnly } from './emoji'
 
 /**
@@ -25,6 +27,9 @@ import { isEmojiOnly } from './emoji'
  * this size — larger than our 48 px text emoji, prized as the message's whole body.
  */
 const ANIMATED_EMOJI_SIZE = 112
+
+/** Longest edge of a sticker message's artwork. */
+const STICKER_SIZE = 140
 
 export interface MessageRowProps {
   chat: ChatSummary
@@ -90,6 +95,11 @@ export const MessageRow = memo(
     onOpenMenu,
     onOpenComments,
   }: MessageRowProps) {
+    /**
+     * A premium sticker's effect plays once; a tap on the sticker replays it, so
+     * the row owns the counter and hands it to the effect.
+     */
+    const [premiumReplay, setPremiumReplay] = useState(0)
     const first = messages[0]
     const last = messages[messages.length - 1]
     if (!first || !last) return null
@@ -181,8 +191,23 @@ export const MessageRow = memo(
           ) : null}
           {isSticker && media ? (
             <>
-              <div className="wx-sticker-wrap" onContextMenu={openMenu}>
-                <StickerRenderer media={media} size={140} />
+              <div
+                className="wx-sticker-wrap"
+                onContextMenu={openMenu}
+                onClick={
+                  media.premiumEffectFileId
+                    ? () => setPremiumReplay((count) => count + 1)
+                    : undefined
+                }
+              >
+                <StickerRenderer media={media} size={STICKER_SIZE} />
+                {media.premiumEffectFileId ? (
+                  <PremiumStickerEffect
+                    media={media}
+                    sticker={stickerBox(media, STICKER_SIZE)}
+                    replay={premiumReplay}
+                  />
+                ) : null}
               </div>
               {channelMeta(true)}
             </>

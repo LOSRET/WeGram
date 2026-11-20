@@ -1,4 +1,4 @@
-import type { Sticker, StickerSet, StickerSetSummary } from '@wegram/protocol'
+import type { CustomEmojiSticker, Sticker, StickerSet, StickerSetSummary } from '@wegram/protocol'
 
 import type { TdObject } from './client'
 import { asArray } from './json'
@@ -38,6 +38,29 @@ export async function getStickerSet(deps: StickerDeps, setId: string): Promise<S
       .map((sticker) => toSticker(deps.mapper, sticker))
       .filter((item) => item.fileId > 0),
   }
+}
+
+/**
+ * Custom emoji art: TDLib answers only the ids it knows, in arbitrary order, so
+ * the sticker's own `full_type.custom_emoji_id` is what pairs it back with the
+ * text entity. A custom emoji has no set, no emoji and no thumbnail here.
+ */
+export async function listCustomEmojiStickers(
+  deps: StickerDeps,
+  ids: string[],
+): Promise<CustomEmojiSticker[]> {
+  if (ids.length === 0) return []
+  const response = await deps.invoke({ _: 'getCustomEmojiStickers', custom_emoji_ids: ids })
+  const stickers: TdObject[] = asArray(response?.stickers)
+  const result: CustomEmojiSticker[] = []
+  for (const raw of stickers) {
+    // The id is int64 on both sides; comparing it as a string is the only safe read.
+    const customEmojiId = raw?.full_type?.custom_emoji_id
+    if (customEmojiId === undefined || customEmojiId === null || customEmojiId === '') continue
+    const sticker = toSticker(deps.mapper, raw)
+    if (sticker.fileId > 0) result.push({ customEmojiId: String(customEmojiId), sticker })
+  }
+  return result
 }
 
 /**

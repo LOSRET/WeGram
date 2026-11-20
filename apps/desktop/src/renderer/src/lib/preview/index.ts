@@ -28,6 +28,7 @@ import {
   now,
   previewFiles,
   previewCommentAccess,
+  previewCustomEmoji,
   previewStickerSet,
   previewThreads,
   PREVIEW_STICKERS,
@@ -342,6 +343,12 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     }
     case 'stickers:set':
       return previewStickerSet()
+    case 'stickers:customEmoji': {
+      const ids: unknown = store.ids
+      return previewCustomEmoji(
+        Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : [],
+      )
+    }
     case 'ui:getDraft': {
       const text = drafts[store.chatId]
       return text ? { text } : null
