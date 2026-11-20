@@ -467,8 +467,15 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
   window's own pixels (pass `PW_RENDERFULLCONTENT = 2`, and call
   `SetProcessDpiAwareness(2)` first or `GetWindowRect` answers in virtualised pixels and
   the bottom of the window is cut off).
-- **`node:sqlite` exists in Electron 38** (bundled Node 22.22) — no better-sqlite3, no
-  Electron-ABI rebuild. It is flagged experimental upstream, hence the single-file
+- **`node:sqlite` exists in Electron (45 ships Node 24.22)** — no better-sqlite3, no
+  Electron-ABI rebuild.
+- **Electron 45 changed two things this code depended on.** `clipboard.writeImage()` is
+  gone: the clipboard is now the web-standard async API, so 复制图片 (`viewer:copy` in
+  `main/ipc/handlers.ts`) writes `new ClipboardItem({ 'image/png': blob })` through
+  `clipboard.write()`. And the binary no longer comes from a `postinstall` — 45 ships
+  `install.js` as the `install-electron` bin, so a fresh checkout needs
+  `pnpm electron:install` before `pnpm dev` / `launch-detached.ps1` (`pnpm build` and
+  electron-builder fetch their own copy). It is flagged experimental upstream, hence the single-file
   confinement. Expect an `ExperimentalWarning` in the log.
 - **`sender_id` has two shapes.** It is `messageSenderUser { user_id }` **or**
   `messageSenderChat { chat_id }`; channel posts and anonymous admins only fill

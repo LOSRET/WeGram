@@ -11,7 +11,7 @@
   },
   "include": [
     "electron.vite.config.ts",
-    "vite.web.config.ts",
+    "vite.web.config.mts",
     "src/main/**/*.ts",
     "src/preload/**/*.ts",
     "scripts/**/*.ts",

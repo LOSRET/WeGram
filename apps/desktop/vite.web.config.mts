@@ -13,21 +13,23 @@ import { defineConfig } from 'vite'
  * in-renderer preview bridge (`lib/preview-bridge.ts`). This is a development
  * tool, not a shipping target: there is no `window.tg` in a browser otherwise.
  */
-const { version } = JSON.parse(
-  readFileSync(resolve(__dirname, '../../package.json'), 'utf8'),
-) as { version: string }
+const here = import.meta.dirname
+
+const { version } = JSON.parse(readFileSync(resolve(here, '../../package.json'), 'utf8')) as {
+  version: string
+}
 
 export default defineConfig({
-  root: resolve(__dirname, 'src/renderer'),
+  root: resolve(here, 'src/renderer'),
   // The browser preview never sees app.getVersion(): inline the root version.
   define: { __WEGRAM_VERSION__: JSON.stringify(version) },
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      '@wegram/mock-fixtures': resolve(__dirname, '../../packages/mock-fixtures/src/index.ts'),
-      '@wegram/mock-session': resolve(__dirname, '../../packages/mock-session/src/index.ts'),
-      '@wegram/protocol': resolve(__dirname, '../../packages/protocol/src/index.ts'),
-      '@renderer': resolve(__dirname, 'src/renderer/src'),
+      '@wegram/mock-fixtures': resolve(here, '../../packages/mock-fixtures/src/index.ts'),
+      '@wegram/mock-session': resolve(here, '../../packages/mock-session/src/index.ts'),
+      '@wegram/protocol': resolve(here, '../../packages/protocol/src/index.ts'),
+      '@renderer': resolve(here, 'src/renderer/src'),
     },
   },
   server: {

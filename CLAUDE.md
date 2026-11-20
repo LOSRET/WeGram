@@ -27,7 +27,7 @@ W3 main body is in: media send/receive (photo + document, upload/download progre
 
 The login is its **own window**, like WeChat's: a frameless 280×373 `BrowserWindow` (`main/login-window.ts`, renderer `screens/LoginWindow.tsx` via the `#login` hash) shows a **QR code** fed by TDLib (`requestQrCodeAuthentication` → `AuthState.waitQr`, rendered locally with the approved `qrcode` dependency). A user-driven sign-in — the QR, or the 用手机号登录 fallback — opens the shell **directly**; only a session restored at startup stops on the profile step first. `login:enter` opens the shell from that step, and signing out recreates the login window before closing the shell. TDLib cannot cancel a pending QR confirmation, so the phone fallback goes through `auth:reset` (destroy + rebuild the auth client). Design and the measured metrics: `docs/技术方案.md` §9.6, `docs/UI-HANDOFF.md` §2.2.
 
-`ui.db` uses the built-in `node:sqlite` (Electron 38 ships Node 22.22) instead of better-sqlite3, so there is no native module to rebuild for the Electron ABI. All SQL is confined to `apps/desktop/src/main/store/ui-db.ts`; `settings.json` keeps only the proxy config because it carries a sealed secret.
+`ui.db` uses the built-in `node:sqlite` (Electron 45 ships Node 24.22) instead of better-sqlite3, so there is no native module to rebuild for the Electron ABI. All SQL is confined to `apps/desktop/src/main/store/ui-db.ts`; `settings.json` keeps only the proxy config because it carries a sealed secret.
 
 Still deferred: search (global + in-chat), pinning chat controls, settings page. Release packaging lives in `.github/workflows/release.yml` (a version bump on `main` → NSIS installer → GitHub Release; pushing a `v*` tag still works), proven by `v0.1.0`–`v0.1.2`; the installer itself has never been installed or code-signed.
 `ui.db` reading positions (`scroll_anchor_id`/`scroll_offset`) are wired: MessageList writes them,
@@ -112,6 +112,7 @@ These rules keep it that way:
 
 ```powershell
 pnpm install                     # allowBuilds is configured in pnpm-workspace.yaml
+pnpm electron:install            # Electron 45 has no postinstall: fetch its binary (dev only)
 pnpm verify                      # THE gate: lint → typecheck → test → build
 pnpm lint                        # eslint, architecture rules included (0 warnings allowed)
 pnpm test                        # vitest, pure modules only (no DOM, no Electron)
@@ -170,6 +171,7 @@ node login.mjs    # interactive; requires TELEGRAM_API_ID / TELEGRAM_API_HASH in
 - **Never start Electron from the agent shell.** Shell commands run inside a Windows job object; Chromium cannot initialise there and aborts (sandbox on → `0x80000003`, sandbox off → `0xC0000005` inside `electron.exe`, logged by WER as APPCRASH). A minimal Electron app reproduces it, so it is not project code. Launch detached instead — `pwsh scripts/launch-detached.ps1` creates the process through WMI (parent `WmiPrvSE`, outside the job) and redirects logs to `.cache/app.log`.
 - **Chromium's sandbox does not work on this machine at all**, independent of the launcher: Electron 30.5.1, 38.8.6 and 45.3.3 all crash with the sandbox enabled and all render fine with `--no-sandbox`. Treat `-NoSandbox` as a local-only workaround (Kaspersky 21.27 is running; Windows is an Insider build 10.0.26300). Never ship `--no-sandbox`; verify the sandboxed path on a clean machine before release.
 - `ELECTRON_RUN_AS_NODE=1` is set globally; Electron then runs as plain Node and `require('electron')` is undefined. Always `Remove-Item Env:ELECTRON_RUN_AS_NODE` before launching Electron.
+- **Electron 45 no longer downloads its binary from a `postinstall`** (the downloader is the `install-electron` bin on purpose). A fresh checkout runs `pnpm electron:install` before `pnpm dev` / `launch-detached.ps1`; `pnpm build` and electron-builder fetch their own copy. Electron 45 also replaced `clipboard.writeImage()` with the async web clipboard, so `viewer:copy` writes a PNG `ClipboardItem`.
 - pnpm 12 reads build-script permissions from `allowBuilds:` in `pnpm-workspace.yaml` (a name → bool map), not from the old `pnpm` field in `package.json`.
 - The pnpm store and lock files live outside the workspace; installing needs full filesystem access.
 - Editors save atomically through `*.tmpdir` folders. Vite's watcher dies with `EBUSY` on those, so both Vite configs ignore `**/*.tmpdir/**` and `**/*.tmp`.

@@ -3,7 +3,7 @@ import { basename, join } from 'node:path'
 
 import { AppError, RECENT_EMOJI_LIMIT } from '@wegram/protocol'
 import type { AppInfo } from '@wegram/protocol'
-import { app, BrowserWindow, clipboard, dialog, nativeImage, shell } from 'electron'
+import { app, BrowserWindow, clipboard, ClipboardItem, dialog, nativeImage, shell } from 'electron'
 
 import { closeLoginWindow } from '../login-window'
 import { resolveProxySecrets, toProxyView, toStoredProxy } from '../proxy'
@@ -256,7 +256,11 @@ export function createHandlers({
       const source = await localFile(payload.fileId)
       const image = nativeImage.createFromPath(source)
       if (image.isEmpty()) throw new AppError('internal', 'Failed to decode the image')
-      clipboard.writeImage(image)
+      // Electron 45 replaced writeImage() with the web-standard clipboard: the
+      // bitmap travels as a PNG Blob inside a ClipboardItem.
+      await clipboard.write([
+        new ClipboardItem({ 'image/png': new Blob([image.toPNG()], { type: 'image/png' }) }),
+      ])
     },
     'viewer:reveal': async (payload) => {
       const source = await localFile(payload.fileId)

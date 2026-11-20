@@ -15,7 +15,7 @@ const logger = createLogger('ui-db')
  * UI database (`ui.db`, design doc §5.1/§5.2).
  *
  * Uses the built-in `node:sqlite` instead of better-sqlite3: it ships with
- * Electron's Node (22.22) so there is no native module to rebuild for the
+ * Electron's Node (24.22) so there is no native module to rebuild for the
  * Electron ABI. It is flagged experimental upstream, so the schema access is
  * confined to this file — swapping in better-sqlite3 later touches nothing else.
  *
