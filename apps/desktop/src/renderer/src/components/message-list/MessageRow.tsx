@@ -304,6 +304,8 @@ export const MessageRow = memo(
                   kind={mediaKind}
                   chatId={chat.id}
                   messageId={first.id}
+                  // Telegram's GIF badge steps aside when the animation has a caption.
+                  showAnimationBadge={!caption}
                   // A channel post is Telegram's card, so its photo may grow past
                   // WeChat's 240 px bubble photograph.
                   {...(channel ? CHANNEL_MEDIA_LIMITS : {})}

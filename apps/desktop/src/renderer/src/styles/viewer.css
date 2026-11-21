@@ -395,6 +395,39 @@
   color: #fff;
 }
 
+/* Telegram's GIF (messageAnimation): the clip itself is the bubble. No play
+   glyph, duration or progress badge is painted over it — it loops — and a click
+   opens the viewer, exactly like a video bubble. */
+.wx-video--animation {
+  cursor: pointer;
+}
+
+.wx-video--animation .wx-video__clip {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Telegram's "GIF" corner status, drawn over the clip; the row hides it when the
+   animation carries a caption. */
+.wx-video__gif {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+/* In the viewer an animation loops instead of offering a transport bar. */
+.wx-player.is-animation {
+  display: none;
+}
+
 /* WeChat's file card: white rounded card, icon tile on the left. */
 .wx-file {
   display: flex;

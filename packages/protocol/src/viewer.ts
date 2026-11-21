@@ -27,6 +27,8 @@ export const viewerItemSchema = z.object({
   /** Message carrying the media, so 更多 → 定位到聊天位置 keeps its origin. */
   messageId: z.number().int().optional(),
   kind: z.enum(['photo', 'video']),
+  /** A GIF-style animation: the canvas loops it instead of offering a transport. */
+  isAnimation: z.boolean().optional(),
   fileName: z.string().optional(),
   width: z.number().int().positive().optional(),
   height: z.number().int().positive().optional(),

@@ -55,6 +55,8 @@ export function VideoCanvas({
   const [duration, setDuration] = useState(item.duration ?? 0)
   const [rate, setRate] = useState<PlaybackRate>(1)
   const [muted, setMuted] = useState(false)
+  /** A GIF has no transport: it loops, and the bar would only cover it. */
+  const animation = Boolean(item.isAnimation)
   const [dragging, setDragging] = useState(false)
   const [hovering, setHovering] = useState(false)
   const [chrome, setChrome] = useState(true)
@@ -218,6 +220,7 @@ export function VideoCanvas({
           }
           preload="auto"
           autoPlay
+          loop={animation}
           playsInline
           style={
             box
@@ -247,7 +250,7 @@ export function VideoCanvas({
       ) : null}
 
       <div
-        className={`wx-player${chrome ? '' : ' is-hidden'}`}
+        className={`wx-player${chrome ? '' : ' is-hidden'}${animation ? ' is-animation' : ''}`}
         onPointerEnter={() => setHovering(true)}
         onPointerLeave={() => setHovering(false)}
       >

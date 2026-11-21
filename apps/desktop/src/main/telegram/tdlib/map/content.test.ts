@@ -86,6 +86,7 @@ describe('mapContent', () => {
         mimeType: 'video/mp4',
       },
     })
+    expect(mapped.media).not.toHaveProperty('isAnimation')
   })
 
   it('treats animations as videos', () => {
@@ -95,7 +96,9 @@ describe('mapContent', () => {
     })
 
     expect(mapped.kind).toBe('video')
-    expect(mapped.media).toMatchObject({ fileId: 21, duration: 2 })
+    // The flag is what makes the bubble autoplay it; an ordinary video waits for
+    // the viewer, so the two must not be told apart by kind alone.
+    expect(mapped.media).toMatchObject({ fileId: 21, duration: 2, isAnimation: true })
   })
 
   it('maps a document size and format', () => {

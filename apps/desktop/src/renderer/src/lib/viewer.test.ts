@@ -70,6 +70,17 @@ describe('buildViewerStrip', () => {
     expect(strip?.items[0]).toMatchObject({ kind: 'video', fileId: 21, duration: 51 })
   })
 
+  it('marks an animation so the canvas loops it instead of offering a transport', () => {
+    const strip = buildViewerStrip(
+      [message(1, 'video', video(21)), message(2, 'video', video(22, { isAnimation: true }))],
+      'video',
+      2,
+    )
+
+    expect(strip?.items[0]).not.toHaveProperty('isAnimation')
+    expect(strip?.items[1]).toMatchObject({ kind: 'video', fileId: 22, isAnimation: true })
+  })
+
   it('refuses to open when the clicked message is not in the strip', () => {
     expect(buildViewerStrip([message(1, 'photo', photo(11))], 'photo', 9)).toBeNull()
     expect(buildViewerStrip([message(5, 'text')], 'photo', 5)).toBeNull()

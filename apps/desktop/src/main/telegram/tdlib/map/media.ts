@@ -83,6 +83,9 @@ export function videoMedia(
   const file = value?.[field]
   return {
     fileId: Number(file?.id ?? 0),
+    // An animation is a video file the bubble plays itself; the flag is what
+    // separates it from a clip that must wait for the viewer (see dto.ts).
+    ...(field === 'animation' ? { isAnimation: true } : {}),
     ...(value?.thumbnail?.file?.id ? { thumbFileId: Number(value.thumbnail.file.id) } : {}),
     ...(value?.duration ? { duration: Number(value.duration) } : {}),
     ...(value?.width ? { width: Number(value.width) } : {}),

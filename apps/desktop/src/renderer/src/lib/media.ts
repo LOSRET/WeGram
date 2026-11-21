@@ -107,10 +107,24 @@ export function ensureMedia(fileId: number, priority: number, owner: string): Pr
  * A `wx-media://` URL for a video the element plays while it downloads: main
  * registers the file id for the streaming handler (design doc §8.7), so the clip
  * starts seconds after the click instead of after the whole transfer.
+ *
+ * The owner is recorded exactly like a download's: an inline GIF that scrolls
+ * away (or a viewer that pages on) releases it, and the tail stops once no other
+ * holder wants the file.
  */
 export async function streamMedia(fileId: number, owner: string): Promise<string> {
-  const { url } = await invoke('media:stream', { fileId, owner })
-  return url
+  if (fileId <= 0) return Promise.reject(new Error('invalid file id'))
+  const previous = heldByOwner.get(owner)
+  if (previous !== undefined && previous !== fileId) releaseMedia(owner, true)
+  clearRelease(owner)
+  heldByOwner.set(owner, fileId)
+  try {
+    const { url } = await invoke('media:stream', { fileId, owner })
+    return url
+  } catch (error) {
+    releaseMedia(owner, true)
+    throw error
+  }
 }
 
 /**

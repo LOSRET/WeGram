@@ -1,5 +1,5 @@
 import type { MessageMedia } from '@wegram/protocol'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { formatDuration } from '../lib/format'
 import { errorMessage, invoke } from '../lib/ipc'
@@ -8,6 +8,8 @@ import {
   formatBytes,
   nextOwner,
   progressRatio,
+  releaseMedia,
+  streamMedia,
   useFileProgress,
   useMediaUrl,
 } from '../lib/media'
@@ -37,6 +39,11 @@ interface MediaBubbleProps {
    */
   maxWidth?: number
   maxHeight?: number
+  /**
+   * The "GIF" corner badge. Telegram hides it on an animation that carries a
+   * caption (the text is the label there), so the row turns it off when it has one.
+   */
+  showAnimationBadge?: boolean
 }
 
 const MAX_PHOTO_W = 240
@@ -136,6 +143,7 @@ export function MediaBubble({
   variant,
   maxWidth = MAX_PHOTO_W,
   maxHeight = MAX_PHOTO_H,
+  showAnimationBadge = true,
 }: MediaBubbleProps) {
   const inAlbum = variant === 'album'
   if (kind === 'photo') {
@@ -151,7 +159,19 @@ export function MediaBubble({
     )
   }
   if (kind === 'video') {
-    return (
+    // A GIF (TDLib `messageAnimation`) is a video file that plays in the bubble;
+    // an ordinary clip waits for the viewer. Same file, two behaviours.
+    return media.isAnimation ? (
+      <AnimationBubble
+        media={media}
+        chatId={chatId}
+        messageId={messageId}
+        inAlbum={inAlbum}
+        maxWidth={maxWidth}
+        maxHeight={maxHeight}
+        showBadge={showAnimationBadge}
+      />
+    ) : (
       <VideoBubble
         media={media}
         chatId={chatId}
@@ -319,6 +339,113 @@ function VideoBubble({
       {media.duration ? (
         <span className="wx-video__duration">{formatDuration(media.duration)}</span>
       ) : null}
+    </button>
+  )
+}
+
+/**
+ * Telegram's GIF: the clip plays inside the bubble — muted, looping, no controls
+ * — and a click opens the same 图片和视频 window a video uses. It streams through
+ * the scheme handler (design doc §8.7), so it starts while TDLib is still
+ * fetching, and it pauses whenever the bubble scrolls out of view.
+ */
+function AnimationBubble({
+  media,
+  chatId,
+  messageId,
+  inAlbum,
+  maxWidth,
+  maxHeight,
+  showBadge,
+}: {
+  media: MessageMedia
+  chatId: number
+  messageId: number
+  inAlbum: boolean
+  maxWidth: number
+  maxHeight: number
+  showBadge: boolean
+}) {
+  const [ref, view] = useInView<HTMLButtonElement>(MEDIA_PRELOAD_PX)
+  const source = useViewerSource()
+  const [url, setUrl] = useState<string>()
+  const [failed, setFailed] = useState(false)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const ownerRef = useRef('')
+  if (!ownerRef.current) ownerRef.current = nextOwner('animation')
+
+  const box = inAlbum
+    ? undefined
+    : reserveBox(media, {
+        maxWidth,
+        maxHeight,
+        ...VIDEO_FALLBACK,
+      })
+
+  const posterMedia = useMemo(() => thumbMediaOf(media, media.fileId), [media])
+  const posterUrl = useMediaUrl(posterMedia, thumbPriority(view.visible), view.armed)
+  const progress = useFileProgress(media.fileId)
+  const ratio = progressRatio(progress)
+  const poster =
+    posterUrl ?? (media.minithumbnail ? `data:image/jpeg;base64,${media.minithumbnail}` : undefined)
+
+  useEffect(() => {
+    if (!view.armed || url) return
+    let alive = true
+    void streamMedia(media.fileId, ownerRef.current)
+      .then((next) => {
+        if (alive) setUrl(next)
+      })
+      .catch(() => {
+        if (alive) setFailed(true)
+      })
+    return () => {
+      alive = false
+    }
+  }, [view.armed, url, media.fileId])
+
+  // Same rule as a sticker: only the animation on screen runs, so a transcript of
+  // GIFs does not decode a screenful of them.
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video || !url) return
+    if (view.visible) void video.play().catch(() => undefined)
+    else video.pause()
+  }, [view.visible, url])
+
+  useEffect(() => () => releaseMedia(ownerRef.current), [])
+
+  return (
+    <button
+      ref={ref}
+      type="button"
+      className={`wx-video wx-video--animation${inAlbum ? ' wx-video--album' : ''}`}
+      style={box}
+      onClick={() => openVideoViewer(chatId, messageId, source)}
+      title="查看动图"
+    >
+      {url && !failed ? (
+        <video
+          ref={videoRef}
+          className="wx-video__clip"
+          src={url}
+          poster={poster}
+          autoPlay
+          muted
+          loop
+          playsInline
+          preload="auto"
+          aria-label="动图"
+          onError={() => setFailed(true)}
+        />
+      ) : poster ? (
+        <img className="wx-video__poster" src={poster} alt="" aria-hidden />
+      ) : null}
+      {!url && !failed && ratio !== undefined ? (
+        <span className="wx-video__progress">{percentOf(ratio)}</span>
+      ) : null}
+      {failed ? <span className="wx-video__progress">动图加载失败</span> : null}
+      {showBadge ? <span className="wx-video__gif">GIF</span> : null}
     </button>
   )
 }

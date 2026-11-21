@@ -138,6 +138,13 @@ export const messageMediaSchema = z.object({
    */
   sizes: z.array(mediaSizeSchema).optional(),
   duration: z.number().int().optional(),
+  /**
+   * A GIF-style animation (TDLib `messageAnimation`): an MP4 the bubble plays
+   * inline, muted and looping, the way Telegram does. `kind` stays 'video'
+   * because the file and its viewer are the same; this flag is what tells the
+   * bubble not to wait for a click before it plays.
+   */
+  isAnimation: z.boolean().optional(),
   stickerFormat: stickerFormatSchema.optional(),
   /**
    * The thumbnail's own format. TDLib serves a static image as a sticker's

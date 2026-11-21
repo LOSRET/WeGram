@@ -37,6 +37,8 @@ export function buildViewerStrip(
       ...(media.size ? { size: media.size } : {}),
       ...(message.canBeSaved === undefined ? {} : { canBeSaved: message.canBeSaved }),
       ...(kind === 'video' && media.duration ? { duration: media.duration } : {}),
+      // The viewer loops animation media instead of painting a transport bar.
+      ...(kind === 'video' && media.isAnimation ? { isAnimation: true } : {}),
       ...(media.minithumbnail ? { minithumbnail: media.minithumbnail } : {}),
       ...(media.thumbFileId ? { thumbFileId: media.thumbFileId } : {}),
       // The window picks its own variant: the box it paints into is not the
