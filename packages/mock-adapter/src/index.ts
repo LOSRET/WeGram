@@ -226,6 +226,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   readonly getChat = this.chatApi.getChat
   readonly openChat = this.chatApi.openChat
   readonly openPrivateChat = this.chatApi.openPrivateChat
+  readonly openUsernameChat = this.chatApi.openUsernameChat
   readonly canPost = this.chatApi.canPost
   readonly setChatMuted = this.chatApi.setMuted
   readonly setChatPinned = this.chatApi.setPinned

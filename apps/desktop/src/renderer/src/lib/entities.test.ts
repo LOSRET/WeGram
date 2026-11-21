@@ -82,7 +82,22 @@ describe('segmentText', () => {
     const [segment] = segmentText('link', [
       { type: 'textUrl', offset: 0, length: 4, url: 'https://example.com' },
     ])
-    expect(segment?.entities).toEqual([{ type: 'textUrl', url: 'https://example.com' }])
+    expect(segment?.entities).toEqual([
+      { type: 'textUrl', offset: 0, length: 4, url: 'https://example.com' },
+    ])
+  })
+
+  it("keeps a mention's own range, so a nested entity cannot shorten it", () => {
+    // `@ada` is bold: the bold segment and the bare tail still quote the whole name.
+    const segments = segmentText('@ada_lovelace', [
+      { type: 'mention', offset: 0, length: 13 },
+      { type: 'bold', offset: 0, length: 4 },
+    ])
+    expect(segments.map((segment) => segment.entities[0])).toEqual([
+      { type: 'bold', offset: 0, length: 4 },
+      { type: 'mention', offset: 0, length: 13 },
+    ])
+    expect(segments.map((segment) => segment.text)).toEqual(['@ada', '_lovelace'])
   })
 
   it('keeps a custom-emoji id so the renderer can swap in the sticker', () => {
@@ -91,7 +106,7 @@ describe('segmentText', () => {
       { type: 'customEmoji', offset: 0, length: 1, customEmojiId: '5368324170671202286' },
     ])
     expect(segment?.entities).toEqual([
-      { type: 'customEmoji', customEmojiId: '5368324170671202286' },
+      { type: 'customEmoji', offset: 0, length: 1, customEmojiId: '5368324170671202286' },
     ])
   })
 })

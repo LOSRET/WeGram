@@ -14,6 +14,23 @@
   color: #576b95;
 }
 
+/* An @mention that jumps: same blue as a link, but it opens the person's chat
+   inside the app instead of leaving it (§8.3). Kept inline so a selected message
+   still reads as one paragraph, and focusable for keyboard readers. */
+.wx-entity-mention--link {
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.wx-entity-mention--link:hover {
+  text-decoration: underline;
+}
+
+.wx-entity-mention--link:focus-visible {
+  outline: 2px solid #576b95;
+  outline-offset: 1px;
+}
+
 .wx-code {
   padding: 1px 4px;
   border-radius: 3px;

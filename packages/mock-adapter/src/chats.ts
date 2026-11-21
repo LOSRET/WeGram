@@ -44,6 +44,20 @@ export function openMockChat(store: MockChatStore, chatId: number): void {
   requireFixture(store, chatId)
 }
 
+/**
+ * `@username` mentions: the fixture's address-book entries are the only usernames
+ * it has, exactly like TDLib's `searchPublicChat` answering from its local cache
+ * for a known account.
+ */
+export function openMockUsernameChat(store: MockChatStore, input: string): ChatSummary {
+  const username = input.trim().replace(/^@+/, '').toLowerCase()
+  const fixture = [...store.fixtures.values()].find(
+    (item) => item.contact?.username?.toLowerCase() === username,
+  )
+  if (!username || !fixture) throw new AppError('invalid_payload', `找不到 @${username} 这个用户名`)
+  return fixture.chat
+}
+
 /** The mock has no user directory; reuse the private chat that carries that id. */
 export function openMockPrivateChat(store: MockChatStore, userId: number): ChatSummary {
   const fixture =
@@ -155,6 +169,7 @@ export interface MockChatApi {
   getChat(chatId: number): Promise<ChatSummary>
   openChat(chatId: number): Promise<void>
   openPrivateChat(userId: number): Promise<ChatSummary>
+  openUsernameChat(username: string): Promise<ChatSummary>
   canPost(chatId: number): Promise<boolean>
   setMuted(chatId: number, muted: boolean): Promise<ChatSummary>
   setPinned(chatId: number, pinned: boolean): Promise<ChatSummary>
@@ -176,6 +191,7 @@ export function createMockChats(
     getChat: async (chatId) => getMockChat(store, chatId),
     openChat: async (chatId) => openMockChat(store, chatId),
     openPrivateChat: async (userId) => openMockPrivateChat(store, userId),
+    openUsernameChat: async (username) => openMockUsernameChat(store, username),
     canPost: async (chatId) => canMockPost(store, chatId),
     setMuted: async (chatId, muted) => setMockMuted(store, chatId, muted),
     setPinned: async (chatId, pinned) => setMockPinned(store, chatId, pinned),

@@ -173,6 +173,23 @@ screenshot, not guessed).
   are hand-drawn, and the brand mark — rail 聊天 tab, login window, empty-pane watermark —
   is the Telegram roundel from Simple Icons. The name manifest in the DLL has no
   recoverable name→payload mapping — see `UI-HANDOFF.md` §3 before trying again.
+- **@提及可点 (2026-11-21)**: a mention is a conversation entry point, not decoration.
+  Both TL kinds render as the same blue, clickable name — `mention` (`@username`) and
+  `mentionName` (TDLib's id-carrying mention, which the mapper used to drop). A tap
+  opens that person's chat: the id goes through `chats:openPrivate`, the username through
+  the new `chats:openUsername` (`searchPublicChat`), and a name nobody owns becomes a
+  Chinese toast instead of a dead click. `@all` stays plain (it names a group), tapping
+  your own name says so instead of opening 文件传输助手, and fake-account group chat 4
+  carries both entity kinds for the preview and the mock Electron window.
+- **Telegram 链接在应用内跳转 (2026-11-21)**: `t.me/<username>[/<post>]`, `t.me/s/…`,
+  `t.me/c/<id>/<post>`, `tg://resolve`, `tg://user` and `tg://openmessage` now open the
+  chat inside the shell instead of leaving it; a link that names a post also lands on that
+  row (`requestLocate` before activation, so the first page is fetched around it). The
+  parser is `lib/telegramLink.ts` (pure, every form unit-tested), the opener is
+  `lib/openTelegramLink.ts`, and the one anchor used by message text and inline-keyboard
+  buttons is `components/TelegramLink.tsx`. Invite/action links (`t.me/+…`, `joinchat`,
+  `/addstickers`, `/share`, `/proxy`) still go to the OS, and modifier/middle clicks keep
+  the "open outside" meaning. Group chat 4 in the fake account carries a `t.me` link.
 - Also fixed while testing: the login field regains focus after each step (it is
   disabled while a request is in flight, which used to drop the caret and force a click).
 

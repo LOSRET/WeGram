@@ -54,6 +54,18 @@ describe('mapEntities', () => {
     })
   })
 
+  it('keeps the user id of a mentionName entity', () => {
+    expect(
+      mapEntities([
+        { type: { _: 'textEntityTypeMentionName', user_id: 23 }, offset: 0, length: 2 },
+      ]),
+    ).toEqual([{ type: 'mentionName', offset: 0, length: 2, userId: 23 }])
+    // A bare mention (@username) has no id to carry; the adapter resolves the name.
+    expect(mapEntities([{ type: { _: 'textEntityTypeMention' }, offset: 0, length: 9 }])).toEqual([
+      { type: 'mention', offset: 0, length: 9 },
+    ])
+  })
+
   it('drops unknown entity types instead of guessing', () => {
     expect(
       mapEntities([{ type: { _: 'textEntityTypeBankCardNumber' }, offset: 0, length: 4 }]),

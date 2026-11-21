@@ -26,6 +26,11 @@ export const chatInvokeChannels = [
   /** Opens (creating if needed) the private chat of a contact card's user. */
   'chats:openPrivate',
   /**
+   * The chat behind an `@username` mention: `searchPublicChat` resolves the name,
+   * and a username nobody owns is an `AppError` to report, not a crash.
+   */
+  'chats:openUsername',
+  /**
    * Whether this account may post in the chat. Only channels ask: posting there
    * is an administrator right, so the composer is offered only when it holds.
    */
@@ -60,6 +65,11 @@ export const chatInvokeSchemas = {
   'chats:open': { request: z.object({ chatId: z.number().int() }), response: noPayload },
   'chats:openPrivate': {
     request: z.object({ userId: z.number().int() }),
+    response: chatSummarySchema,
+  },
+  'chats:openUsername': {
+    // The @ is optional: a click hands over the mention's own words either way.
+    request: z.object({ username: z.string().trim().min(1).max(64) }),
     response: chatSummarySchema,
   },
   'chats:canPost': { request: z.object({ chatId: z.number().int() }), response: z.boolean() },

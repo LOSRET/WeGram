@@ -2,6 +2,7 @@ import type { InlineButton } from '@wegram/protocol'
 
 import { useAppStore } from '../../store/useAppStore'
 import { safeHref } from '../RichText'
+import { TelegramLink } from '../TelegramLink'
 
 interface InlineButtonsProps {
   rows: InlineButton[][]
@@ -30,15 +31,9 @@ export function InlineButtons({ rows }: InlineButtonsProps) {
             const tone = button.style && button.style !== 'default' ? button.style : 'plain'
             const tint = ' wx-inline-button--' + tone
             return href ? (
-              <a
-                className={'wx-inline-button' + tint}
-                href={href}
-                key={index}
-                target="_blank"
-                rel="noreferrer"
-              >
+              <TelegramLink className={'wx-inline-button' + tint} href={href} key={index}>
                 {button.text}
-              </a>
+              </TelegramLink>
             ) : (
               <button
                 type="button"

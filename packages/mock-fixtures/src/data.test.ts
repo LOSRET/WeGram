@@ -36,6 +36,21 @@ describe('the fake account', () => {
     })
   })
 
+  it('carries both mention kinds the transcript can jump from', () => {
+    const message = seeds.get(4)?.messages.find((item) => item.id === 402)
+    expect(message?.text.slice(1, 13)).toBe('ada_lovelace')
+    expect(message?.entities).toEqual([
+      { type: 'mention', offset: 0, length: 13 },
+      { type: 'mentionName', offset: 16, length: 2, userId: 23 },
+    ])
+  })
+
+  it('carries a t.me link the transcript opens inside the app', () => {
+    const message = seeds.get(4)?.messages.find((item) => item.id === 403)
+    expect(message?.text.slice(8)).toBe('https://t.me/ada_lovelace')
+    expect(message?.entities).toEqual([{ type: 'url', offset: 8, length: 25 }])
+  })
+
   it('carries one custom emoji entity, with its base glyph still in the text', () => {
     const message = seeds.get(2)?.messages.find((item) => item.id === 204)
     const text = message?.text ?? ''

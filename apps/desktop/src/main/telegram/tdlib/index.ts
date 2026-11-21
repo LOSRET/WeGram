@@ -295,6 +295,11 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     return summary
   }
 
+  /** An `@username` mention; see `actions.openUsernameChat`. */
+  async openUsernameChat(username: string): Promise<ChatSummary> {
+    return actions.openUsernameChat(this.actionDeps, username)
+  }
+
   async canPost(chatId: number): Promise<boolean> {
     return actions.canPost(
       { invoke: (method) => this.invoke(method), getSelfUserId: () => this.selfUserId },

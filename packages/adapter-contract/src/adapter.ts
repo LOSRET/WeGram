@@ -120,6 +120,12 @@ export interface TelegramAdapter {
    */
   openPrivateChat(userId: number): Promise<ChatSummary>
   /**
+   * The chat behind an `@username` mention (`searchPublicChat`): the transcript's
+   * mentions jump there. A name nobody owns is an `AppError` for the renderer to
+   * report, not a failure of the whole pane.
+   */
+  openUsernameChat(username: string): Promise<ChatSummary>
+  /**
    * Whether this account may post in the chat. Channels are the only kind the UI
    * asks about: posting there is an administrator right, so a channel without it
    * is rendered read-only and never offers a composer.

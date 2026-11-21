@@ -3,6 +3,7 @@ import type {
   ChatMember,
   ChatPinnedMessage,
   ChatSummary,
+  Contact,
   EventChannel,
   Message,
 } from '@wegram/protocol'
@@ -61,6 +62,23 @@ export function clearPreviewHistory(store: PreviewChatStore, chatId: number): vo
   delete chat.lastMessageText
   delete chat.lastMessageAt
   announce(store, chat)
+}
+
+/**
+ * `@username` mentions: the fixture's address book is its only user directory,
+ * so a known username answers with that person's private chat — the preview's
+ * stand-in for TDLib's `searchPublicChat`.
+ */
+export function previewOpenUsername(
+  chats: ChatSummary[],
+  contacts: Contact[],
+  input: string,
+): ChatSummary {
+  const username = input.trim().replace(/^@+/, '').toLowerCase()
+  const contact = contacts.find((item) => item.username?.toLowerCase() === username)
+  const chat = contact ? chats.find((item) => item.userId === contact.userId) : undefined
+  if (!chat) throw { code: 'invalid_payload', message: `找不到 @${username} 这个用户名` }
+  return { ...chat }
 }
 
 /** The fixture has no member table: the people who posted are the members. */

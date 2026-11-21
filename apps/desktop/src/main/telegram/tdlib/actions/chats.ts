@@ -56,6 +56,35 @@ export async function openChat(deps: ActionDeps, chatId: number): Promise<void> 
   await deps.invoke({ _: 'getChat', chat_id: chatId })
 }
 
+/**
+ * The chat behind an @username mention (design doc §8.3).
+ *
+ * TDLib has no "open by username": the name is first resolved with
+ * `searchPublicChat`, which answers the chat for a user, a group or a channel.
+ * A name nobody owns is what a stale mention in an old message looks like — it
+ * crosses IPC as an `AppError` carrying a Chinese sentence, so the renderer can
+ * toast it instead of opening a blank conversation.
+ */
+export async function openUsernameChat(deps: ActionDeps, input: string): Promise<ChatSummary> {
+  const username = input.trim().replace(/^@+/, '')
+  if (!username) throw new AppError('invalid_payload', '缺少用户名')
+  let raw: TdObject
+  try {
+    raw = await deps.invoke({ _: 'searchPublicChat', username })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (/USERNAME_NOT_OCCUPIED|USERNAME_INVALID|USERNAME_PURCHASE_AVAILABLE/.test(message)) {
+      throw new AppError('invalid_payload', `找不到 @${username} 这个用户名`)
+    }
+    throw error
+  }
+  // The summary is also pushed, so the row exists in the renderer's list before
+  // the pane mounts — the same contract as `openPrivateChat` on the adapter.
+  const summary = mapChat(deps.mapper, raw)
+  deps.emit({ type: 'chats', ops: [{ op: 'upsert', chat: summary }] })
+  return summary
+}
+
 /** TDLib's "muted forever"; `mute_for` is a signed 32-bit seconds field. */
 const MUTE_FOREVER = 2_147_483_647
 

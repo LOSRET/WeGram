@@ -9,6 +9,7 @@ import {
   historyNewer,
   joinCommentGroup,
   openChat,
+  openUsernameChat,
   sendComment,
   setChatMuted,
 } from './actions'
@@ -75,6 +76,44 @@ describe('openChat', () => {
      * reader's other devices all said "read" while the unread block was on screen.
      */
     expect(calls.map((call) => call._)).toEqual(['getChat'])
+  })
+})
+
+describe('openUsernameChat', () => {
+  const ada: TdObject = {
+    id: 7,
+    title: 'Ada Lovelace',
+    type: { _: 'chatTypePrivate', user_id: 21 },
+    unread_count: 0,
+    last_read_outbox_message_id: 0,
+  }
+
+  it('resolves an @username mention to its chat and pushes the row', async () => {
+    const { deps, calls, events } = makeDeps((method) =>
+      method._ === 'searchPublicChat' ? ada : null,
+    )
+
+    const chat = await openUsernameChat(deps, ' @ada_lovelace ')
+
+    // The mention covers the @; TDLib wants the bare name.
+    expect(calls).toEqual([{ _: 'searchPublicChat', username: 'ada_lovelace' }])
+    expect(chat).toMatchObject({ id: 7, title: 'Ada Lovelace', kind: 'private', userId: 21 })
+    // Upserted like `openPrivateChat`, so the row exists before the pane mounts.
+    expect(events).toEqual([{ type: 'chats', ops: [{ op: 'upsert', chat }] }])
+  })
+
+  it('reports a name nobody owns as a payload error, not a broken pane', async () => {
+    const { deps } = makeDeps((method) => {
+      if (method._ === 'searchPublicChat') {
+        throw Object.assign(new Error('USERNAME_NOT_OCCUPIED'), { code: 400 })
+      }
+      return null
+    })
+
+    await expect(openUsernameChat(deps, '@nobody')).rejects.toMatchObject({
+      code: 'invalid_payload',
+      message: '找不到 @nobody 这个用户名',
+    })
   })
 })
 
@@ -461,3 +500,4 @@ describe('beginStream', () => {
     }
   })
 })
+

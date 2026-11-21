@@ -337,12 +337,30 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
       unread: 3,
       pinned: false,
       muted: true,
-      lastMessageText: '会议纪要已经放到共享盘',
-      lastMessageAt: at(180),
+      lastMessageText: '完整纪要在这里 https://t.me/ada_lovelace',
+      lastMessageAt: at(0),
       lastReadInboxMessageId: 400,
       lastReadOutboxMessageId: 0,
     },
-    messages: [text(4, 401, 180, '会议纪要已经放到共享盘', false)],
+    messages: [
+      text(4, 401, 180, '会议纪要已经放到共享盘', false),
+      // Both mention kinds the transcript can jump from (§8.3): `mention` is the
+      // literal @username main resolves with `searchPublicChat`, and
+      // `mentionName` already carries the user id.
+      {
+        ...text(4, 402, 0, '@ada_lovelace 和 陈晨 都看下这份纪要', false),
+        entities: [
+          { type: 'mention', offset: 0, length: 13 },
+          { type: 'mentionName', offset: 16, length: 2, userId: 23 },
+        ],
+      },
+      // A Telegram link: the transcript opens it inside the app (§8.3), so the
+      // browser preview and the mock Electron window can click it through.
+      {
+        ...text(4, 403, 0, '完整纪要在这里 https://t.me/ada_lovelace', false),
+        entities: [{ type: 'url', offset: 8, length: 25 }],
+      },
+    ],
   })
 
   const newsChannel: FixtureSeed = {

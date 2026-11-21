@@ -2,10 +2,19 @@ import type { MessageEntity } from '@wegram/protocol'
 
 export interface EntityAttributes {
   type: MessageEntity['type']
+  /**
+   * Where the entity sits in the original text. A segment keeps its entities' own
+   * ranges, so a mention can read its full words even when another entity splits
+   * the segment (bold inside a mention).
+   */
+  offset: number
+  length: number
   url?: string
   language?: string
   /** TDLib int64, kept as a string (see `MessageEntity.customEmojiId`). */
   customEmojiId?: string
+  /** `mentionName` only: the mentioned user's id (see `MessageEntity.userId`). */
+  userId?: number
 }
 
 export interface TextSegment {
@@ -53,13 +62,18 @@ export function segmentText(text: string, entities: MessageEntity[] | undefined)
       .filter((entity) => entity.offset <= start && entity.offset + entity.length >= end)
       .map<EntityAttributes>((entity) => ({
         type: entity.type,
+        offset: entity.offset,
+        length: entity.length,
         ...(entity.url ? { url: entity.url } : {}),
         ...(entity.language ? { language: entity.language } : {}),
         ...(entity.customEmojiId ? { customEmojiId: entity.customEmojiId } : {}),
+        ...(entity.userId ? { userId: entity.userId } : {}),
       }))
       .sort((a, b) => a.type.localeCompare(b.type))
 
-    const key = active.map((entity) => `${entity.type}:${entity.url ?? ''}`).join('|')
+    const key = active
+      .map((entity) => `${entity.type}:${entity.url ?? ''}:${entity.userId ?? ''}`)
+      .join('|')
     const piece = text.slice(start, end)
     const last = segments[segments.length - 1]
     if (last && key === previousKey) last.text += piece

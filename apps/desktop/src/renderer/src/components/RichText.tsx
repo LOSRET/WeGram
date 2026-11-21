@@ -2,7 +2,10 @@ import type { MessageEntity } from '@wegram/protocol'
 import { Fragment, useState, type ReactNode } from 'react'
 
 import { segmentText, type EntityAttributes } from '../lib/entities'
+import { mentionTarget } from '../lib/mention'
+import { openMention } from '../lib/openMention'
 import { CustomEmoji } from './CustomEmoji'
+import { TelegramLink } from './TelegramLink'
 
 interface RichTextProps {
   text: string
@@ -19,7 +22,7 @@ export function RichText({ text, entities }: RichTextProps) {
   return (
     <>
       {segments.map((segment, index) => (
-        <Fragment key={index}>{wrapSegment(segment.text, segment.entities)}</Fragment>
+        <Fragment key={index}>{wrapSegment(text, segment.text, segment.entities)}</Fragment>
       ))}
     </>
   )
@@ -36,21 +39,22 @@ const WRAP_ORDER: Array<MessageEntity['type']> = [
   'strikethrough',
   'spoiler',
   'mention',
+  'mentionName',
   'hashtag',
   'url',
   'textUrl',
 ]
 
-function wrapSegment(text: string, entities: EntityAttributes[]): ReactNode {
+function wrapSegment(fullText: string, text: string, entities: EntityAttributes[]): ReactNode {
   let node: ReactNode = text
   const ordered = [...entities].sort(
     (a, b) => WRAP_ORDER.indexOf(a.type) - WRAP_ORDER.indexOf(b.type),
   )
-  for (const entity of ordered) node = wrap(entity, node)
+  for (const entity of ordered) node = wrap(entity, node, fullText)
   return node
 }
 
-function wrap(entity: EntityAttributes, children: ReactNode): ReactNode {
+function wrap(entity: EntityAttributes, children: ReactNode, fullText: string): ReactNode {
   switch (entity.type) {
     case 'bold':
       return <strong>{children}</strong>
@@ -75,6 +79,33 @@ function wrap(entity: EntityAttributes, children: ReactNode): ReactNode {
         <CustomEmoji id={entity.customEmojiId} glyph={String(children)} />
       )
     case 'mention':
+    case 'mentionName': {
+      // The entity's own range, not the segment's: another entity (bold inside a
+      // mention) splits the segment without changing what the name is.
+      const covered = fullText.slice(entity.offset, entity.offset + entity.length)
+      const target = mentionTarget(covered, entity)
+      if (!target) return <span className="wx-entity-mention">{children}</span>
+      return (
+        <span
+          className="wx-entity-mention wx-entity-mention--link"
+          role="button"
+          tabIndex={0}
+          onClick={(event) => {
+            // A mention can sit inside a link entity (a textUrl whose words are
+            // "@name"). Cancel the anchor's default action too, or one click would
+            // open the chat and the URL in a browser window.
+            event.preventDefault()
+            event.stopPropagation()
+            openMention(target)
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') openMention(target)
+          }}
+        >
+          {children}
+        </span>
+      )
+    }
     case 'hashtag':
       return <span className="wx-entity-mention">{children}</span>
     case 'url':
@@ -82,9 +113,9 @@ function wrap(entity: EntityAttributes, children: ReactNode): ReactNode {
       const href = safeHref(entity.url ?? (entity.type === 'url' ? String(children) : undefined))
       if (!href) return <span>{children}</span>
       return (
-        <a className="wx-link" href={href} target="_blank" rel="noreferrer">
+        <TelegramLink className="wx-link" href={href}>
           {children}
-        </a>
+        </TelegramLink>
       )
     }
     default:

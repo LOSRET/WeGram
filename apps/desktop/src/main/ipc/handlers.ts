@@ -149,6 +149,7 @@ export function createHandlers({
     'chats:get': (payload) => adapter.getChat(payload.chatId),
     'chats:open': (payload) => adapter.openChat(payload.chatId),
     'chats:openPrivate': (payload) => adapter.openPrivateChat(payload.userId),
+    'chats:openUsername': (payload) => adapter.openUsernameChat(payload.username),
     'chats:canPost': (payload) => adapter.canPost(payload.chatId),
     'chats:setMuted': (payload) => adapter.setChatMuted(payload.chatId, payload.muted),
     'chats:setPinned': (payload) => adapter.setChatPinned(payload.chatId, payload.pinned),

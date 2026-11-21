@@ -71,6 +71,12 @@ export const messageEntitySchema = z.object({
     'url',
     'textUrl',
     'mention',
+    /**
+     * A mention of a user by id (`textEntityTypeMentionName`): right-to-left
+     * scripts and users without a username are mentioned by their name, and only
+     * this entity carries the id the renderer can open.
+     */
+    'mentionName',
     'hashtag',
     'spoiler',
     'customEmoji',
@@ -79,6 +85,11 @@ export const messageEntitySchema = z.object({
   length: z.number().int().positive(),
   url: z.string().optional(),
   language: z.string().optional(),
+  /**
+   * `mentionName` only: the mentioned user's id. A `mention` carries none — its
+   * text is the `@username`, resolved when the reader taps it.
+   */
+  userId: z.number().int().optional(),
   /**
    * The custom emoji's id (TDLib int64), as a **string**: real ids exceed
    * `Number.MAX_SAFE_INTEGER` (measured 2026-11-20: 5909018290759408000), so a

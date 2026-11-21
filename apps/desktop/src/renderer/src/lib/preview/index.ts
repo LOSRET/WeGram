@@ -30,6 +30,7 @@ import {
   leavePreviewChat,
   previewChatMembers,
   previewInviteLink,
+  previewOpenUsername,
   previewPinnedMessage,
   searchPreviewChats,
   searchPreviewMessages,
@@ -180,8 +181,11 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       return ME
     case 'chats:list':
       return chats
-    case 'chats:get':
-      return chats.find((chat) => chat.id === store.chatId)
+    case 'chats:get': {
+      const chat = chats.find((item) => item.id === store.chatId)
+      if (!chat) throw { code: 'invalid_payload', message: `找不到会话 ${String(store.chatId)}` }
+      return { ...chat }
+    }
     case 'chats:open': {
       // Reading is reported per viewport via `messages:read`; opening a chat must
       // not mark it read (same rule as the real adapter, see tdlib/actions.ts).
@@ -230,6 +234,8 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       if (!chat) throw { code: 'internal', message: 'unknown preview contact' }
       return { ...chat }
     }
+    case 'chats:openUsername':
+      return previewOpenUsername(chats, contacts, String(store.username ?? ''))
     case 'contacts:list':
       return contacts
     case 'messages:read': {

@@ -13,6 +13,7 @@ const ENTITY_TYPES: Record<string, MessageEntity['type']> = {
   textEntityTypeUrl: 'url',
   textEntityTypeTextUrl: 'textUrl',
   textEntityTypeMention: 'mention',
+  textEntityTypeMentionName: 'mentionName',
   textEntityTypeHashtag: 'hashtag',
   textEntityTypeSpoiler: 'spoiler',
   textEntityTypeCustomEmoji: 'customEmoji',
@@ -25,12 +26,19 @@ export function mapEntities(rawEntities: TdObject[] | undefined): MessageEntity[
   for (const raw of rawEntities) {
     const type = ENTITY_TYPES[raw?.type?._]
     if (!type) continue
+    // A mention by id (`entityMentionName`) only carries the user, and a bad id is
+    // dropped rather than rounded into somebody else.
+    const mentionUserId =
+      raw.type?._ === 'textEntityTypeMentionName' ? Number(raw.type.user_id) : Number.NaN
     result.push({
       type,
       offset: raw.offset ?? 0,
       length: raw.length ?? 0,
       ...(raw.url ? { url: raw.url } : {}),
       ...(raw.language ? { language: raw.language } : {}),
+      ...(Number.isSafeInteger(mentionUserId) && mentionUserId > 0
+        ? { userId: mentionUserId }
+        : {}),
       // TDLib int64: keep it as the string tdl hands over, or the id rounds.
       ...(raw.type?.custom_emoji_id ? { customEmojiId: String(raw.type.custom_emoji_id) } : {}),
     })
