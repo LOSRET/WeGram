@@ -71,7 +71,7 @@ The TypeScript/Electron equivalent of rustracker's "no `.unwrap()` in production
 
 **Done means** `pnpm verify` green (lint → typecheck → test → build) with zero warnings. While iterating, use the narrow command (`pnpm vitest run <file>`, `pnpm typecheck`); when reporting, say exactly what you ran and what you skipped — never claim success on a subset.
 
-**Git.** Verify before committing (at least `pnpm typecheck && pnpm lint`). One logical change per commit, Conventional Commit messages. Small fix → current branch; multi-file feature or refactor → new branch.
+**Git.** Verify before committing (at least `pnpm typecheck && pnpm lint`). One logical change per commit, Conventional Commit messages. Commits are GPG-signed (`commit.gpgsign=true`): never pass `--no-gpg-sign`, and check `git log -1 --format=%G?` prints `G`. Small fix → current branch; multi-file feature or refactor → new branch.
 
 **Version.** The root `package.json` is the only place a version is written down. `pnpm sync-version` copies it into `apps/desktop` (what Electron and electron-builder read) and `packages/protocol`; `pnpm check:version`, the first step of `pnpm verify`, fails on drift. Bump with `pnpm version 0.2.1 --no-git-tag-version && pnpm sync-version`; the renderer gets the value inlined as `__WEGRAM_VERSION__` at build time, main uses `app.getVersion()`, and a release tag re-stamps the root manifest in CI.
 
