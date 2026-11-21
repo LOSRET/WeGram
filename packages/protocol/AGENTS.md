@@ -12,8 +12,9 @@ schemas), `errors.ts` (`AppError`) and the modules split out when a file hit its
 `contact.ts` (the 通讯录 `Contact` row), `settings.ts` (proxy,
 app settings, `app:info`), `viewer.ts` (the 图片和视频 window's payloads),
 `chat.ts` (the chat DTOs: kind/summary/member/pinned message/invite link/chat ops),
-`chats.ts` (the chat domain's channel keys and schemas) and `qr.ts` (the 群二维码
-window's channels), both spread into the two tables.
+`chats.ts` (the chat domain's channel keys and schemas), `qr.ts` (the 群二维码
+window's channels) and `search.ts` (the cross-chat message search schemas), with the
+channel tables of `chats.ts` and `qr.ts` spread into the two tables.
 The package is exported straight from source (`src/index.ts`, no build step), so
 `pnpm typecheck` in the consumer is the only build. A new field that pushes `dto.ts`
 over the budget is a signal to split the domain out, not to raise the cap.

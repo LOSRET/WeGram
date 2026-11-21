@@ -32,6 +32,7 @@ import {
   previewInviteLink,
   previewOpenUsername,
   previewPinnedMessage,
+  searchPreviewAllMessages,
   searchPreviewChats,
   searchPreviewMessages,
   setPreviewMuted,
@@ -229,6 +230,13 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       return searchPreviewChats(chats, String(store.q ?? ''), Number(store.limit ?? 20))
     case 'search:inChat':
       return searchPreviewMessages(previewChats, Number(store.chatId), String(store.q ?? ''))
+    case 'search:messages':
+      return searchPreviewAllMessages(previewChats, {
+        q: String(store.q ?? ''),
+        scope: store.scope === 'channel' ? 'channel' : 'chat',
+        limit: Number(store.limit ?? 20),
+        ...(store.cursor === undefined ? {} : { cursor: store.cursor }),
+      })
     case 'chats:openPrivate': {
       const chat = chats.find((item) => item.kind === 'private' && item.userId === store.userId)
       if (!chat) throw { code: 'internal', message: 'unknown preview contact' }

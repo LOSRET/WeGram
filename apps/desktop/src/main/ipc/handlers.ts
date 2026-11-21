@@ -177,6 +177,7 @@ export function createHandlers({
 
     'search:global': (payload) => adapter.searchGlobal(payload),
     'search:inChat': (payload) => adapter.searchInChat(payload),
+    'search:messages': (payload) => adapter.searchMessages(payload),
 
     'media:pick': async (payload) => {
       const owner = BrowserWindow.getFocusedWindow()

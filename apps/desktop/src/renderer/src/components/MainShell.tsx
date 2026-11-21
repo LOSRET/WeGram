@@ -11,6 +11,7 @@ import { ProxyPanel } from './ProxyPanel'
 import { SectionPlaceholder } from './SectionPlaceholder'
 import { SideRail, type ShellSection } from './SideRail'
 import { errorMessage, invoke } from '../lib/ipc'
+import type { MessageHit } from '../lib/messageSearch'
 import { activateChat } from '../lib/openChat'
 import { useAppStore } from '../store/useAppStore'
 
@@ -147,6 +148,20 @@ export function MainShell() {
     activateChat(chat)
   }, [])
 
+  /**
+   * A message hit opens its chat and asks the transcript to locate the row. The
+   * locate request may name a chat whose history is not loaded yet: the pane's
+   * locating path fetches the window around it (messages:around) after the chat
+   * has mounted, and spends the request exactly once.
+   */
+  const openMessageHit = useCallback((hit: MessageHit): void => {
+    const store = useAppStore.getState()
+    store.applyChatOps([{ op: 'upsert', chat: hit.chat }])
+    setQuery('')
+    activateChat(hit.chat)
+    store.requestLocate(hit.chat.id, hit.message.id)
+  }, [])
+
   return (
     <div className="wx-app">
       {/* WeChat paints one flat strip above all three columns; the native window
@@ -183,6 +198,7 @@ export function MainShell() {
               onQueryChange={setQuery}
               onSelect={openChat}
               onSelectHit={openSearchHit}
+              onOpenMessageHit={openMessageHit}
               onOpenPlus={(anchor) => setPlusMenu(anchor)}
             />
             <ChatPane />

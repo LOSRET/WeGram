@@ -246,24 +246,124 @@
 
 /* ---------- Global search results ---------- */
 
-/* The column swaps faces while the pill has text: a group header and the
-   server's hits, drawn plainly (one page at most), inside the same scroller. */
-.wx-list__hits {
+/* The column swaps faces while the pill has text: the 聊天 / 频道 tabs, the
+   conversations whose name matches, then the matching messages themselves.
+   Named "panel" because .wx-search is already the pill (SearchField). */
+.wx-search-panel {
   padding-bottom: 8px;
 }
 
-.wx-list__hits-head {
+.wx-search-tabs {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  height: 28px;
-  padding: 0 12px;
+  gap: 18px;
+  padding: 2px 12px 0;
+}
+
+.wx-search-tab {
+  padding: 6px 0;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--wx-text-secondary);
+}
+
+.wx-search-tab:hover {
+  color: var(--wx-text);
+}
+
+.wx-search-tab--active {
+  color: var(--wx-brand);
+  box-shadow: inset 0 -2px 0 var(--wx-brand);
+}
+
+.wx-search-section {
+  padding: 8px 12px 2px;
   font-size: 12px;
+  line-height: 16px;
   color: var(--wx-text-tertiary);
 }
 
-.wx-list__hits-count {
+.wx-search-found {
+  padding: 0 12px 6px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--wx-text-tertiary);
+}
+
+/* One message hit: 32 px chat face, the chat title over the message's own text. */
+.wx-search-hit {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  text-align: left;
+}
+
+.wx-search-hit:hover {
+  background: var(--wx-row-hover);
+}
+
+.wx-search-hit .wx-avatar {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 5px;
+  font-size: 13px;
+}
+
+.wx-search-hit__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.wx-search-hit__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.wx-search-hit__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--wx-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wx-search-hit__time {
+  flex: 0 0 auto;
   font-size: 11px;
+  line-height: 16px;
+  color: var(--wx-text-tertiary);
+}
+
+.wx-search-hit__text {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--wx-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wx-search-note {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--wx-text-tertiary);
+  text-align: center;
 }
 
 /* The matched run of a hit's title: WeChat's green rather than the browser's

@@ -18,7 +18,7 @@ listed in "Known deltas" is a deliberate, documented difference.
 | `renderer/src/components/MainShell.tsx` | Three-column shell, owns the toast + app menu + settings dialog state. |
 | `renderer/src/components/SideRail.tsx` | 61 px icon rail: avatar (connection dot), 聊天/通讯录/收藏/朋友圈, 手机/设置. The avatar is the account's real profile photo (`Self.avatarUrl`), initials until it arrives. All four sections are selectable; the selected tab swaps its outlined glyph for the filled one and is painted brand green, like the client. |
 | `renderer/src/components/SectionPlaceholder.tsx` | The 收藏 / 朋友圈 pane: those two tabs switch the shell (and turn green) but the protocol has no data for them, so the pane says 收藏/朋友圈还没有接入 instead of a toast. |
-| `renderer/src/components/ChatList.tsx` | Search pill + circular "+" (both inside the list column) + 65 px rows. The pill is the **global search** (§2.9): text swaps the column for the server's hits (`search:global`), Esc or the pill's × returns to the conversation list. Selecting the row that is already open toggles the conversation shut. Rows show the real chat photo when `ChatSummary.avatarUrl` is present, initials otherwise. |
+| `renderer/src/components/ChatList.tsx` | Search pill + circular "+" (both inside the list column) + 65 px rows. The pill is the **global search** (§2.9): text swaps the column for 聊天 / 频道 tabs — the server's conversation hits (`search:global`) and real message hits (`search:messages`) — and Esc or the pill's × returns to the conversation list. Selecting the row that is already open toggles the conversation shut. Rows show the real chat photo when `ChatSummary.avatarUrl` is present, initials otherwise. |
 | `renderer/src/components/contacts/ContactsList.tsx` | The 通讯录 column (§2.4): 26 px search, 35 px 通讯录管理 card, 36 px service rows, 54 px contact rows grouped by initial. |
 | `renderer/src/components/contacts/ContactDetail.tsx` | The contact card: 60 px avatar, 微信号, 朋友资料 / 更多信息, and the three blue actions (发消息 / 语音聊天 / 视频聊天). |
 | `renderer/src/lib/contacts.ts` | Private-chat filter + initial/grouping rules (pinyin via ICU collation; pure, unit-tested). |
@@ -443,27 +443,34 @@ against the client are listed separately.
 ### 2.9 Global search (added 2026-11-21)
 
 - **The pill is the entry, not a filter.** Typing swaps the list column's body for
-  `search:global` hits — TDLib `searchChats`, which matches titles and usernames
-  over every chat the client knows (archived and not-yet-paged ones included), so the
-  100-row first page no longer bounds what can be found. 260 ms debounce, newest
-  request wins; an empty box is the conversation list again.
-- **Shape:** results stay in the 238 px column (no separate overlay — W4's
-  "SearchOverlay" was planned, the client's own shape is this swap). A 28 px group
-  header `聊天` with the hit count on the right, then ordinary 65 px rows: at most
-  one page of hits, so they are drawn plainly instead of going through the
-  virtualiser. A pinned chat draws no pinned tint among results; unread badges stay.
-- **Hit emphasis:** the matched run of the title is `--wx-brand` green (the `mark`
-  element's yellow background is reset); on the selected row the run turns white and
-  underlined, or it would vanish into the green fill.
+  the search panel, 260 ms debounce, newest request wins; an empty box is the
+  conversation list again.
+- **Two tabs: 聊天 / 频道.** 聊天 covers private chats and groups, 频道 covers
+  channels (the client's own split). Both scopes are fetched for one query, so
+  switching tabs is instant.
+- **Each tab is two sections.** First the conversations whose name matches
+  (`search:global` → TDLib `searchChats`); then the messages themselves
+  (`search:messages` → TDLib `searchMessages` with `chat_type_filter`, the 聊天 tab
+  merging the private and group streams) under a `找到 N 条消息` line (TDLib's
+  approximate total). A hit row is the chat's 32 px face, its title with the time,
+  and the message preview; picking it opens that chat at that message through the
+  pane's existing locate path (it loads a window around a row it does not have).
+- **Paging** is cursor-based: the response carries TDLib's `next_offset` per stream,
+  and reaching within 160 px of the scroller's end asks for the next page; empty
+  offsets mean the scope is exhausted. Results are drawn plainly (no virtualiser):
+  a page is 20 rows and they append.
+- **Hit emphasis:** the matched run of a conversation title is `--wx-brand` green
+  (the `mark` element's yellow background is reset); on the selected row the run
+  turns white and underlined.
 - **The pill grows a 14 px ×** only while it has text; Esc clears it too (and stops
   there — the chat-info panel's Esc ordering never sees it).
-- **Picking a hit** upserts that summary into the store first (a hit need not be in
-  `chats` at all) and then clears the box, so the column is a list again with the
-  conversation open, not a result row that vanishes under the reader.
-- Verified in the browser preview on 2026-11-21: `周会` → one hit with the green run
-  and `1` count, the no-match copy, Esc and × back to the list, and clicking the hit
-  opening 前端周会. The real TDLib path is the adapter's existing `searchChats`
-  call; it was not exercised against the account that session.
+- Verified in the browser preview on 2026-11-21: `会议` → one message hit,
+  `找到 1 条消息`, clicking it opened 前端周会 and flashed the row; `频道` → the
+  会话 section with WeGram 频道 plus 3 channel message hits, clicking one opened the
+  channel at that post; `的` → `找到 5003 条消息`, scrolling appended page after page;
+  an empty scope reads 没有找到相关内容 and switching tabs is instant. The real TDLib
+  path (`searchMessages` + `chat_type_filter`) matches TDLib 1.8.70's scheme but was
+  not exercised against the account that session.
 
 ## 3. Icon provenance (this is the part people get wrong)
 
@@ -662,9 +669,10 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
 5. **Window controls** are the native `titleBarOverlay` buttons (~46 px each) versus
    WeChat's own ~30 px ones — height and colour match, widths do not.
 6. **List column is a fixed 238 px**; WeChat lets you drag it.
-7. **The chat-list search is a server search** (§2.9): it asks TDLib (`search:global`)
-   and shows conversation hits only. Telegram's 聊天记录 group (message hits across
-   chats) and 联系人 hits from the address book are not in the protocol yet.
+7. **The chat-list search is a server search** (§2.9): 聊天 / 频道 tabs, each with
+   conversation hits and real message hits (`search:messages`). Missing vs the
+   client: 应用 / 贴文 / 图片 / 视频 / 音频 / 链接 filters, 联系人 hits from the
+   address book, and archived chats (the search asks `chatListMain` only).
 8. **Dark mode** is measured end to end (§2, re-done 2026-11-18): surfaces, accents, text
    greys, the rail/toolbar glyph greys and the disabled send button all sample the client's
    own ink — the shell *and* the standalone viewer window (§2.1) — and the app was verified
@@ -857,10 +865,11 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
    with the private and group layouts, 搜索群成员, 群聊名称, 群公告 (pinned message),
    群二维码 / 添加 (invite link), mute/pin/clear and 退出群聊. Remaining: a member card
    on avatar click, and a local 备注 if the owner wants one.
-4. ~~Global search~~ — done 2026-11-21 (§2.9), inside the conversation column rather
-   than an overlay. Remaining: the 聊天记录 (message hits across chats) and 联系人
-   groups the client puts above the conversation hits, and a chat-wide in-chat search
-   view (the panel's 查找聊天内容, §2.8, still hosts that search).
+4. ~~Global search~~ — done 2026-11-21 (§2.9): 聊天 / 频道 tabs with conversation
+   and message hits, inside the conversation column rather than an overlay. Remaining:
+   the other filter tabs (应用 / 贴文 / 图片 / 视频 / 音频 / 链接), 联系人 hits,
+   archived chats, and a chat-wide in-chat search view (the panel's 查找聊天内容,
+   §2.8, still hosts that search).
 5. Pin button + draggable list width, if the client fidelity matters more than scope.
 6. ~~Avatar photos once the DTO carries them~~ — done for the rail, the chat list and
    **the transcript's sender rows** (`Message.senderAvatarUrl` + `evt:avatars`;

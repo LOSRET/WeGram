@@ -51,9 +51,11 @@ components/Avatar.tsx    the ONE avatar box (photo or initials); the box class i
                         is the positioned element, which is the rule that once cost a session
 components/CustomEmoji.tsx  a Premium custom emoji in text: its sticker art at 20 px,
                         with the base glyph as the fallback
-components/ChatList.tsx  the conversation column: pill (server global search, §2.9 of
-                        UI-HANDOFF), "+" and the virtualised rows; search hits are a
-                        plain results face in the same scroller
+components/ChatList.tsx  the conversation column: pill (server search panel, §2.9 of
+                        UI-HANDOFF), "+" and the virtualised rows; search results are a
+                        plain face in the same scroller (tabs + message rows)
+components/chat-search/ SearchTabs (聊天 / 频道) and SearchHitRow (one message hit:
+                        chat face, chat title, message preview, time)
 components/SearchField.tsx  the ONE search pill (label + input + optional trailing control)
 components/           the remaining visual concerns (Composer, MediaBubble, …)
 lib/ipc.ts            thin `window.tg` wrapper
@@ -61,8 +63,12 @@ lib/clipboard.ts      text copy for the contact card (navigator.clipboard + exec
 lib/format.ts         time / preview / avatar helpers (pure, unit-tested)
 lib/search.ts         normalizeQuery / containsText / matchSegments — the ONE reading of a
                       search box, and the hit emphasis a result row draws
-lib/useGlobalSearch.ts  the chat-list pill's server search: 260 ms debounce over
+lib/useGlobalSearch.ts  the search panel's conversation hits: 260 ms debounce over
                       search:global, only the newest request may land
+lib/messageSearch.ts  the search panel's hit/cursor rules (join a page to its chat
+                      summaries, dedupe an appended page; pure, unit-tested)
+lib/useMessageSearch.ts  cross-chat message search: one page per scope, cursor paging
+                      and load-more for the active tab
 lib/self.ts           SelfIdentity + selfIdentity(auth); one placeholder id (1000)
 lib/popupPlacement.ts (pure, unit-tested) "which edge does this card hang from"
 lib/mediaBox.ts       (pure, unit-tested) the reserved media box + percent text

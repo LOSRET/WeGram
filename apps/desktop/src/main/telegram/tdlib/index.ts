@@ -9,6 +9,8 @@ import type {
   ConnectionState,
   Contact,
   CustomEmojiSticker,
+  InvokeRequest,
+  InvokeResponse,
   Message,
   ProxyConfig,
   ProxyTestResult,
@@ -441,6 +443,12 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     fromMessageId?: number
   }): Promise<Message[]> {
     return actions.searchInChat(this.actionDeps, input)
+  }
+
+  async searchMessages(
+    input: InvokeRequest<'search:messages'>,
+  ): Promise<InvokeResponse<'search:messages'>> {
+    return actions.searchMessages(this.actionDeps, input)
   }
 
   async downloadFile(input: {

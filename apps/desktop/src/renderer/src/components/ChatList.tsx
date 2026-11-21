@@ -1,15 +1,19 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { ChatSummary } from '@wegram/protocol'
-import { memo, useEffect, useRef, type KeyboardEvent, type MouseEvent } from 'react'
+import { memo, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 
 import { Avatar } from './Avatar'
+import { SearchHitRow } from './chat-search/SearchHitRow'
+import { SearchTabs } from './chat-search/SearchTabs'
 import { OverlayScrollbar } from './OverlayScrollbar'
 import { PlusIcon } from './Icon'
 import { SearchField } from './SearchField'
 import { formatChatTime, previewSegments } from '../lib/format'
 import { CHAT_ROW_H, LIST_OVERSCAN } from '../lib/listMetrics'
+import type { MessageHit, SearchScope } from '../lib/messageSearch'
 import { matchSegments, normalizeQuery } from '../lib/search'
 import { useGlobalSearch } from '../lib/useGlobalSearch'
+import { useMessageSearch } from '../lib/useMessageSearch'
 
 interface ChatRowProps {
   chat: ChatSummary
@@ -94,6 +98,8 @@ interface ChatListProps {
   onSelect: (chat: ChatSummary) => void
   /** A global-search hit: it may sit outside `chats`, so the shell resolves it itself. */
   onSelectHit: (chat: ChatSummary) => void
+  /** A message hit: open that chat, then locate the row inside it. */
+  onOpenMessageHit: (hit: MessageHit) => void
   /** The header's circular "+" — opens the new-chat menu under the button. */
   onOpenPlus: (anchor: { x: number; y: number }) => void
 }
@@ -106,10 +112,11 @@ interface ChatListProps {
  * a full re-render of every row on each `evt:chats` batch is the difference between
  * a smooth wheel and a stutter. Rows are fixed-height, so no measurement pass.
  *
- * When the pill has text the column swaps faces: the rows become the server's
- * global search hits (`search:global` → TDLib `searchChats`, design doc §9.2),
- * not a filter over the page already loaded. That face is at most one page of
- * hits, so it is drawn plainly; Esc or the pill's × brings the conversations back.
+ * When the pill has text the column swaps faces (design doc §9.2): 聊天 / 频道
+ * tabs, the conversations whose name matches (`search:global`), then the actual
+ * messages those chats contain (`search:messages`, TDLib `searchMessages` with
+ * a chat-type filter). Results are drawn plainly and pages load as the reader
+ * reaches the end; Esc or the pill's × brings the conversations back.
  */
 export function ChatList({
   chats,
@@ -118,6 +125,7 @@ export function ChatList({
   onQueryChange,
   onSelect,
   onSelectHit,
+  onOpenMessageHit,
   onOpenPlus,
 }: ChatListProps) {
   // The scrolling view and the box that hosts the floating scrollbar (the
@@ -127,17 +135,26 @@ export function ChatList({
 
   const needle = normalizeQuery(query)
   const searching = needle !== ''
-  const { hits, loading, error } = useGlobalSearch(query)
+  const [tab, setTab] = useState<SearchScope>('chat')
+  /** Conversations whose title matches, split by the active scope. */
+  const { hits: chatHits, loading: chatHitsLoading, error: chatHitsError } = useGlobalSearch(query)
+  /** Message text across chats, one page per scope. */
+  const { scopes, loadMore } = useMessageSearch(query)
+  const conversationHits = chatHits.filter((chat) =>
+    tab === 'channel' ? chat.kind === 'channel' : chat.kind !== 'channel',
+  )
+  const scopeState = scopes[tab]
+  const loading = chatHitsLoading || scopeState.loading
 
-  // Both faces open at the top, and the virtualiser has to be told through a real
-  // scroll event: a programmatic `scrollTop` write bypasses its own listener
-  // (renderer/AGENTS.md).
+  // Both faces (and both search tabs) open at the top, and the virtualiser has to
+  // be told through a real scroll event: a programmatic `scrollTop` write bypasses
+  // its own listener (renderer/AGENTS.md).
   useEffect(() => {
     const scroller = scrollRef.current
     if (!scroller) return
     scroller.scrollTop = 0
     scroller.dispatchEvent(new Event('scroll'))
-  }, [searching])
+  }, [searching, tab])
 
   const virtualizer = useVirtualizer({
     count: searching ? 0 : chats.length,
@@ -159,6 +176,15 @@ export function ChatList({
     if (event.key !== 'Escape' || !searching) return
     event.stopPropagation()
     onQueryChange('')
+  }
+
+  /** Reaching the end of the results asks for the next page of the active scope. */
+  const onScroll = (): void => {
+    if (!searching) return
+    const scroller = scrollRef.current
+    if (!scroller) return
+    if (scroller.scrollTop + scroller.clientHeight < scroller.scrollHeight - 160) return
+    loadMore(tab)
   }
 
   return (
@@ -193,32 +219,48 @@ export function ChatList({
       </div>
 
       <div className="wx-list__body" ref={bodyRef}>
-        <div className="wx-list__view" ref={scrollRef} data-testid="chat-scroller">
+        <div
+          className="wx-list__view"
+          ref={scrollRef}
+          data-testid="chat-scroller"
+          onScroll={onScroll}
+        >
           {searching ? (
-            <div className="wx-list__hits">
-              <div className="wx-list__hits-head">
-                <span>聊天</span>
-                {!loading && error === null && hits.length > 0 ? (
-                  <span className="wx-list__hits-count">{hits.length}</span>
-                ) : null}
-              </div>
-              {error !== null ? (
-                <div className="wx-list__empty">{error}</div>
+            <div className="wx-search-panel">
+              <SearchTabs value={tab} onChange={setTab} />
+              {conversationHits.length > 0 ? (
+                <>
+                  <div className="wx-search-section">会话</div>
+                  {conversationHits.map((chat) => (
+                    <ChatRow
+                      key={chat.id}
+                      chat={chat}
+                      active={chat.id === activeChatId}
+                      onSelect={onSelectHit}
+                      highlight={needle}
+                    />
+                  ))}
+                </>
+              ) : null}
+              {scopeState.error !== null ? (
+                <div className="wx-list__empty">{scopeState.error}</div>
+              ) : scopeState.hits.length > 0 ? (
+                <>
+                  <p className="wx-search-found">找到 {scopeState.total} 条消息</p>
+                  {scopeState.hits.map((hit) => (
+                    <SearchHitRow
+                      key={hit.chat.id + ':' + hit.message.id}
+                      hit={hit}
+                      onOpen={onOpenMessageHit}
+                    />
+                  ))}
+                  {scopeState.loadingMore ? <p className="wx-search-note">正在加载…</p> : null}
+                </>
               ) : loading ? (
                 <div className="wx-list__empty">正在搜索…</div>
-              ) : hits.length === 0 ? (
-                <div className="wx-list__empty">没有找到相关聊天</div>
-              ) : (
-                hits.map((chat) => (
-                  <ChatRow
-                    key={chat.id}
-                    chat={chat}
-                    active={chat.id === activeChatId}
-                    onSelect={onSelectHit}
-                    highlight={needle}
-                  />
-                ))
-              )}
+              ) : conversationHits.length === 0 && chatHitsError === null ? (
+                <div className="wx-list__empty">没有找到相关内容</div>
+              ) : null}
             </div>
           ) : chats.length === 0 ? (
             <div className="wx-list__empty">还没有会话</div>

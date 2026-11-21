@@ -6,6 +6,7 @@ import type {
   Contact,
   EventChannel,
   Message,
+  SearchMessagesCursor,
 } from '@wegram/protocol'
 
 /**
@@ -145,6 +146,54 @@ export function searchPreviewChats(chats: ChatSummary[], q: string, limit: numbe
   const needle = q.trim().toLowerCase()
   if (needle === '') return []
   return chats.filter((chat) => chat.title.toLowerCase().includes(needle)).slice(0, limit)
+}
+
+/**
+ * Cross-chat hits for the search panel, the mock adapter's rule over the fixture
+ * account: one merged stream per scope, the numeric offset as its cursor.
+ */
+export function searchPreviewAllMessages(
+  store: PreviewChatStore,
+  input: {
+    q: string
+    scope: 'chat' | 'channel'
+    limit: number
+    cursor?: SearchMessagesCursor
+  },
+): {
+  messages: Message[]
+  chats: ChatSummary[]
+  total: number
+  cursor: SearchMessagesCursor
+} {
+  const needle = input.q.trim().toLowerCase()
+  const wantChannel = input.scope === 'channel'
+  const key = wantChannel ? 'channel' : 'private'
+  const offset = Number.parseInt(input.cursor?.[key] ?? '0', 10) || 0
+
+  const hits: { chat: ChatSummary; message: Message }[] = []
+  for (const chat of store.chats) {
+    if ((chat.kind === 'channel') !== wantChannel) continue
+    for (const message of store.messagesByChat[chat.id] ?? []) {
+      if (message.text.toLowerCase().includes(needle)) hits.push({ chat, message })
+    }
+  }
+  hits.sort((a, b) => b.message.date - a.message.date || b.message.id - a.message.id)
+
+  const page = hits.slice(offset, offset + input.limit)
+  const next = offset + input.limit < hits.length ? String(offset + input.limit) : ''
+  return {
+    messages: page.map((hit) => hit.message),
+    chats: [...new Map(page.map((hit) => [hit.chat.id, hit.chat])).values()].map((chat) => ({
+      ...chat,
+    })),
+    total: hits.length,
+    cursor: {
+      private: wantChannel ? '' : next,
+      group: '',
+      channel: wantChannel ? next : '',
+    },
+  }
 }
 
 /** In-chat search, the mock adapter's substring rule over the transcript. */

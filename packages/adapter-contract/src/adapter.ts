@@ -18,6 +18,7 @@ import type {
   StickerSetSummary,
   UserAvatar,
   InvokeRequest,
+  InvokeResponse,
 } from '@wegram/protocol'
 
 export type AdapterKind = 'mock' | 'tdlib'
@@ -222,6 +223,14 @@ export interface TelegramAdapter {
 
   searchGlobal(input: InvokeRequest<'search:global'>): Promise<ChatSummary[]>
   searchInChat(input: InvokeRequest<'search:inChat'>): Promise<Message[]>
+  /**
+   * Message text across chats, split by chat type: 'chat' asks TDLib for private
+   * chats and groups (two streams merged), 'channel' for channels. The returned
+   * cursor continues the page; empty offsets mean that stream is exhausted.
+   */
+  searchMessages(
+    input: InvokeRequest<'search:messages'>,
+  ): Promise<InvokeResponse<'search:messages'>>
 
   downloadFile(input: InvokeRequest<'media:download'>): Promise<{ path: string; url: string }>
   /**

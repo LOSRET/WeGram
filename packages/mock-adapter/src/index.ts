@@ -14,6 +14,7 @@ import type {
   MessageMedia,
   ProxyConfig,
   ProxyTestResult,
+  SearchMessagesCursor,
   Self,
   StickerSet,
   StickerSetSummary,
@@ -44,7 +45,7 @@ import {
   type MockHistoryQuery,
   type MockNewerQuery,
 } from './history'
-import { searchChats, searchMessages } from './search'
+import { searchChats, searchMessages, searchMessagesInScope } from './search'
 import { getMockStickerSet, listMockCustomEmoji, listMockStickerSets } from './stickers'
 import { emitTraffic } from './traffic'
 import { appendMessage, outgoingMessage } from './transcript'
@@ -431,6 +432,20 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     fromMessageId?: number
   }): Promise<Message[]> {
     return searchMessages(this.fixtures, input)
+  }
+
+  async searchMessages(input: {
+    q: string
+    scope: 'chat' | 'channel'
+    limit: number
+    cursor?: SearchMessagesCursor
+  }): Promise<{
+    messages: Message[]
+    chats: ChatSummary[]
+    total: number
+    cursor: SearchMessagesCursor
+  }> {
+    return searchMessagesInScope(this.fixtures, input)
   }
 
   async downloadFile(input: { fileId: number; priority: number }) {

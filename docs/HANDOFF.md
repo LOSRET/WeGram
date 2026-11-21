@@ -922,11 +922,12 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
      left to TDLib's error.
    - `updateMessageContent`/`updateNewMessage` are mapped, but `updateMessageSendSucceeded`
      is not handled separately; message ids are server ids already, so it is cosmetic.
-   - ~~Search is W4~~ — **done 2026-11-21**: the chat-list pill runs `search:global`
-     (TDLib `searchChats`, offline title/username match over known chats) and the
-     聊天信息 panel's 查找聊天内容 runs `search:inChat` (`searchChatMessages`). Still
-     missing: message hits across chats, 联系人 hits, and paging beyond one page of
-     results.
+   - ~~Search is W4~~ — **done 2026-11-21**: the chat-list pill is a Telegram-style
+     panel — 聊天 / 频道 tabs, conversation hits (`searchChats`) and real message hits
+     across chats (`searchMessages` with `chat_type_filter`, cursor-paged) — and the
+     聊天信息 panel's 查找聊天内容 runs `search:inChat`. Still missing: the other
+     filter tabs (贴文/图片/视频/链接), 联系人 hits, and archived chats (the search
+     asks `chatListMain` only).
 4. ~~**Channel posts show senderName `未知`**~~ — **done**: `senderChatId` in the DTO,
    `mapMessage` resolves `messageSenderChat` through the chat-title cache, verified on
    the real account by the `senderChat` line of `tdlib:smoke`. Mock + preview fixtures

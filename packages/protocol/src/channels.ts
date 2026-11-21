@@ -33,6 +33,7 @@ import {
 } from './comment'
 import { contactSchema } from './contact'
 import { appErrorSchema } from './errors'
+import { searchMessagesRequestSchema, searchMessagesResponseSchema } from './search'
 
 /**
  * Single source of truth for the IPC contract (design doc §7).
@@ -107,6 +108,12 @@ export const invokeChannels = [
   'messages:sendSticker',
   'search:global',
   'search:inChat',
+  /**
+   * Searches message text across chats (the search panel's 聊天 / 频道 tabs),
+   * with TDLib's chat-type filter doing the partitioning: 聊天 covers private
+   * chats and groups, 频道 covers channels.
+   */
+  'search:messages',
   'media:pick',
   'media:download',
   /**
@@ -285,6 +292,11 @@ export const invokeSchemas = {
       fromMessageId: z.number().int().optional(),
     }),
     response: z.array(messageSchema),
+  },
+  /** Cross-chat message search; schemas live in `search.ts`. */
+  'search:messages': {
+    request: searchMessagesRequestSchema,
+    response: searchMessagesResponseSchema,
   },
   /** Opens the native file dialog; an empty list means the user cancelled. */
   'media:pick': {
