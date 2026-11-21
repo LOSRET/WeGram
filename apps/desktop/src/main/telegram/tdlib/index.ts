@@ -1,6 +1,7 @@
 import { AppError } from '@wegram/protocol'
 import type {
   AuthState,
+  BootState,
   ChatSummary,
   ConnectionState,
   Contact,
@@ -12,7 +13,6 @@ import type {
   StickerSet,
   StickerSetSummary,
 } from '@wegram/protocol'
-import { createClient } from 'tdl'
 
 import { createLogger, toAdapterError } from '../../util'
 import { AdapterEmitter } from '../adapter'
@@ -22,13 +22,13 @@ import type { ActionDeps } from './actions'
 import * as auth from './auth'
 import type { AuthDeps } from './auth'
 import { AvatarCache } from './avatar-cache'
-import { configureTdlib, safeVersion } from './client'
-import type { TdClientLike, TdObject } from './client'
+import type { TdObject } from './client'
+import { TdlibLifecycle } from './lifecycle'
 import type { MapperContext } from './map/context'
 import { createResolvers } from './map/resolvers'
 import { mapChat } from './map/chat'
 import { mapUser } from './map/user'
-import { applyProxy, setProxy as applyProxyConfig, testProxy as testProxyConfig } from './proxy'
+import { setProxy as applyProxyConfig, testProxy as testProxyConfig } from './proxy'
 import type { ProxyDeps } from './proxy'
 import * as stickers from './stickers'
 import { createUpdateHandler } from './updates'
@@ -54,16 +54,16 @@ export interface TdlibAdapterOptions {
  * Authorization is driven manually instead of `client.login()`, because the UI
  * needs explicit steps (`auth:start` → `auth:code` → `auth:password`).
  *
- * This file owns lifecycle, connection state and the `invoke` wrapper; the
- * protocol work itself lives in the sibling modules (`auth` for the sign-in
- * steps, `actions`, `updates`, `avatar-cache`, `stickers`, `proxy`, `map/*`).
+ * This file owns connection state and the `invoke` wrapper; the client lifecycle
+ * (create, crash, restart) is `lifecycle.ts`, and the protocol work itself lives
+ * in the sibling modules (`auth` for the sign-in steps, `actions`, `updates`,
+ * `avatar-cache`, `stickers`, `proxy`, `map/*`).
  */
 export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   readonly kind = 'tdlib' as const
   readonly label = 'TDLib'
 
   private readonly logger = createLogger('tdlib')
-  private client: TdClientLike | null = null
   private auth: AuthState = { kind: 'idle' }
   private connection: ConnectionState = 'offline'
   private proxy: ProxyConfig | null = null
@@ -88,6 +88,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   private readonly authDeps: AuthDeps
   private readonly proxyDeps: ProxyDeps
   private readonly handleUpdate: (update: TdObject) => Promise<void>
+  private readonly lifecycle: TdlibLifecycle
 
   constructor(private readonly options: TdlibAdapterOptions) {
     super()
@@ -147,7 +148,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     this.authDeps = {
       invoke: (method) => this.invoke(method),
       getAuth: () => this.auth,
-      resetClient: () => this.resetClient(),
+      resetClient: () => this.lifecycle.restart(),
     }
 
     this.proxyDeps = {
@@ -166,7 +167,9 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
       mapper: this.mapper,
       logger: this.logger,
       setAuth: (state) => this.setAuth(state),
+      setBoot: (state) => this.lifecycle.setBoot(state),
       setConnection: (state) => this.setConnection(state),
+      setConnectionBoot: (state) => this.lifecycle.noteConnectionBoot(state),
       me: () => this.me(),
       fetchChatSummary: (chatId) => actions.fetchChatSummary(this.actionDeps, chatId),
       avatars: {
@@ -178,81 +181,45 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
         syncUserPhoto: (userId, fileId) => this.avatars.syncUserPhoto(userId, fileId),
       },
       getSelfUserId: () => this.selfUserId,
-      safeVersion: () => safeVersion(this.client),
+      safeVersion: () => this.lifecycle.version(),
     })
-  }
 
-  async start(): Promise<void> {
-    if (this.client) return
-    configureTdlib(this.logger)
-
-    // `restartAuth()` drops this client and creates another one; every callback
-    // checks identity first so a dying client cannot touch the adapter.
-    const client = createClient({
+    // Built last: it needs `handleUpdate`, and every other dep above reaches it
+    // lazily anyway.
+    this.lifecycle = new TdlibLifecycle({
       apiId: this.options.apiId,
       apiHash: this.options.apiHash,
       databaseDirectory: this.options.databaseDirectory,
       filesDirectory: this.options.filesDirectory,
       useTestDc: this.options.useTestDc === true,
-      tdlibParameters: {
-        use_message_database: true,
-        use_secret_chats: false,
-        system_language_code: 'zh-hans',
-        application_version: this.options.applicationVersion ?? 'dev',
-        device_model: 'WeGram Desktop',
-        system_version: 'Windows',
+      applicationVersion: this.options.applicationVersion ?? 'dev',
+      initialProxy: this.options.initialProxy,
+      logger: this.logger,
+      emit: (event) => this.emit(event),
+      handleUpdate: (update) => this.handleUpdate(update),
+      setAuth: (state) => this.setAuth(state),
+      proxy: this.proxyDeps,
+      onReset: () => {
+        this.selfUserId = null
+        this.setAuth({ kind: 'idle' })
       },
-    }) as unknown as TdClientLike
-    this.client = client
-
-    client.on('update', (update) => {
-      if (this.client !== client) return
-      void this.handleUpdate(update).catch((error) => {
-        this.logger.warn('update handler failed:', error instanceof Error ? error.message : error)
-      })
     })
-    client.on('error', (error) => {
-      if (this.client !== client) return
-      this.logger.warn('client error:', error.message)
-    })
-    client.on('close', () => {
-      if (this.client !== client) return
-      this.setAuth({ kind: 'closed' })
-    })
-
-    // Proxy must be in place before any network request (§6.4). tdl queues
-    // requests until it has sent the TDLib parameters, so calling it here is
-    // both safe and early enough.
-    if (this.options.initialProxy) {
-      const proxy = this.options.initialProxy
-      void applyProxy(this.proxyDeps, proxy)
-        .then(() =>
-          this.logger.info(`initial proxy applied: ${proxy.type} ${proxy.host}:${proxy.port}`),
-        )
-        .catch((error) =>
-          this.logger.warn(
-            'initial proxy failed:',
-            error instanceof Error ? error.message : String(error),
-          ),
-        )
-    }
-
-    // Version is only known once TDLib emits its first update, so it is not
-    // available here; report it when authorization settles instead.
-    this.logger.info('TDLib client created')
   }
 
-  async stop(): Promise<void> {
-    if (!this.client) return
-    try {
-      await this.client.close()
-    } finally {
-      this.client = null
-    }
+  start(): Promise<void> {
+    return this.lifecycle.start()
+  }
+
+  stop(): Promise<void> {
+    return this.lifecycle.stop()
   }
 
   getAuthState(): AuthState {
     return this.auth
+  }
+
+  getBootState(): BootState {
+    return this.lifecycle.getBootState()
   }
 
   getConnectionState(): ConnectionState {
@@ -281,32 +248,6 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
 
   async restartAuth(): Promise<AuthState> {
     return auth.restartAuth(this.authDeps)
-  }
-
-  /** `destroy` deletes the database: the replacement waits for the old `close`. */
-  private async resetClient(): Promise<void> {
-    const client = this.client
-    if (client) {
-      // Detach first: the old client's close/update callbacks must not fire into
-      // this adapter while the replacement is starting.
-      this.client = null
-      const closed = new Promise<void>((resolve) => {
-        client.on('close', () => resolve())
-      })
-      try {
-        await client.invoke({ _: 'destroy' })
-      } catch (error) {
-        this.logger.warn('destroy failed:', error instanceof Error ? error.message : String(error))
-      }
-      await Promise.race([
-        closed,
-        new Promise<void>((resolve) => setTimeout(resolve, 5_000)),
-      ])
-    }
-
-    this.selfUserId = null
-    this.setAuth({ kind: 'idle' })
-    await this.start()
   }
 
   async logout(): Promise<void> {
@@ -522,7 +463,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   }
 
   private async invoke(method: TdObject): Promise<any> {
-    const client = this.client
+    const client = this.lifecycle.getClient()
     if (!client) throw new AppError('internal', 'TDLib client is not started')
     try {
       return await client.invoke(method)

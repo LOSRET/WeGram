@@ -7,6 +7,9 @@ export function publishAdapterEvent(bus: EventBus, event: AdapterEvent): void {
     case 'auth':
       bus.publish('evt:auth', event.state)
       return
+    case 'boot':
+      bus.publish('evt:boot', event.state)
+      return
     case 'connection':
       bus.publish('evt:connection', event.state)
       return

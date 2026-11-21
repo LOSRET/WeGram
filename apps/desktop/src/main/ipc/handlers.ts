@@ -116,6 +116,7 @@ export function createHandlers({
     },
 
     'auth:state': () => adapter.getAuthState(),
+    'boot:state': () => adapter.getBootState(),
     'auth:start': (payload) => {
       onAuthInteraction()
       return adapter.submitPhone(payload.phone)

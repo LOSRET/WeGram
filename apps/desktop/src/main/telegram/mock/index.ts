@@ -6,6 +6,7 @@ import { pageAround, pageNewer, pageOlder, sortChatList } from '@wegram/mock-ses
 import { AppError } from '@wegram/protocol'
 import type {
   AuthState,
+  BootState,
   ChatSummary,
   ConnectionState,
   Contact,
@@ -111,6 +112,14 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
 
   getAuthState(): AuthState {
     return this.auth
+  }
+
+  /**
+   * The mock has no client to load: it is up as soon as the adapter exists, and a
+   * half-written fixture folder is a development error, not a Telegram outage.
+   */
+  getBootState(): BootState {
+    return { kind: 'ready' }
   }
 
   getConnectionState(): ConnectionState {

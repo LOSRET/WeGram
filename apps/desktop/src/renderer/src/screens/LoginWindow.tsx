@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { CloseIcon, SettingsGearIcon, TelegramLogo } from '@renderer/components/Icon'
+import { CloseIcon, SettingsGearIcon } from '@renderer/components/Icon'
 import { ProxyPanel } from '@renderer/components/ProxyPanel'
 
+import { BootStatus } from './login/BootStatus'
 import { LoginFooter } from './login/LoginFooter'
 import { LoginHelp } from './login/LoginHelp'
 import { PhoneForm } from './login/PhoneForm'
@@ -17,14 +18,18 @@ type Panel = 'proxy' | 'help' | null
  * 280×373 frameless window, before the shell exists at all.
  *
  * This component is the window's chrome and its four bodies; the flow itself
- * lives in `useLoginFlow`, the copy in `loginCopy` and each step in its own
- * module under `login/`. The window owns no chat state: it only follows auth
+ * lives in `useLoginFlow`, the copy in `loginCopy` / `bootCopy` and each step in
+ * its own module under `login/`. The window owns no chat state: it only follows auth
  * events, so the two windows never both hydrate the chat store.
  */
 export function LoginWindow() {
   const flow = useLoginFlow()
   const [panel, setPanel] = useState<Panel>(null)
   const copy = loginCopy(flow.step, flow.auth)
+  /** A terminal startup phase: the spinner is gone and the reason takes over. */
+  const bootDown = flow.boot?.kind === 'failed' || flow.boot?.kind === 'crashed'
+  /** Nothing but 登录帮助 is actionable once the client is gone. */
+  const terminal = bootDown || flow.closed
 
   return (
     <div className="wx-login">
@@ -50,27 +55,10 @@ export function LoginWindow() {
         </button>
       </div>
 
-      {flow.booting ? (
-        <div className="wx-login__body wx-login__body--center">
-          <TelegramLogo size={64} className="wx-login__mark" />
-          <div className="wx-login__spinner">
-            <span className="wx-spinner" />
-          </div>
-          <div className="wx-login__subtitle">正在连接 Telegram…</div>
-          {flow.error ? (
-            <div className="wx-login__feedback">
-              <span className="wx-login__error">{flow.error}</span>
-            </div>
-          ) : null}
-        </div>
-      ) : flow.closed ? (
-        <div className="wx-login__body wx-login__body--center">
-          <TelegramLogo size={64} className="wx-login__mark wx-login__mark--muted" />
-          <div className="wx-login__title">连接已关闭</div>
-          <div className="wx-login__subtitle">
-            与 Telegram 的连接已断开，重新打开 WeGram 就能再试。
-          </div>
-        </div>
+      {terminal ? (
+        <BootStatus boot={flow.boot} closed={flow.closed} error={flow.error} />
+      ) : flow.booting ? (
+        <BootStatus boot={flow.boot} closed={false} error={flow.error} />
       ) : flow.ready && flow.auth?.kind === 'ready' ? (
         <ProfileStep me={flow.auth.me} busy={flow.busy} onEnter={() => void flow.enter()} />
       ) : flow.qrLink !== null || flow.qrPending ? (
@@ -96,10 +84,10 @@ export function LoginWindow() {
       )}
 
       <LoginFooter
-        ready={flow.ready}
-        qrLink={flow.qrLink}
-        qrPending={flow.qrPending}
-        phoneEntry={flow.phoneEntry}
+        ready={flow.ready && !terminal}
+        qrLink={terminal ? null : flow.qrLink}
+        qrPending={terminal ? false : flow.qrPending}
+        phoneEntry={terminal ? false : flow.phoneEntry}
         busy={flow.busy}
         onSwitchAccount={() => void flow.switchAccount()}
         onSwitchToPhone={() => void flow.switchToPhone()}
@@ -110,9 +98,7 @@ export function LoginWindow() {
       {panel === 'proxy' ? (
         <ProxyPanel onClose={() => setPanel(null)} onError={flow.setError} />
       ) : null}
-      {panel === 'help' ? (
-        <LoginHelp isMock={flow.isMock} onClose={() => setPanel(null)} />
-      ) : null}
+      {panel === 'help' ? <LoginHelp isMock={flow.isMock} onClose={() => setPanel(null)} /> : null}
     </div>
   )
 }

@@ -10,7 +10,8 @@ only adds what is specific to this layer.
 main.tsx              route by hash: plain = shell, #viewer = viewer, #login = login window
 App.tsx               shell only (auth ready) + the ONE place that subscribes to evt:*
 screens/LoginWindow.tsx  the standalone login window: chrome + its four bodies
-screens/login/           useLoginFlow (the whole sign-in flow) + QrStep / ProfileStep /
+screens/login/           useLoginFlow (the whole sign-in flow) + BootStatus / bootCopy (the
+                         startup-phase and failed/crashed panel) + QrStep / ProfileStep /
                          PhoneForm / LoginFooter / LoginHelp + loginCopy (pure copy table)
 components/QrCode.tsx    login QR: one SVG path from the qrcode matrix
 lib/qr.ts                QR matrix + path helpers (pure, unit-tested)

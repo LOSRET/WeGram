@@ -1,5 +1,6 @@
 import type {
   AuthState,
+  BootState,
   ChatSummary,
   ConnectionState,
   MessageInteraction,
@@ -11,7 +12,7 @@ import type { Logger } from '../../util'
 import type { AdapterEvent } from '../adapter'
 import type { TdObject } from './client'
 import { asArray } from './json'
-import { mapConnectionState } from './map/chat'
+import { mapConnectionBoot, mapConnectionState } from './map/chat'
 import type { MapperContext } from './map/context'
 import { isTranscriptRemoval } from './map/deletion'
 import { mapMessage } from './map/message'
@@ -23,7 +24,10 @@ export interface UpdateDeps {
   mapper: MapperContext
   logger: Logger
   setAuth(state: AuthState): void
+  setBoot(state: BootState): void
   setConnection(state: ConnectionState): void
+  /** Connection-derived boot stage; ignored once the boot settled. */
+  setConnectionBoot(state: BootState): void
   me(): Promise<Self>
   fetchChatSummary(chatId: number): Promise<ChatSummary>
   avatars: {
@@ -54,6 +58,7 @@ export function createUpdateHandler(deps: UpdateDeps): (update: TdObject) => Pro
         return
       case 'updateConnectionState':
         deps.setConnection(mapConnectionState(update.state))
+        deps.setConnectionBoot(mapConnectionBoot(update.state))
         return
       case 'updateNewMessage': {
         const raw = update.message
@@ -245,7 +250,18 @@ async function handleAuthorizationState(
   deps: UpdateDeps,
   state: TdObject | undefined,
 ): Promise<void> {
+  // Any authorization state except the two lifecycle ones means the client is up:
+  // the boot panel's job is done and the sign-in steps take over.
+  if (
+    state?._ !== 'authorizationStateWaitTdlibParameters' &&
+    state?._ !== 'authorizationStateClosed'
+  ) {
+    deps.setBoot({ kind: 'ready' })
+  }
   switch (state?._) {
+    case 'authorizationStateWaitTdlibParameters':
+      deps.setBoot({ kind: 'opening' })
+      return
     case 'authorizationStateWaitPhoneNumber':
       deps.setAuth({ kind: 'waitPhoneNumber' })
       deps.logger.info(`TDLib ${deps.safeVersion()} ready for phone login`)
@@ -297,7 +313,7 @@ async function handleAuthorizationState(
       deps.setAuth({ kind: 'closed' })
       return
     default:
-      // authorizationStateLoggingOut / waitTdlibParameters etc. keep the
+      // authorizationStateLoggingOut / authorizationStateClosing keep the
       // previous state visible; nothing actionable for the UI.
       return
   }

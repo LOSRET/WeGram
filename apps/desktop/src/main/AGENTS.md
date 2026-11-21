@@ -22,8 +22,10 @@ telegram/mock/      fixtures.ts is a thin adapter over @wegram/mock-fixtures (th
                     data, shared with the browser preview); transcript.ts is the one
                     "append and announce" writer, effects.ts drives read/transfer; paging,
                     read, comment and list-order rules come from @wegram/mock-session
-telegram/tdlib/     client / updates / json.ts (the one "missing array" read) / map/* (content,
-                    rich, media.ts holds the one media field table)
+telegram/tdlib/     lifecycle.ts (create / crash / restart the client, reports BootState) /
+                    boot.ts (that state machine) / client / updates / json.ts (the one
+                    "missing array" read) / map/* (content, rich, media.ts holds the one
+                    media field table)
 telegram/tdlib/actions/  TDLib requests as functions over ActionDeps, grouped into
                     chats / history / files / send / comments (index.ts re-exports);
                     message-input.ts holds the one send envelope
@@ -66,6 +68,11 @@ change belongs in the adapter.
   `authorizationStateWaitOtherDeviceConfirmation` updates (`waitQr`) and must be passed
   through as-is. A completed user-driven login opens the shell directly; only a session
   restored at startup stops on the profile step (`syncWindowsToAuth`).
+- **A client that never comes up is a state, not a log line.** `tdlib/lifecycle.ts` owns
+  create/crash/restart and reports `BootState`: `adapter.start()` throwing is `failed`,
+  and the client closing while `stop()` did not ask for it is `crashed`. The login window
+  stops its spinner on both; a new failure mode must set one of them instead of only
+  logging.
 - Packaging constraint: `tdjson.dll` cannot load from inside `app.asar`
   (`electron-builder.yml` unpacks it), and TDLib data dirs live under
   `app.getPath('userData')`, which `index.ts` pins to `%APPDATA%\WeGram`.

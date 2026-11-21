@@ -11,6 +11,7 @@ import {
   selfSchema,
   userAvatarSchema,
 } from './dto'
+import { bootStateSchema } from './boot'
 import { customEmojiStickerSchema, stickerSetSchema, stickerSetSummarySchema } from './stickers'
 import {
   appInfoSchema,
@@ -56,6 +57,8 @@ export const invokeChannels = [
   'auth:reset',
   'auth:logout',
   'auth:me',
+  /** Startup phase: what TDLib is doing before authorization can begin. */
+  'boot:state',
   'chats:list',
   'chats:get',
   'chats:open',
@@ -189,6 +192,7 @@ export const invokeSchemas = {
   'auth:reset': { request: noPayload, response: authStateSchema },
   'auth:logout': { request: noPayload, response: noPayload },
   'auth:me': { request: noPayload, response: selfSchema },
+  'boot:state': { request: noPayload, response: bootStateSchema },
   'chats:list': {
     request: z.object({
       limit: z.number().int().positive().max(200),
@@ -477,6 +481,8 @@ const envelope = <S extends z.ZodType>(payload: S) => z.object({ seq: z.number()
 
 export const eventChannels = [
   'evt:auth',
+  /** The startup phase changed; terminal kinds stop the login spinner. */
+  'evt:boot',
   'evt:connection',
   'evt:chats',
   'evt:messages',
@@ -501,6 +507,7 @@ export type EventChannel = (typeof eventChannels)[number]
 
 export const eventSchemas = {
   'evt:auth': envelope(authStateSchema),
+  'evt:boot': envelope(bootStateSchema),
   'evt:connection': envelope(connectionStateSchema),
   'evt:chats': envelope(z.object({ ops: z.array(chatOpSchema) })),
   'evt:messages': envelope(z.object({ chatId: z.number().int(), ops: z.array(messageOpSchema) })),

@@ -1,4 +1,4 @@
-import type { ChatSummary, ConnectionState } from '@wegram/protocol'
+import type { BootState, ChatSummary, ConnectionState } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
 import { asArray } from '../json'
@@ -75,5 +75,25 @@ export function mapConnectionState(state: TdObject | undefined): ConnectionState
       return 'connecting'
     default:
       return 'offline'
+  }
+}
+
+/**
+ * The same update as a boot stage. It keeps the one detail `ConnectionState` has
+ * no room for: whether the client is dialing through the configured proxy, which
+ * is how the login window tells "connecting" from "the proxy is wrong".
+ */
+export function mapConnectionBoot(state: TdObject | undefined): BootState {
+  switch (state?._) {
+    case 'connectionStateReady':
+      return { kind: 'ready' }
+    case 'connectionStateUpdating':
+      return { kind: 'updating' }
+    case 'connectionStateWaitingForNetwork':
+      return { kind: 'offline' }
+    case 'connectionStateConnectingToProxy':
+      return { kind: 'connecting', viaProxy: true }
+    default:
+      return { kind: 'connecting', viaProxy: false }
   }
 }

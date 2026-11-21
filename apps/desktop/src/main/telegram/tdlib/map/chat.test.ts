@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { mapChat, mapChatKind, mapConnectionState } from './chat'
+import { mapChat, mapChatKind, mapConnectionBoot, mapConnectionState } from './chat'
 import type { MapperContext } from './context'
 
 function makeContext(overrides: Partial<MapperContext> = {}): MapperContext {
@@ -138,5 +138,27 @@ describe('mapConnectionState', () => {
     expect(mapConnectionState({ _: 'connectionStateConnectingToProxy' })).toBe('connecting')
     expect(mapConnectionState({ _: 'connectionStateWaitingForNetwork' })).toBe('offline')
     expect(mapConnectionState(undefined)).toBe('offline')
+  })
+})
+
+describe('mapConnectionBoot', () => {
+  it('keeps the proxy detail the connection state drops', () => {
+    expect(mapConnectionBoot({ _: 'connectionStateConnectingToProxy' })).toEqual({
+      kind: 'connecting',
+      viaProxy: true,
+    })
+    expect(mapConnectionBoot({ _: 'connectionStateConnecting' })).toEqual({
+      kind: 'connecting',
+      viaProxy: false,
+    })
+  })
+
+  it('maps the settled connection states onto boot stages', () => {
+    expect(mapConnectionBoot({ _: 'connectionStateReady' })).toEqual({ kind: 'ready' })
+    expect(mapConnectionBoot({ _: 'connectionStateUpdating' })).toEqual({ kind: 'updating' })
+    expect(mapConnectionBoot({ _: 'connectionStateWaitingForNetwork' })).toEqual({
+      kind: 'offline',
+    })
+    expect(mapConnectionBoot(undefined)).toEqual({ kind: 'connecting', viaProxy: false })
   })
 })

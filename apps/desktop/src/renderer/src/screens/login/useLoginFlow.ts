@@ -1,4 +1,4 @@
-import type { AppInfo, AuthState } from '@wegram/protocol'
+import type { AppInfo, AuthState, BootState } from '@wegram/protocol'
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 
 import { errorMessage, invoke } from '../../lib/ipc'
@@ -9,6 +9,8 @@ export type LoginMode = 'qr' | 'phone'
 
 export interface LoginFlow {
   auth: AuthState | null
+  /** Startup phase, before authorization: what TDLib is doing or why it failed. */
+  boot: BootState | null
   info: AppInfo | null
   mode: LoginMode
   value: string
@@ -39,7 +41,8 @@ export interface LoginFlow {
 /**
  * The login window's whole sign-in flow (design doc §9.6): follow `evt:auth`,
  * ask TDLib for a QR when it waits for a phone, run the phone/code/password
- * steps, and switch methods.
+ * steps, switch methods, and follow `evt:boot` while the client is still coming
+ * up (or has failed to start).
  *
  * QR is the primary method, like WeChat. TDLib hands us a short-lived
  * `tg://login?token=…` link and re-issues it every few seconds, so the window
@@ -53,6 +56,8 @@ export interface LoginFlow {
 export function useLoginFlow(): LoginFlow {
   /** `null` until `auth:state` answers: the form must not flash before we know. */
   const [auth, setAuth] = useState<AuthState | null>(null)
+  /** `null` until `boot:state` answers; the panel then shows the latest stage. */
+  const [boot, setBoot] = useState<BootState | null>(null)
   const [info, setInfo] = useState<AppInfo | null>(null)
   const [mode, setMode] = useState<LoginMode>('qr')
   const [value, setValue] = useState('')
@@ -62,6 +67,8 @@ export function useLoginFlow(): LoginFlow {
   const inputRef = useRef<HTMLInputElement | null>(null)
   /** An `evt:auth` that arrived before `auth:state` answered is the newer truth. */
   const sawAuthEvent = useRef(false)
+  /** Same race for the startup phase: the snapshot must not step it backwards. */
+  const sawBootEvent = useRef(false)
   /** One QR request per `waitPhoneNumber` episode; TDLib must not be spammed. */
   const qrRequested = useRef(false)
   /** The user switched to the phone form, so a late QR rejection is irrelevant. */
@@ -73,11 +80,16 @@ export function useLoginFlow(): LoginFlow {
       sawAuthEvent.current = true
       setAuth(event.payload)
     })
+    const unsubscribeBoot = window.tg.on('evt:boot', (event) => {
+      sawBootEvent.current = true
+      setBoot(event.payload)
+    })
 
     void (async () => {
       try {
-        const [authState, appInfo, settings] = await Promise.all([
+        const [authState, bootState, appInfo, settings] = await Promise.all([
           invoke('auth:state'),
+          invoke('boot:state'),
           invoke('app:info'),
           invoke('settings:get'),
         ])
@@ -87,6 +99,7 @@ export function useLoginFlow(): LoginFlow {
         // flight (a restored session goes ready during startup) — never let the
         // late answer step the window back to an earlier screen.
         if (!sawAuthEvent.current) setAuth(authState)
+        if (!sawBootEvent.current) setBoot(bootState)
         setInfo(appInfo)
       } catch (cause) {
         if (alive) setError(errorMessage(cause))
@@ -96,6 +109,7 @@ export function useLoginFlow(): LoginFlow {
     return () => {
       alive = false
       unsubscribe()
+      unsubscribeBoot()
     }
   }, [])
 
@@ -250,6 +264,7 @@ export function useLoginFlow(): LoginFlow {
 
   return {
     auth,
+    boot,
     info,
     mode,
     value,

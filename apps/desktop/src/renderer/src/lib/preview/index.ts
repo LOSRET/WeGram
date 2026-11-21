@@ -8,6 +8,7 @@ import {
 import type {
   AppSettings,
   AuthState,
+  BootState,
   EventChannel,
   EventEnvelope,
   InvokeChannel,
@@ -121,6 +122,10 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       return info
     case 'auth:state':
       return auth
+    // The preview never has a client to start; the login window is already past
+    // the boot panel by the time it mounts.
+    case 'boot:state':
+      return { kind: 'ready' } satisfies BootState
     case 'auth:start':
       return setAuth({ kind: 'waitCode', hint: store.phone, codeLength: 5 })
     case 'auth:code': {

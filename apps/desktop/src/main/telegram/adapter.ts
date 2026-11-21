@@ -1,5 +1,6 @@
 import type {
   AuthState,
+  BootState,
   ChatOp,
   ChatSummary,
   ConnectionState,
@@ -48,6 +49,11 @@ export type {
  */
 export type AdapterEvent =
   | { type: 'auth'; state: AuthState }
+  /**
+   * Startup progress, distinct from authorization: the login window shows this
+   * while TDLib is loading, opening its database or failing to start at all.
+   */
+  | { type: 'boot'; state: BootState }
   | { type: 'connection'; state: ConnectionState }
   | { type: 'chats'; ops: ChatOp[] }
   | { type: 'messages'; chatId: number; ops: MessageOp[] }
@@ -80,6 +86,8 @@ export interface TelegramAdapter {
   onEvent(listener: AdapterListener): () => void
 
   getAuthState(): AuthState
+  /** Snapshot for a window that opened after the last `boot` event. */
+  getBootState(): BootState
   getConnectionState(): ConnectionState
   submitPhone(phone: string): Promise<AuthState>
   submitCode(code: string): Promise<AuthState>

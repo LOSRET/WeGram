@@ -280,7 +280,9 @@ reads there (an `existsSync` check passes) but not `LoadLibrary`, so `createClie
 the login window spins on 正在连接 Telegram… forever and TDLib never even opens
 `userData/tdlib` (measured on the installed 0.1.1 build). `tdlib/client.ts` →
 `resolveTdjsonPath()` maps the path onto `app.asar.unpacked`; with it the same packaged exe logs
-`TDLib client created` and `TDLib 1.8.70 ready for phone login`.
+`TDLib client created` and `TDLib 1.8.70 ready for phone login`. That silent failure now reaches
+the window: `tdlib/lifecycle.ts` reports `BootState.failed` with the throw reason, and the login
+window shows 未能启动 instead of spinning (see the 技术方案 §6.1 / §9.6 notes).
 
 Reading and driving the real renderer over CDP is what produced the numbers above. The
 helper is `.cache/cdp-eval.mjs` (gitignored; ~30 lines: read
@@ -336,7 +338,7 @@ apps/desktop/src/main/
   media/leases.ts            (pure, unit-tested) who still waits for a file's transfer
   media/image-size.ts        PNG/JPEG/WebP/GIF header probe (inputPhoto needs real sizes)
   telegram/adapter.ts        TelegramAdapter interface + event types (the seam)
-  telegram/tdlib/           ONLY folder allowed to import `tdl` (index/client/actions/updates/avatar-cache/stickers/proxy/map)
+  telegram/tdlib/           ONLY folder allowed to import `tdl` (index/lifecycle/boot/client/actions/updates/avatar-cache/stickers/proxy/map)
   telegram/mock.ts           fake adapter incl. a 5000-message chat (id 99) + media fixtures
   telegram/mock-assets.ts    embedded WebP/TGS + runtime PNG encoder for mock media
   telegram/updates.ts        EventBus: 60 ms batching, monotonic seq
