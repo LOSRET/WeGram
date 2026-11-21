@@ -25,8 +25,7 @@ listed in "Known deltas" is a deliberate, documented difference.
 | `renderer/src/components/OverlayScrollbar.tsx` | WeChat's floating scrollbar: a 6 px translucent pill drawn over the rows (hover/scroll/drag), so long lists get no layout gutter and nothing re-flows when it appears. Used by the chat list and the transcript. |
 | `renderer/src/components/chat-pane/` | 46 px header (title, typing, call/… buttons), watermark empty state, and the 聊天信息 side panel (§2.8). |
 | `renderer/src/components/MessageList.tsx` | Bubbles, real sender photos on both sides (own avatar on the right; `senderAvatarUrl`, `evt:avatars`, `Self.avatarUrl`), hover-only timestamp/read receipt, day + unread separators. |
-| `renderer/src/components/message-list/CommentBar.tsx` | WeChat's 评论 N 条 bar under a bubble (design doc §9.8) — the handle, not the thread. It is a **channel post** feature: `isCommentablePost` (`lib/comments.ts`) draws it in a channel chat only, never for a group or private message even when TDLib reports `reply_info` (the official clients gate the same way). In a channel post it is the bubble's last row instead. |
-| `renderer/src/components/message-list/ChannelMeta.tsx` | A channel post's footer: eye + view count + time (+ 已编辑), inside the bubble or under a sticker. The channel composition itself is `styles/channel.css`. |
+| `renderer/src/components/message-list/CommentBar.tsx` | WeChat's 评论 N 条 bar under a bubble (design doc §9.8) — the handle, not the thread. It is a **channel post** feature: `isCommentablePost` (`lib/comments.ts`) draws it in a channel chat only, never for a group or private message even when TDLib reports `reply_info` (the official clients gate the same way). It draws under the bubble as a row of its own. |
 | `renderer/src/components/chat-pane/CommentPanel.tsx` | Telegram's discussion view: the full chat pane, sliding in from the right (250 ms, `COMMENT_PANEL_ANIM_MS` unmount delay), pinned post, comments drawn with `MessageRow` (opens at the top of the thread, scroll-up paging, session cache, and the row the reader left restored through `useCommentAnchor` / `ui:saveCommentAnchor`) and the chat composer's card at the bottom (`messages:sendComment`). Styles: `styles/comments.css`. |
 | `renderer/src/components/Composer.tsx` | Bordered input card, toolbar under the text, attach menu, send button inside the card. A channel manages it through `onCollapse`: the channel composer shows a labelled 收起 button next to 发送 that puts the 服务号 bar back. |
 | `renderer/src/components/chat-pane/ChannelBar.tsx` | A channel's bottom edge instead of the composer: WeChat's 服务号 card — 静音 always, plus the keyboard switch on the right when `chats:canPost` says this account may post (the switch swaps the card for the composer). A read-only channel keeps only 静音, and its message menu has no 回复. |
@@ -819,24 +818,16 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
     footer follows the official client's gate (`BottomControls::isJoinGroup`): when the
     account may not post, the composer is replaced by 加入讨论组 / 申请加入讨论组, and the
     input returns only after the join — sending never auto-joins.
-32. **A channel post is one WeChat bubble, composed the way Telegram composes a post.**
-    The owner's instruction (2026-11-20): "依旧是微信的气泡,但是像 Telegram 一样把图片、消息和
-    评论嵌入到一块". A channel has one author, so a post reads as a single block instead of
-    WeChat's photo-on-the-wallpaper + second caption bubble + separate 评论 card. WeChat's
-    bubble itself stays — same fill, 6 px radius, avatar column, hover row for every other
-    message — and only the block's inside changes: the media gets a 3 px inset of the
-    bubble's own colour, the caption follows on the same surface, 评论 N 条 is the last row
-    (hairline above, the bubble's own bottom corners, no card of its own), and the view
-    counter with the time closes it (`ChannelMeta`). The hover timestamp is suppressed for
-    channels: a channel post has no read receipt, and its counters are part of the post,
-    the way Telegram shows them. Channel photos may grow to 420×480 (`MediaBubble`'s
-    `maxWidth`/`maxHeight`); every other chat keeps WeChat's 240×300. Two measurements
-    that were wrong on the first pass: the bubble's width is taken **from the media**
-    (`channelMediaWidth` + the 3 px inset), otherwise a long caption wins the
-    `fit-content` race and leaves a strip of empty bubble right of the picture; and the
-    评论 row is `calc(100% + 2 × inset)` wide with negative margins — a `width: auto`
-    button shrank to its label and read as a small control in the bubble's corner.
-    Groups, private chats and the comment rows inside `CommentPanel` are untouched.
+32. **A channel post reuses the group transcript.** The owner's instruction (2026-11-21):
+    "频道的聊天消息改成复用群组的聊天消息 不能用的去掉". This supersedes the 2026-11-20
+    single-block composition: a channel now draws exactly the group row (`MessageRow`'s
+    default branch) — WeChat's bubble, the 240×300 media frame, the hover timestamp, the
+    caption as its own bubble under the media, and the 评论 handle as a row under the
+    bubble. Everything only that composition used is gone with it: `ChannelMeta`
+    (eye + views + time), `styles/channel.css`, `--wx-channel-rule`, and
+    `CHANNEL_MEDIA_LIMITS` / `CHANNEL_MEDIA_INSET` / `channelMediaWidth`. A channel's
+    view / forward counters now appear only in the discussion view's pinned post
+    (阅读 / 转发). Groups, private chats and `CommentPanel` rows were already on this path.
 33. **聊天信息 maps the client's group rows onto what Telegram has.** 群公告 is the
     newest pinned message; 群聊名称 renames the group; 群二维码 opens the client's own
     window, but the code inside is a Telegram invite link (7-day temporary when the

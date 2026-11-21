@@ -33,6 +33,4 @@
 @import './cards.css';
 @import './viewer.css';
 @import './stickers.css';
-/* After the bubble and comment rules on purpose: a channel post re-shapes both. */
-@import './channel.css';
 @import './dev.css';

@@ -24,9 +24,8 @@ components/message-list/  virtualiser + MessageRow + Divider + the scroll hooks:
                          useInitialPosition / usePrependRestore / useAnchorSave /
                          useLandingSave / useJumpToLatest / useLocateScroll / useViewportSeen;
                          RichMessage (page blocks), ContactCard (vCards), InlineButtons,
-                         CommentBar (评论 N 条 handle, §9.8), ChannelMeta (a channel post's
-                         views/time footer; the one-bubble channel composition is
-                         styles/channel.css), PremiumStickerEffect (a Premium sticker's
+                         CommentBar (评论 N 条 handle, §9.8: a channel post only, a row
+                         under the bubble), PremiumStickerEffect (a Premium sticker's
                          second TGS, painted once at 1.49× the sticker and replayed on tap)
 components/chat-pane/     render tree + useChatHistory (history/ modules) + messageActions +
                          CommentPanel (full-pane discussion view, slides in from the right;

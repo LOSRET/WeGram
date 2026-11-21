@@ -31,12 +31,6 @@ interface MediaBubbleProps {
    * grid's CSS owns the box, so the bubble's inline size is skipped.
    */
   variant?: 'bubble' | 'album'
-  /**
-   * The reserved box's largest side. WeChat's 240×300 bubble photograph is the
-   * default; a channel post is Telegram's wider card and asks for more.
-   */
-  maxWidth?: number
-  maxHeight?: number
 }
 
 const MAX_PHOTO_W = 240
@@ -51,32 +45,9 @@ const MAX_PHOTO_H = 300
  */
 const MEDIA_PRELOAD_PX = 420
 
-/** A channel post's media may grow past WeChat's 240×300 bubble photograph. */
-export const CHANNEL_MEDIA_LIMITS = { maxWidth: 420, maxHeight: 480 } as const
-
-/**
- * The inset a channel media bubble draws around its media. It is the
- * `--wx-channel-pad-x` of a media bubble in `styles/channel.css`; the bubble is
- * sized from the media plus this frame, so the picture sits flush.
- */
-export const CHANNEL_MEDIA_INSET = 3
-
 /** The ratio a photo / a video falls back to when TDLib gave no dimensions. */
 const PHOTO_FALLBACK = { fallbackWidth: 4, fallbackHeight: 3 }
 const VIDEO_FALLBACK = { fallbackWidth: 16, fallbackHeight: 9 }
-
-/**
- * The width a channel post's media occupies, so the bubble that frames it can be
- * sized to the media itself. A long caption then wraps at the photograph's width —
- * the way Telegram's post reads — instead of widening the bubble and leaving a gap
- * to the right of the picture.
- */
-export function channelMediaWidth(kind: 'photo' | 'video', media: MessageMedia): number {
-  return reserveBox(media, {
-    ...CHANNEL_MEDIA_LIMITS,
-    ...(kind === 'photo' ? PHOTO_FALLBACK : VIDEO_FALLBACK),
-  }).width
-}
 
 /**
  * The DTO narrowed to one file id, without the full picture's cached URL.
@@ -128,39 +99,13 @@ function deviceBox(
  *   transfer stops again once it leaves;
  * - a video only fetches its poster here — the clip is streamed by the viewer.
  */
-export function MediaBubble({
-  media,
-  kind,
-  chatId,
-  messageId,
-  variant,
-  maxWidth = MAX_PHOTO_W,
-  maxHeight = MAX_PHOTO_H,
-}: MediaBubbleProps) {
+export function MediaBubble({ media, kind, chatId, messageId, variant }: MediaBubbleProps) {
   const inAlbum = variant === 'album'
   if (kind === 'photo') {
-    return (
-      <PhotoBubble
-        media={media}
-        chatId={chatId}
-        messageId={messageId}
-        inAlbum={inAlbum}
-        maxWidth={maxWidth}
-        maxHeight={maxHeight}
-      />
-    )
+    return <PhotoBubble media={media} chatId={chatId} messageId={messageId} inAlbum={inAlbum} />
   }
   if (kind === 'video') {
-    return (
-      <VideoBubble
-        media={media}
-        chatId={chatId}
-        messageId={messageId}
-        inAlbum={inAlbum}
-        maxWidth={maxWidth}
-        maxHeight={maxHeight}
-      />
-    )
+    return <VideoBubble media={media} chatId={chatId} messageId={messageId} inAlbum={inAlbum} />
   }
   if (kind === 'voice') return <VoiceBubble media={media} />
   return <FileBubble media={media} />
@@ -176,15 +121,11 @@ function PhotoBubble({
   chatId,
   messageId,
   inAlbum,
-  maxWidth,
-  maxHeight,
 }: {
   media: MessageMedia
   chatId: number
   messageId: number
   inAlbum: boolean
-  maxWidth: number
-  maxHeight: number
 }) {
   const [ref, view] = useInView<HTMLButtonElement>(MEDIA_PRELOAD_PX)
   const [loadedUrl, setLoadedUrl] = useState<string>()
@@ -194,8 +135,8 @@ function PhotoBubble({
   const box = inAlbum
     ? undefined
     : reserveBox(media, {
-        maxWidth,
-        maxHeight,
+        maxWidth: MAX_PHOTO_W,
+        maxHeight: MAX_PHOTO_H,
         ...PHOTO_FALLBACK,
       })
 
@@ -203,7 +144,7 @@ function PhotoBubble({
   // download bytes we already have.
   const variant = media.localUrl
     ? undefined
-    : pickVariant(media.sizes, deviceBox(box, maxWidth, maxHeight))
+    : pickVariant(media.sizes, deviceBox(box, MAX_PHOTO_W, MAX_PHOTO_H))
   const primaryId = variant?.fileId ?? media.fileId
 
   const primaryMedia = useMemo(() => mediaAt(media, primaryId), [media, primaryId])
@@ -268,15 +209,11 @@ function VideoBubble({
   chatId,
   messageId,
   inAlbum,
-  maxWidth,
-  maxHeight,
 }: {
   media: MessageMedia
   chatId: number
   messageId: number
   inAlbum: boolean
-  maxWidth: number
-  maxHeight: number
 }) {
   const [ref, view] = useInView<HTMLButtonElement>(MEDIA_PRELOAD_PX)
   const source = useViewerSource()
@@ -284,8 +221,8 @@ function VideoBubble({
   const box = inAlbum
     ? undefined
     : reserveBox(media, {
-        maxWidth,
-        maxHeight,
+        maxWidth: MAX_PHOTO_W,
+        maxHeight: MAX_PHOTO_H,
         ...VIDEO_FALLBACK,
       })
 
