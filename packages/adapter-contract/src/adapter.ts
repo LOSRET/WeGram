@@ -132,6 +132,12 @@ export interface TelegramAdapter {
    * is rendered read-only and never offers a composer.
    */
   canPost(chatId: number): Promise<boolean>
+  /**
+   * Whether this account may read the chat's member list. A group answers true;
+   * a channel's subscribers are visible to its administrators only, so the
+   * 聊天信息 panel asks before it draws the member grid.
+   */
+  canGetMembers(chatId: number): Promise<boolean>
   /** Mutes / unmutes a chat and answers the refreshed summary. */
   setChatMuted(chatId: number, muted: boolean): Promise<ChatSummary>
   /** 置顶聊天 / 取消置顶; answers the refreshed summary. */

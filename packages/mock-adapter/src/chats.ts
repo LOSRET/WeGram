@@ -130,6 +130,17 @@ export function mockChatMembers(
   return members
 }
 
+/**
+ * 管理员显示群成员: a fixture channel marked `canPost` is the managed one, so it
+ * is also the one whose member grid the panel draws (both are administrator
+ * rights). Groups answer true, private chats have no member table.
+ */
+export function canMockGetMembers(store: MockChatStore, chatId: number): boolean {
+  const fixture = requireFixture(store, chatId)
+  if (fixture.chat.kind === 'channel') return Boolean(fixture.canPost)
+  return fixture.chat.kind === 'group'
+}
+
 /** 群聊名称; the fixture has no permissions, so a rename always applies. */
 export function setMockTitle(store: MockChatStore, chatId: number, title: string): ChatSummary {
   const fixture = requireFixture(store, chatId)
@@ -171,6 +182,7 @@ export interface MockChatApi {
   openPrivateChat(userId: number): Promise<ChatSummary>
   openUsernameChat(username: string): Promise<ChatSummary>
   canPost(chatId: number): Promise<boolean>
+  canGetMembers(chatId: number): Promise<boolean>
   setMuted(chatId: number, muted: boolean): Promise<ChatSummary>
   setPinned(chatId: number, pinned: boolean): Promise<ChatSummary>
   clearHistory(chatId: number): Promise<void>
@@ -193,6 +205,7 @@ export function createMockChats(
     openPrivateChat: async (userId) => openMockPrivateChat(store, userId),
     openUsernameChat: async (username) => openMockUsernameChat(store, username),
     canPost: async (chatId) => canMockPost(store, chatId),
+    canGetMembers: async (chatId) => canMockGetMembers(store, chatId),
     setMuted: async (chatId, muted) => setMockMuted(store, chatId, muted),
     setPinned: async (chatId, pinned) => setMockPinned(store, chatId, pinned),
     clearHistory: async (chatId) => clearMockHistory(store, chatId),

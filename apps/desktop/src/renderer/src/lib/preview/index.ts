@@ -197,6 +197,11 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       const chat = chats.find((item) => item.id === store.chatId)
       return chat?.kind === 'channel' ? Boolean(channelPostRights[chat.id]) : true
     }
+    case 'chats:canGetMembers': {
+      // A managed fixture channel is the administrator case (see the mock adapter).
+      const chat = chats.find((item) => item.id === store.chatId)
+      return chat?.kind === 'channel' ? Boolean(channelPostRights[chat.id]) : chat?.kind === 'group'
+    }
     case 'chats:setMuted':
       return setPreviewMuted(previewChats, Number(store.chatId), Boolean(store.muted))
     case 'chats:setPinned':

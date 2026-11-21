@@ -45,10 +45,12 @@ interface ChatInfoPanelProps {
  * Telegram does not — 备注, 我在本群的昵称, 保存到通讯录, 显示群成员昵称 — are
  * deliberately absent (see docs/UI-HANDOFF.md §5).
  *
- * A channel reuses that layout without the member grid: TDLib only hands a
- * channel's member list to its administrators, so the grid would be the
- * channel's own face for everyone else. 群聊名称, 群公告, 群二维码, 查找聊天内容,
- * the mute/pin pair, 清空聊天记录 and 退出群聊 all work on a channel.
+ * A channel reuses that layout. Its member grid is drawn only for an
+ * administrator: TDLib hands a channel's subscriber list to nobody else, so the
+ * panel asks `chats:canGetMembers` and keeps the grid (with its 搜索群成员) closed
+ * otherwise — a subscriber would only see the channel's own face pretending to
+ * be a member. Every other row works on a channel: 频道名称, 频道公告,
+ * 频道二维码, 查找聊天内容, the mute/pin pair, 清空聊天记录 and 退出频道.
  */
 export function ChatInfoPanel({
   chat,
@@ -63,6 +65,12 @@ export function ChatInfoPanel({
 }: ChatInfoPanelProps) {
   const [entered, setEntered] = useState(false)
   const [members, setMembers] = useState<ChatMember[]>([])
+  /**
+   * 管理员显示群成员: whether this account may read a channel's subscriber list.
+   * `null` while the question is in flight; groups never ask, private chats have
+   * no member table.
+   */
+  const [canReadMembers, setCanReadMembers] = useState<boolean | null>(null)
   const [memberQuery, setMemberQuery] = useState('')
   const [pinned, setPinned] = useState<ChatPinnedMessage | null>(null)
   const [searching, setSearching] = useState(false)
@@ -75,10 +83,18 @@ export function ChatInfoPanel({
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
   const isGroup = chat.kind === 'group'
-  /** A channel draws every group row except the member grid (see the header). */
+  /** A channel draws the group rows; its member block depends on administrator rights. */
   const isChannel = chat.kind === 'channel'
   /** 群聊名称 / 群公告 / 群二维码 / 退出群聊: groups and channels, not private chats. */
   const hasChatRows = chat.kind !== 'private'
+  /**
+   * A group always shows its participant block; a channel's appears only once this
+   * account is known to administer it. `memberTable` means the chat has a member
+   * list this account may search (a private chat draws its own face without one);
+   * `showMemberBlock` also keeps that face for a private chat.
+   */
+  const memberTable = isGroup || (isChannel && canReadMembers === true)
+  const showMemberBlock = !isChannel || memberTable
 
   // Mount closed, open on the next paint. The timeout is the fallback for an
   // occluded window, where rAF is throttled (see AGENTS.md).
@@ -91,13 +107,35 @@ export function ChatInfoPanel({
     return () => window.clearTimeout(timer)
   }, [open])
 
+  // 管理员显示群成员. A group's members are readable by its members; a channel
+  // answers subscribers with a refusal, so the panel asks before it draws the
+  // grid instead of showing the channel's own face as a fake member.
+  useEffect(() => {
+    if (!isChannel) {
+      setCanReadMembers(isGroup)
+      return
+    }
+    let cancelled = false
+    setCanReadMembers(null)
+    void invoke('chats:canGetMembers', { chatId: chat.id })
+      .then((allowed) => {
+        if (!cancelled) setCanReadMembers(allowed)
+      })
+      .catch(() => {
+        if (!cancelled) setCanReadMembers(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [chat.id, chat.kind, isChannel, isGroup])
+
   // The participant grid. 搜索群成员 is a server-side search (searchChatMembers),
   // not a filter over the twelve rows already on screen, so a query is debounced
   // the same way the in-chat search view is.
   useEffect(() => {
-    // Only a group draws the member grid; a channel's member list is
-    // administrator-only, so its panel skips the request entirely.
-    if (!isGroup) {
+    // Nothing to ask: a private chat has no member table, and a channel keeps its
+    // grid closed until `chats:canGetMembers` says this account administers it.
+    if (!memberTable) {
       setMembers([])
       return
     }
@@ -124,7 +162,7 @@ export function ChatInfoPanel({
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [chat.id, chat.kind, isGroup, memberQuery])
+  }, [chat.id, chat.kind, memberTable, memberQuery])
 
   // 群公告: Telegram's newest pinned message. A chat without one answers null;
   // a private conversation has no pinned message at all.
@@ -190,11 +228,12 @@ export function ChatInfoPanel({
 
   /** A query with no hits must not fall back to the group's face: the grid is the answer. */
   const queryEmpty = memberQuery.trim() === ''
-  const tiles = isChannel
-    ? []
-    : (isGroup && !queryEmpty && members.length === 0 ? [] : personTiles(members, chat)).map(
-        (tile) => ({ ...tile, avatarUrl: tile.avatarUrl ?? userAvatars[tile.id] }),
-      )
+  const tiles =
+    isChannel && !memberTable
+      ? []
+      : (isGroup && !queryEmpty && members.length === 0 ? [] : personTiles(members, chat)).map(
+          (tile) => ({ ...tile, avatarUrl: tile.avatarUrl ?? userAvatars[tile.id] }),
+        )
 
   /** A channel's rows are the group's rows under the channel's own nouns. */
   const renameTitle = isChannel ? '频道名称' : '群聊名称'
@@ -210,9 +249,9 @@ export function ChatInfoPanel({
         <ChatInfoSearch chatId={chat.id} onBack={() => setSearching(false)} onPick={onLocate} />
       ) : (
         <div className="wx-info__scroll" ref={scrollRef}>
-          {!isChannel ? (
+          {showMemberBlock ? (
             <>
-              {isGroup ? (
+              {memberTable ? (
                 <div className="wx-info__member-search">
                   <SearchField
                     value={memberQuery}
@@ -250,7 +289,7 @@ export function ChatInfoPanel({
                 ) : null}
               </div>
 
-              {isGroup && !queryEmpty && tiles.length === 0 ? (
+              {memberTable && !queryEmpty && tiles.length === 0 ? (
                 <p className="wx-info__note">没有找到群成员</p>
               ) : null}
 

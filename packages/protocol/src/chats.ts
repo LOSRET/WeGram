@@ -35,6 +35,11 @@ export const chatInvokeChannels = [
    * is an administrator right, so the composer is offered only when it holds.
    */
   'chats:canPost',
+  /**
+   * Whether this account may read the chat's member list. A channel's subscribers
+   * are administrator-only, so the 聊天信息 panel asks before drawing the grid.
+   */
+  'chats:canGetMembers',
   /** 静音 / 取消静音 for the channel bar; answers the refreshed summary. */
   'chats:setMuted',
   /** 置顶聊天 / 取消置顶; answers the refreshed summary (sorted by the renderer). */
@@ -73,6 +78,10 @@ export const chatInvokeSchemas = {
     response: chatSummarySchema,
   },
   'chats:canPost': { request: z.object({ chatId: z.number().int() }), response: z.boolean() },
+  'chats:canGetMembers': {
+    request: z.object({ chatId: z.number().int() }),
+    response: z.boolean(),
+  },
   'chats:setMuted': {
     request: z.object({ chatId: z.number().int(), muted: z.boolean() }),
     response: chatSummarySchema,

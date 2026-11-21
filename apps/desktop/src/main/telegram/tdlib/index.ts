@@ -309,6 +309,11 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     )
   }
 
+  /** 管理员显示群成员; see `actions.canGetMembers`. */
+  async canGetMembers(chatId: number): Promise<boolean> {
+    return actions.canGetMembers(this.actionDeps, chatId)
+  }
+
   async setChatMuted(chatId: number, muted: boolean): Promise<ChatSummary> {
     return actions.setChatMuted(this.actionDeps, chatId, muted)
   }

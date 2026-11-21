@@ -37,9 +37,9 @@ components/chat-pane/     render tree + useChatHistory (history/ modules) + mess
                          ChatInfoPanel (聊天信息, §9.9: a 314 px OVERLAY sheet — transform
                          only, the transcript keeps its width — with 搜索群成员 and the
                          member grid for groups, 群聊名称 / 群公告 / 群二维码 / 退出群聊 (频道
-                         名称 / 频道公告 / 频道二维码 / 退出频道 on a channel, which keeps the
-                         rows but not the grid) and the shared mute/pin/clear rows;
-                         群二维码 opens screens/QrWindow.tsx, the
+                         名称 / 频道公告 / 频道二维码 / 退出频道 on a channel, whose member
+                         grid only an administrator gets — chats:canGetMembers) and the
+                         shared mute/pin/clear rows; 群二维码 opens screens/QrWindow.tsx, the
                          rows live in ChatInfoRows.tsx, and the rename/invite sheets in
                          ChatInfoDialogs.tsx) + ChatInfoSearch
                          (in-panel 查找聊天内容 over search:inChat, picks a row → locate)
@@ -142,9 +142,10 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   owner's reference presses the sheet on top of the messages, and a width animation
   re-lays-out every virtualised row on every frame (an earlier version did, and was
   wrong). `INFO_PANEL_ANIM_MS` is pinned to the stylesheet by
-  `style-contract.test.ts`. A channel reuses the group panel without its member block:
-  TDLib only lists a channel's members to administrators, so the panel never asks and
-  the grid would otherwise be the channel's own face pretending to be a member.
+  `style-contract.test.ts`. A channel reuses the group panel; its member block is
+  administrator-only, so the panel asks `chats:canGetMembers` (`supergroupFullInfo.
+  can_get_members`) and draws 搜索群成员 + the grid only when that answers true — a
+  subscriber would otherwise see the channel's own face pretending to be a member.
 - **A programmatic `scrollTop` write desyncs `@tanstack/react-virtual`** (it
   re-reads its offset only on real scroll events). After every programmatic
   scroll, dispatch one `scroll` event so the virtualizer re-measures — otherwise

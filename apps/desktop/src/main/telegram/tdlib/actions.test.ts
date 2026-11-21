@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   beginStream,
+  canGetMembers,
   canPost,
   commentInfo,
   history,
@@ -240,6 +241,49 @@ describe('canPost', () => {
   })
 })
 
+describe('canGetMembers', () => {
+  const channel = { _: 'chatTypeSupergroup', is_channel: true, supergroup_id: 9 }
+
+  function memberDeps(type: TdObject, info: TdObject | null | Error): ReturnType<typeof makeDeps> {
+    return makeDeps((method) => {
+      if (method._ === 'getChat') return { id: 5, type }
+      if (method._ === 'getSupergroupFullInfo') {
+        if (info instanceof Error) throw info
+        return info
+      }
+      throw new Error(`unexpected ${String(method._)}`)
+    })
+  }
+
+  it("lets an administrator read a channel's members", async () => {
+    const { deps, calls } = memberDeps(channel, { can_get_members: true })
+    await expect(canGetMembers(deps, 5)).resolves.toBe(true)
+    expect(calls.find((call) => call._ === 'getSupergroupFullInfo')).toMatchObject({
+      supergroup_id: 9,
+    })
+  })
+
+  it('keeps the grid closed for a subscriber', async () => {
+    const { deps } = memberDeps(channel, { can_get_members: false })
+    await expect(canGetMembers(deps, 5)).resolves.toBe(false)
+  })
+
+  it('never asks for a basic group or a private chat, and answers for both', async () => {
+    const basic = memberDeps({ _: 'chatTypeBasicGroup', basic_group_id: 3 }, null)
+    await expect(canGetMembers(basic.deps, 5)).resolves.toBe(true)
+    expect(basic.calls.map((call) => call._)).toEqual(['getChat'])
+
+    const privateChat = memberDeps({ _: 'chatTypePrivate', user_id: 7 }, null)
+    await expect(canGetMembers(privateChat.deps, 5)).resolves.toBe(false)
+    expect(privateChat.calls.map((call) => call._)).toEqual(['getChat'])
+  })
+
+  it('answers false when the full info cannot be read', async () => {
+    const { deps } = memberDeps(channel, new Error('not cached'))
+    await expect(canGetMembers(deps, 5)).resolves.toBe(false)
+  })
+})
+
 describe('setChatMuted', () => {
   it('changes only the mute fields and answers the refreshed chat', async () => {
     const settings = {
@@ -463,12 +507,13 @@ describe('beginStream', () => {
    * file cannot be streamed" on the very first click. TDLib reports the path
    * with the next update, so the call has to wait for it.
    */
-  it('waits for the update that finally carries a cold file\'s local path', async () => {
+  it("waits for the update that finally carries a cold file's local path", async () => {
     vi.useFakeTimers()
     try {
       const { deps, calls } = makeDeps((method) => {
         if (method._ === 'downloadFile') return { expected_size: 900, local: { path: '' } }
-        if (method._ === 'getFile') return { expected_size: 900, local: { path: 'C:/cache/6000.mp4' } }
+        if (method._ === 'getFile')
+          return { expected_size: 900, local: { path: 'C:/cache/6000.mp4' } }
         throw new Error(`unexpected ${String(method._)}`)
       })
 
@@ -500,4 +545,3 @@ describe('beginStream', () => {
     }
   })
 })
-

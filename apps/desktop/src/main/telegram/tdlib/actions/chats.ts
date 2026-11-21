@@ -117,6 +117,34 @@ export async function canPost(deps: PostPermissionDeps, chatId: number): Promise
 }
 
 /**
+ * Whether this account may read the chat's member list (管理员显示群成员).
+ *
+ * The 聊天信息 panel draws its member grid for groups; a channel exposes its
+ * subscribers to administrators only. TDLib's own gate for that is
+ * `supergroupFullInfo.can_get_members` — the same flag that lets
+ * `searchChatMembers` answer — so the panel asks once instead of drawing an
+ * empty grid for every subscriber. A basic group's member table is readable by
+ * its members, and a private chat has none.
+ */
+export async function canGetMembers(deps: ActionDeps, chatId: number): Promise<boolean> {
+  const chat = await deps.invoke({ _: 'getChat', chat_id: chatId })
+  const type = chat?.type
+  if (type?._ === 'chatTypeBasicGroup') return true
+  if (type?._ !== 'chatTypeSupergroup') return false
+  try {
+    const info = await deps.invoke({
+      _: 'getSupergroupFullInfo',
+      supergroup_id: type.supergroup_id,
+    })
+    return Boolean(info?.can_get_members)
+  } catch {
+    // A supergroup whose full info is not cached yet is not an answer; the panel
+    // simply keeps the grid closed and asks again the next time it opens.
+    return false
+  }
+}
+
+/**
  * Mutes or unmutes a chat.
  *
  * TDLib has no mute toggle: `setChatNotificationSettings` replaces the whole

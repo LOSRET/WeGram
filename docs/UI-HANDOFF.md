@@ -390,12 +390,14 @@ against the client are listed separately.
   退出群聊. The rows are composed in `ChatInfoRows.tsx`, the dialogs in
   `ChatInfoDialogs.tsx`; the panel itself only owns state.
 - **Channel** (2026-11-21, owner's instruction "频道的聊天信息面板复用群组的"): the group
-  layout without the participant block — no 搜索群成员, no grid, no 添加. TDLib only hands
-  a channel's member list to its administrators, so everyone else would get a fake
-  one-row grid of the channel itself; the rest stays with the channel's nouns:
-  频道名称 (rename sheet and toast too), 频道公告 (the channel's newest pinned post, or
-  未设置), 频道二维码, 查找聊天内容, mute/pin, 清空聊天记录 and 退出频道 (its confirm
-  dialog too). The QR window follows: 频道：…, 频道二维码, 公开频道。
+  layout with the channel's nouns — 频道名称 (rename sheet and toast too), 频道公告 (the
+  channel's newest pinned post, or 未设置), 频道二维码, 查找聊天内容, mute/pin,
+  清空聊天记录 and 退出频道 (its confirm dialog too); the QR window follows: 频道：…,
+  频道二维码, 公开频道。The participant block is **administrator-only**: TDLib hands a
+  channel's subscriber list to nobody else, so the panel asks `chats:canGetMembers`
+  (`supergroupFullInfo.can_get_members`) and draws 搜索群成员 + the grid only when it
+  answers true — otherwise the block is absent rather than a fake one-row grid of the
+  channel itself. 添加 stays a group row.
 - **搜索群成员** is a *server* search: `chats:members` grew a `query` that goes straight
   to `searchChatMembers` (260 ms debounce). It is not a filter over the twelve rows the
   grid already has, and a query with no hits deliberately draws no tiles (not the group's
