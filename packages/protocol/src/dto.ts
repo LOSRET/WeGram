@@ -56,37 +56,6 @@ export type AuthState = z.infer<typeof authStateSchema>
 export const connectionStateSchema = z.enum(['online', 'connecting', 'offline', 'updating'])
 export type ConnectionState = z.infer<typeof connectionStateSchema>
 
-export const chatKindSchema = z.enum(['private', 'group', 'channel'])
-export type ChatKind = z.infer<typeof chatKindSchema>
-
-export const chatSummarySchema = z.object({
-  id: z.number().int(),
-  title: z.string(),
-  kind: chatKindSchema,
-  /** Peer user id (private/secret); 通讯录 hides our own Saved Messages. */
-  userId: z.number().int().optional(),
-  unread: z.number().int().nonnegative(),
-  pinned: z.boolean(),
-  muted: z.boolean(),
-  lastMessageText: z.string().optional(),
-  lastMessageAt: z.number().optional(),
-  /** [start, end) spoiler runs of `lastMessageText`, so the row can mask them too. */
-  lastMessageSpoilers: z.array(z.tuple([z.number().int(), z.number().int()])).optional(),
-  /** Highest incoming message id the server considers read (unread divider). */
-  lastReadInboxMessageId: z.number().int().optional(),
-  /** Highest outgoing message id the peer has read (read receipt). */
-  lastReadOutboxMessageId: z.number().int().optional(),
-  /** `wx-media://` URL of the chat photo; filled in after it is downloaded. */
-  avatarUrl: z.string().optional(),
-})
-export type ChatSummary = z.infer<typeof chatSummarySchema>
-
-export const chatOpSchema = z.discriminatedUnion('op', [
-  z.object({ op: z.literal('upsert'), chat: chatSummarySchema }),
-  z.object({ op: z.literal('remove'), chatId: z.number().int() }),
-])
-export type ChatOp = z.infer<typeof chatOpSchema>
-
 /**
  * Telegram formatting is TL entities (offset + length + type), not Markdown.
  * Offsets are UTF-16 code units — see design doc §8.3.

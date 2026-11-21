@@ -49,7 +49,7 @@ const PREVIEW_TGS =
 
 /**
  * The premium sticker's effect, as a data URL: the same gzip'd Lottie file the
- * mock writes to `premium-sticker-effect.tgs` (main/telegram/mock-assets.ts,
+ * mock writes to `premium-sticker-effect.tgs` (packages/mock-adapter/src/mock-assets.ts,
  * generated there once). Duplicated instead of shared because the mock owns real
  * files and the preview owns URLs — the account data only names file ids.
  */
@@ -65,7 +65,7 @@ const PREVIEW_PREMIUM_EFFECT =
  */
 /**
  * The animated emoji's click sound, as a data URL: the same 0.18 s 880 Hz beep the
- * mock writes under userData (main/telegram/mock-assets.ts). The browser preview has
+ * mock writes under userData (packages/mock-adapter/src/mock-assets.ts). The browser preview has
  * no `wx-media://` handler, so the WAV travels inside the URL — `media-src` allows
  * `data:`, and `new Audio(url)` plays it exactly like the Electron path.
  */

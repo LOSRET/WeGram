@@ -193,8 +193,11 @@ renderer/src/components/chat-pane/
   index.tsx              render tree + modal/popover state only
   useChatHistory.ts      first page, empty-page retries, paging to the saved anchor, loadOlder
   messageActions.ts      createMessageActions() — a plain factory, NOT a hook
-  ChatHeader.tsx         title, typing, call buttons, "…"
-  ChatInfoPopover.tsx    the "…" popover
+  ChatHeader.tsx         title, typing, call buttons, "…" (toggles 聊天信息)
+  ChatInfoPanel.tsx      the 聊天信息 overlay (state: members/query, pinned, search, dialogs)
+  ChatInfoRows.tsx       its rows: InfoRow / LinkRow / ToggleRow / DangerRow (presentational)
+  ChatInfoDialogs.tsx    RenameDialog (chats:setTitle) + InviteDialog (添加's invite link)
+  ChatInfoSearch.tsx     its 查找聊天内容 view (search:inChat + pick → locate)
   Placeholders.tsx       no-chat / loading / anchor-pending / empty-transcript states
   labels.ts              kindLabel
 ```
@@ -320,6 +323,15 @@ Per-domain modules re-exported from `index.ts` — the export surface must stay 
 `channels.ts` now imports from those two. `dto.ts` is at ~470 lines; the message schemas
 still live in it, so the rest of this batch is unchanged.
 
+**Also done 2026-11-21**: the 聊天信息 channels pushed `channels.ts` over its cap, so
+the **chat domain's keys and schemas** moved to `chats.ts` (list/get/open/openPrivate/
+canPost/setMuted/setPinned/clearHistory/members/setTitle/leave/pinned/inviteLink).
+`invokeChannels` and `invokeSchemas` spread them, so the tables are still the one
+contract; a new chat channel now goes into `chats.ts`. The panel's DTOs
+(`chatKind`/`chatSummary`/`chatMember`/`chatPinnedMessage`/`chatOp`) then pushed
+`dto.ts` over its own cap and moved to `chat.ts`; the package index still exports every
+type, so no consumer import changed.
+
 Files over 200 lines that are **not** in the plan: `WechatIcons.tsx` (458, generated
 artwork — leave it), `Composer.tsx` (283), `MediaBubble.tsx` (261), `main/index.ts` (250),
 `ProxyPanel.tsx` (222), `OverlayScrollbar.tsx` (205), `PerfPanel.tsx` (198),
@@ -429,6 +441,30 @@ source there is nothing left to reconcile.
 `TelegramAdapter`; the three `proxy` modules and the two stores keep their own formats;
 `setError(errorMessage(e))` stays at its call sites. The audit's C class lists why —
 see the dedupe section above.
+## Mock adapter extracted (2026-11-21)
+
+The fake adapter left `apps/desktop/src/main`. `telegram/mock/` (16 files) and
+`telegram/mock-assets.ts` now live in `packages/mock-adapter`, and the
+`TelegramAdapter` seam moved to `packages/adapter-contract`
+(`main/telegram/adapter.ts` is a two-line re-export, so every existing `./adapter`
+import stayed where it was).
+
+Why a package and not just a folder: the mock implements the seam, so it cannot import
+app code. Its only two app-side dependencies — `media/registry.ts` and
+`media/image-size.ts` — are now injected through `MockAdapterOptions`
+(`registerMedia`, `probeImageSize`), wired in `main/telegram/index.ts`. Both packages
+are connected exactly like the existing fakes: tsconfig paths + `include`,
+`electron.vite.config.ts` alias + `externalizeDepsPlugin` exclude (main only, so the
+renderer cannot pull `node:fs` through the alias), ESLint's `max-lines` list, and
+`scripts/sync-version.mjs`. Each package has its own `AGENTS.md`.
+
+Behaviour is unchanged and `pnpm verify` is green (lint → typecheck → 535 tests →
+build). Note what did **not** change: main still imports `@wegram/mock-adapter`
+statically and the renderer still imports `lib/preview-bridge.ts` statically, so the
+fixture code remains in the artifact. Excluding it from a release would be a separate
+build-time change (dev-only dynamic import + a define that rollup can eliminate), and it
+must cover both sides at once.
+
 ## Start-here checklist for the next session
 
 ```powershell

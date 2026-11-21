@@ -1,12 +1,12 @@
-import { anchorOf, type PopupAnchor } from '../../lib/popupPlacement'
 import { CallIcon, CallMenuIcon, MoreIcon } from '../Icon'
 
 interface ChatHeaderProps {
   title: string
   /** The peer is typing right now (the store expires the flag itself). */
   typing: boolean
-  /** Opens the chat-info popover against the "…" button. */
-  onOpenInfo: (anchor: PopupAnchor) => void
+  /** The 聊天信息 panel is showing; the "…" button is its switch. */
+  infoOpen: boolean
+  onToggleInfo: () => void
 }
 
 /**
@@ -14,7 +14,7 @@ interface ChatHeaderProps {
  * this build (there is no call stack yet), so they are rendered as such rather
  * than hidden — the header's rhythm depends on them being there.
  */
-export function ChatHeader({ title, typing, onOpenInfo }: ChatHeaderProps) {
+export function ChatHeader({ title, typing, infoOpen, onToggleInfo }: ChatHeaderProps) {
   return (
     <header className="wx-chat__header">
       <h1 className="wx-chat__title">
@@ -32,7 +32,8 @@ export function ChatHeader({ title, typing, onOpenInfo }: ChatHeaderProps) {
           className="wx-ghost-btn"
           title="聊天信息"
           aria-label="聊天信息"
-          onClick={(event) => onOpenInfo(anchorOf(event.currentTarget.getBoundingClientRect()))}
+          aria-expanded={infoOpen}
+          onClick={onToggleInfo}
         >
           <MoreIcon size={18} />
         </button>

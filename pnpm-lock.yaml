@@ -199,6 +199,12 @@ importers:
       '@tanstack/react-virtual':
         specifier: ^3.14.26
         version: 3.14.26(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@wegram/adapter-contract':
+        specifier: workspace:*
+        version: link:../../packages/adapter-contract
+      '@wegram/mock-adapter':
+        specifier: workspace:*
+        version: link:../../packages/mock-adapter
       '@wegram/mock-fixtures':
         specifier: workspace:*
         version: link:../../packages/mock-fixtures
@@ -269,6 +275,38 @@ importers:
       vite:
         specifier: ^8.3.8
         version: 8.3.8(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)
+
+  packages/adapter-contract:
+    dependencies:
+      '@wegram/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+    devDependencies:
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  packages/mock-adapter:
+    dependencies:
+      '@wegram/adapter-contract':
+        specifier: workspace:*
+        version: link:../adapter-contract
+      '@wegram/mock-fixtures':
+        specifier: workspace:*
+        version: link:../mock-fixtures
+      '@wegram/mock-session':
+        specifier: workspace:*
+        version: link:../mock-session
+      '@wegram/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+    devDependencies:
+      '@types/node':
+        specifier: ^24.19.2
+        version: 24.19.2
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
   packages/mock-fixtures:
     dependencies:

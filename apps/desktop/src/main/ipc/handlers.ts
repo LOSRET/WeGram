@@ -1,4 +1,4 @@
-import { copyFile } from 'node:fs/promises'
+import { copyFile, rm, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 
 import { AppError, RECENT_EMOJI_LIMIT } from '@wegram/protocol'
@@ -9,6 +9,7 @@ import { closeLoginWindow } from '../login-window'
 import { drop, hold } from '../media/leases'
 import { registerStreamFile } from '../media/registry'
 import { resolveProxySecrets, toProxyView, toStoredProxy } from '../proxy'
+import { closeQrWindow, getQrWindow, openQrWindow, qrTarget } from '../qr-window'
 import type { SettingsStore } from '../store/settings'
 import type { UiDatabase } from '../store/ui-db'
 import type { TelegramAdapter } from '../telegram/adapter'
@@ -150,6 +151,14 @@ export function createHandlers({
     'chats:openPrivate': (payload) => adapter.openPrivateChat(payload.userId),
     'chats:canPost': (payload) => adapter.canPost(payload.chatId),
     'chats:setMuted': (payload) => adapter.setChatMuted(payload.chatId, payload.muted),
+    'chats:setPinned': (payload) => adapter.setChatPinned(payload.chatId, payload.pinned),
+    'chats:clearHistory': (payload) => adapter.clearHistory(payload.chatId),
+    'chats:members': (payload) =>
+      adapter.chatMembers(payload.chatId, payload.limit ?? 12, payload.query),
+    'chats:setTitle': (payload) => adapter.setChatTitle(payload.chatId, payload.title),
+    'chats:leave': (payload) => adapter.leaveChat(payload.chatId),
+    'chats:pinned': (payload) => adapter.pinnedMessage(payload.chatId),
+    'chats:inviteLink': (payload) => adapter.inviteLink(payload.chatId, payload.temporary),
     'contacts:list': () => adapter.listContacts(),
 
     'messages:history': (payload) => adapter.history(payload),
@@ -349,6 +358,62 @@ export function createHandlers({
     },
     'viewer:close': () => {
       closeViewer()
+    },
+
+    /**
+     * 群二维码 is a window of its own (like the client's), opened from the panel.
+     * It fetches everything in one call: the chat, the faces for the collage and
+     * the 7-day invite link the code encodes.
+     */
+    'qr:open': (payload) => {
+      openQrWindow(payload.chatId, storedTheme(uiDb), BrowserWindow.getFocusedWindow())
+    },
+    'qr:info': async () => {
+      const chatId = qrTarget()
+      if (chatId === null) throw new AppError('internal', '二维码窗口没有打开任何群')
+      const [chat, members, invite] = await Promise.all([
+        adapter.getChat(chatId),
+        adapter.chatMembers(chatId, 12).catch(() => []),
+        adapter.inviteLink(chatId, true).catch(() => null),
+      ])
+      return { chat, members, invite, theme: storedTheme(uiDb) }
+    },
+    'qr:copy': async (payload) => {
+      const image = nativeImage.createFromBuffer(Buffer.from(payload.png, 'base64'))
+      if (image.isEmpty()) throw new AppError('internal', 'Failed to decode the QR image')
+      // Same web-standard clipboard the viewer's 复制 uses (Electron 45 has no
+      // writeImage any more); main owns it, so the frameless window needs no
+      // clipboard permission of its own.
+      await clipboard.write([
+        new ClipboardItem({ 'image/png': new Blob([image.toPNG()], { type: 'image/png' }) }),
+      ])
+    },
+    'qr:save': async (payload) => {
+      const win = getQrWindow()
+      const options: Electron.SaveDialogOptions = {
+        defaultPath: join(app.getPath('pictures'), '群二维码.png'),
+        filters: [{ name: '图片', extensions: ['png'] }],
+      }
+      const result = win
+        ? await dialog.showSaveDialog(win, options)
+        : await dialog.showSaveDialog(options)
+      if (result.canceled || !result.filePath) return null
+      await writeFile(result.filePath, Buffer.from(payload.png, 'base64'))
+      return { path: result.filePath }
+    },
+    'qr:share': async (payload) => {
+      // 转发给朋友 sends the picture the window rasterised: write it where the
+      // adapter's photo upload can read it, send, then remove the temporary file.
+      const file = join(app.getPath('temp'), `wegram-qr-${Date.now()}.png`)
+      await writeFile(file, Buffer.from(payload.png, 'base64'))
+      try {
+        await adapter.sendMedia({ chatId: payload.chatId, filePath: file, kind: 'photo' })
+      } finally {
+        await rm(file, { force: true })
+      }
+    },
+    'qr:close': () => {
+      closeQrWindow()
     },
   }
 }

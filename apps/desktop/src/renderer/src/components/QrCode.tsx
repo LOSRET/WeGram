@@ -6,6 +6,8 @@ interface QrCodeProps {
   value: string
   /** Rendered size in px of the whole square; the quiet zone scales with it. */
   size?: number
+  /** What the code encodes, for screen readers (a login code or a group link). */
+  label?: string
 }
 
 /**
@@ -16,7 +18,7 @@ interface QrCodeProps {
  * page: the sheet behind it is #fafafa (dark theme #1e1e1f), and a code whose
  * modules touch that edge is not readable by a phone camera.
  */
-export function QrCode({ value, size = 136 }: QrCodeProps) {
+export function QrCode({ value, size = 136, label = '登录二维码' }: QrCodeProps) {
   const drawing = useMemo(() => {
     try {
       return qrDrawing(qrMatrix(value))
@@ -40,7 +42,7 @@ export function QrCode({ value, size = 136 }: QrCodeProps) {
       height={size}
       viewBox={`0 0 ${drawing.box} ${drawing.box}`}
       role="img"
-      aria-label="登录二维码"
+      aria-label={label}
       shapeRendering="crispEdges"
     >
       <rect className="wx-qr__light" width={drawing.box} height={drawing.box} />

@@ -51,8 +51,7 @@ You sign in with your own account and see your real chats, groups and channels. 
 WeGram/
 ├─ apps/desktop/                 Electron app
 │  ├─ src/main/                  main process
-│  │  ├─ telegram/adapter.ts     TelegramAdapter interface (domain model, decoupled from TDLib JSON)
-│  │  ├─ telegram/mock/          fake adapter (fixtures / assets / traffic) — lets the UI proceed without the protocol layer
+│  │  ├─ telegram/adapter.ts     re-export of the packages/adapter-contract interface (decoupled from TDLib JSON)
 │  │  ├─ telegram/tdlib/         the only folder allowed to import tdl / prebuilt-tdlib
 │  │  ├─ windows.ts              shell window factory, title-bar theme, external-link allowlist
 │  │  ├─ ipc/                    channel router, zod input validation, AppError normalisation
@@ -62,6 +61,10 @@ WeGram/
 │  ├─ src/preload/               window.tg whitelist bridge (literal channel names only)
 │  └─ src/renderer/              React 19 + Tailwind v4 UI
 ├─ packages/protocol/            IPC contract: dto (zod) / channels / errors
+├─ packages/adapter-contract/    TelegramAdapter interface + events (shared by both adapters)
+├─ packages/mock-adapter/        fake adapter (fixtures / assets / traffic) — lets the UI proceed without the protocol layer
+├─ packages/mock-session/        the fake session's pure rules (paging / read / comments / list order)
+├─ packages/mock-fixtures/       the demo account (shared by the Electron fake and the browser preview)
 ├─ docs/                         design, handoffs and measurements
 ├─ spikes/tdlib/                 TDLib probes and the real session (not committed)
 └─ scripts/                      launcher scripts

@@ -10,6 +10,10 @@ only adds what is specific to this layer.
 main.tsx              route by hash: plain = shell, #viewer = viewer, #login = login window
 App.tsx               shell only (auth ready) + the ONE place that subscribes to evt:*
 screens/LoginWindow.tsx  the standalone login window: chrome + its four bodies
+screens/QrWindow.tsx     the 群二维码 window (`#qr`, design doc §9.9): a frameless 360×560
+                         sheet with the member collage, 群聊：…, the code, its validity
+                         line and 转发给朋友 / 复制图片 / 保存图片. It owns no shell state
+                         and rasterises its own PNG (lib/qrImage.ts).
 screens/login/           useLoginFlow (the whole sign-in flow) + BootStatus / bootCopy (the
                          startup-phase and failed/crashed panel) + QrStep / ProfileStep /
                          PhoneForm / LoginFooter / LoginHelp + loginCopy (pure copy table)
@@ -29,7 +33,14 @@ components/chat-pane/     render tree + useChatHistory (history/ modules) + mess
                          chat-style rows + the composer card, posts via messages:sendComment;
                          non-members get the official client's 加入/申请加入 gate instead;
                          opens at the top of the thread) + useCommentAnchor (that thread's
-                         reading position in ui.db; the default landing is the top)
+                         reading position in ui.db; the default landing is the top) +
+                         ChatInfoPanel (聊天信息, §9.9: a 314 px OVERLAY sheet — transform
+                         only, the transcript keeps its width — with 搜索群成员, the member
+                         grid, 群聊名称 / 群公告 / 群二维码 / 退出群聊 for groups and the
+                         shared mute/pin/clear rows; 群二维码 opens screens/QrWindow.tsx, the
+                         rows live in ChatInfoRows.tsx, and the rename/invite sheets in
+                         ChatInfoDialogs.tsx) + ChatInfoSearch
+                         (in-panel 查找聊天内容 over search:inChat, picks a row → locate)
 components/contacts/      通讯录: ContactsList (service rows + address book by initial) +
                          ContactDetail (the card)
 components/picker/        the expression panel's data hooks and body components
@@ -58,6 +69,10 @@ lib/entities.ts       TL entity → text segments (pure, unit-tested)
 lib/useAnchoredScroll.ts  ready gate, stick-to-bottom, resize compensation
 lib/scrollGeometry.ts (pure, unit-tested) the ONE "is the reader at the bottom" rule
 lib/jumpSettle.ts    (pure, unit-tested) "has the jump to the newest message landed?"
+lib/chatInfo.ts      (pure, unit-tested) the panel's slide length + which faces its
+                     participant grid draws (members, or the conversation as the fallback)
+lib/qrImage.ts       the 群二维码 window's PNG: same qrMatrix/qrDrawing the SVG uses,
+                     rasterised with the quiet zone for clipboard/save/forward
 lib/history.ts       (pure, unit-tested) the ONE "may this empty page be cached" rule
 lib/media.ts          per-owner request dedupe + cancel + the media URL/progress hooks
 lib/mediaVariant.ts   (pure, unit-tested) which photo size covers a box
@@ -73,7 +88,9 @@ lib/stickerBox.ts     (pure, unit-tested) the on-screen sticker box + the 1.49×
 lib/useInView.ts      the visibility gate a sticker and its effect share (geometry first)
 lib/preview-bridge.ts DEV-ONLY entry point (re-exports lib/preview)
 lib/preview/          browser-preview session + invoke switch (index.ts); fixtures.ts is a
-                      thin adapter over @wegram/mock-fixtures (data: URLs + gradient faces)
+                      thin adapter over @wegram/mock-fixtures (data: URLs + gradient faces);
+                      chats.ts / messages.ts / comments.ts / qr.ts hold the handler rules the
+                      invoke switch delegates to
 ```
 
 `styles/index.css` is the entry point only: it imports `styles/*.css` in source order
@@ -106,7 +123,13 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   unmount.** `CommentPanel` renders at `translateX(100%)` and flips `is-open` on the
   next tick (a 20 ms timeout, since rAF is throttled while occluded); on close the
   pane keeps it mounted for `COMMENT_PANEL_ANIM_MS` (250 ms) or the panel vanishes
-  mid-slide. Any future full-pane push view follows the same two rules.
+  mid-slide. `ChatInfoPanel` follows the same two rules, and it is an **overlay**:
+  `translateX(100% → 0)` only. Never give it a width animation to "push" the chat — the
+  owner's reference presses the sheet on top of the messages, and a width animation
+  re-lays-out every virtualised row on every frame (an earlier version did, and was
+  wrong). `INFO_PANEL_ANIM_MS` is pinned to the stylesheet by
+  `style-contract.test.ts`, and a channel whose member list needs administrator rights
+  answers with no members on purpose (the grid falls back to the conversation's face).
 - **A programmatic `scrollTop` write desyncs `@tanstack/react-virtual`** (it
   re-reads its offset only on real scroll events). After every programmatic
   scroll, dispatch one `scroll` event so the virtualizer re-measures — otherwise

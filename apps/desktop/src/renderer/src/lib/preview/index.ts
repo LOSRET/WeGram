@@ -1,10 +1,3 @@
-import {
-  composeCommentAccess,
-  nextReadState,
-  pageAround,
-  pageNewer,
-  pageOlder,
-} from '@wegram/mock-session'
 import type {
   AppSettings,
   AuthState,
@@ -23,6 +16,27 @@ import type {
 } from '@wegram/protocol'
 
 import { RECENT_EMOJI_LIMIT } from '../emoji'
+import { handlePreviewComments } from './comments'
+import {
+  previewAround,
+  previewHistory,
+  previewMarkRead,
+  previewNewer,
+  type PreviewMessagesStore,
+} from './messages'
+import { handlePreviewQr, type PreviewQrStore } from './qr'
+import {
+  clearPreviewHistory,
+  leavePreviewChat,
+  previewChatMembers,
+  previewInviteLink,
+  previewPinnedMessage,
+  searchPreviewMessages,
+  setPreviewMuted,
+  setPreviewPinned,
+  setPreviewTitle,
+  type PreviewChatStore,
+} from './chats'
 import { stickerMedia } from '../stickerMedia'
 import {
   ME,
@@ -34,10 +48,8 @@ import {
   msg,
   now,
   previewFiles,
-  previewCommentAccess,
   previewCustomEmoji,
   previewStickerSet,
-  previewThreads,
   PREVIEW_STICKERS,
   channelPostRights,
 } from './fixtures'
@@ -45,7 +57,7 @@ import {
 /**
  * Development-only bridge used when the renderer runs in a plain browser
  * (`pnpm web`). It mirrors just enough of the mock adapter to click through the
- * UI; the real source of truth is `main/telegram/mock/` + TDLib.
+ * UI; the real source of truth is `@wegram/mock-adapter` + TDLib.
  *
  * The fixture data lives in `preview/fixtures.ts`; this file keeps the mutable
  * session (auth, drafts, anchors, viewer), the invoke switch and the installer.
@@ -61,6 +73,9 @@ function emit(channel: EventChannel, payload: unknown): void {
   const envelope = { seq, payload } as EventEnvelope<EventChannel>
   for (const listener of listeners.get(channel) ?? []) listener(envelope)
 }
+
+/** The chat handlers' view of this session; their rules live in ./chats.ts. */
+const previewChats: PreviewChatStore = { chats, messagesByChat, emit }
 
 /**
  * The shell is the default browser-preview route. `#login` previews the login
@@ -85,20 +100,8 @@ function clearQrTimer(): void {
   qrTimer = null
 }
 
-/**
- * The adapter's read rule in three lines: the marker only moves forward, and
- * `unread` is whatever is still newer than it. `upTo === null` means "the newest
- * message" (`chats:open`).
- */
-function applyPreviewRead(chatId: number, upTo: number | null): void {
-  const chat = chats.find((item) => item.id === chatId)
-  if (!chat) return
-  const state = nextReadState(chat, messagesByChat[chatId] ?? [], upTo ?? undefined)
-  if (!state) return
-  chat.lastReadInboxMessageId = state.lastReadInboxMessageId
-  chat.unread = state.unread
-  emit('evt:chats', { ops: [{ op: 'upsert', chat: { ...chat } }] })
-}
+/** The message rules' view of this session; see ./messages.ts. */
+const previewMessagesStore: PreviewMessagesStore = { chats, messagesByChat, emit }
 
 const drafts: Record<number, string> = {}
 const anchors: Record<number, { messageId: number; offset: number }> = {}
@@ -113,6 +116,16 @@ let openChatId: number | null = null
 let proxy: ProxyConfig | null = null
 let settings: AppSettings = { theme: 'light' }
 let previewViewer: { items: ViewerItem[]; index: number; title?: string } | null = null
+
+/** What the 群二维码 handlers read; their rules live in ./qr.ts. */
+const previewQrStore: PreviewQrStore = {
+  chats,
+  members: (chatId) => previewChatMembers(previewChats, chatId, 12),
+  invite: (chatId, temporary) => previewInviteLink(chatId, temporary),
+  get theme() {
+    return settings.theme
+  },
+}
 
 async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown> {
   const store = payload as Record<string, any>
@@ -178,13 +191,37 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       const chat = chats.find((item) => item.id === store.chatId)
       return chat?.kind === 'channel' ? Boolean(channelPostRights[chat.id]) : true
     }
-    case 'chats:setMuted': {
-      const chat = chats.find((item) => item.id === store.chatId)
-      if (!chat) throw { code: 'internal', message: 'unknown preview chat' }
-      chat.muted = Boolean(store.muted)
-      emit('evt:chats', { ops: [{ op: 'upsert', chat: { ...chat } }] })
-      return { ...chat }
-    }
+    case 'chats:setMuted':
+      return setPreviewMuted(previewChats, Number(store.chatId), Boolean(store.muted))
+    case 'chats:setPinned':
+      return setPreviewPinned(previewChats, Number(store.chatId), Boolean(store.pinned))
+    case 'chats:clearHistory':
+      return clearPreviewHistory(previewChats, Number(store.chatId))
+    case 'chats:members':
+      return previewChatMembers(
+        previewChats,
+        Number(store.chatId),
+        Number(store.limit ?? 12),
+        String(store.query ?? ''),
+      )
+    case 'chats:setTitle':
+      return setPreviewTitle(previewChats, Number(store.chatId), String(store.title ?? ''))
+    case 'chats:leave':
+      return leavePreviewChat(previewChats, Number(store.chatId))
+    case 'chats:pinned':
+      return previewPinnedMessage()
+    case 'chats:inviteLink':
+      return previewInviteLink(Number(store.chatId), Boolean(store.temporary))
+    /** 群二维码: the preview boots the same renderer on `#qr` (see ./qr.ts). */
+    case 'qr:open':
+    case 'qr:info':
+    case 'qr:copy':
+    case 'qr:save':
+    case 'qr:share':
+    case 'qr:close':
+      return handlePreviewQr(channel, store, previewQrStore)
+    case 'search:inChat':
+      return searchPreviewMessages(previewChats, Number(store.chatId), String(store.q ?? ''))
     case 'chats:openPrivate': {
       const chat = chats.find((item) => item.kind === 'private' && item.userId === store.userId)
       if (!chat) throw { code: 'internal', message: 'unknown preview contact' }
@@ -194,84 +231,38 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       return contacts
     case 'messages:read': {
       const upTo = Number(store.upToMessageId)
-      if (Number.isFinite(upTo)) applyPreviewRead(Number(store.chatId), upTo)
-      return undefined
+      return previewMarkRead(
+        previewMessagesStore,
+        Number(store.chatId),
+        Number.isFinite(upTo) ? upTo : null,
+      )
     }
     case 'messages:history':
-      return pageOlder(
-        messagesByChat[store.chatId] ?? [],
-        store.fromMessageId as number | undefined,
-        Number(store.limit ?? 50),
-      )
+      return previewHistory(previewMessagesStore, {
+        chatId: Number(store.chatId),
+        ...(store.fromMessageId === undefined
+          ? {}
+          : { fromMessageId: Number(store.fromMessageId) }),
+        limit: Number(store.limit ?? 50),
+      })
     case 'messages:around':
-      return pageAround(
-        messagesByChat[store.chatId] ?? [],
-        Number(store.messageId),
-        Number(store.limit ?? 25),
-      )
+      return previewAround(previewMessagesStore, {
+        chatId: Number(store.chatId),
+        messageId: Number(store.messageId),
+        limit: Number(store.limit ?? 25),
+      })
     case 'messages:newer':
-      return pageNewer(
-        messagesByChat[store.chatId] ?? [],
-        Number(store.fromMessageId),
-        Number(store.limit ?? 50),
-      )
+      return previewNewer(previewMessagesStore, {
+        chatId: Number(store.chatId),
+        fromMessageId: Number(store.fromMessageId),
+        limit: Number(store.limit ?? 50),
+      })
+    /** The discussion channels; their rules live in ./comments.ts. */
     case 'messages:comments':
-      return pageOlder(
-        previewThreads[`${store.chatId}:${store.messageId}`] ?? [],
-        store.fromMessageId as number | undefined,
-        Number(store.limit ?? 30),
-      )
-    case 'messages:commentInfo': {
-      const key = `${store.chatId}:${store.messageId}`
-      if (!previewThreads[key]) {
-        throw { code: 'not_implemented', message: '这个帖子还没有讨论群组，不能评论' }
-      }
-      return composeCommentAccess(previewCommentAccess[key])
-    }
-    case 'messages:joinCommentGroup': {
-      const key = `${store.chatId}:${store.messageId}`
-      const access = previewCommentAccess[key] ?? {}
-      if (access.joinByRequest) return { joined: false, requestSent: true }
-      previewCommentAccess[key] = { ...access, joined: true, canComment: true }
-      return { joined: true, requestSent: false }
-    }
-    case 'messages:sendComment': {
-      const chatId = Number(store.chatId)
-      const messageId = Number(store.messageId)
-      const thread = previewThreads[`${chatId}:${messageId}`]
-      if (!thread) throw { code: 'not_implemented', message: '这个帖子还没有讨论群组，不能评论' }
-      const message: Message = {
-        id: thread.reduce((max, item) => Math.max(max, item.id), 0) + 1,
-        chatId,
-        senderId: ME.id,
-        senderName: '我',
-        outgoing: true,
-        date: now(),
-        kind: 'text',
-        text: String(store.text),
-      }
-      thread.push(message)
-      const target = (messagesByChat[chatId] ?? []).find((item) => item.id === messageId)
-      if (target) {
-        target.interaction = {
-          ...target.interaction,
-          comments: thread.length,
-          canOpen: true,
-        }
-        emit('evt:messages', {
-          chatId,
-          ops: [
-            {
-              op: 'interaction',
-              chatId,
-              messageId,
-              interaction: target.interaction,
-            },
-          ],
-        })
-      }
-      return { message }
-    }
+    case 'messages:commentInfo':
+    case 'messages:joinCommentGroup':
+    case 'messages:sendComment':
+      return handlePreviewComments(channel, store, messagesByChat, emit)
     case 'messages:send': {
       const list = messagesByChat[store.chatId] ?? []
       const message = msg(store.chatId, nextId++, String(store.text), true, 0)

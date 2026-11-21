@@ -1,6 +1,6 @@
 import { AppError } from '@wegram/protocol'
 
-import type { AdapterEvent } from '../adapter'
+import type { AdapterEvent } from '@wegram/adapter-contract'
 import type { MockAssets } from './assets'
 import { simulateTransfer } from './effects'
 

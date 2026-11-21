@@ -5,7 +5,6 @@ import { join } from 'node:path'
 import { AppError } from '@wegram/protocol'
 import type { MessageMedia, Sticker } from '@wegram/protocol'
 
-import { registerMediaFile } from '../../media/registry'
 import type { MockFile } from './constants'
 import {
   SAMPLE_VIDEO_WEBM,
@@ -15,7 +14,7 @@ import {
   STICKER_WAVE_TGS,
   createGradientPng,
   createToneWav,
-} from '../mock-assets'
+} from './mock-assets'
 
 /**
  * The mock's real media: PNG/WebP/TGS/WebM files written once under `userData`
@@ -24,6 +23,8 @@ import {
  * account.
  */
 export class MockAssets {
+  constructor(private readonly registerMedia: (path: string) => string) {}
+
   readonly files = new Map<number, MockFile>()
   readonly stickers: Sticker[] = []
   /** Custom emoji: the id a text entity carries → the sticker it draws. */
@@ -59,7 +60,7 @@ export class MockAssets {
 
     const avatarPath = join(mediaDir, 'self-avatar.png')
     await writeFile(avatarPath, createGradientPng(256, 256, [7, 193, 96], [24, 96, 180]))
-    this.selfAvatarUrl = registerMediaFile(avatarPath)
+    this.selfAvatarUrl = this.registerMedia(avatarPath)
 
     this.addFile(7001, facePath, '笑脸贴纸', 'image/webp', 128, 128)
     this.addFile(7002, heartPath, '爱心贴纸', 'image/webp', 128, 128)
@@ -97,7 +98,7 @@ export class MockAssets {
     this.files.set(fileId, {
       fileId,
       path,
-      url: registerMediaFile(path),
+      url: this.registerMedia(path),
       name,
       size: statSync(path).size,
       mimeType,

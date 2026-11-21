@@ -1,0 +1,77 @@
+import { z } from 'zod'
+
+/**
+ * The chat domain's DTOs (design doc §6; the 聊天信息 rows are §9.9).
+ *
+ * Split out of `dto.ts` when the panel's member and pinned-message schemas pushed
+ * that file over its 550-line budget. `channels.ts` and `chats.ts` import from
+ * here; the renderer still sees every type through the package index.
+ */
+
+export const chatKindSchema = z.enum(['private', 'group', 'channel'])
+export type ChatKind = z.infer<typeof chatKindSchema>
+
+export const chatSummarySchema = z.object({
+  id: z.number().int(),
+  title: z.string(),
+  kind: chatKindSchema,
+  /** Peer user id (private/secret); 通讯录 hides our own Saved Messages. */
+  userId: z.number().int().optional(),
+  unread: z.number().int().nonnegative(),
+  pinned: z.boolean(),
+  muted: z.boolean(),
+  lastMessageText: z.string().optional(),
+  lastMessageAt: z.number().optional(),
+  /** [start, end) spoiler runs of `lastMessageText`, so the row can mask them too. */
+  lastMessageSpoilers: z.array(z.tuple([z.number().int(), z.number().int()])).optional(),
+  /** Highest incoming message id the server considers read (unread divider). */
+  lastReadInboxMessageId: z.number().int().optional(),
+  /** Highest outgoing message id the peer has read (read receipt). */
+  lastReadOutboxMessageId: z.number().int().optional(),
+  /** `wx-media://` URL of the chat photo; filled in after it is downloaded. */
+  avatarUrl: z.string().optional(),
+})
+export type ChatSummary = z.infer<typeof chatSummarySchema>
+
+/**
+ * One participant in the 聊天信息 panel's member grid (design doc §9.9).
+ *
+ * Names come from the adapter's cache; `avatarUrl` is filled only when the photo
+ * is already on disk, exactly like `ChatSummary.avatarUrl`. A picture that
+ * finishes later arrives through `evt:avatars`, so the grid draws initials first
+ * and gains faces without refetching the list.
+ */
+export const chatMemberSchema = z.object({
+  userId: z.number().int(),
+  title: z.string(),
+  avatarUrl: z.string().optional(),
+})
+export type ChatMember = z.infer<typeof chatMemberSchema>
+
+/**
+ * 群公告: Telegram's newest pinned message, which is what a group uses for an
+ * announcement. Only the row's preview crosses IPC — the panel shows the text and
+ * the 定位 path fetches the row itself when the reader taps it.
+ */
+export const chatPinnedMessageSchema = z.object({
+  messageId: z.number().int(),
+  text: z.string(),
+})
+export type ChatPinnedMessage = z.infer<typeof chatPinnedMessageSchema>
+
+/**
+ * 群二维码's payload: the invite link a phone can open. `expiresAt` is Unix
+ * seconds and only present for a temporary link (the 7-day QR the client draws);
+ * a public username link never expires, so it carries no date.
+ */
+export const chatInviteLinkSchema = z.object({
+  link: z.string(),
+  expiresAt: z.number().int().optional(),
+})
+export type ChatInviteLink = z.infer<typeof chatInviteLinkSchema>
+
+export const chatOpSchema = z.discriminatedUnion('op', [
+  z.object({ op: z.literal('upsert'), chat: chatSummarySchema }),
+  z.object({ op: z.literal('remove'), chatId: z.number().int() }),
+])
+export type ChatOp = z.infer<typeof chatOpSchema>

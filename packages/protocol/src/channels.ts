@@ -2,8 +2,6 @@ import { z } from 'zod'
 
 import {
   authStateSchema,
-  chatOpSchema,
-  chatSummarySchema,
   connectionStateSchema,
   messageOpSchema,
   messageSchema,
@@ -12,6 +10,9 @@ import {
   userAvatarSchema,
 } from './dto'
 import { bootStateSchema } from './boot'
+import { chatOpSchema, chatSummarySchema } from './chat'
+import { chatInvokeChannels, chatInvokeSchemas } from './chats'
+import { qrInvokeChannels, qrInvokeSchemas } from './qr'
 import { customEmojiStickerSchema, stickerSetSchema, stickerSetSummarySchema } from './stickers'
 import {
   appInfoSchema,
@@ -59,18 +60,10 @@ export const invokeChannels = [
   'auth:me',
   /** Startup phase: what TDLib is doing before authorization can begin. */
   'boot:state',
-  'chats:list',
-  'chats:get',
-  'chats:open',
-  /** Opens (creating if needed) the private chat of a contact card's user. */
-  'chats:openPrivate',
-  /**
-   * Whether this account may post in the chat. Only channels ask: posting there
-   * is an administrator right, so the composer is offered only when it holds.
-   */
-  'chats:canPost',
-  /** 静音 / 取消静音 for the channel bar; answers the refreshed summary. */
-  'chats:setMuted',
+  /** The chat domain's keys live in ./chats.ts; this stays the one channel list. */
+  ...chatInvokeChannels,
+  /** 群二维码 is its own window; see ./qr.ts. */
+  ...qrInvokeChannels,
   /**
    * The account's Telegram address book (通讯录). People, not conversations:
    * the list comes from TDLib's `getContacts`, so a contact without a private
@@ -193,24 +186,8 @@ export const invokeSchemas = {
   'auth:logout': { request: noPayload, response: noPayload },
   'auth:me': { request: noPayload, response: selfSchema },
   'boot:state': { request: noPayload, response: bootStateSchema },
-  'chats:list': {
-    request: z.object({
-      limit: z.number().int().positive().max(200),
-      offset: z.number().int().nonnegative(),
-    }),
-    response: z.array(chatSummarySchema),
-  },
-  'chats:get': { request: z.object({ chatId: z.number().int() }), response: chatSummarySchema },
-  'chats:open': { request: z.object({ chatId: z.number().int() }), response: noPayload },
-  'chats:openPrivate': {
-    request: z.object({ userId: z.number().int() }),
-    response: chatSummarySchema,
-  },
-  'chats:canPost': { request: z.object({ chatId: z.number().int() }), response: z.boolean() },
-  'chats:setMuted': {
-    request: z.object({ chatId: z.number().int(), muted: z.boolean() }),
-    response: chatSummarySchema,
-  },
+  ...chatInvokeSchemas,
+  ...qrInvokeSchemas,
   'contacts:list': { request: noPayload, response: z.array(contactSchema) },
   'messages:history': {
     request: z.object({

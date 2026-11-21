@@ -51,8 +51,7 @@ WeGram 是一个自用的 Telegram 桌面客户端：协议层用 Telegram 官�
 WeGram/
 ├─ apps/desktop/                 Electron 应用
 │  ├─ src/main/                  主进程
-│  │  ├─ telegram/adapter.ts     TelegramAdapter 接口（领域模型，与 TDLib JSON 解耦）
-│  │  ├─ telegram/mock/          假数据适配器（fixtures / assets / traffic）—— UI 可以脱离协议层并行开发
+│  │  ├─ telegram/adapter.ts     重新导出 packages/adapter-contract 的接口（领域模型，与 TDLib JSON 解耦）
 │  │  ├─ telegram/tdlib/         唯一允许 import tdl / prebuilt-tdlib 的目录
 │  │  ├─ windows.ts              主窗口工厂、标题栏主题、外链白名单
 │  │  ├─ ipc/                    通道路由 + zod 入参校验 + AppError 归一
@@ -62,6 +61,10 @@ WeGram/
 │  ├─ src/preload/               window.tg 白名单桥（只认字面量通道名）
 │  └─ src/renderer/              React 19 + Tailwind v4 界面
 ├─ packages/protocol/            IPC 契约：dto（zod）/ channels / errors
+├─ packages/adapter-contract/    TelegramAdapter 接口 + 事件（两个适配器共用）
+├─ packages/mock-adapter/        假数据适配器（fixtures / assets / traffic）—— UI 可以脱离协议层并行开发
+├─ packages/mock-session/        假会话的纯规则（分页 / 已读 / 评论 / 列表顺序）
+├─ packages/mock-fixtures/       演示账号数据（主进程 fake 与浏览器预览共用）
 ├─ docs/                         设计、交接与实测记录
 ├─ spikes/tdlib/                 TDLib 探针、真实 session（不提交）
 └─ scripts/                      启动脚本

@@ -23,7 +23,7 @@ listed in "Known deltas" is a deliberate, documented difference.
 | `renderer/src/components/contacts/ContactDetail.tsx` | The contact card: 60 px avatar, 微信号, 朋友资料 / 更多信息, and the three blue actions (发消息 / 语音聊天 / 视频聊天). |
 | `renderer/src/lib/contacts.ts` | Private-chat filter + initial/grouping rules (pinyin via ICU collation; pure, unit-tested). |
 | `renderer/src/components/OverlayScrollbar.tsx` | WeChat's floating scrollbar: a 6 px translucent pill drawn over the rows (hover/scroll/drag), so long lists get no layout gutter and nothing re-flows when it appears. Used by the chat list and the transcript. |
-| `renderer/src/components/ChatPane.tsx` | 46 px header (title, typing, call/… buttons), watermark empty state, chat-info popover. |
+| `renderer/src/components/chat-pane/` | 46 px header (title, typing, call/… buttons), watermark empty state, and the 聊天信息 side panel (§2.8). |
 | `renderer/src/components/MessageList.tsx` | Bubbles, real sender photos on both sides (own avatar on the right; `senderAvatarUrl`, `evt:avatars`, `Self.avatarUrl`), hover-only timestamp/read receipt, day + unread separators. |
 | `renderer/src/components/message-list/CommentBar.tsx` | WeChat's 评论 N 条 bar under a bubble (design doc §9.8) — the handle, not the thread. In a channel post it is the bubble's last row instead. |
 | `renderer/src/components/message-list/ChannelMeta.tsx` | A channel post's footer: eye + view count + time (+ 已编辑), inside the bubble or under a sticker. The channel composition itself is `styles/channel.css`. |
@@ -331,7 +331,7 @@ not from a WeChat screenshot, because the behaviour is Telegram's:
   itself; the sticker underneath is unaffected.
 - Fixture: chat 2 (`WeGram 产品群`) message 207 — the ✨ TGS sticker plus a gold
   spark burst (`mock-media/premium-sticker-effect.tgs`, generated in
-  `main/telegram/mock-assets.ts`). It opens at the unread divider, so scroll or hit
+  `packages/mock-adapter/src/mock-assets.ts`). It opens at the unread divider, so scroll or hit
   the "N 条新消息" buoy to see it play.
 - Verified in the browser preview over CDP on 2026-11-20: 209 × 209 box around a
   140 px sticker, autoplay on appearance, replay on click, and opacity 0 after the
@@ -356,6 +356,89 @@ caption, and the app drew the bare glyph — the client draws a small sticker in
   `messageAnimatedEmoji`, drawn at 112 px (§2.5).
 - Fixture: chat 2 (`WeGram 产品群`) message 204 carries the ✨ custom emoji; both
   fakes answer id 7003 with the same TGS sticker.
+
+### 2.8 聊天信息 panel (added 2026-11-21)
+
+The header's "…" opens WeChat 4.x's **聊天信息** side panel instead of a popover. The
+reference is the client's own panel (two screenshots from the owner, 2026-11-21: a
+private chat and a group); every number below was read off them, and the deltas
+against the client are listed separately.
+
+| what | value |
+|---|---|
+| panel | 314 px wide, starts under the 46 px header, left hairline `#f0f0f0` |
+| insets | left 19, right 18 (rules inset 18/19); rows reserve 33 on the right for the switch |
+| participant grid | 66 px cells, 47 px avatar (radius 4), caption 12 px `#9f9fa6`, 4 px below, single line |
+| 搜索群成员 | search pill 32 px tall, 19 px sides, 12 px above the grid |
+| 群聊名称 / 群公告 | label 14/20 over hint 12/16 (clamped to two lines), 9–10 px vertical padding |
+| 群二维码 | 64 px row; QR pictogram then chevron, both `#b7b7b7` |
+| 查找聊天内容 | 64 px row, 14 px label, trailing chevron `#b7b7b7` |
+| mute / pin block | 10 px padding above and below, two 41 px rows, no rule between them |
+| 清空聊天记录 / 退出群聊 | 64 px rows, centred, `#fa5151` |
+| switch | 36 × 20, 16 px white knob inset 2, off `#ededed`, on `#00c375` |
+
+- **It overlays; it must not push.** The owner corrected this on 2026-11-21 ("这个信息面板
+  是压在消息上面的"): the sheet slides over the transcript and the composer, which keep their
+  width underneath — the client's own panel leaves its messages clipped at the sheet's
+  edge, not re-wrapped. A push layout (animating the width) re-lays-out every virtualised
+  row on every frame and was wrong on both counts. The animation is therefore only
+  `translateX(100% → 0)` (200 ms); `lib/chatInfo.ts` holds the duration and
+  `style-contract.test.ts` pins the stylesheet to it.
+- **Private chat**: the peer's face, 查找聊天内容, 消息免打扰, 置顶聊天, 清空聊天记录.
+- **Group**: 搜索群成员 over the grid + the dashed 添加 tile, then 群聊名称 and 群公告 as
+  label-over-hint rows, then 群二维码, 查找聊天内容, the mute/pin pair, 清空聊天记录 and
+  退出群聊. The rows are composed in `ChatInfoRows.tsx`, the dialogs in
+  `ChatInfoDialogs.tsx`; the panel itself only owns state.
+- **搜索群成员** is a *server* search: `chats:members` grew a `query` that goes straight
+  to `searchChatMembers` (260 ms debounce). It is not a filter over the twelve rows the
+  grid already has, and a query with no hits deliberately draws no tiles (not the group's
+  own face).
+- **群聊名称** opens `RenameDialog` and writes through the new `chats:setTitle`
+  (`setChatTitle`; needs `can_change_info`). The dialog owns the draft, so a refusal
+  keeps the sheet open with the typed name.
+- **群公告** is Telegram's newest pinned message (`chats:pinned` →
+  `getChatPinnedMessage`; a 404 is "nothing pinned", not an error) shown as its preview;
+  tapping the row locates that message through the existing locate path.
+- **群二维码 is its own window**, like the client's: clicking the row opens a frameless
+  360 × 560 sheet (child of the shell, so it closes/minimises with it and never gets its
+  own task-bar button). It carries the group's faces as a collage (up to six members,
+  else the chat photo), 群聊：the first three member names, a 280 px code, a validity
+  line and the three actions.
+  - The code is a **temporary link**: `chats:inviteLink { temporary: true }` asks for a
+    `createChatInviteLink` with a 7-day expiry, so the line reads 该二维码 7 天内（M月D日前）
+    有效，重新进入将更新 — and it is true: every open mints a fresh code. Without invite
+    rights it falls back to the public username (or the account's own link) and the line
+    becomes 该链接长期有效，重新进入不会变化.
+  - The actions work on a 1024 px PNG the window rasterises itself from the same
+    `qrMatrix` the SVG uses: 复制图片 → `qr:copy` (main writes the clipboard bitmap, the
+    same web-clipboard path the viewer uses), 保存图片 → `qr:save` (native save dialog
+    into 图片), 转发给朋友 → an in-window chat list (`chats:list`) then `qr:share`, which
+    writes a temporary PNG and sends it as a **photo message** through the adapter's
+    `sendMedia`.
+  - 添加 still opens the in-panel 邀请成员 sheet — in Telegram, inviting someone *is*
+    sharing the link.
+  - Esc closes the chat list first, then the window; the frameless × goes through
+    `qr:close`, since there are no native controls to close it with.
+- **退出群聊** asks first, then `chats:leave` (`leaveChat`) and a `remove` chat op; the
+  pane returns to the watermark.
+- **清空聊天记录** asks first, then `chats:clearHistory` (`deleteChatHistory` with
+  `revoke: false`): this account's copy only. The store's history for the chat is
+  emptied in place instead of refetched.
+- **查找聊天内容** switches the panel to its own search view (back chevron + search
+  pill, 260 ms debounce) and searches through `search:inChat` — TDLib's index, not the
+  loaded page. Results are newest first; picking one closes the panel and rides the
+  existing locate path.
+- Verified in the browser preview on 2026-11-21 (chat panel): overlay over a 5000-message transcript
+  (no row re-flow), the group layout in both themes, member search with and without hits,
+  rename (header, list row and panel all follow), the invite QR + link, leaving a group,
+  both switches with their toasts and the list re-sorting on unpin, the clear dialog,
+  in-panel search, Esc ordering (dialog → search view → panel) and chat switching.
+- The **群二维码 window** was checked in the browser preview on `#qr?chat=2` on 2026-11-21:
+  the member collage, 群聊：…, the 280 px code, the 7-day validity line, the three actions,
+  the forward list and Esc ordering. Its real Electron form (frameless 360 × 560, parented
+  to the shell) follows the login window's creation path and needs one run in the app —
+  the detached launcher needs WMI, which this agent sandbox denies, and the owner's app
+  was already running.
 
 ## 3. Icon provenance (this is the part people get wrong)
 
@@ -720,6 +803,17 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
     评论 row is `calc(100% + 2 × inset)` wide with negative margins — a `width: auto`
     button shrank to its label and read as a small control in the bubble's corner.
     Groups, private chats and the comment rows inside `CommentPanel` are untouched.
+33. **聊天信息 maps the client's group rows onto what Telegram has.** 群公告 is the
+    newest pinned message; 群聊名称 renames the group; 群二维码 opens the client's own
+    window, but the code inside is a Telegram invite link (7-day temporary when the
+    account may create one, else the public username) rather than WeChat's per-group
+    code; 添加 opens the in-panel invite sheet instead of a member picker. Deliberately
+    absent: 备注, 我在本群的昵称, 保存到通讯录, 显示群成员昵称 — Telegram has no
+    counterpart (the name shown in a group is the profile name, every group already sits
+    in the chat list, and sender names are always drawn). 查找聊天内容 searches inside
+    the panel instead of opening the client's chat-wide search view (which awaits the W4
+    surface); the query, results and jump behave the same, and a member avatar does not
+    open a profile yet.
 
 ---
 
@@ -733,9 +827,12 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
 2. ~~通讯录 panel~~ — done 2026-11-19 (§2.4): the Telegram address book
    (`getContacts`) grouped by pinyin initial, the client's service rows and the
    contact card. Remaining follow-up: virtualise past ~300 contacts.
-3. Chat-info popover → real side panel (members, mute/pin controls) — the protocol
-   already has `muted`/`pinned`.
-4. Global search overlay (W4) and in-chat search.
+3. ~~Chat-info popover → real side panel~~ — done 2026-11-21 (§2.8): the overlay
+   with the private and group layouts, 搜索群成员, 群聊名称, 群公告 (pinned message),
+   群二维码 / 添加 (invite link), mute/pin/clear and 退出群聊. Remaining: a member card
+   on avatar click, and a local 备注 if the owner wants one.
+4. Global search overlay (W4); in-chat search exists inside the panel (§2.8), the
+   chat-wide view does not.
 5. Pin button + draggable list width, if the client fidelity matters more than scope.
 6. ~~Avatar photos once the DTO carries them~~ — done for the rail, the chat list and
    **the transcript's sender rows** (`Message.senderAvatarUrl` + `evt:avatars`;
@@ -746,6 +843,14 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
 ---
 
 ## 7. Pitfalls that cost time
+
+- **A channel's response shape is only checked by the handler map, not at runtime.**
+  `chats:inviteLink` was declared `{ link: string } ` while the adapter returned the bare
+  string; `answer?.link` then resolved to **`String.prototype.link`**, and passing that
+  function to `useState` made React call it as an updater — the renderer crashed with
+  `String.prototype.link called on null or undefined` and the window closed. The handler
+  map is now typed by `InvokeResponse<C>` (the mismatch is a compile error); if a
+  response ever looks like a function, suspect this class of mismatch, not React.
 
 - **Electron single-instance.** Relaunching while an instance runs silently does
   nothing — the visible window keeps the *old* bundle. Always

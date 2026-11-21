@@ -14,14 +14,16 @@ app-window.ts       the ONE BrowserWindow factory (security webPreferences, rout
 windows.ts          the shell window: geometry, theme repaint, minimize↔viewer wiring
 login-window.ts     the frameless 280×373 login BrowserWindow (#login), close/refocus
 viewer.ts           the 图片和视频 window; unowned on purpose (see below), pins/hides it
+qr-window.ts        the 群二维码 window: frameless 360×560, parented to the shell (closes
+                    with it), owns the chat it draws for qr:info and the window's ×
 ipc/router.ts       per-channel zod validation, typed handler map, Result envelope
 ipc/handlers.ts     one handler per invoke channel
-telegram/           adapter.ts (the seam) / tdlib/ (real adapter) / mock/ (fixtures) /
+telegram/           adapter.ts (re-export of the seam) / tdlib/ (real adapter) /
                     updates.ts / events.ts / comment-access.ts (the comment permission rule)
-telegram/mock/      fixtures.ts is a thin adapter over @wegram/mock-fixtures (the account
-                    data, shared with the browser preview); transcript.ts is the one
-                    "append and announce" writer, effects.ts drives read/transfer; paging,
-                    read, comment and list-order rules come from @wegram/mock-session
+                    The seam and the fake adapter are workspace packages:
+                    @wegram/adapter-contract (TelegramAdapter + AdapterEvent/Emitter) and
+                    @wegram/mock-adapter (fixture adapter; main injects registerMediaFile
+                    and probeImageSize, so the package imports no app code)
 telegram/tdlib/     lifecycle.ts (create / crash / restart the client, reports BootState) /
                     boot.ts (that state machine) / client / updates / json.ts (the one
                     "missing array" read) / map/* (content, rich, media.ts holds the one
@@ -62,6 +64,13 @@ change belongs in the adapter.
   chat, or groups open empty and never page back.
 - Events are emitted as domain `AdapterEvent`s and batched by `telegram/updates.ts`
   (60 ms, monotonic `seq`). Do not push IPC events directly from the adapter.
+- **A handler's data must be exactly `InvokeResponse<C>` — the handler map is typed
+  that way.** Responses are not zod-validated in the router, so a shape mismatch reaches
+  the renderer silently. One did: `chats:inviteLink` was declared `{ link: string }` but
+  the adapter returned the string itself, so `answer?.link` was **String.prototype.link**;
+  the dialog passed that function to `useState`, React ran it as an updater with a null
+  state and the renderer died ("String.prototype.link called on null or undefined").
+  Fix the schema or the adapter — never wrap/flatten a response only at the handler.
 - Password / MTProxy secret are sealed with `safeStorage` (`security/secrets.ts`).
 - **TDLib cannot cancel a pending QR confirmation.** `auth:reset` destroys the auth
   client and starts a new one (nothing is stored yet); the QR link arrives as repeated

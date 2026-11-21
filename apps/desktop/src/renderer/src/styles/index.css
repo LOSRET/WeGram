@@ -20,12 +20,14 @@
 @import './shell.css';
 @import './chat-list.css';
 @import './chat-pane.css';
+@import './chat-info.css';
 @import './contacts.css';
 @import './message-rows.css';
 @import './comments.css';
 @import './composer.css';
 @import './controls.css';
 @import './login.css';
+@import './qr-window.css';
 @import './rich-text.css';
 @import './rich-message.css';
 @import './cards.css';

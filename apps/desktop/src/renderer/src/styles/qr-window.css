@@ -1,0 +1,250 @@
+/* ==========================================================================
+   群二维码 window (design doc §9.9).
+
+   WeChat opens a group's QR in its own small sheet, not a dialog inside the chat:
+   360 × 560, frameless, with the group's faces, 群聊：…, the code, its validity
+   line and the client's three actions. Measured proportions from the client's
+   window: 64 px avatar, 280 px code, a 13 px action row sitting on the bottom
+   edge, and the validity line in the client's grey 12 px.
+   ========================================================================== */
+
+.wx-qr-window {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 34px 24px 0;
+  overflow: hidden;
+  background: var(--wx-pane);
+  color: var(--wx-text);
+  user-select: none;
+}
+
+.wx-qr-window__close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--wx-icon);
+  -webkit-app-region: no-drag;
+}
+
+.wx-qr-window__close:hover {
+  background: var(--wx-row-hover);
+  color: var(--wx-text);
+}
+
+/* The only place the sheet can be dragged from: the rest is content. */
+.wx-qr-window__head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  -webkit-app-region: drag;
+}
+
+.wx-qr-window__avatar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
+  border-radius: 10px;
+  overflow: hidden;
+  color: var(--wx-text-on-brand);
+  font-size: 20px;
+  letter-spacing: 0.5px;
+}
+
+/* A group's face is a collage of its members, like WeChat's group avatar. */
+.wx-qr-window__avatar--grid {
+  display: grid;
+  gap: 1px;
+  background: var(--wx-line);
+}
+
+.wx-qr-window__avatar--2 {
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: 1fr;
+}
+
+.wx-qr-window__avatar--3,
+.wx-qr-window__avatar--4 {
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+}
+
+.wx-qr-window__avatar--5,
+.wx-qr-window__avatar--6 {
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+}
+
+.wx-qr-window__face {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  color: var(--wx-text-on-brand);
+  font-size: 12px;
+}
+
+.wx-qr-window__title {
+  display: -webkit-box;
+  overflow: hidden;
+  max-width: 300px;
+  margin: 0;
+  color: var(--wx-text);
+  font-size: 14px;
+  line-height: 20px;
+  text-align: center;
+  word-break: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.wx-qr-window .wx-qr {
+  margin: 18px auto 10px;
+}
+
+.wx-qr-window__validity {
+  margin: 0;
+  padding: 0 6px;
+  color: var(--wx-text-secondary);
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.wx-qr-window__note {
+  margin: 0;
+  padding: 36px 6px;
+  color: var(--wx-text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+  text-align: center;
+}
+
+/* 转发给朋友 / 复制图片 / 保存图片: one row on the bottom edge, full width. */
+.wx-qr-window__actions {
+  display: flex;
+  align-items: stretch;
+  height: 64px;
+  flex: 0 0 64px;
+  margin: auto -24px 0;
+  border-top: 1px solid var(--wx-line);
+}
+
+.wx-qr-window__actions button {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--wx-link);
+  font-size: 13px;
+}
+
+.wx-qr-window__actions button:hover:not(:disabled) {
+  background: var(--wx-row-hover);
+}
+
+.wx-qr-window__actions button:disabled {
+  color: var(--wx-text-disabled);
+}
+
+/* 转发给朋友's chat picker, drawn over the sheet. */
+.wx-qr-window__picker {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--wx-elevated);
+}
+
+.wx-qr-window__picker-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 44px;
+  flex: 0 0 44px;
+  padding: 0 8px 0 20px;
+  border-bottom: 1px solid var(--wx-line);
+  font-size: 14px;
+}
+
+.wx-qr-window__picker-head button {
+  border: none;
+  background: transparent;
+  color: var(--wx-link);
+  font-size: 13px;
+}
+
+.wx-qr-window__picker-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 0;
+}
+
+.wx-qr-window__pick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 20px;
+  border: none;
+  background: transparent;
+  color: var(--wx-text);
+  font-size: 13px;
+  text-align: left;
+}
+
+.wx-qr-window__pick:hover {
+  background: var(--wx-row-hover);
+}
+
+.wx-qr-window__pick > span:last-child {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wx-qr-window__pick-avatar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 4px;
+  overflow: hidden;
+  color: var(--wx-text-on-brand);
+  font-size: 12px;
+}
+
+.wx-qr-window__toast {
+  position: absolute;
+  left: 50%;
+  bottom: 84px;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.72);
+  color: var(--wx-text-on-brand);
+  font-size: 12px;
+  pointer-events: none;
+}

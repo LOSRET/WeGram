@@ -1,6 +1,6 @@
 import type { Message, MessageMedia } from '@wegram/protocol'
 
-import type { AdapterEvent } from '../adapter'
+import type { AdapterEvent } from '@wegram/adapter-contract'
 import type { Fixture } from './constants'
 import { ME } from './constants'
 

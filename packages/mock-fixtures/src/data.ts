@@ -6,7 +6,7 @@ import { buildCommentThread } from './threads'
 
 /**
  * The fake account both fakes serve: the Electron mock adapter
- * (`main/telegram/mock`) and the browser preview (`renderer/lib/preview`).
+ * (`packages/mock-adapter`) and the browser preview (`renderer/lib/preview`).
  *
  * One copy, because the two used to drift: the preview was missing a contact,
  * disagreed on a read marker and served different media ids, so a UI change

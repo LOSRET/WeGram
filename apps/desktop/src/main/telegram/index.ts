@@ -1,9 +1,11 @@
 import { join } from 'node:path'
 
+import { MockAdapter } from '@wegram/mock-adapter'
 import type { ProxyConfig } from '@wegram/protocol'
 
+import { probeImageSize } from '../media/image-size'
+import { registerMediaFile } from '../media/registry'
 import type { TelegramAdapter } from './adapter'
-import { MockAdapter } from './mock'
 import { TdlibAdapter } from './tdlib'
 
 /** `WEGRAM_TDLIB_TEST_DC` accepts 1/true/yes/on, like the other dev switches. */
@@ -34,7 +36,11 @@ export interface CreateAdapterOptions {
  */
 export function createAdapter(options: CreateAdapterOptions): TelegramAdapter {
   const mock = (): TelegramAdapter =>
-    new MockAdapter({ mediaDir: join(options.userDataDir, 'mock-media') })
+    new MockAdapter({
+      mediaDir: join(options.userDataDir, 'mock-media'),
+      registerMedia: registerMediaFile,
+      probeImageSize,
+    })
 
   // WEGRAM_ADAPTER=mock forces the fake adapter even when credentials exist:
   // needed for UI work and demos that must not touch the real account.

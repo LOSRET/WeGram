@@ -1,7 +1,7 @@
 import { nextReadState } from '@wegram/mock-session'
 import { AppError } from '@wegram/protocol'
 
-import type { AdapterEvent } from '../adapter'
+import type { AdapterEvent } from '@wegram/adapter-contract'
 import type { Fixture, MockFile } from './constants'
 
 type Emit = (event: AdapterEvent) => void

@@ -43,6 +43,77 @@ export {
 
 import { CallBubbleIcon } from './WechatIcons'
 
+/**
+ * Trailing chevron of a navigational row (the chat-info panel's 查找聊天内容).
+ * Hand-drawn at the client's weight: a 7 × 11 stroke, 1.3 px, no fill.
+ */
+export function ChevronRightIcon({ size = 12, ...rest }: IconProps) {
+  return (
+    <svg
+      width={(size * 8) / 14}
+      height={size}
+      viewBox="0 0 8 14"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+      {...rest}
+    >
+      <path
+        d="M2 1.5 6.2 7 2 12.5"
+        stroke="currentColor"
+        strokeWidth={1.3}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+/**
+ * 群二维码's trailing mark: WeChat draws a small QR pictogram next to the chevron.
+ * Hand-drawn — three finder squares and four modules, at the same 1.2 px weight as
+ * the surrounding chrome.
+ */
+export function QrGlyphIcon({ size = 14, ...rest }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 14 14"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+      {...rest}
+    >
+      <rect x="1" y="1" width="4.2" height="4.2" rx="0.6" stroke="currentColor" strokeWidth={1.1} />
+      <rect
+        x="8.8"
+        y="1"
+        width="4.2"
+        height="4.2"
+        rx="0.6"
+        stroke="currentColor"
+        strokeWidth={1.1}
+      />
+      <rect
+        x="1"
+        y="8.8"
+        width="4.2"
+        height="4.2"
+        rx="0.6"
+        stroke="currentColor"
+        strokeWidth={1.1}
+      />
+      <path
+        d="M9 9h1.6v1.6H9zM11.4 11.4H13V13h-1.6zM11.4 9H13M9 11.4V13"
+        stroke="currentColor"
+        strokeWidth={1.1}
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
 /** Header "voice / video call" entry: WeChat's own bubble glyph. */
 export function CallMenuIcon(props: IconProps) {
   return <CallBubbleIcon {...props} />

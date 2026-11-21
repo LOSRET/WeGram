@@ -20,6 +20,15 @@ const protocolAlias = {
   '@wegram/protocol': resolve(__dirname, '../../packages/protocol/src/index.ts'),
 }
 
+/**
+ * Main-process only: the adapter seam and the fake adapter. Kept out of the
+ * shared alias so a renderer import cannot pull `node:fs` in by accident.
+ */
+const adapterAlias = {
+  '@wegram/adapter-contract': resolve(__dirname, '../../packages/adapter-contract/src/index.ts'),
+  '@wegram/mock-adapter': resolve(__dirname, '../../packages/mock-adapter/src/index.ts'),
+}
+
 const shared = {
   resolve: { alias: protocolAlias },
 }
@@ -41,9 +50,16 @@ function apiCredentials(): string {
 export default defineConfig({
   main: {
     ...shared,
+    resolve: { alias: { ...protocolAlias, ...adapterAlias } },
     define: { __WEGRAM_API_CREDENTIALS__: apiCredentials() },
     plugins: [externalizeDepsPlugin({
-        exclude: ['@wegram/protocol', '@wegram/mock-session', '@wegram/mock-fixtures'],
+        exclude: [
+          '@wegram/adapter-contract',
+          '@wegram/mock-adapter',
+          '@wegram/protocol',
+          '@wegram/mock-session',
+          '@wegram/mock-fixtures',
+        ],
       })],
     build: {
       rollupOptions: {

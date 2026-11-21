@@ -67,23 +67,3 @@
 .wx-perf__fail {
   color: var(--wx-danger) !important;
 }
-
-/* ---------- Chat info popover rows ---------- */
-
-.wx-info-pop__row {
-  display: flex;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 4px 9px;
-  font-size: 12px;
-  color: var(--wx-text-secondary);
-  white-space: nowrap;
-}
-
-.wx-info-pop__row strong {
-  color: var(--wx-text);
-  font-weight: 500;
-  max-width: 150px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}

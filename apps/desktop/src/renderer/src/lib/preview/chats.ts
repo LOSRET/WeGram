@@ -1,0 +1,136 @@
+import type {
+  ChatInviteLink,
+  ChatMember,
+  ChatPinnedMessage,
+  ChatSummary,
+  EventChannel,
+  Message,
+} from '@wegram/protocol'
+
+/**
+ * The chat-side handlers of the browser preview (design doc §9.9), split out of
+ * `preview/index.ts` to keep that file inside its size budget.
+ *
+ * They mirror the mock adapter's rules one for one — the preview exists so the UI
+ * can be clicked through without Electron, so the two must not drift. The session
+ * (chat rows, transcripts, event emitter) is handed in by `index.ts`.
+ */
+export interface PreviewChatStore {
+  chats: ChatSummary[]
+  messagesByChat: Record<number, Message[]>
+  emit(channel: EventChannel, payload: unknown): void
+}
+
+function findChat(store: PreviewChatStore, chatId: number): ChatSummary {
+  const chat = store.chats.find((item) => item.id === chatId)
+  if (!chat) throw { code: 'internal', message: 'unknown preview chat' }
+  return chat
+}
+
+function announce(store: PreviewChatStore, chat: ChatSummary): void {
+  store.emit('evt:chats', { ops: [{ op: 'upsert', chat: { ...chat } }] })
+}
+
+export function setPreviewMuted(
+  store: PreviewChatStore,
+  chatId: number,
+  muted: boolean,
+): ChatSummary {
+  const chat = findChat(store, chatId)
+  chat.muted = muted
+  announce(store, chat)
+  return { ...chat }
+}
+
+export function setPreviewPinned(
+  store: PreviewChatStore,
+  chatId: number,
+  pinned: boolean,
+): ChatSummary {
+  const chat = findChat(store, chatId)
+  chat.pinned = pinned
+  announce(store, chat)
+  return { ...chat }
+}
+
+/** 清空聊天记录: this account's copy only, exactly like the mock adapter. */
+export function clearPreviewHistory(store: PreviewChatStore, chatId: number): void {
+  const chat = findChat(store, chatId)
+  store.messagesByChat[chat.id] = []
+  chat.unread = 0
+  delete chat.lastMessageText
+  delete chat.lastMessageAt
+  announce(store, chat)
+}
+
+/** The fixture has no member table: the people who posted are the members. */
+export function previewChatMembers(
+  store: PreviewChatStore,
+  chatId: number,
+  limit: number,
+  query = '',
+): ChatMember[] {
+  const chat = findChat(store, chatId)
+  if (chat.kind === 'private') return []
+  const needle = query.trim().toLowerCase()
+  const seen = new Set<number>()
+  const members: ChatMember[] = []
+  for (const message of store.messagesByChat[chat.id] ?? []) {
+    if (message.outgoing || message.senderId <= 0 || seen.has(message.senderId)) continue
+    if (needle !== '' && !message.senderName.toLowerCase().includes(needle)) continue
+    seen.add(message.senderId)
+    members.push({
+      userId: message.senderId,
+      title: message.senderName,
+      ...(message.senderAvatarUrl ? { avatarUrl: message.senderAvatarUrl } : {}),
+    })
+    if (members.length >= limit) break
+  }
+  return members
+}
+
+/** 群聊名称: the preview has no permissions, so a rename always applies. */
+export function setPreviewTitle(
+  store: PreviewChatStore,
+  chatId: number,
+  title: string,
+): ChatSummary {
+  const chat = findChat(store, chatId)
+  chat.title = title
+  announce(store, chat)
+  return { ...chat }
+}
+
+/** 退出群聊: the row leaves the list, exactly like `leaveChat` on the mock. */
+export function leavePreviewChat(store: PreviewChatStore, chatId: number): void {
+  const chat = findChat(store, chatId)
+  store.chats.splice(store.chats.indexOf(chat), 1)
+  delete store.messagesByChat[chat.id]
+  store.emit('evt:chats', { ops: [{ op: 'remove', chatId }] })
+}
+
+/** The fixture pins nothing, so 群公告 reads 群主未设置. */
+export function previewPinnedMessage(): ChatPinnedMessage | null {
+  return null
+}
+
+/** 群二维码: a link that scans; the preview's is not a real group. */
+export function previewInviteLink(chatId: number, temporary = false): ChatInviteLink | null {
+  return {
+    link: `https://t.me/wegram_preview_${Math.abs(chatId)}`,
+    ...(temporary ? { expiresAt: Math.floor(Date.now() / 1000) + 7 * 86_400 } : {}),
+  }
+}
+
+/** In-chat search, the mock adapter's substring rule over the transcript. */
+export function searchPreviewMessages(
+  store: PreviewChatStore,
+  chatId: number,
+  q: string,
+): Message[] {
+  const needle = q.toLowerCase()
+  if (needle === '') return []
+  return (store.messagesByChat[chatId] ?? []).filter((message) =>
+    message.text.toLowerCase().includes(needle),
+  )
+}

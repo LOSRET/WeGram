@@ -19,6 +19,8 @@ const rootDir = join(dirname(fileURLToPath(import.meta.url)), '..')
 const TARGETS = [
   'apps/desktop/package.json',
   'packages/protocol/package.json',
+  'packages/adapter-contract/package.json',
+  'packages/mock-adapter/package.json',
   'packages/mock-session/package.json',
   'packages/mock-fixtures/package.json',
 ]

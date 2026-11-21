@@ -1,7 +1,7 @@
 # AGENTS.md — packages/mock-session
 
 Scope: the rules a *fake* Telegram session plays by, shared by the two fakes —
-`apps/desktop/src/main/telegram/mock/**` (the Electron mock adapter) and
+`packages/mock-adapter/**` (the Electron mock adapter) and
 `apps/desktop/src/renderer/src/lib/preview/**` (the browser preview bridge).
 Read the root `../../CLAUDE.md` first.
 

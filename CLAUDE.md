@@ -16,6 +16,8 @@ pnpm workspace with W1 + W2 + the W3 main body implemented:
 
 - `docs/技术方案.md` — authoritative design (Chinese). Change the design here first, then the code.
 - `packages/protocol` — IPC contract: DTO zod schemas, channel tables, `AppError`. Single source of truth shared by main, preload and renderer. Exported straight from source (`src/index.ts`), no build step.
+- `packages/adapter-contract` — the `TelegramAdapter` seam (`adapter.ts`: interface, events, `AdapterEmitter`) shared by the TDLib adapter and the fake one, so the mock implements the seam without importing app code. Types plus a 20-line emitter only.
+- `packages/mock-adapter` — the fake `TelegramAdapter` (auth flow, chats, history, search, stickers, media), plus the generated PNG/WebP/TGS/WebM fixtures; main injects the `wx-media://` registry and the image-size probe. Development only.
 - `packages/mock-session` — the fake session's pure rules (paging, read marker, comment access, chat-list order), shared by the main mock adapter and the browser preview. Imports nothing: it is bundled into the renderer.
 - `packages/mock-fixtures` — the demo account both fakes serve (chats, messages, comment threads, contact fields); each side injects its media and clock.
 - `apps/desktop` — Electron app: `src/main` (adapter + IPC + store + media protocol), `src/preload` (whitelisted `window.tg`), `src/renderer` (React 19 + Tailwind v4 UI).
@@ -88,6 +90,17 @@ These rules keep it that way:
   `max-lines: 550` on `apps/desktop/src/**` and `packages/protocol/src/**` (generated
   `WechatIcons.tsx` is exempt). Hitting the cap is a design signal, not a formatting
   problem.
+- **Core logic may break the 550 cap — deliberately, once, and in writing.** A file whose
+  single concern is one indivisible algorithm (a state machine, a reducer over one data
+  shape, a protocol table whose keys cannot be partitioned without inventing a boundary)
+  may run past the cap, because splitting it would trade one long file for cross-module
+  plumbing plus a "why is this in three places" question. The exemption takes all three,
+  in the same change: a top-of-file `/* eslint-disable max-lines -- <the one concern this
+  file owns> */` carrying the reason, a row in the layer's `AGENTS.md` naming the file
+  and its concern, and a design-doc sentence recording what is deliberately not split.
+  It is re-justified as soon as the file grows a second concern, and at ~800 lines the
+  split question reopens on readability alone. Feature growth never takes it: a
+  component that is merely getting bigger still splits.
 - **Split by responsibility, never by line count.** Keep the public import path stable
   with a directory index (`viewer/`, `picker/`, `login/`, `history/`,
   `tdlib/actions/index.ts`, `mock/index.ts`). No `utils.ts` / `helpers.ts` dumping

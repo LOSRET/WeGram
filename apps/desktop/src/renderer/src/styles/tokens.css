@@ -104,6 +104,15 @@
   /* Disabled fills and their ink (the send button, disabled dialog buttons). */
   --wx-fill-disabled: #ececec;
   --wx-text-disabled: #b7b7b7;
+  /* 聊天信息 side panel (design doc §9.9), measured off the client's panel: a
+     314 px sheet with a #f0f0f0 hairline on its left edge, and the #00C375
+     toggle (the login window's green, not the brand green). */
+  --wx-info-w: 314px;
+  --wx-info-rule: #f0f0f0;
+  /* Participant captions: the client's #9F9FA6, the same grey as 通讯录 counts. */
+  --wx-info-name: #9f9fa6;
+  --wx-switch-off: #ededed;
+  --wx-switch-on: #00c375;
   --wx-sidebar-w: 238px;
   --wx-list-head-h: 43px;
   --wx-list-item-h: 65px;
@@ -171,6 +180,12 @@
   /* No divider under the pane header in dark mode — it is one flat surface. */
   --wx-pane-line: #1e1e1f;
   --wx-divider: rgba(255, 255, 255, 0.07);
+  /* 聊天信息 panel: no measured dark sheet yet; the hairline follows the shell's
+     lifted line and the switch keeps the light-theme green, as the client does. */
+  --wx-info-rule: #2f2f30;
+  --wx-info-name: #7b7b80;
+  --wx-switch-off: #3a3a3c;
+  --wx-switch-on: #07c160;
   --wx-brand-weak: rgba(7, 193, 96, 0.16);
   --wx-rail-icon: #969697;
   --wx-icon: #a5a5a5;

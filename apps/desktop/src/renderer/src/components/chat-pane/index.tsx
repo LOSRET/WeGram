@@ -2,8 +2,8 @@ import type { Message } from '@wegram/protocol'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { loadLatestWindow } from '../../lib/anchoredWindow'
+import { INFO_PANEL_ANIM_MS } from '../../lib/chatInfo'
 import { errorMessage, invoke } from '../../lib/ipc'
-import type { PopupAnchor } from '../../lib/popupPlacement'
 import { mayMarkRead } from '../../lib/readGate'
 import { useAppStore } from '../../store/useAppStore'
 import { Composer } from '../Composer'
@@ -12,7 +12,7 @@ import { ForwardDialog } from '../ForwardDialog'
 import { MessageList } from '../message-list'
 import { ChannelBar } from './ChannelBar'
 import { ChatHeader } from './ChatHeader'
-import { ChatInfoPopover } from './ChatInfoPopover'
+import { ChatInfoPanel } from './ChatInfoPanel'
 import { COMMENT_PANEL_ANIM_MS } from '../../lib/comments'
 import { CommentPanel } from './CommentPanel'
 import {
@@ -61,8 +61,15 @@ export function ChatPane() {
 
   const [forwarding, setForwarding] = useState<Message | null>(null)
   const [deleting, setDeleting] = useState<Message | null>(null)
-  /** Chat-info popover (the "…" button in the header). */
-  const [infoAt, setInfoAt] = useState<PopupAnchor | null>(null)
+  /**
+   * 聊天信息 (design doc §9.9). Like the discussion view it keeps its content while
+   * it slides out, so the open flag lives next to the unmount timer rather than in
+   * the panel itself.
+   */
+  const [info, setInfo] = useState<{ open: boolean } | null>(null)
+  const infoTimerRef = useRef<number | null>(null)
+  /** 清空聊天记录 asks first: the history of a chat cannot be undeleted. */
+  const [clearConfirm, setClearConfirm] = useState(false)
   /**
    * Channels: whether this account may post there. Asked once per chat and kept
    * for the session — switching back must not let the keyboard button flicker
@@ -73,6 +80,8 @@ export function ChatPane() {
   const [channelInputChatId, setChannelInputChatId] = useState<number | null>(null)
   /** A mute call is in flight, so the bar cannot be double-toggled. */
   const [muteBusy, setMuteBusy] = useState(false)
+  /** The same guard for 置顶聊天. */
+  const [pinBusy, setPinBusy] = useState(false)
 
   /**
    * The full-pane discussion view (design doc §9.8). It stays mounted while it
@@ -82,13 +91,44 @@ export function ChatPane() {
   const [comments, setComments] = useState<{ message: Message; open: boolean } | null>(null)
   const commentTimerRef = useRef<number | null>(null)
 
-  const openComments = useCallback((message: Message): void => {
-    if (commentTimerRef.current !== null) {
-      window.clearTimeout(commentTimerRef.current)
-      commentTimerRef.current = null
+  const openInfo = useCallback((): void => {
+    if (infoTimerRef.current !== null) {
+      window.clearTimeout(infoTimerRef.current)
+      infoTimerRef.current = null
     }
-    setComments({ message, open: true })
+    setInfo({ open: true })
   }, [])
+
+  const closeInfo = useCallback((): void => {
+    setInfo((current) => (current ? { ...current, open: false } : null))
+    if (infoTimerRef.current !== null) window.clearTimeout(infoTimerRef.current)
+    infoTimerRef.current = window.setTimeout(() => {
+      infoTimerRef.current = null
+      setInfo((current) => (current && !current.open ? null : current))
+    }, INFO_PANEL_ANIM_MS)
+  }, [])
+
+  const infoOpen = info?.open ?? false
+  const toggleInfo = useCallback((): void => {
+    if (infoOpen) closeInfo()
+    else openInfo()
+  }, [infoOpen, closeInfo, openInfo])
+
+  /**
+   * Opening a discussion view closes 聊天信息: both claim the pane's right-hand
+   * column, and stacking them would leave the transcript a sliver wide.
+   */
+  const openComments = useCallback(
+    (message: Message): void => {
+      if (commentTimerRef.current !== null) {
+        window.clearTimeout(commentTimerRef.current)
+        commentTimerRef.current = null
+      }
+      closeInfo()
+      setComments({ message, open: true })
+    },
+    [closeInfo],
+  )
 
   const closeComments = useCallback((): void => {
     setComments((current) => (current ? { ...current, open: false } : null))
@@ -102,13 +142,22 @@ export function ChatPane() {
   useEffect(
     () => () => {
       if (commentTimerRef.current !== null) window.clearTimeout(commentTimerRef.current)
+      if (infoTimerRef.current !== null) window.clearTimeout(infoTimerRef.current)
     },
     [],
   )
 
-  /** Another conversation owns another discussion view: switching chats closes it. */
+  /**
+   * Another conversation owns another discussion view or another 聊天信息 panel:
+   * switching chats closes both (the panel belongs to the chat that opened it).
+   */
   useEffect(() => {
     setComments(null)
+    setInfo(null)
+    if (infoTimerRef.current !== null) {
+      window.clearTimeout(infoTimerRef.current)
+      infoTimerRef.current = null
+    }
   }, [activeChatId])
 
   const {
@@ -232,13 +281,49 @@ export function ChatPane() {
     }
   }, [chat, muteBusy])
 
+  const togglePinned = useCallback(async (): Promise<void> => {
+    if (!chat || pinBusy) return
+    setPinBusy(true)
+    try {
+      const updated = await invoke('chats:setPinned', { chatId: chat.id, pinned: !chat.pinned })
+      useAppStore.getState().applyChatOps([{ op: 'upsert', chat: updated }])
+      useAppStore.getState().setToast(updated.pinned ? '已置顶' : '已取消置顶')
+    } catch (error) {
+      useAppStore.getState().setError(errorMessage(error))
+    } finally {
+      setPinBusy(false)
+    }
+  }, [chat, pinBusy])
+
+  /**
+   * 清空聊天记录 removes this account's copy (the adapter sends `revoke: false`),
+   * so the other members keep theirs — WeChat's meaning of the row. The transcript
+   * is emptied in place rather than refetched: there is nothing left to fetch, and
+   * an empty page must not be mistaken for a cold cache.
+   */
+  const clearHistory = useCallback(async (): Promise<void> => {
+    if (activeChatId === null) return
+    try {
+      await invoke('chats:clearHistory', { chatId: activeChatId })
+      useAppStore.getState().setHistory(activeChatId, [], false)
+      useAppStore.getState().setToast('聊天记录已清空')
+    } catch (error) {
+      useAppStore.getState().setError(errorMessage(error))
+    }
+  }, [activeChatId])
+
   if (!chat || !activeChatId) return <NoChatPlaceholder />
 
   const actions = createMessageActions(activeChatId)
 
   return (
     <main className={`wx-chat${comments ? ' wx-chat--comments' : ''}`}>
-      <ChatHeader title={chat.title} typing={typing} onOpenInfo={setInfoAt} />
+      <ChatHeader
+        title={chat.title}
+        typing={typing}
+        infoOpen={infoOpen}
+        onToggleInfo={toggleInfo}
+      />
 
       {loadingHistory && messages.length === 0 ? (
         <LoadingPlaceholder restoring={restoring} />
@@ -312,6 +397,27 @@ export function ChatPane() {
         />
       )}
 
+      {info ? (
+        <ChatInfoPanel
+          chat={chat}
+          open={info.open}
+          muting={muteBusy}
+          pinning={pinBusy}
+          onToggleMuted={() => {
+            void toggleMute()
+          }}
+          onTogglePinned={() => {
+            void togglePinned()
+          }}
+          onRequestClear={() => setClearConfirm(true)}
+          onClose={closeInfo}
+          onLocate={(messageId) => {
+            closeInfo()
+            useAppStore.getState().requestLocate(chat.id, messageId)
+          }}
+        />
+      ) : null}
+
       {comments ? (
         <CommentPanel
           /* The live store row, not the snapshot taken on open: posting a comment
@@ -351,12 +457,17 @@ export function ChatPane() {
         />
       ) : null}
 
-      {infoAt ? (
-        <ChatInfoPopover
-          chat={chat}
-          loadedCount={messages.length}
-          anchor={infoAt}
-          onClose={() => setInfoAt(null)}
+      {clearConfirm ? (
+        <ConfirmDialog
+          title="清空聊天记录？"
+          description="将删除此聊天中你可见的全部消息，其他成员不受影响。"
+          confirmLabel="清空"
+          danger
+          onConfirm={() => {
+            setClearConfirm(false)
+            void clearHistory()
+          }}
+          onCancel={() => setClearConfirm(false)}
         />
       ) : null}
     </main>

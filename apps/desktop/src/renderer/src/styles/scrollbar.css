@@ -37,11 +37,15 @@
 
 /* The panes that carry the overlay bar hide their native one. */
 .wx-list__view,
-.wx-messages {
+.wx-messages,
+.wx-info__scroll,
+.wx-info__search-scroll {
   scrollbar-width: none;
 }
 
 .wx-list__view::-webkit-scrollbar,
-.wx-messages::-webkit-scrollbar {
+.wx-messages::-webkit-scrollbar,
+.wx-info__scroll::-webkit-scrollbar,
+.wx-info__search-scroll::-webkit-scrollbar {
   display: none;
 }

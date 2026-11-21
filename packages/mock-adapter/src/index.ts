@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto'
 import { stat } from 'node:fs/promises'
 import { basename } from 'node:path'
 
-import { pageAround, pageNewer, pageOlder, sortChatList } from '@wegram/mock-session'
 import { AppError } from '@wegram/protocol'
 import type {
   AuthState,
@@ -20,11 +19,10 @@ import type {
   StickerSetSummary,
 } from '@wegram/protocol'
 
-import { probeImageSize } from '../../media/image-size'
-import { registerMediaFile } from '../../media/registry'
-import { AdapterEmitter, type MediaKind, type TelegramAdapter } from '../adapter'
+import { AdapterEmitter, type MediaKind, type TelegramAdapter } from '@wegram/adapter-contract'
 import { MockAssets } from './assets'
 import { MockAvatars } from './avatars'
+import { createMockChats } from './chats'
 import { createMockComments } from './comments'
 import { listMockContacts } from './contacts'
 import {
@@ -38,6 +36,14 @@ import {
 import { applyRead, simulateTransfer } from './effects'
 import { beginMockStream, downloadMockFile, mockDownloadedPrefix } from './files'
 import { buildFixtures } from './fixtures'
+import {
+  mockHistory,
+  mockHistoryAround,
+  mockHistoryNewer,
+  type MockAroundQuery,
+  type MockHistoryQuery,
+  type MockNewerQuery,
+} from './history'
 import { searchChats, searchMessages } from './search'
 import { getMockStickerSet, listMockCustomEmoji, listMockStickerSets } from './stickers'
 import { emitTraffic } from './traffic'
@@ -46,6 +52,14 @@ import { appendMessage, outgoingMessage } from './transcript'
 export interface MockAdapterOptions {
   /** Where generated fixture media is written (under userData). */
   mediaDir: string
+  /**
+   * Mints a `wx-media://` URL for a local file. Injected because the token
+   * registry is a main-process concern (`main/media/registry.ts`); this package
+   * must not import app code.
+   */
+  registerMedia: (filePath: string) => string
+  /** Reads an image's pixel size, or null for a format we cannot parse. */
+  probeImageSize: (filePath: string) => Promise<{ width: number; height: number } | null>
 }
 
 /**
@@ -73,7 +87,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   readonly commentInfo = this.commentApi.info
   readonly joinCommentGroup = this.commentApi.join
   readonly sendComment = this.commentApi.send
-  private readonly assets = new MockAssets()
+  private readonly assets: MockAssets
   private readonly avatars: MockAvatars
   private nextMessageId = 5000
   private nextFileId = 9000
@@ -83,8 +97,10 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
 
   constructor(private readonly options: MockAdapterOptions) {
     super()
+    this.assets = new MockAssets(options.registerMedia)
     this.avatars = new MockAvatars({
       mediaDir: options.mediaDir,
+      registerMedia: options.registerMedia,
       fixtures: this.fixtures,
       emit: (event) => this.emit(event),
     })
@@ -204,86 +220,39 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     return avatarUrl ? { ...this.auth.me, avatarUrl } : this.auth.me
   }
 
-  async listChats(input: { limit: number; offset: number }): Promise<ChatSummary[]> {
-    const all = sortChatList([...this.fixtures.values()].map((fixture) => fixture.chat))
-    return all.slice(input.offset, input.offset + input.limit)
-  }
-
-  async getChat(chatId: number): Promise<ChatSummary> {
-    return this.requireFixture(chatId).chat
-  }
-
-  async openChat(chatId: number): Promise<void> {
-    // Opening does not consume the unread messages: the renderer reports
-    // `messages:read` per viewport (see `tdlib/actions.openChat`).
-    this.requireFixture(chatId)
-  }
-
-  /** The mock has no user directory; reuse the private chat that carries that id. */
-  async openPrivateChat(userId: number): Promise<ChatSummary> {
-    const fixture =
-      [...this.fixtures.values()].find((item) => item.chat.userId === userId) ??
-      [...this.fixtures.values()].find((item) => item.chat.kind === 'private')
-    if (!fixture)
-      throw new AppError('not_implemented', `mock has no private chat for user ${userId}`)
-    return fixture.chat
-  }
-
-  async canPost(chatId: number): Promise<boolean> {
-    const fixture = this.requireFixture(chatId)
-    // Groups and private chats keep the composer; only channels gate on rights.
-    return fixture.chat.kind === 'channel' ? Boolean(fixture.canPost) : true
-  }
-
-  async setChatMuted(chatId: number, muted: boolean): Promise<ChatSummary> {
-    const fixture = this.requireFixture(chatId)
-    fixture.chat.muted = muted
-    this.emit({ type: 'chats', ops: [{ op: 'upsert', chat: { ...fixture.chat } }] })
-    return { ...fixture.chat }
-  }
+  /** The chat endpoints; their rules live in ./chats.ts. */
+  private readonly chatApi = createMockChats(this.fixtures, (event) => this.emit(event))
+  readonly listChats = this.chatApi.listChats
+  readonly getChat = this.chatApi.getChat
+  readonly openChat = this.chatApi.openChat
+  readonly openPrivateChat = this.chatApi.openPrivateChat
+  readonly canPost = this.chatApi.canPost
+  readonly setChatMuted = this.chatApi.setMuted
+  readonly setChatPinned = this.chatApi.setPinned
+  readonly clearHistory = this.chatApi.clearHistory
+  readonly chatMembers = this.chatApi.members
+  readonly setChatTitle = this.chatApi.setTitle
+  readonly leaveChat = this.chatApi.leave
+  readonly pinnedMessage = this.chatApi.pinnedMessage
+  readonly inviteLink = this.chatApi.inviteLink
 
   /** The mock address book; see `listMockContacts`. */
   async listContacts(): Promise<Contact[]> {
     return listMockContacts(this.fixtures)
   }
 
-  async history(input: {
-    chatId: number
-    fromMessageId?: number
-    limit: number
-  }): Promise<{ messages: Message[]; hasMore: boolean }> {
-    const page = pageOlder(
-      this.requireFixture(input.chatId).messages,
-      input.fromMessageId,
-      input.limit,
-    )
-    return { messages: page.messages.map((message) => ({ ...message })), hasMore: page.hasMore }
+  async history(input: MockHistoryQuery): Promise<{ messages: Message[]; hasMore: boolean }> {
+    return mockHistory({ fixtures: this.fixtures }, input)
   }
 
-  async historyAround(input: {
-    chatId: number
-    messageId: number
-    limit: number
-  }): Promise<{ messages: Message[]; hasMore: boolean; hasNewer: boolean }> {
-    const { messages, hasMore, hasNewer } = pageAround(
-      this.requireFixture(input.chatId).messages,
-      input.messageId,
-      input.limit,
-    )
-    return { messages: messages.map((message) => ({ ...message })), hasMore, hasNewer }
+  async historyAround(
+    input: MockAroundQuery,
+  ): Promise<{ messages: Message[]; hasMore: boolean; hasNewer: boolean }> {
+    return mockHistoryAround({ fixtures: this.fixtures }, input)
   }
 
-  async historyNewer(input: {
-    chatId: number
-    fromMessageId: number
-    limit: number
-  }): Promise<{ messages: Message[]; hasNewer: boolean }> {
-    const { messages, hasNewer } = pageNewer(
-      this.requireFixture(input.chatId).messages,
-      input.fromMessageId,
-      input.limit,
-    )
-    return { messages: messages.map((message) => ({ ...message })), hasNewer }
+  async historyNewer(input: MockNewerQuery): Promise<{ messages: Message[]; hasNewer: boolean }> {
+    return mockHistoryNewer({ fixtures: this.fixtures }, input)
   }
 
   async sendText(input: {
@@ -312,12 +281,12 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   }): Promise<{ localId: string; message: Message }> {
     const fixture = this.requireFixture(input.chatId)
     const info = await stat(input.filePath)
-    const size = input.kind === 'photo' ? await probeImageSize(input.filePath) : null
+    const size = input.kind === 'photo' ? await this.options.probeImageSize(input.filePath) : null
     const fileId = this.nextFileId++
     const file: MockFile = {
       fileId,
       path: input.filePath,
-      url: registerMediaFile(input.filePath),
+      url: this.options.registerMedia(input.filePath),
       name: basename(input.filePath),
       size: info.size,
       mimeType: mimeFromPath(input.filePath),

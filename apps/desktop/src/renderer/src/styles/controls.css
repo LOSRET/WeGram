@@ -444,3 +444,56 @@
     transform: rotate(360deg);
   }
 }
+
+/* ---------- Switch ---------- */
+
+/* WeChat's toggle, measured off the 聊天信息 panel: a 36 × 20 track with a 16 px
+   white knob inset by 2 px, #EDEDED off and #00C375 on. */
+.wx-switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--wx-switch-off);
+  transition: background-color 0.15s ease;
+}
+
+.wx-switch.is-on {
+  background: var(--wx-switch-on);
+}
+
+.wx-switch__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--wx-text-on-brand);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  transition: transform 0.15s ease;
+}
+
+.wx-switch.is-on .wx-switch__knob {
+  transform: translateX(16px);
+}
+
+.wx-switch:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.wx-switch:focus-visible {
+  outline: 2px solid var(--wx-brand);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wx-switch,
+  .wx-switch__knob {
+    transition: none;
+  }
+}

@@ -11,7 +11,7 @@ import type {
   CommentQuery,
   CommentSendQuery,
   CommentTarget,
-} from '../adapter'
+} from '@wegram/adapter-contract'
 import type { Fixture } from './constants'
 import { outgoingMessage } from './transcript'
 

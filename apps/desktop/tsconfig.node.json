@@ -4,6 +4,8 @@
     "lib": ["ES2023"],
     "types": ["node"],
     "paths": {
+      "@wegram/adapter-contract": ["../../packages/adapter-contract/src/index.ts"],
+      "@wegram/mock-adapter": ["../../packages/mock-adapter/src/index.ts"],
       "@wegram/mock-fixtures": ["../../packages/mock-fixtures/src/index.ts"],
       "@wegram/mock-session": ["../../packages/mock-session/src/index.ts"],
       "@wegram/protocol": ["../../packages/protocol/src/index.ts"]
@@ -15,6 +17,8 @@
     "src/main/**/*.ts",
     "src/preload/**/*.ts",
     "scripts/**/*.ts",
+    "../../packages/adapter-contract/src/**/*.ts",
+    "../../packages/mock-adapter/src/**/*.ts",
     "../../packages/mock-fixtures/src/**/*.ts",
     "../../packages/mock-session/src/**/*.ts",
     "../../packages/protocol/src/**/*.ts"

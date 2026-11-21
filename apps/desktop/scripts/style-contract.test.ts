@@ -3,6 +3,7 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
+import { INFO_PANEL_ANIM_MS } from '../src/renderer/src/lib/chatInfo'
 import { COMMENT_PANEL_ANIM_MS } from '../src/renderer/src/lib/comments'
 import { CHAT_ROW_H } from '../src/renderer/src/lib/listMetrics'
 
@@ -47,6 +48,21 @@ function transformMs(css: string): number {
   return declaration.slice(index, index + 2).startsWith('m') ? value : Math.round(value * 1000)
 }
 
+/** Duration of one property in a rule's `transition:` declaration. */
+function propertyMs(css: string, selector: string, property: string): number {
+  const start = css.indexOf(selector)
+  if (start < 0) throw new Error(`${selector} is missing from the stylesheet`)
+  const block = css.slice(start, css.indexOf('}', start))
+  const declarationStart = block.indexOf('transition:')
+  if (declarationStart < 0) throw new Error(`the transition is missing from ${selector}`)
+  const declaration = block.slice(declarationStart, block.indexOf(';', declarationStart))
+  const valueStart = declaration.indexOf(property) + property.length
+  let index = valueStart
+  while (DIGITS.includes(declaration[index] ?? '') && index < declaration.length) index += 1
+  const value = Number(declaration.slice(valueStart, index).trim())
+  return declaration.slice(index, index + 2).startsWith('m') ? value : Math.round(value * 1000)
+}
+
 describe('style contract', () => {
   it('keeps the virtualised row height equal to --wx-list-item-h', () => {
     expect(pxAfter(read('tokens.css'), '--wx-list-item-h')).toBe(CHAT_ROW_H)
@@ -54,5 +70,9 @@ describe('style contract', () => {
 
   it('keeps the panel slide equal to COMMENT_PANEL_ANIM_MS', () => {
     expect(transformMs(read('comments.css'))).toBe(COMMENT_PANEL_ANIM_MS)
+  })
+
+  it('keeps the 聊天信息 slide equal to INFO_PANEL_ANIM_MS', () => {
+    expect(propertyMs(read('chat-info.css'), '.wx-info {', 'transform')).toBe(INFO_PANEL_ANIM_MS)
   })
 })

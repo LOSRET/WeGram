@@ -95,6 +95,25 @@ Greenfield → working skeleton in three milestones:
   group threads and the channel's 78-comment thread. Read-only: posting a comment is
   deliberately not implemented (it needs the discussion chat's thread root id). Design:
   `技术方案.md` §9.8.
+- **聊天信息 side panel (2026-11-21; group layout the same day)**: the header's "…"
+  opens the client's 聊天信息 panel — a 314 px sheet that **overlays** the transcript and
+  the composer (the owner corrected the first push version: the panel presses on the
+  messages, it does not reflow them). A private chat gets the peer + 查找聊天内容 /
+  免打扰 / 置顶 / 清空; a group gets 搜索群成员, the member grid + 添加, 群聊名称 (rename,
+  `setChatTitle`), 群公告 (the newest **pinned message**, tap → locate), 群二维码 (invite
+  link QR), the same rows, and 退出群聊 (`leaveChat`). 查找聊天内容 stays an in-panel
+  search over `search:inChat`; 清空聊天记录 is `deleteChatHistory` with `revoke: false`
+  (this account's copy only). 群二维码 opens its **own frameless 360 × 560 window**
+  (`main/qr-window.ts` + `screens/QrWindow.tsx`, `#qr`): member collage, 群聊：…, a
+  280 px code, the 7-day validity line and 转发给朋友 / 复制图片 / 保存图片. The code is a
+  temporary invite link (`createChatInviteLink` + 7 days); the window rasterises the
+  PNG itself and the actions copy it (main clipboard), save it (native dialog) or send
+  it as a photo message. New channels `qr:open/info/copy/save/share/close` and
+  `chats:setPinned` / `clearHistory` /
+  `members` / `setTitle` / `leave` / `pinned` / `inviteLink`; the chat channels live in
+  `packages/protocol/src/chats.ts` and the chat DTOs in `chat.ts` (both split at the
+  550-line budget). Design: `技术方案.md` §9.9; measured metrics and the deliberate
+  deltas: `UI-HANDOFF.md` §2.8 / §5 item 33.
 - **Sender photos in the transcript (W3 addendum)**: group members are no longer
   initials. `Message.senderAvatarUrl` carries the picture a row can already draw, and
   the adapter's photo pool (the one that fetched chat photos) now resolves **people**
@@ -324,6 +343,10 @@ Anything that opens a chat also marks it read on the server — use it deliberat
 ```
 packages/protocol/src/       dto.ts (zod schemas + types), channels.ts (channel tables,
                              schemas, TgBridge), errors.ts (AppError), index.ts
+packages/adapter-contract/src/  the seam: TelegramAdapter + AdapterEvent/Emitter
+packages/mock-adapter/src/      the fake adapter + generated fixture media (mock-assets.ts)
+packages/mock-session/src/      the fake session's pure rules (shared with the preview)
+packages/mock-fixtures/src/     the demo account both fakes serve
 apps/desktop/src/main/
   index.ts                   app lifecycle, main-window creation, theme overlay, adapter
                              wiring, the login↔shell hand-over (login:enter / sign-out)
@@ -337,10 +360,8 @@ apps/desktop/src/main/
   media/stream.ts            (pure, unit-tested) the byte pump behind that branch
   media/leases.ts            (pure, unit-tested) who still waits for a file's transfer
   media/image-size.ts        PNG/JPEG/WebP/GIF header probe (inputPhoto needs real sizes)
-  telegram/adapter.ts        TelegramAdapter interface + event types (the seam)
+  telegram/adapter.ts        re-export of the seam from @wegram/adapter-contract
   telegram/tdlib/           ONLY folder allowed to import `tdl` (index/lifecycle/boot/client/actions/updates/avatar-cache/stickers/proxy/map)
-  telegram/mock.ts           fake adapter incl. a 5000-message chat (id 99) + media fixtures
-  telegram/mock-assets.ts    embedded WebP/TGS + runtime PNG encoder for mock media
   telegram/updates.ts        EventBus: 60 ms batching, monotonic seq
   telegram/events.ts         AdapterEvent → evt:* channels
   telegram/index.ts          adapter selection (mock / tdlib, WEGRAM_ADAPTER)
@@ -369,7 +390,8 @@ apps/desktop/src/renderer/src/
   components/chat-pane/      index.tsx (render tree + modal state) + useChatHistory.ts
                              (first page, empty-page retries, paging to the saved anchor,
                              loadOlder), messageActions.ts (send/edit/delete/forward/copy),
-                             ChatHeader.tsx, ChatInfoPopover.tsx, Placeholders.tsx, labels.ts
+                             ChatHeader.tsx, ChatInfoPanel.tsx, ChatInfoSearch.tsx,
+                             Placeholders.tsx, labels.ts
   components/MediaBubble.tsx photo lightbox / video / file card / voice bar + progress
   components/StickerRenderer.tsx WebP <img>, TGS lottie, WebM <video>, offscreen pause
   components/StickerPanel.tsx installed sets → grid → send sticker
@@ -691,7 +713,7 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
 - **Editing content is a full remap, not a text patch.** `updateMessageContent` can change
   media/captions, so the adapter fetches the message and emits a `replace` op instead of
   an `edit` op with just the text.
-- **Mock media is generated, not referenced.** `telegram/mock-assets.ts` embeds two real
+- **Mock media is generated, not referenced.** `packages/mock-adapter/src/mock-assets.ts` embeds two real
   WebP stickers and one gzipped TGS animation, and encodes gradient PNGs at runtime with
   `node:zlib`; the files land in `userData/mock-media` and are served through the same
   `wx-media://` registry as TDLib downloads. This is what makes media/sticker work

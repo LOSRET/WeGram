@@ -1,0 +1,401 @@
+/* ==========================================================================
+   聊天信息 — the side panel behind the header's "…" (design doc §9.9).
+
+   It is an OVERLAY: the sheet slides in over the transcript and the composer,
+   which keep their width underneath, so switching the panel on never re-flows a
+   message row.
+
+   Measured off the client's panel: 314 px wide, starting under the 46 px header,
+   19/18 px insets, 47 px participant avatars on 66 px cells, 64 px link rows, and
+   the mute/pin pair on one 10 px-padded block of 41 px rows.
+
+   The 200 ms slide is also written as INFO_PANEL_ANIM_MS in lib/chatInfo.ts; the
+   parent unmounts the panel after exactly that long. style-contract.test.ts pins
+   the two together.
+   ========================================================================== */
+
+.wx-info {
+  position: absolute;
+  top: var(--wx-pane-head-h);
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  width: var(--wx-info-w);
+  overflow: hidden;
+  background: var(--wx-pane);
+  border-left: 1px solid var(--wx-info-rule);
+  user-select: none;
+  transform: translateX(100%);
+  transition: transform 0.2s cubic-bezier(0.22, 0.8, 0.2, 1);
+}
+
+.wx-info.is-open {
+  transform: translateX(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wx-info {
+    transition: none;
+  }
+}
+
+.wx-info__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ---------- Participants ---------- */
+
+.wx-info__member-search {
+  display: flex;
+  padding: 12px 19px 2px;
+}
+
+.wx-info__member-search .wx-search {
+  height: 32px;
+}
+
+.wx-info__people {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 18px 19px 12px;
+}
+
+.wx-info__person {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 66px;
+  margin-bottom: 12px;
+}
+
+button.wx-info__person--add {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+.wx-info__person--add:hover .wx-info__add-tile {
+  background: var(--wx-row-hover);
+}
+
+.wx-info__add-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 47px;
+  height: 47px;
+  flex: 0 0 47px;
+  border: 1px dashed var(--wx-icon-strong);
+  border-radius: 5px;
+  color: var(--wx-icon-strong);
+}
+
+.wx-info__avatar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 47px;
+  height: 47px;
+  flex: 0 0 47px;
+  border-radius: 4px;
+  overflow: hidden;
+  color: var(--wx-text-on-brand);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+.wx-info__name {
+  max-width: 62px;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--wx-info-name);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Rows ---------- */
+
+.wx-info__rule {
+  height: 1px;
+  margin: 0 18px;
+  background: var(--wx-info-rule);
+}
+
+/* 群聊名称 / 群公告: label over hint, both on one tappable block. */
+.wx-info__stack {
+  padding: 4px 0;
+}
+
+.wx-info__info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 9px 19px 10px;
+  border: none;
+  background: transparent;
+  color: var(--wx-text);
+  text-align: left;
+}
+
+.wx-info__info--tap:hover {
+  background: var(--wx-row-hover);
+}
+
+.wx-info__label {
+  min-width: 0;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.wx-info__row .wx-info__label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wx-info__hint {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--wx-info-name);
+  font-size: 12px;
+  line-height: 16px;
+  word-break: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.wx-info__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 64px;
+  padding: 0 33px 0 19px;
+  border: none;
+  background: transparent;
+  color: var(--wx-text);
+  font-size: 14px;
+  text-align: left;
+}
+
+.wx-info__row:hover {
+  background: var(--wx-row-hover);
+}
+
+.wx-info__chevron,
+.wx-info__qr {
+  flex: none;
+  color: var(--wx-text-tertiary);
+}
+
+.wx-info__toggles {
+  padding: 10px 0;
+}
+
+.wx-info__row--toggle {
+  height: 41px;
+  justify-content: space-between;
+}
+
+.wx-info__row--toggle:hover {
+  background: transparent;
+}
+
+.wx-info__row--clear {
+  justify-content: center;
+  padding: 0 19px;
+  color: var(--wx-danger);
+}
+
+.wx-info__note {
+  margin: 4px 19px 16px;
+  color: var(--wx-text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+/* ---------- 查找聊天内容 (in-panel results) ---------- */
+
+.wx-info__search {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.wx-info__search-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  padding: 11px 12px 11px 8px;
+}
+
+.wx-info__back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--wx-icon);
+}
+
+.wx-info__back:hover {
+  background: var(--wx-row-hover);
+  color: var(--wx-text);
+}
+
+.wx-info__search-field {
+  height: 30px;
+}
+
+.wx-info__search-body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.wx-info__search-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 8px;
+}
+
+.wx-info__note--search {
+  margin: 26px 19px;
+}
+
+.wx-info__results {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wx-info__result {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 19px;
+  border: none;
+  background: transparent;
+  text-align: left;
+}
+
+.wx-info__result:hover {
+  background: var(--wx-row-hover);
+}
+
+.wx-info__result-avatar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 4px;
+  overflow: hidden;
+  color: var(--wx-text-on-brand);
+  font-size: 12px;
+}
+
+.wx-info__result-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.wx-info__result-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.wx-info__result-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--wx-text);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wx-info__result-time {
+  flex: none;
+  color: var(--wx-text-tertiary);
+  font-size: 11px;
+}
+
+.wx-info__result-text {
+  overflow: hidden;
+  color: var(--wx-text-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- 群聊名称 / 群二维码 dialogs ---------- */
+
+.wx-info-dialog {
+  width: 320px;
+}
+
+.wx-info-dialog .wx-input {
+  height: 34px;
+}
+
+.wx-info-dialog__hint {
+  margin: 0;
+  color: var(--wx-text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.wx-info-invite {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.wx-info-invite__link {
+  max-width: 100%;
+  color: var(--wx-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+  word-break: break-all;
+}
+
+.wx-info-invite__state {
+  padding: 18px 6px;
+  color: var(--wx-text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+  text-align: center;
+}

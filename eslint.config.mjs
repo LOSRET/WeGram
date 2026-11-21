@@ -64,6 +64,8 @@ export default tseslint.config(
     files: [
       'apps/desktop/src/**/*.{ts,tsx}',
       'packages/protocol/src/**/*.ts',
+      'packages/adapter-contract/src/**/*.ts',
+      'packages/mock-adapter/src/**/*.ts',
       'packages/mock-session/src/**/*.ts',
       'packages/mock-fixtures/src/**/*.ts',
     ],

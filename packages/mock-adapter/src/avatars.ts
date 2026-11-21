@@ -3,10 +3,9 @@ import { join } from 'node:path'
 
 import type { UserAvatar } from '@wegram/protocol'
 
-import type { AdapterEvent } from '../adapter'
-import { registerMediaFile } from '../../media/registry'
+import type { AdapterEvent } from '@wegram/adapter-contract'
 import { ME, MOCK_AVATAR_COLORS, type Fixture } from './constants'
-import { createGradientPng } from '../mock-assets'
+import { createGradientPng } from './mock-assets'
 
 /**
  * Generated profile photos for the fixtures (and the one sender whose photo
@@ -23,6 +22,7 @@ export class MockAvatars {
   constructor(
     private readonly deps: {
       mediaDir: string
+      registerMedia: (path: string) => string
       fixtures: Map<number, Fixture>
       emit: (event: AdapterEvent) => void
     },
@@ -41,7 +41,7 @@ export class MockAvatars {
       const [from, to] = pair
       const path = join(this.deps.mediaDir, `chat-avatar-${chatId}.png`)
       writeFileSync(path, createGradientPng(128, 128, from, to))
-      fixture.chat.avatarUrl = registerMediaFile(path)
+      fixture.chat.avatarUrl = this.deps.registerMedia(path)
     }
 
     const senderIds = new Set<number>()
@@ -58,7 +58,7 @@ export class MockAvatars {
       const [from, to] = pair
       const path = join(this.deps.mediaDir, `user-avatar-${userId}.png`)
       writeFileSync(path, createGradientPng(128, 128, from, to))
-      this.urls.set(userId, registerMediaFile(path))
+      this.urls.set(userId, this.deps.registerMedia(path))
       if (this.lateId === null) this.lateId = userId
       else this.stamp(userId)
     }

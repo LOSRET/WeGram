@@ -1,7 +1,7 @@
 # AGENTS.md — packages/mock-fixtures
 
 Scope: the demo account both fakes serve — the Electron mock adapter
-(`apps/desktop/src/main/telegram/mock`) and the browser preview
+(`packages/mock-adapter`) and the browser preview
 (`apps/desktop/src/renderer/src/lib/preview`). Read the root `../../CLAUDE.md` first.
 
 ## What belongs here
@@ -28,7 +28,7 @@ clock.
   album, thread counts, stress size, digit-only phones).
 - Do not add process/environment knowledge here — no `Date.now()`, no `node:*`, no
   Electron, no file system. Inject it.
-- `apps/desktop/src/main/telegram/mock/fixtures.ts` is a thin adapter over this
+- `packages/mock-adapter/src/fixtures.ts` is a thin adapter over this
   package, and so is `renderer/src/lib/preview/fixtures.ts`; the preview adds only
   its `data:` media and gradient avatars on top.
 

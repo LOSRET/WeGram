@@ -19,6 +19,8 @@
   "dependencies": {
     "@tanstack/react-query": "^5.108.1",
     "@tanstack/react-virtual": "^3.14.26",
+    "@wegram/adapter-contract": "workspace:*",
+    "@wegram/mock-adapter": "workspace:*",
     "@wegram/mock-fixtures": "workspace:*",
     "@wegram/mock-session": "workspace:*",
     "@wegram/protocol": "workspace:*",

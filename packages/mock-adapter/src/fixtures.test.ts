@@ -1,7 +1,7 @@
 import type { MessageMedia } from '@wegram/protocol'
 import { describe, expect, it } from 'vitest'
 
-import type { AdapterEvent } from '../adapter'
+import type { AdapterEvent } from '@wegram/adapter-contract'
 import { commentAccessOf, commentsOf, joinGroupIn, postComment } from './comments'
 import { buildFixtures } from './fixtures'
 

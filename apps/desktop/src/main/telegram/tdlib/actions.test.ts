@@ -29,8 +29,13 @@ function makeContext(): MapperContext {
 
 type Responder = (method: TdObject) => TdObject | null
 
-function makeDeps(respond: Responder): { deps: ActionDeps; calls: TdObject[] } {
+function makeDeps(respond: Responder): {
+  deps: ActionDeps
+  calls: TdObject[]
+  events: unknown[]
+} {
   const calls: TdObject[] = []
+  const events: unknown[] = []
   const deps: ActionDeps = {
     invoke: async (method) => {
       calls.push(method)
@@ -38,10 +43,10 @@ function makeDeps(respond: Responder): { deps: ActionDeps; calls: TdObject[] } {
     },
     mapper: makeContext(),
     logger: { info: () => undefined, warn: () => undefined, error: () => undefined },
-    emit: () => undefined,
+    emit: (event) => events.push(event),
     prefetchChatAvatars: () => undefined,
   }
-  return { deps, calls }
+  return { deps, calls, events }
 }
 
 function rawMessage(id: number, text: string): TdObject {

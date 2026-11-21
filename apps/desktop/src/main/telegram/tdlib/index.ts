@@ -2,6 +2,9 @@ import { AppError } from '@wegram/protocol'
 import type {
   AuthState,
   BootState,
+  ChatInviteLink,
+  ChatMember,
+  ChatPinnedMessage,
   ChatSummary,
   ConnectionState,
   Contact,
@@ -301,6 +304,45 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
 
   async setChatMuted(chatId: number, muted: boolean): Promise<ChatSummary> {
     return actions.setChatMuted(this.actionDeps, chatId, muted)
+  }
+
+  /** 置顶聊天; see `actions.setChatPinned`. */
+  async setChatPinned(chatId: number, pinned: boolean): Promise<ChatSummary> {
+    return actions.setChatPinned(this.actionDeps, chatId, pinned)
+  }
+
+  /** 清空聊天记录 (this account's copy); see `actions.clearHistory`. */
+  async clearHistory(chatId: number): Promise<void> {
+    return actions.clearHistory(this.actionDeps, chatId)
+  }
+
+  /** The 聊天信息 panel's member grid; see `actions.listMembers`. */
+  async chatMembers(chatId: number, limit: number, query?: string): Promise<ChatMember[]> {
+    return actions.listMembers(this.actionDeps, chatId, limit, query)
+  }
+
+  /** 群聊名称; see `actions.setChatTitle`. */
+  async setChatTitle(chatId: number, title: string): Promise<ChatSummary> {
+    return actions.setChatTitle(this.actionDeps, chatId, title)
+  }
+
+  /** 退出群聊; see `actions.leaveChat`. */
+  async leaveChat(chatId: number): Promise<void> {
+    return actions.leaveChat(this.actionDeps, chatId)
+  }
+
+  /** 群公告 (the newest pinned message); see `actions.pinnedMessage`. */
+  async pinnedMessage(chatId: number): Promise<ChatPinnedMessage | null> {
+    return actions.pinnedMessage(this.actionDeps, chatId)
+  }
+
+  /** 群二维码; see `actions.inviteLink`. */
+  async inviteLink(chatId: number, temporary?: boolean): Promise<ChatInviteLink | null> {
+    return actions.inviteLink(
+      { ...this.actionDeps, getSelfUserId: () => this.selfUserId },
+      chatId,
+      temporary,
+    )
   }
 
   /** The account's Telegram address book (通讯录); see `actions.listContacts`. */

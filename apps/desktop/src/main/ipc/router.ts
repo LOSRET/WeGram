@@ -5,6 +5,7 @@ import {
   type AppErrorShape,
   type InvokeChannel,
   type InvokeRequest,
+  type InvokeResponse,
 } from '@wegram/protocol'
 import { ipcMain } from 'electron'
 
@@ -17,7 +18,9 @@ import { ipcMain } from 'electron'
  * each handler read `payload.chatId` with the type the protocol promises.
  */
 export type IpcHandlerMap = {
-  [C in InvokeChannel]?: (payload: InvokeRequest<C>) => Promise<unknown> | unknown
+  [C in InvokeChannel]?: (
+    payload: InvokeRequest<C>,
+  ) => Promise<InvokeResponse<C>> | InvokeResponse<C>
 }
 
 export interface IpcResult {
