@@ -243,3 +243,57 @@
 .wx-chat-item--active .wx-badge--muted {
   background: rgba(0, 0, 0, 0.28);
 }
+
+/* ---------- Global search results ---------- */
+
+/* The column swaps faces while the pill has text: a group header and the
+   server's hits, drawn plainly (one page at most), inside the same scroller. */
+.wx-list__hits {
+  padding-bottom: 8px;
+}
+
+.wx-list__hits-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 28px;
+  padding: 0 12px;
+  font-size: 12px;
+  color: var(--wx-text-tertiary);
+}
+
+.wx-list__hits-count {
+  font-size: 11px;
+}
+
+/* The matched run of a hit's title: WeChat's green rather than the browser's
+   default yellow `mark`; the selected row keeps white text and underlines it. */
+.wx-chat-item__hit {
+  background: none;
+  color: var(--wx-brand);
+}
+
+.wx-chat-item--active .wx-chat-item__hit {
+  color: #fff;
+  text-decoration: underline;
+}
+
+/* The pill's ×: shown only while there is something to clear. */
+.wx-search__clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--wx-text-tertiary);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.wx-search__clear:hover {
+  color: var(--wx-text);
+}

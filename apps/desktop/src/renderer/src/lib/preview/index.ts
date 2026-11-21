@@ -31,6 +31,7 @@ import {
   previewChatMembers,
   previewInviteLink,
   previewPinnedMessage,
+  searchPreviewChats,
   searchPreviewMessages,
   setPreviewMuted,
   setPreviewPinned,
@@ -220,6 +221,8 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'qr:share':
     case 'qr:close':
       return handlePreviewQr(channel, store, previewQrStore)
+    case 'search:global':
+      return searchPreviewChats(chats, String(store.q ?? ''), Number(store.limit ?? 20))
     case 'search:inChat':
       return searchPreviewMessages(previewChats, Number(store.chatId), String(store.q ?? ''))
     case 'chats:openPrivate': {

@@ -31,7 +31,7 @@ The login is its **own window**, like WeChat's: a frameless 280×373 `BrowserWin
 
 `ui.db` uses the built-in `node:sqlite` (Electron 45 ships Node 24.22) instead of better-sqlite3, so there is no native module to rebuild for the Electron ABI. All SQL is confined to `apps/desktop/src/main/store/ui-db.ts`; `settings.json` keeps only the proxy config because it carries a sealed secret.
 
-Still deferred: search (global + in-chat), pinning chat controls, settings page. Release packaging lives in `.github/workflows/release.yml` (a version bump on `main` → NSIS installer → GitHub Release; pushing a `v*` tag still works), proven by `v0.1.0`–`v0.1.2`; the installer itself has never been installed or code-signed.
+Global and in-chat search are wired: the chat-list pill asks `search:global` (TDLib `searchChats`, matching titles and usernames of every known chat) and the 聊天信息 panel's 查找聊天内容 uses `search:inChat` (`searchChatMessages`). Still deferred: pinning chat controls, settings page. Release packaging lives in `.github/workflows/release.yml` (a version bump on `main` → NSIS installer → GitHub Release; pushing a `v*` tag still works), proven by `v0.1.0`–`v0.1.2`; the installer itself has never been installed or code-signed.
 `ui.db` reading positions (`scroll_anchor_id`/`scroll_offset`) are wired: MessageList writes them,
 ChatPane restores them when the reader was not at the bottom. A row older than the
 newest page is loaded *around* itself (`messages:around`), and a window that stops

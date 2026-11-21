@@ -1,5 +1,5 @@
 import type { ChatSummary, Contact } from '@wegram/protocol'
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { AppMenu } from './AppMenu'
 import { ChatList } from './ChatList'
@@ -12,7 +12,6 @@ import { SectionPlaceholder } from './SectionPlaceholder'
 import { SideRail, type ShellSection } from './SideRail'
 import { errorMessage, invoke } from '../lib/ipc'
 import { activateChat } from '../lib/openChat'
-import { containsText, normalizeQuery } from '../lib/search'
 import { useAppStore } from '../store/useAppStore'
 
 interface Anchor {
@@ -28,13 +27,8 @@ export function MainShell() {
   const toast = useAppStore((state) => state.toast)
   const setToast = useAppStore((state) => state.setToast)
 
+  /** The conversation column's global search: the server answers, the list draws. */
   const [query, setQuery] = useState('')
-  /**
-   * The field stays responsive while the list recomputes: typing filters synchronously
-   * today, which on a full page of chats means every keystroke waits for the render of
-   * every row. `query` still feeds the input and the "no matches" copy.
-   */
-  const deferredQuery = useDeferredValue(query)
   const [proxyOpen, setProxyOpen] = useState(false)
   /** The rail's "≡" menu (settings / theme / sign out). */
   const [menu, setMenu] = useState<Anchor | null>(null)
@@ -121,16 +115,10 @@ export function MainShell() {
     [setError],
   )
 
-  const filteredChats = useMemo(() => {
-    const needle = normalizeQuery(deferredQuery)
-    if (!needle) return chats
-    return chats.filter((chat) => containsText(chat.title, needle))
-  }, [chats, deferredQuery])
-
   /**
    * Selecting the row that is already open toggles the conversation shut: the
-   * right pane goes back to its initial watermark state and the list keeps its
-   * filter, so the reader can pick the same or another chat again.
+   * right pane goes back to its initial watermark state, and the row stays put
+   * in the list so the reader can pick it (or another) again.
    */
   /**
    * Stable for the life of the shell, so memoised rows keep their identity when the
@@ -144,6 +132,18 @@ export function MainShell() {
       store.setActiveChat(null)
       return
     }
+    activateChat(chat)
+  }, [])
+
+  /**
+   * A global-search hit is not necessarily in `chats`: TDLib answers from every
+   * chat it knows, archived and not-yet-paged ones included, so the row is put in
+   * the store before the pane looks its summary up. The box then empties and the
+   * column is a list again, with the hit among its rows.
+   */
+  const openSearchHit = useCallback((chat: ChatSummary): void => {
+    useAppStore.getState().applyChatOps([{ op: 'upsert', chat }])
+    setQuery('')
     activateChat(chat)
   }, [])
 
@@ -177,11 +177,12 @@ export function MainShell() {
         {section === 'chats' ? (
           <>
             <ChatList
-              chats={filteredChats}
+              chats={chats}
               activeChatId={activeChatId}
               query={query}
               onQueryChange={setQuery}
               onSelect={openChat}
+              onSelectHit={openSearchHit}
               onOpenPlus={(anchor) => setPlusMenu(anchor)}
             />
             <ChatPane />

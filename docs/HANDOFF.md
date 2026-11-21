@@ -905,7 +905,11 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
      left to TDLib's error.
    - `updateMessageContent`/`updateNewMessage` are mapped, but `updateMessageSendSucceeded`
      is not handled separately; message ids are server ids already, so it is cosmetic.
-   - Search (global + in-chat) is W4 even though the adapter methods exist.
+   - ~~Search is W4~~ — **done 2026-11-21**: the chat-list pill runs `search:global`
+     (TDLib `searchChats`, offline title/username match over known chats) and the
+     聊天信息 panel's 查找聊天内容 runs `search:inChat` (`searchChatMessages`). Still
+     missing: message hits across chats, 联系人 hits, and paging beyond one page of
+     results.
 4. ~~**Channel posts show senderName `未知`**~~ — **done**: `senderChatId` in the DTO,
    `mapMessage` resolves `messageSenderChat` through the chat-title cache, verified on
    the real account by the `senderChat` line of `tdlib:smoke`. Mock + preview fixtures
@@ -951,7 +955,7 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
 ## Open questions for the product owner
 
 - ~~W3 order: media first or search first?~~ Media + stickers were done first (W3 main
-  body); search is the natural start of W4.
+  body); search followed on 2026-11-21 (global pill + in-panel 查找聊天内容).
 - Scroll-position restore: WeChat restores where you left; we already do that when the
   reader was not at the bottom. Confirm it should stay.
 - Multi-account stays v2 — confirm nothing in W3/W4 needs it.

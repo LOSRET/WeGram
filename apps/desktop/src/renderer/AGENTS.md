@@ -51,12 +51,18 @@ components/Avatar.tsx    the ONE avatar box (photo or initials); the box class i
                         is the positioned element, which is the rule that once cost a session
 components/CustomEmoji.tsx  a Premium custom emoji in text: its sticker art at 20 px,
                         with the base glyph as the fallback
+components/ChatList.tsx  the conversation column: pill (server global search, §2.9 of
+                        UI-HANDOFF), "+" and the virtualised rows; search hits are a
+                        plain results face in the same scroller
 components/SearchField.tsx  the ONE search pill (label + input + optional trailing control)
 components/           the remaining visual concerns (Composer, MediaBubble, …)
 lib/ipc.ts            thin `window.tg` wrapper
 lib/clipboard.ts      text copy for the contact card (navigator.clipboard + execCommand fallback)
 lib/format.ts         time / preview / avatar helpers (pure, unit-tested)
-lib/search.ts         normalizeQuery / containsText — the ONE reading of a search box
+lib/search.ts         normalizeQuery / containsText / matchSegments — the ONE reading of a
+                      search box, and the hit emphasis a result row draws
+lib/useGlobalSearch.ts  the chat-list pill's server search: 260 ms debounce over
+                      search:global, only the newest request may land
 lib/self.ts           SelfIdentity + selfIdentity(auth); one placeholder id (1000)
 lib/popupPlacement.ts (pure, unit-tested) "which edge does this card hang from"
 lib/mediaBox.ts       (pure, unit-tested) the reserved media box + percent text

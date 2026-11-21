@@ -122,6 +122,13 @@ export function previewInviteLink(chatId: number, temporary = false): ChatInvite
   }
 }
 
+/** Global search, the mock adapter's title rule over the fixture account. */
+export function searchPreviewChats(chats: ChatSummary[], q: string, limit: number): ChatSummary[] {
+  const needle = q.trim().toLowerCase()
+  if (needle === '') return []
+  return chats.filter((chat) => chat.title.toLowerCase().includes(needle)).slice(0, limit)
+}
+
 /** In-chat search, the mock adapter's substring rule over the transcript. */
 export function searchPreviewMessages(
   store: PreviewChatStore,
