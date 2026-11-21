@@ -1,6 +1,7 @@
 import { threadInteraction } from '@wegram/mock-session'
-import type { ChatSummary, Message, MessageMedia } from '@wegram/protocol'
+import type { Message } from '@wegram/protocol'
 
+import type { FixtureOptions, FixtureSeed } from './seed'
 import { buildStressSeed } from './stress'
 import { buildCommentThread } from './threads'
 
@@ -16,47 +17,6 @@ import { buildCommentThread } from './threads'
  * userData and mints `wx-media://` tokens, while the preview uses `data:` URLs.
  * Each side passes `mediaOf`, so a message only says which file id it carries.
  */
-
-export type SeedMedia = (
-  fileId: number,
-  extra?: Partial<MessageMedia>,
-  options?: { downloadable?: boolean },
-) => MessageMedia
-
-/** One conversation as the fakes hold it (the mock calls this a `Fixture`). */
-export interface FixtureSeed {
-  chat: ChatSummary
-  messages: Message[]
-  /** Channels only: whether this account may post there (TDLib: admin right). */
-  canPost?: boolean
-  /**
-   * Private chats only: the person's address-book identity (微信号 / phone).
-   * The real adapter reads the same fields from TDLib's `getContacts` + `user`.
-   * Phones are stored the way TDLib hands them over: digits with no leading +.
-   */
-  contact?: { username?: string; phone?: string; dcId?: number }
-  /**
-   * Comment threads by message id (design doc §9.8). TDLib keeps them in the
-   * message thread — a channel's linked discussion group — not in the transcript.
-   */
-  comments?: Record<number, Message[]>
-  /** Comment permissions for the fake discussion groups; defaults to joined. */
-  commentAccess?: {
-    joined?: boolean
-    canComment?: boolean
-    joinByRequest?: boolean
-    slowModeSeconds?: number
-    banned?: boolean
-  }
-}
-
-export interface FixtureOptions {
-  /** Our own user id: the Saved Messages chat and every outgoing row. */
-  selfId: number
-  mediaOf: SeedMedia
-  /** Unix seconds; each fake reads its own clock. */
-  now: () => number
-}
 
 export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureSeed> {
   const { selfId, mediaOf, now } = options
@@ -379,6 +339,10 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
     // The channel's discussion group is not joined yet: the panel offers
     // 加入讨论组 first, like the official client does for a non-member.
     commentAccess: { joined: false, canComment: false },
+    // And the channel itself starts out unjoined, like one opened from 搜索: the
+    // bottom bar must offer 加入 rather than 静音, and pressing it turns this
+    // fixture into the read-only subscriber case (§9.9).
+    joined: false,
     messages: [
       text(5, 501, 600, 'Telegram 11.0 released', false),
       // Channel posts are sent by the chat itself (`messageSenderChat`), not by a
@@ -408,7 +372,8 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
   )
 
   // A channel this account *does* manage: the bar shows the keyboard switch and
-  // the composer opens from it. Chat 5 above is the read-only case.
+  // the composer opens from it. Chat 5 above is the read-only case — and its
+  // unjoined start is what exercises the bar's 加入 item.
   fixtures.set(6, {
     chat: {
       id: 6,

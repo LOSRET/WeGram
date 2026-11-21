@@ -9,6 +9,9 @@ Scope: the demo account both fakes serve — the Electron mock adapter
 - `data.ts` — `buildFixtureSeeds`: chats 1–11, their messages (albums, stickers,
   one premium sticker, one custom emoji, a channel post, the 通讯录 people), comment
   threads on the posts that own one, and the contact fields the address book reads.
+- `seed.ts` — the dataset's shape (`FixtureSeed`, `FixtureOptions`, `SeedMedia`).
+  Split out of `data.ts` when the channel fixtures pushed it to its 550-line budget;
+  `FixtureSeed` carries `canPost` and `joined` for channels.
 - `stress.ts` — the 5000-message stress chat 99 for the virtualised list. Split out
   of `data.ts` when the custom-emoji fixture pushed it to its 550-line budget.
 - `threads.ts` — the comment authors, bodies and the id formula

@@ -31,6 +31,9 @@ telegram/tdlib/     lifecycle.ts (create / crash / restart the client, reports B
 telegram/tdlib/actions/  TDLib requests as functions over ActionDeps, grouped into
                     chats / history / files / send / comments (index.ts re-exports);
                     message-input.ts holds the one send envelope
+telegram/tdlib/chat-api.ts  createChatApi: the chat seam methods (list/open/mute/pin/
+                    members/title/join) as one object the adapter class binds; split
+                    out of index.ts when the 频道底栏 methods hit its line budget
 media/              registry.ts (token → path | fileId) / protocol.ts (wx-media://: disk
                     Range streams, plus the branch that tails a download) / stream.ts
                     (the byte pump, pure) / leases.ts (per-file download holders, pure) /

@@ -2,6 +2,8 @@ import type {
   AuthState,
   BootState,
   ChatInviteLink,
+  ChatJoinResult,
+  ChatJoinState,
   ChatMember,
   ChatOp,
   ChatPinnedMessage,
@@ -138,6 +140,14 @@ export interface TelegramAdapter {
    * 聊天信息 panel asks before it draws the member grid.
    */
   canGetMembers(chatId: number): Promise<boolean>
+  /**
+   * 频道底栏: whether this account belongs to the channel, and whether joining
+   * would file a request. Non-channels answer "joined" — only a previewed
+   * channel can be read without subscribing.
+   */
+  chatJoinState(chatId: number): Promise<ChatJoinState>
+  /** 加入 / 申请加入 for the channel bar (TDLib `joinChat`). */
+  joinChannel(chatId: number): Promise<ChatJoinResult>
   /** Mutes / unmutes a chat and answers the refreshed summary. */
   setChatMuted(chatId: number, muted: boolean): Promise<ChatSummary>
   /** 置顶聊天 / 取消置顶; answers the refreshed summary. */

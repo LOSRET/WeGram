@@ -114,6 +114,16 @@ Greenfield → working skeleton in three milestones:
   `packages/protocol/src/chats.ts` and the chat DTOs in `chat.ts` (both split at the
   550-line budget). Design: `技术方案.md` §9.9; measured metrics and the deliberate
   deltas: `UI-HANDOFF.md` §2.8 / §5 item 33.
+- **未加入频道的底栏 (2026-11-21)**: a channel opened from 搜索 or an `@username` is
+  readable without being subscribed, and the 服务号 card used to offer 静音 anyway. The
+  bottom edge now asks `chats:joinState` (`supergroup.status` is the account's own
+  membership; `join_by_request` decides the wording) and draws a single 加入 item instead
+  — 申请加入 for a request-based channel, 已申请加入 after the request went out, and no
+  keyboard switch. 加入 calls `chats:join` → `joinChat`: `chatJoinResultSuccess` flips
+  the card back to 静音 (with the keyboard when the account administers the channel) and
+  toasts 已加入频道, while `chatJoinResultRequestSent` only toasts. The fake account's
+  Telegram News channel starts unjoined, so both states are clickable offline. Design:
+  `技术方案.md` §9.9.
 - **Sender photos in the transcript (W3 addendum)**: group members are no longer
   initials. `Message.senderAvatarUrl` carries the picture a row can already draw, and
   the adapter's photo pool (the one that fetched chat photos) now resolves **people**

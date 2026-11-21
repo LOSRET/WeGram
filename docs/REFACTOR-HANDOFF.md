@@ -77,6 +77,19 @@ moved to `mock/effects.ts`; and ESLint now enforces `max-lines: 550` on app and
 protocol sources (generated `WechatIcons.tsx` exempt) so the tree cannot silently grow
 back to 1000-line files.
 
+Next batch, 2026-11-21 (with the 未加入频道底栏 feature): three files hit the cap at
+once, so each split followed the same "extract one concern, bind it" rule:
+
+| Was | Now |
+| --- | --- |
+| `tdlib/index.ts` at its cap (频道底栏) | `tdlib/chat-api.ts`: `createChatApi` returns the chat seam methods as one object (the class binds it as fields, lazily reading `actionDeps`); `openPrivateChat` moved into `actions/chats.ts` next to `openUsernameChat` |
+| `mock-fixtures/data.ts` at its cap | `mock-fixtures/seed.ts`: `FixtureSeed` / `FixtureOptions` / `SeedMedia`; `index.ts` re-exports them, so the mock and the preview import the same path |
+| `tdlib/actions.test.ts` at its cap | `tdlib/actions-chat-join.test.ts`: the 频道底栏 membership and `joinChat` cases, with the same fake adapter kept local (the `actions-chat-info.test.ts` precedent) |
+
+Behaviour was not changed: every doc comment moved with its code and the seam, the
+protocol tables and the fixture data are identical. The Electron/mock pass for the
+feature itself is in the 2026-11-21 handoff bullet.
+
 Still open from the original plan: optional **batch 8** (`packages/protocol` split by
 domain; the export surface must stay identical because preload bundles it). The two
 files that remain above the 550 cap are gone; `mock/index.ts` (540) is the adapter

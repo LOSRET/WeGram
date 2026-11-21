@@ -1,5 +1,7 @@
 import type {
   ChatInviteLink,
+  ChatJoinResult,
+  ChatJoinState,
   ChatMember,
   ChatPinnedMessage,
   ChatSummary,
@@ -31,6 +33,21 @@ function findChat(store: PreviewChatStore, chatId: number): ChatSummary {
 
 function announce(store: PreviewChatStore, chat: ChatSummary): void {
   store.emit('evt:chats', { ops: [{ op: 'upsert', chat: { ...chat } }] })
+}
+
+/**
+ * 频道底栏 (§9.9): the fixture's unjoined channels are the previewed ones, which
+ * is exactly the state a channel opened from 搜索 is in.
+ */
+export function previewJoinState(chat: ChatSummary, notJoined: Set<number>): ChatJoinState {
+  if (chat.kind !== 'channel') return { joined: true, byRequest: false }
+  return { joined: !notJoined.has(chat.id), byRequest: false }
+}
+
+/** 加入频道: the preview subscribes at once; it never asks for approval. */
+export function joinPreviewChannel(notJoined: Set<number>, chatId: number): ChatJoinResult {
+  notJoined.delete(chatId)
+  return { joined: true, requestSent: false }
 }
 
 export function setPreviewMuted(

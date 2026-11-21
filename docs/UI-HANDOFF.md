@@ -858,6 +858,13 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
     surface); the query, results and jump behave the same, and a member avatar does not
     open a profile yet.
 
+34. **A channel's bottom card is 加入 until the account subscribes.** The 服务号 card has
+    one menu item, and Telegram lets a public channel be read (and its posts opened from
+    搜索 or an `@username`) before joining — 静音 on a channel the account does not follow
+    muted nothing. The item is 加入 (申请加入 when the channel approves members, 已申请加入
+    once the request went out, disabled) and the keyboard switch is absent; after joining
+    the card is the old 静音 one, plus the keyboard for an administrator.
+
 ---
 
 ## 6. Suggested next steps, in order

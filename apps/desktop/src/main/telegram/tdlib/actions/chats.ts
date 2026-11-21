@@ -1,5 +1,12 @@
 import { AppError } from '@wegram/protocol'
-import type { ChatInviteLink, ChatMember, ChatPinnedMessage, ChatSummary } from '@wegram/protocol'
+import type {
+  ChatInviteLink,
+  ChatJoinResult,
+  ChatJoinState,
+  ChatMember,
+  ChatPinnedMessage,
+  ChatSummary,
+} from '@wegram/protocol'
 
 import type { TdObject } from '../client'
 import { asArray } from '../json'
@@ -54,6 +61,19 @@ export async function listChats(
  */
 export async function openChat(deps: ActionDeps, chatId: number): Promise<void> {
   await deps.invoke({ _: 'getChat', chat_id: chatId })
+}
+
+/**
+ * 发消息 on a contact card: TDLib creates the private chat on first use and
+ * answers with it. The summary is pushed as an upsert too, so the row exists in
+ * the renderer's list before the pane mounts — the same contract as
+ * `openUsernameChat`.
+ */
+export async function openPrivateChat(deps: ActionDeps, userId: number): Promise<ChatSummary> {
+  const raw = await deps.invoke({ _: 'createPrivateChat', user_id: userId, force: false })
+  const summary = mapChat(deps.mapper, raw)
+  deps.emit({ type: 'chats', ops: [{ op: 'upsert', chat: summary }] })
+  return summary
 }
 
 /**
@@ -141,6 +161,67 @@ export async function canGetMembers(deps: ActionDeps, chatId: number): Promise<b
     // A supergroup whose full info is not cached yet is not an answer; the panel
     // simply keeps the grid closed and asks again the next time it opens.
     return false
+  }
+}
+
+/** chatMemberStatus* → "this account belongs to the chat". */
+function statusIsMember(status: TdObject | undefined): boolean {
+  switch (status?._) {
+    case 'chatMemberStatusCreator':
+    case 'chatMemberStatusAdministrator':
+    case 'chatMemberStatusMember':
+      return true
+    case 'chatMemberStatusRestricted':
+      // A restricted member is still a member; joining is not the next step.
+      return Boolean(status.is_member)
+    default:
+      // chatMemberStatusLeft / chatMemberStatusBanned / no status at all.
+      return false
+  }
+}
+
+/**
+ * 频道底栏: whether this account belongs to the channel, and how joining would go.
+ *
+ * A channel reached from 搜索 or an `@username` is readable without being
+ * subscribed, so the bar cannot infer membership from "the chat is open". TDLib
+ * keeps the current user's own status on the supergroup (the same field
+ * `commentInfo` reads for groups) and `join_by_request` decides 加入 vs 申请加入.
+ */
+export async function chatJoinState(deps: ActionDeps, chatId: number): Promise<ChatJoinState> {
+  const chat = await deps.invoke({ _: 'getChat', chat_id: chatId })
+  const type = chat?.type
+  if (type?._ !== 'chatTypeSupergroup' || !type.is_channel) {
+    return { joined: true, byRequest: false }
+  }
+  const supergroup = await deps.invoke({
+    _: 'getSupergroup',
+    supergroup_id: type.supergroup_id,
+  })
+  return {
+    joined: statusIsMember(supergroup?.status),
+    byRequest: Boolean(supergroup?.join_by_request),
+  }
+}
+
+/**
+ * 加入频道 / 申请加入 (design doc §9.9).
+ *
+ * TDLib answers with a join *result*, not with the membership: a public channel
+ * subscribes at once, while a request-based one only files the request an
+ * administrator must approve — the two states the bar draws.
+ */
+export async function joinChannel(deps: ActionDeps, chatId: number): Promise<ChatJoinResult> {
+  const result = await deps.invoke({ _: 'joinChat', chat_id: chatId })
+  switch (result?._) {
+    case 'chatJoinResultSuccess':
+      return { joined: true, requestSent: false }
+    case 'chatJoinResultRequestSent':
+      return { joined: false, requestSent: true }
+    case 'chatJoinResultGuardBotApprovalRequired':
+      throw new AppError('not_implemented', '这个频道需要通过机器人验证才能加入')
+    default:
+      throw new AppError('internal', '加入频道失败')
   }
 }
 

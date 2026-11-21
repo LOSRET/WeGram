@@ -2,6 +2,8 @@ import { z } from 'zod'
 
 import {
   chatInviteLinkSchema,
+  chatJoinResultSchema,
+  chatJoinStateSchema,
   chatMemberSchema,
   chatPinnedMessageSchema,
   chatSummarySchema,
@@ -40,6 +42,14 @@ export const chatInvokeChannels = [
    * are administrator-only, so the 聊天信息 panel asks before drawing the grid.
    */
   'chats:canGetMembers',
+  /**
+   * 频道底栏: whether this account belongs to the channel and whether joining
+   * would file a request. A channel opened from 搜索 / an `@username` is only a
+   * preview until the account joins it.
+   */
+  'chats:joinState',
+  /** 加入 / 申请加入: subscribes to the channel the bar is previewing. */
+  'chats:join',
   /** 静音 / 取消静音 for the channel bar; answers the refreshed summary. */
   'chats:setMuted',
   /** 置顶聊天 / 取消置顶; answers the refreshed summary (sorted by the renderer). */
@@ -81,6 +91,14 @@ export const chatInvokeSchemas = {
   'chats:canGetMembers': {
     request: z.object({ chatId: z.number().int() }),
     response: z.boolean(),
+  },
+  'chats:joinState': {
+    request: z.object({ chatId: z.number().int() }),
+    response: chatJoinStateSchema,
+  },
+  'chats:join': {
+    request: z.object({ chatId: z.number().int() }),
+    response: chatJoinResultSchema,
   },
   'chats:setMuted': {
     request: z.object({ chatId: z.number().int(), muted: z.boolean() }),

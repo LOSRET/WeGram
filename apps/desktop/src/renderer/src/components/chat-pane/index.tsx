@@ -1,4 +1,4 @@
-import type { Message } from '@wegram/protocol'
+import type { ChatJoinState, Message } from '@wegram/protocol'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { loadLatestWindow } from '../../lib/anchoredWindow'
@@ -78,6 +78,16 @@ export function ChatPane() {
   const [postRights, setPostRights] = useState<Record<number, boolean>>({})
   /** The channel whose composer was opened from the bar's keyboard switch. */
   const [channelInputChatId, setChannelInputChatId] = useState<number | null>(null)
+  /**
+   * 频道底栏: whether this account belongs to the channel. A channel opened from
+   * 搜索 or an `@username` can be read without being subscribed, so the bar asks
+   * once per chat and keeps the answer for the session, like `postRights`.
+   */
+  const [joinStates, setJoinStates] = useState<Record<number, ChatJoinState>>({})
+  /** A 加入 / 申请加入 call is in flight, so the item cannot be pressed twice. */
+  const [joinBusy, setJoinBusy] = useState(false)
+  /** 申请加入 was sent: the bar reports it instead of offering the request again. */
+  const [joinRequested, setJoinRequested] = useState<Record<number, boolean>>({})
   /** A mute call is in flight, so the bar cannot be double-toggled. */
   const [muteBusy, setMuteBusy] = useState(false)
   /** The same guard for 置顶聊天. */
@@ -267,6 +277,57 @@ export function ChatPane() {
   /** A channel's composer is closed until the bar's keyboard button opens it. */
   const channelInputOpen = isChannel && channelInputChatId === activeChatId
 
+  /**
+   * Membership is not on the chat summary, so a channel's bar asks the adapter
+   * once per chat. A failed lookup keeps the bar's 静音 face and retries the next
+   * time the channel opens — the same rule as `postRights`.
+   */
+  useEffect(() => {
+    if (activeChatId === null || !isChannel) return
+    if (joinStates[activeChatId] !== undefined) return
+    let cancelled = false
+    void invoke('chats:joinState', { chatId: activeChatId })
+      .then((state) => {
+        if (!cancelled) setJoinStates((current) => ({ ...current, [activeChatId]: state }))
+      })
+      .catch(() => {
+        // Kept unknown on purpose: the bar stays on 静音 and asks again later.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [activeChatId, isChannel, joinStates])
+
+  const joinState = activeChatId !== null ? joinStates[activeChatId] : undefined
+  /** Until the adapter answers, the bar keeps its previous (静音) face. */
+  const channelJoined = joinState?.joined ?? true
+
+  /**
+   * 加入频道: the bar's item while this account is not a subscriber (§9.9). A
+   * public channel subscribes at once; a request-based one only files the
+   * request, and the bar then reports it instead of offering it again.
+   */
+  const joinChannel = useCallback(async (): Promise<void> => {
+    const chatId = activeChatId
+    if (chatId === null || joinBusy) return
+    setJoinBusy(true)
+    try {
+      const result = await invoke('chats:join', { chatId })
+      if (result.requestSent) {
+        setJoinRequested((current) => ({ ...current, [chatId]: true }))
+        useAppStore.getState().setToast('已提交加入申请')
+      } else if (result.joined) {
+        const byRequest = joinStates[chatId]?.byRequest ?? false
+        setJoinStates((current) => ({ ...current, [chatId]: { joined: true, byRequest } }))
+        useAppStore.getState().setToast('已加入频道')
+      }
+    } catch (error) {
+      useAppStore.getState().setError(errorMessage(error))
+    } finally {
+      setJoinBusy(false)
+    }
+  }, [activeChatId, joinBusy, joinStates])
+
   const toggleMute = useCallback(async (): Promise<void> => {
     if (!chat || muteBusy) return
     setMuteBusy(true)
@@ -389,7 +450,14 @@ export function ChatPane() {
         <ChannelBar
           muted={chat.muted}
           canPost={canPost}
+          joined={channelJoined}
+          joinByRequest={joinState?.byRequest ?? false}
+          joinRequested={activeChatId !== null && Boolean(joinRequested[activeChatId])}
+          joinBusy={joinBusy}
           busy={muteBusy}
+          onJoin={() => {
+            void joinChannel()
+          }}
           onToggleMute={() => {
             void toggleMute()
           }}

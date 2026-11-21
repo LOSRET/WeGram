@@ -2,9 +2,6 @@ import { AppError } from '@wegram/protocol'
 import type {
   AuthState,
   BootState,
-  ChatInviteLink,
-  ChatMember,
-  ChatPinnedMessage,
   ChatSummary,
   ConnectionState,
   Contact,
@@ -31,11 +28,11 @@ import type { TdObject } from './client'
 import { TdlibLifecycle } from './lifecycle'
 import type { MapperContext } from './map/context'
 import { createResolvers } from './map/resolvers'
-import { mapChat } from './map/chat'
 import { mapUser } from './map/user'
 import { setProxy as applyProxyConfig, testProxy as testProxyConfig } from './proxy'
 import type { ProxyDeps } from './proxy'
 import * as stickers from './stickers'
+import { createChatApi } from './chat-api'
 import { createUpdateHandler } from './updates'
 
 export interface TdlibAdapterOptions {
@@ -273,89 +270,33 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     return mapUser(raw)
   }
 
-  async listChats(input: { limit: number; offset: number }): Promise<ChatSummary[]> {
-    return actions.listChats(this.actionDeps, input)
-  }
-
-  async getChat(chatId: number): Promise<ChatSummary> {
-    return actions.getChat(this.actionDeps, chatId)
-  }
-
-  async openChat(chatId: number): Promise<void> {
-    return actions.openChat(this.actionDeps, chatId)
-  }
-
   /**
-   * A contact card's 发消息: TDLib creates the private chat on first use and
-   * answers with it. The summary is pushed as an upsert too, so the row exists
-   * in the renderer's list before the pane mounts.
+   * The chat endpoints. Their TDLib calls live in `chat-api.ts`; the lazy deps
+   * keep this initializer safe before the constructor has built `actionDeps`
+   * (it is read on the first call, not at construction).
    */
-  async openPrivateChat(userId: number): Promise<ChatSummary> {
-    const raw = await this.invoke({ _: 'createPrivateChat', user_id: userId, force: false })
-    const summary = mapChat(this.mapper, raw)
-    this.emit({ type: 'chats', ops: [{ op: 'upsert', chat: summary }] })
-    return summary
-  }
+  private readonly chatApi = createChatApi(() => ({
+    actionDeps: this.actionDeps,
+    getSelfUserId: () => this.selfUserId,
+  }))
 
-  /** An `@username` mention; see `actions.openUsernameChat`. */
-  async openUsernameChat(username: string): Promise<ChatSummary> {
-    return actions.openUsernameChat(this.actionDeps, username)
-  }
-
-  async canPost(chatId: number): Promise<boolean> {
-    return actions.canPost(
-      { invoke: (method) => this.invoke(method), getSelfUserId: () => this.selfUserId },
-      chatId,
-    )
-  }
-
-  /** 管理员显示群成员; see `actions.canGetMembers`. */
-  async canGetMembers(chatId: number): Promise<boolean> {
-    return actions.canGetMembers(this.actionDeps, chatId)
-  }
-
-  async setChatMuted(chatId: number, muted: boolean): Promise<ChatSummary> {
-    return actions.setChatMuted(this.actionDeps, chatId, muted)
-  }
-
-  /** 置顶聊天; see `actions.setChatPinned`. */
-  async setChatPinned(chatId: number, pinned: boolean): Promise<ChatSummary> {
-    return actions.setChatPinned(this.actionDeps, chatId, pinned)
-  }
-
-  /** 清空聊天记录 (this account's copy); see `actions.clearHistory`. */
-  async clearHistory(chatId: number): Promise<void> {
-    return actions.clearHistory(this.actionDeps, chatId)
-  }
-
-  /** The 聊天信息 panel's member grid; see `actions.listMembers`. */
-  async chatMembers(chatId: number, limit: number, query?: string): Promise<ChatMember[]> {
-    return actions.listMembers(this.actionDeps, chatId, limit, query)
-  }
-
-  /** 群聊名称; see `actions.setChatTitle`. */
-  async setChatTitle(chatId: number, title: string): Promise<ChatSummary> {
-    return actions.setChatTitle(this.actionDeps, chatId, title)
-  }
-
-  /** 退出群聊; see `actions.leaveChat`. */
-  async leaveChat(chatId: number): Promise<void> {
-    return actions.leaveChat(this.actionDeps, chatId)
-  }
-
-  /** 群公告 (the newest pinned message); see `actions.pinnedMessage`. */
-  async pinnedMessage(chatId: number): Promise<ChatPinnedMessage | null> {
-    return actions.pinnedMessage(this.actionDeps, chatId)
-  }
-
-  /** 群二维码; see `actions.inviteLink`. */
-  async inviteLink(chatId: number, temporary?: boolean): Promise<ChatInviteLink | null> {
-    return actions.inviteLink(
-      { ...this.actionDeps, getSelfUserId: () => this.selfUserId },
-      chatId,
-      temporary,
-    )
-  }
+  readonly listChats = this.chatApi.listChats
+  readonly getChat = this.chatApi.getChat
+  readonly openChat = this.chatApi.openChat
+  readonly openPrivateChat = this.chatApi.openPrivateChat
+  readonly openUsernameChat = this.chatApi.openUsernameChat
+  readonly canPost = this.chatApi.canPost
+  readonly canGetMembers = this.chatApi.canGetMembers
+  readonly chatJoinState = this.chatApi.chatJoinState
+  readonly joinChannel = this.chatApi.joinChannel
+  readonly setChatMuted = this.chatApi.setChatMuted
+  readonly setChatPinned = this.chatApi.setChatPinned
+  readonly clearHistory = this.chatApi.clearHistory
+  readonly chatMembers = this.chatApi.chatMembers
+  readonly setChatTitle = this.chatApi.setChatTitle
+  readonly leaveChat = this.chatApi.leaveChat
+  readonly pinnedMessage = this.chatApi.pinnedMessage
+  readonly inviteLink = this.chatApi.inviteLink
 
   /** The account's Telegram address book (通讯录); see `actions.listContacts`. */
   async listContacts(): Promise<Contact[]> {

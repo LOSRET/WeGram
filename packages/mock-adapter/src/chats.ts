@@ -1,6 +1,13 @@
 import { sortChatList } from '@wegram/mock-session'
 import { AppError } from '@wegram/protocol'
-import type { ChatInviteLink, ChatMember, ChatPinnedMessage, ChatSummary } from '@wegram/protocol'
+import type {
+  ChatInviteLink,
+  ChatJoinResult,
+  ChatJoinState,
+  ChatMember,
+  ChatPinnedMessage,
+  ChatSummary,
+} from '@wegram/protocol'
 
 import type { AdapterEvent } from '@wegram/adapter-contract'
 import type { Fixture } from './constants'
@@ -71,6 +78,24 @@ export function canMockPost(store: MockChatStore, chatId: number): boolean {
   const fixture = requireFixture(store, chatId)
   // Groups and private chats keep the composer; only channels gate on rights.
   return fixture.chat.kind === 'channel' ? Boolean(fixture.canPost) : true
+}
+
+/**
+ * 频道底栏 (§9.9): the fixture channel marked `joined: false` is the previewed
+ * one — the state a channel opened from 搜索 is in. Everything else is a member.
+ */
+export function mockChatJoinState(store: MockChatStore, chatId: number): ChatJoinState {
+  const fixture = requireFixture(store, chatId)
+  if (fixture.chat.kind !== 'channel') return { joined: true, byRequest: false }
+  return { joined: fixture.joined !== false, byRequest: false }
+}
+
+/** 加入频道: the fixture subscribes at once; it never asks for approval. */
+export function joinMockChannel(store: MockChatStore, chatId: number): ChatJoinResult {
+  const fixture = requireFixture(store, chatId)
+  if (fixture.chat.kind !== 'channel') throw new AppError('invalid_payload', '只有频道可以加入')
+  fixture.joined = true
+  return { joined: true, requestSent: false }
 }
 
 export function setMockMuted(store: MockChatStore, chatId: number, muted: boolean): ChatSummary {
@@ -183,6 +208,8 @@ export interface MockChatApi {
   openUsernameChat(username: string): Promise<ChatSummary>
   canPost(chatId: number): Promise<boolean>
   canGetMembers(chatId: number): Promise<boolean>
+  joinState(chatId: number): Promise<ChatJoinState>
+  join(chatId: number): Promise<ChatJoinResult>
   setMuted(chatId: number, muted: boolean): Promise<ChatSummary>
   setPinned(chatId: number, pinned: boolean): Promise<ChatSummary>
   clearHistory(chatId: number): Promise<void>
@@ -206,6 +233,8 @@ export function createMockChats(
     openUsernameChat: async (username) => openMockUsernameChat(store, username),
     canPost: async (chatId) => canMockPost(store, chatId),
     canGetMembers: async (chatId) => canMockGetMembers(store, chatId),
+    joinState: async (chatId) => mockChatJoinState(store, chatId),
+    join: async (chatId) => joinMockChannel(store, chatId),
     setMuted: async (chatId, muted) => setMockMuted(store, chatId, muted),
     setPinned: async (chatId, pinned) => setMockPinned(store, chatId, pinned),
     clearHistory: async (chatId) => clearMockHistory(store, chatId),

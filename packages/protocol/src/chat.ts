@@ -70,6 +70,38 @@ export const chatInviteLinkSchema = z.object({
 })
 export type ChatInviteLink = z.infer<typeof chatInviteLinkSchema>
 
+/**
+ * 频道底栏: whether this account belongs to the channel, and how joining would go
+ * (design doc §9.9).
+ *
+ * A channel reached from 搜索 or an `@username` can be read without being
+ * subscribed, so "the transcript is open" says nothing about membership. The
+ * bar asks once per channel and draws 加入 instead of 静音 until the account
+ * joins — muting a channel one has not joined is a lie.
+ */
+export const chatJoinStateSchema = z.object({
+  /** A subscriber: creator, administrator, member — or a restricted member. */
+  joined: z.boolean(),
+  /** `joinChat` files an administrator's request instead of adding the account. */
+  byRequest: z.boolean(),
+})
+export type ChatJoinState = z.infer<typeof chatJoinStateSchema>
+
+/**
+ * The answer of 加入 / 申请加入 (design doc §9.9).
+ *
+ * Deliberately the same two flags as `CommentJoinResult`: the chat domain keeps
+ * its own row so `chats.ts` does not import the comment module for a shape that
+ * is only coincidentally the same.
+ */
+export const chatJoinResultSchema = z.object({
+  /** The account is a subscriber now. */
+  joined: z.boolean(),
+  /** The server took a request: the bar waits for an administrator. */
+  requestSent: z.boolean(),
+})
+export type ChatJoinResult = z.infer<typeof chatJoinResultSchema>
+
 export const chatOpSchema = z.discriminatedUnion('op', [
   z.object({ op: z.literal('upsert'), chat: chatSummarySchema }),
   z.object({ op: z.literal('remove'), chatId: z.number().int() }),

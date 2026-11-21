@@ -155,9 +155,17 @@ export const previewCommentAccess: Record<string, FakeCommentFlags> = {}
 
 export const channelPostRights: Record<number, boolean> = {}
 
+/**
+ * Channels this account has not subscribed to: one reached from 搜索 is only
+ * being previewed, so the bottom bar offers 加入 (design doc §9.9). Joining
+ * removes the id — the preview needs no other membership state.
+ */
+export const channelNotJoined = new Set<number>()
+
 for (const seed of seeds.values()) {
   messagesByChat[seed.chat.id] = seed.messages.map(decorate)
   if (seed.canPost) channelPostRights[seed.chat.id] = true
+  if (seed.chat.kind === 'channel' && seed.joined === false) channelNotJoined.add(seed.chat.id)
   for (const [messageId, thread] of Object.entries(seed.comments ?? {})) {
     const key = seed.chat.id + ':' + messageId
     previewThreads[key] = thread.map(decorate)

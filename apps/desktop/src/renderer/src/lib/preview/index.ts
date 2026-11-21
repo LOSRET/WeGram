@@ -27,9 +27,11 @@ import {
 import { handlePreviewQr, type PreviewQrStore } from './qr'
 import {
   clearPreviewHistory,
+  joinPreviewChannel,
   leavePreviewChat,
   previewChatMembers,
   previewInviteLink,
+  previewJoinState,
   previewOpenUsername,
   previewPinnedMessage,
   searchPreviewAllMessages,
@@ -54,6 +56,7 @@ import {
   previewCustomEmoji,
   previewStickerSet,
   PREVIEW_STICKERS,
+  channelNotJoined,
   channelPostRights,
 } from './fixtures'
 
@@ -202,6 +205,13 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       const chat = chats.find((item) => item.id === store.chatId)
       return chat?.kind === 'channel' ? Boolean(channelPostRights[chat.id]) : chat?.kind === 'group'
     }
+    case 'chats:joinState': {
+      const chat = chats.find((item) => item.id === store.chatId)
+      if (!chat) throw { code: 'internal', message: 'unknown preview chat' }
+      return previewJoinState(chat, channelNotJoined)
+    }
+    case 'chats:join':
+      return joinPreviewChannel(channelNotJoined, Number(store.chatId))
     case 'chats:setMuted':
       return setPreviewMuted(previewChats, Number(store.chatId), Boolean(store.muted))
     case 'chats:setPinned':
