@@ -54,7 +54,10 @@ change belongs in the adapter.
   downloading this": `protocol.ts` tails the file and must measure readable bytes with
   `getFileDownloadedPrefixSize`, never with `stat().size` (the file is sparse). Stopping a
   transfer goes through `media/leases.ts`, so the shell's bubble and the viewer's window
-  cannot cancel each other's download.
+  cannot cancel each other's download. **The first `downloadFile` answer is the file's state
+  *before* the transfer was queued** — empty `local.path` for a cold clip, sometimes a zero
+  `expected_size` — so `beginStream` waits for `getFile` to report the path; the first answer
+  is never "this file cannot be streamed".
 - **The renderer never sees a filesystem path.** Only the adapters may call
   `media/registry.ts` to mint a `wx-media://f/<token>` URL; `media/protocol.ts`
   resolves tokens and never request paths, and it must keep Range support.

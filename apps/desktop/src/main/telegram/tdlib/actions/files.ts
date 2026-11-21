@@ -27,19 +27,42 @@ export async function fetchFilePath(
   return { path, file }
 }
 
+/** How long a transfer that has just been queued gets to report its bytes. */
+const STREAM_READY_TIMEOUT_MS = 4_000
+const STREAM_READY_POLL_MS = 100
+
+/** What a stream needs from a `file`, or `null` while TDLib has not filled it in yet. */
+function streamable(file: TdObject | undefined): { path: string; size: number } | null {
+  const path: unknown = file?.local?.path
+  const size = Number(file?.expected_size ?? file?.size ?? 0)
+  if (typeof path !== 'string' || path.length === 0 || !(size > 0)) return null
+  return { path, size }
+}
+
+function pause(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 /**
  * Begins (or re-targets) a download and answers where its bytes live.
  *
  * `synchronous: false` is the point: the call returns as soon as TDLib has
- * queued the transfer, with the local path it is about to fill and the size the
- * file will have. Sending it again with a different `offset` is how a seek
+ * queued the transfer. Sending it again with a different `offset` is how a seek
  * works — TDLib drops the previous range and fetches from there.
+ *
+ * That answer is the file *as it was before* the transfer was queued, though: a
+ * clip nobody has downloaded yet comes back with an empty `local.path` (and a
+ * zero `expected_size` until TDLib has read the header), and both only arrive
+ * with the following `updateFile`. Failing on the first answer made every cold
+ * video answer "cannot be streamed yet"; the viewer waits for the settled state
+ * instead (measured on the real account: a 0:39 clip reported its path 500 ms
+ * after the click, so the timeout only covers a slow round-trip).
  */
 export async function beginStream(
-  deps: Pick<ActionDeps, 'invoke'>,
+  deps: Pick<ActionDeps, 'invoke' | 'logger'>,
   input: { fileId: number; offset: number; priority: number },
 ): Promise<{ path: string; size: number }> {
-  const file = await deps.invoke({
+  let file: TdObject | undefined = await deps.invoke({
     _: 'downloadFile',
     file_id: input.fileId,
     priority: input.priority,
@@ -47,12 +70,28 @@ export async function beginStream(
     limit: 0,
     synchronous: false,
   })
-  const path: unknown = file?.local?.path
-  const size = Number(file?.expected_size ?? file?.size ?? 0)
-  if (typeof path !== 'string' || path.length === 0 || !(size > 0)) {
+  let ready = streamable(file)
+  if (!ready) {
+    let waited = 0
+    while (!ready && waited < STREAM_READY_TIMEOUT_MS) {
+      await pause(STREAM_READY_POLL_MS)
+      waited += STREAM_READY_POLL_MS
+      file = await deps.invoke({ _: 'getFile', file_id: input.fileId })
+      ready = streamable(file)
+    }
+    if (ready) {
+      deps.logger.info(
+        `file ${input.fileId} was not streamable on the first answer; TDLib reported a path after ${waited}ms`,
+      )
+    }
+  }
+  if (!ready) {
+    deps.logger.warn(
+      `file ${input.fileId} never became streamable: ${JSON.stringify(file)}`,
+    )
     throw new AppError('internal', `File ${input.fileId} cannot be streamed yet`)
   }
-  return { path, size }
+  return ready
 }
 
 /**

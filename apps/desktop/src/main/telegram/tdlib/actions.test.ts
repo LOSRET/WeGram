@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import {
+  beginStream,
   canPost,
   commentInfo,
   history,
@@ -413,5 +414,50 @@ describe('joinCommentGroup', () => {
 
     expect(result).toEqual({ joined: false, requestSent: true })
     expect(calls.find((call) => call._ === 'joinChat')?.chat_id).toBe(-100123)
+  })
+})
+
+describe('beginStream', () => {
+  /**
+   * A cold clip answers its `downloadFile` call with the state it had *before*
+   * the transfer was queued: `local.path` empty, which used to be read as "this
+   * file cannot be streamed" on the very first click. TDLib reports the path
+   * with the next update, so the call has to wait for it.
+   */
+  it('waits for the update that finally carries a cold file\'s local path', async () => {
+    vi.useFakeTimers()
+    try {
+      const { deps, calls } = makeDeps((method) => {
+        if (method._ === 'downloadFile') return { expected_size: 900, local: { path: '' } }
+        if (method._ === 'getFile') return { expected_size: 900, local: { path: 'C:/cache/6000.mp4' } }
+        throw new Error(`unexpected ${String(method._)}`)
+      })
+
+      const pending = beginStream(deps, { fileId: 6000, offset: 0, priority: 28 })
+      await vi.advanceTimersByTimeAsync(100)
+
+      await expect(pending).resolves.toEqual({ path: 'C:/cache/6000.mp4', size: 900 })
+      expect(calls.map((call) => call._)).toEqual(['downloadFile', 'getFile'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('gives up when TDLib never reports a usable file', async () => {
+    vi.useFakeTimers()
+    try {
+      const { deps } = makeDeps(() => ({ expected_size: 0, local: { path: '' } }))
+
+      const pending = beginStream(deps, { fileId: 6000, offset: 0, priority: 28 })
+      const rejected = expect(pending).rejects.toMatchObject({
+        code: 'internal',
+        message: 'File 6000 cannot be streamed yet',
+      })
+      await vi.advanceTimersByTimeAsync(5_000)
+
+      await rejected
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

@@ -795,6 +795,12 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
   without filesystem access, is unnecessary). `downloadFile(offset, limit: 0, synchronous:
   false)` starts or re-targets the transfer; a *different* offset is how a seek works, and it
   cancels the previous range. On a stall the pump sends the same offset again once a second.
+- **The first `downloadFile` answer describes the file *before* the transfer was queued.** A cold
+  clip comes back with an empty `local.path` (and `expected_size: 0`), both of which only arrive
+  with the next `updateFile`: the first click on any never-played video answered "File 1304 cannot
+  be streamed yet" while the download was in fact starting. Measured on the real account, the path
+  appeared **500 ms** after the click. `beginStream` now polls `getFile` (100 ms, 4 s cap) until
+  the state is usable and logs how long it waited; the renderer is unchanged.
 - **A cancel has to be refcounted, or two windows cancel each other.** `media/leases.ts` counts
   holders per file: `media:download` holds, `media:cancel` drops, `cancelDownloadFile` runs
   only when the last holder leaves. Owners are per hook instance, not per effect run — a
