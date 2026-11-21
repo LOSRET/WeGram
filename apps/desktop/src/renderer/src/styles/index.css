@@ -15,6 +15,7 @@
    ========================================================================== */
 
 @import './tokens.css';
+@import './font.css';
 @import './base.css';
 @import './scrollbar.css';
 @import './shell.css';

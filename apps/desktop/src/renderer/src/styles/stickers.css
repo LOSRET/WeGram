@@ -145,7 +145,7 @@
   border: none;
   border-radius: 5px;
   background: transparent;
-  font-family: 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif;
+  font-family: 'WeGram Emoji', 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif;
   /* The client paints 24 px emoji art; a 24 px color glyph measures the same. */
   font-size: 24px;
   line-height: 1;

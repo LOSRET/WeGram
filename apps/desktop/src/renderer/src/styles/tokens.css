@@ -64,7 +64,10 @@
   --wx-scrollbar-thumb-active: rgba(0, 0, 0, 0.38);
 
   /* Typography — WeChat on Windows renders with YaHei UI. */
-  --wx-font: 'Microsoft YaHei UI', 'Microsoft YaHei', 'Segoe UI', 'PingFang SC', sans-serif;
+  /* The emoji font comes first and only claims the codepoints it owns (its cmap
+   has no ASCII digits, so numbers and keycaps still render as text). */
+  --wx-font: 'WeGram Emoji', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Segoe UI', 'PingFang SC',
+    sans-serif;
   --wx-fs-body: 14px;
   --wx-lh-body: 1.45;
   --wx-fs-caption: 12px;

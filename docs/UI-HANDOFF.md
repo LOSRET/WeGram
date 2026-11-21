@@ -32,6 +32,9 @@ listed in "Known deltas" is a deliberate, documented difference.
 | `renderer/src/components/chat-pane/ChannelBar.tsx` | A channel's bottom edge instead of the composer: WeChat's 服务号 card — 静音 always, plus the keyboard switch on the right when `chats:canPost` says this account may post (the switch swaps the card for the composer). A read-only channel keeps only 静音, and its message menu has no 回复. |
 | `renderer/src/components/ExpressionPicker.tsx` | The composer's 表情/贴纸 panel: the client's 464 px card with 最近使用, the 10-column 所有表情 grid, a 搜索 tab and one tab per installed sticker set (with 下一页 paging). Picking an emoji inserts it at the caret; clicking a sticker sends it. |
 | `renderer/src/lib/emoji.ts` | The Unicode emoji catalogue with Chinese names/keywords, search and the recent-row merge (pure, unit-tested). |
+| `renderer/src/styles/font.css` | The `@font-face` for the WeGram Emoji colour font (CBDT, 25 MB) — the one place the emoji artwork enters the UI. |
+| `renderer/src/assets/fonts/` | `WeGramEmoji.ttf` + `NOTICE.md` (provenance, format rationale, licensing caveat, keycap delta). |
+| `scripts/emoji-font.py` / `scripts/emoji-art.py` | The two-step build: Apple PNGs → `.cache/emoji-art` → the font. Nothing under `public/` is involved. |
 | `renderer/src/lib/pickerTabs.ts` | Tab-strip capacity/paging maths for the picker (pure, unit-tested). |
 | `renderer/src/components/ContextMenu.tsx` | Exports `Popup` (positioned, closes on Escape/outside click) plus the message menu. |
 | `renderer/src/components/AppMenu.tsx` | The rail "≡" menu: settings, theme, sign out, adapter caption. |
@@ -866,6 +869,19 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
     the card is the old 静音 one, plus the keyboard for an administrator.
 
 ---
+
+35. **Emoji are Apple artwork, as a colour font — the way Telegram's clients do it.**
+    `styles/font.css` loads `WeGramEmoji.ttf` (CBDT, 25 MB, built by `scripts/emoji-font.py`)
+    and `--wx-font` puts that family first, so a Windows box draws Apple emoji in the
+    transcript, the picker **and the textarea** — no `<img>`, no contenteditable, no repaint
+    flash. Format matters: Apple's own `AppleColorEmoji.ttf` is sbix and Chromium on Windows
+    does not paint it (verified: it falls back to Segoe), while CBDT renders; skin tones,
+    flags and ZWJ families are `ccmp` ligatures, FE0F is absorbed by a one-rule-per-glyph
+    ligature. One deliberate hole: ASCII digits, `#` and `*` are kept out of the font's
+    cmap, because with the family first a digit would otherwise resolve to the font's blank
+    keycap component and the number would vanish — so keycaps (1️⃣, #️⃣) fall back to the
+    system emoji font. The chat-list and search previews inherit the font too. Provenance,
+    the licensing caveat and the regeneration steps: `renderer/src/assets/fonts/NOTICE.md`.
 
 ## 6. Suggested next steps, in order
 

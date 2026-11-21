@@ -1,0 +1,23 @@
+/* ---------- Emoji ---------- */
+
+/*
+ * The emoji artwork as a colour font (scripts/emoji-font.py).
+ *
+ * A textarea cannot hold an <img>, so painting emoji as images forced the
+ * composer to be a contenteditable that rebuilt its DOM on every pick — the
+ * flash. One font fixes the input, the bubbles and the picker at once: the
+ * message stays plain Unicode and the glyph is Apple's.
+ *
+ * CBDT/CBLC, not Apple's own sbix font: Chromium on Windows does not paint
+ * sbix (verified — it falls back to Segoe), while a CBDT face renders.
+ *
+ * font-display: block because a swap would flash Segoe emoji in every bubble
+ * that is already on screen; the file is local, so the block is one frame.
+ */
+@font-face {
+  font-family: 'WeGram Emoji';
+  src: url('../assets/fonts/WeGramEmoji.ttf') format('truetype');
+  font-display: block;
+  font-style: normal;
+  font-weight: 400;
+}

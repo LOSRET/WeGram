@@ -92,6 +92,8 @@ lib/media.ts          per-owner request dedupe + cancel + the media URL/progress
 lib/mediaVariant.ts   (pure, unit-tested) which photo size covers a box
 lib/mediaPriority.ts  (pure, unit-tested) the TDLib download priority ladder
 lib/emojiSound.ts     an animated emoji's click sound, fetched on the first click
+styles/font.css       the @font-face for the emoji colour font (assets/fonts/
+                      WeGramEmoji.ttf, built by scripts/emoji-font.py)
 lib/viewer.ts         which messages become one viewer strip (pure, unit-tested)
 lib/player.ts         video player-bar maths: clocks, seek clamp, progress (pure, unit-tested)
 lib/tgs.ts            gzip guards + Lottie decode cache
@@ -256,6 +258,14 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
 - **`wx-*` class names and the `--wx-*` tokens are a measured contract** (see
   `styles/index.css` header and `docs/UI-HANDOFF.md`). Do not rename a class, and
   do not hard-code a colour — every colour comes from the `:root` block.
+- **Emoji are a font, not images, and its cmap is deliberately incomplete.**
+  `--wx-font` starts with `WeGram Emoji` (CBDT, `styles/font.css`), so bubbles, the
+  picker and the textarea all paint Apple artwork; there is no `<img>` path to keep
+  in sync. ASCII digits, `#` and `*` are kept out of the font's cmap on purpose: with
+  the family first they would resolve to the font's blank keycap component and a
+  number in a message would disappear. Never "fix" that by adding digits back — it
+  breaks every number in the transcript. Rebuild with `scripts/emoji-art.py` then
+  `scripts/emoji-font.py`, and treat the two as one change.
 - User-facing copy is Chinese (`回复`/`复制`/`转发`…), code, identifiers and
   comments are English.
 
