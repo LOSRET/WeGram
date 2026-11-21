@@ -12,6 +12,7 @@ import type {
   CustomEmojiSticker,
   Message,
   MessageMedia,
+  MessageProperties,
   ProxyConfig,
   ProxyTestResult,
   SearchMessagesCursor,
@@ -45,6 +46,7 @@ import {
   type MockHistoryQuery,
   type MockNewerQuery,
 } from './history'
+import { mockMessageProperties } from './properties'
 import { searchChats, searchMessages, searchMessagesInScope } from './search'
 import { getMockStickerSet, listMockCustomEmoji, listMockStickerSets } from './stickers'
 import { emitTraffic } from './traffic'
@@ -400,6 +402,13 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
       chatId: input.chatId,
       ops: [{ op: 'delete', chatId: input.chatId, messageIds: input.messageIds }],
     })
+  }
+
+  async messageProperties(input: {
+    chatId: number
+    messageId: number
+  }): Promise<MessageProperties> {
+    return mockMessageProperties({ fixtures: this.fixtures }, input)
   }
 
   async forwardMessages(input: {

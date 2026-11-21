@@ -11,6 +11,8 @@ export const appErrorCodeSchema = z.enum([
   'auth_required',
   'auth_failed',
   'invalid_payload',
+  /** The account may not do this to the content (protected media, etc.). */
+  'forbidden',
   'not_implemented',
   'tdlib_error',
   'rate_limited',

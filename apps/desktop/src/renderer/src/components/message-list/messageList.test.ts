@@ -1,8 +1,8 @@
-import type { Message } from '@wegram/protocol'
+import type { Message, MessageProperties } from '@wegram/protocol'
 import { describe, expect, it } from 'vitest'
 
 import { isEmojiOnly } from './emoji'
-import { buildMessageMenuItems } from './menu'
+import { buildMessageMenuItems, type MessageMenuOptions } from './menu'
 import { messagesById, pickSeenUpTo } from './seen'
 import { countUnreadBelow } from './unreadBelow'
 import { findUnreadMessage, locateLanding, pickPagingTarget, resolveLanding } from './unread'
@@ -170,49 +170,114 @@ describe('buildMessageMenuItems', () => {
     onCopy: () => undefined,
     onForward: () => undefined,
     onEdit: () => undefined,
-    onDelete: () => undefined,
+    onDelete: (_message: Message, _forBoth: boolean) => undefined,
   }
-  const labels = (message: Message): string[] =>
-    buildMessageMenuItems(message, handlers).map((item) => item.label)
+  const props = (overrides: Partial<MessageProperties> = {}): MessageProperties => ({
+    canBeEdited: false,
+    canBeForwarded: true,
+    canBeDeletedOnlyForSelf: true,
+    canBeDeletedForAllUsers: false,
+    canBeCopied: true,
+    canBeReplied: true,
+    ...overrides,
+  })
+  const labels = (
+    target: Message,
+    properties: MessageProperties | null = props(),
+    options: Partial<MessageMenuOptions> = {},
+  ): string[] =>
+    buildMessageMenuItems(target, handlers, { canReply: true, properties, ...options }).map(
+      (item) => item.label,
+    )
 
   it('offers reply, copy, forward and delete on a text message', () => {
     expect(labels(message(1))).toEqual(['回复', '复制', '转发', '删除'])
   })
 
-  it('hides copy when there is no text', () => {
+  it('hides copy when there is no text or TDLib forbids it', () => {
     expect(labels(message(1, { kind: 'photo', text: '', media: { fileId: 1 } }))).toEqual([
       '回复',
       '转发',
       '删除',
     ])
+    expect(labels(message(1), props({ canBeCopied: false }))).not.toContain('复制')
   })
 
-  it('only offers edit on our own plain text messages', () => {
-    expect(labels(message(1, { outgoing: true }))).toContain('编辑')
-    // A caption cannot be edited through this menu.
+  it('offers edit only where the text edit path can actually run', () => {
+    expect(labels(message(1, { outgoing: true }), props({ canBeEdited: true }))).toContain('编辑')
+    // TDLib may allow editing a caption, but this client only implements editMessageText.
     expect(
-      labels(message(1, { outgoing: true, kind: 'photo', media: { fileId: 1 } })),
+      labels(
+        message(1, { outgoing: true, kind: 'photo', media: { fileId: 1 } }),
+        props({ canBeEdited: true }),
+      ),
     ).not.toContain('编辑')
-    expect(labels(message(1, { outgoing: false }))).not.toContain('编辑')
+    // The 48-hour window / permissions are TDLib's answer, not "it is ours".
+    expect(
+      labels(message(1, { outgoing: true }), props({ canBeEdited: false })),
+    ).not.toContain('编辑')
+  })
+
+  it('hides forward when TDLib says the content is protected', () => {
+    expect(labels(message(1), props({ canBeForwarded: false }))).not.toContain('转发')
+  })
+
+  it('offers 撤回 only for our own message TDLib lets us revoke', () => {
+    expect(
+      labels(message(1, { outgoing: true }), props({ canBeDeletedForAllUsers: true })),
+    ).toContain('撤回')
+    expect(labels(message(1), props({ canBeDeletedForAllUsers: true }))).not.toContain('撤回')
+  })
+
+  it('deletes locally by default and revokes only through 撤回', () => {
+    const seen: Array<[Message, boolean]> = []
+    const target = message(1, { outgoing: true })
+    const items = buildMessageMenuItems(
+      target,
+      { ...handlers, onDelete: (item, forBoth) => seen.push([item, forBoth]) },
+      { canReply: true, properties: props({ canBeDeletedForAllUsers: true }) },
+    )
+    items.find((item) => item.label === '删除')?.onSelect()
+    items.find((item) => item.label === '撤回')?.onSelect()
+    expect(seen).toEqual([
+      [target, false],
+      [target, true],
+    ])
+  })
+
+  it('hides delete when neither local delete nor revoke is allowed', () => {
+    expect(
+      labels(
+        message(1),
+        props({ canBeDeletedOnlyForSelf: false, canBeDeletedForAllUsers: false }),
+      ),
+    ).not.toContain('删除')
+  })
+
+  it('falls back to the safe items when the properties call failed', () => {
+    expect(labels(message(1), null)).toEqual(['回复', '复制', '删除'])
   })
 
   it('drops reply where there is no composer to reply into (a channel)', () => {
-    const items = buildMessageMenuItems(message(1), handlers, { canReply: false })
-    expect(items.map((item) => item.label)).toEqual(['复制', '转发', '删除'])
+    expect(labels(message(1), props(), { canReply: false })).toEqual(['复制', '转发', '删除'])
   })
 
   it('marks delete as the dangerous item', () => {
-    const remove = buildMessageMenuItems(message(1), handlers).find((item) => item.label === '删除')
+    const remove = buildMessageMenuItems(message(1), handlers, {
+      canReply: true,
+      properties: props(),
+    }).find((item) => item.label === '删除')
     expect(remove?.danger).toBe(true)
   })
 
   it('calls the handler with the message it was built for', () => {
     const target = message(7)
     const seen: Message[] = []
-    const items = buildMessageMenuItems(target, {
-      ...handlers,
-      onReply: (item) => seen.push(item),
-    })
+    const items = buildMessageMenuItems(
+      target,
+      { ...handlers, onReply: (item) => seen.push(item) },
+      { canReply: true, properties: props() },
+    )
     items[0]?.onSelect()
     expect(seen).toEqual([target])
   })

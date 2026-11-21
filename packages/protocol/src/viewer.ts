@@ -31,6 +31,8 @@ export const viewerItemSchema = z.object({
   width: z.number().int().positive().optional(),
   height: z.number().int().positive().optional(),
   size: z.number().int().nonnegative().optional(),
+  /** TDLib `message.can_be_saved`; false blocks the viewer's 保存/复制. */
+  canBeSaved: z.boolean().optional(),
   /** Seconds; lets the player show the total before the file has loaded. */
   duration: z.number().nonnegative().optional(),
   /** base64 JPEG, ~40px: paints the 预览 grid before a file has been fetched. */

@@ -7,9 +7,15 @@ import { useAppStore } from '../../store/useAppStore'
 export interface MessageActions {
   send: (text: string, replyToMessageId: number | undefined) => Promise<void>
   saveEdit: (messageId: number, text: string) => Promise<void>
-  removeMessage: (message: Message) => Promise<void>
+  removeMessage: (message: Message, forBoth: boolean) => Promise<void>
   forward: (message: Message, toChatId: number) => Promise<void>
   copy: (message: Message) => void
+}
+
+/** The confirm dialog's payload: which message, and whether 撤回 or 删除. */
+export interface PendingDelete {
+  message: Message
+  forBoth: boolean
 }
 
 /**
@@ -50,12 +56,12 @@ export function createMessageActions(activeChatId: number): MessageActions {
       store.setEditing(null)
     },
 
-    removeMessage: async (message) => {
+    removeMessage: async (message, forBoth) => {
       try {
         await invoke('messages:delete', {
           chatId: message.chatId,
           messageIds: [message.id],
-          forBoth: true,
+          forBoth,
         })
         useAppStore
           .getState()

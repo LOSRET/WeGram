@@ -35,6 +35,7 @@ export function buildViewerStrip(
       ...(media.width ? { width: media.width } : {}),
       ...(media.height ? { height: media.height } : {}),
       ...(media.size ? { size: media.size } : {}),
+      ...(message.canBeSaved === undefined ? {} : { canBeSaved: message.canBeSaved }),
       ...(kind === 'video' && media.duration ? { duration: media.duration } : {}),
       ...(media.minithumbnail ? { minithumbnail: media.minithumbnail } : {}),
       ...(media.thumbFileId ? { thumbFileId: media.thumbFileId } : {}),

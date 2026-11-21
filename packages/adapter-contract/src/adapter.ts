@@ -13,6 +13,7 @@ import type {
   CustomEmojiSticker,
   Message,
   MessageOp,
+  MessageProperties,
   ProxyConfig,
   ProxyTestResult,
   Self,
@@ -221,6 +222,12 @@ export interface TelegramAdapter {
   deleteMessages(input: InvokeRequest<'messages:delete'>): Promise<void>
   forwardMessages(input: InvokeRequest<'messages:forward'>): Promise<void>
   markRead(input: InvokeRequest<'messages:read'>): Promise<void>
+  /**
+   * TDLib's per-message capabilities (`getMessageProperties`, an offline call).
+   * The context menu asks when it opens: the edit window, protected content and
+   * the delete-for-me / delete-for-everyone split are TDLib's rules, not ours.
+   */
+  messageProperties(input: InvokeRequest<'messages:properties'>): Promise<MessageProperties>
 
   /** Sends a local file as a photo or a document (design doc §1: media upload). */
   sendMedia(input: InvokeRequest<'media:send'>): Promise<{ localId: string; message: Message }>

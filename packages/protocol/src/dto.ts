@@ -423,6 +423,12 @@ export const messageSchema = z.object({
    */
   senderAvatarUrl: z.string().optional(),
   outgoing: z.boolean(),
+  /**
+   * TDLib `message.can_be_saved`: false for protected content (the chat's
+   * `has_protected_content`), which the viewer's 保存/复制 must respect. Optional
+   * so fixtures without the flag stay valid; only an explicit false blocks.
+   */
+  canBeSaved: z.boolean().optional(),
   date: z.number().int(),
   kind: messageKindSchema,
   text: z.string(),
@@ -447,6 +453,22 @@ export const messageSchema = z.object({
   interaction: messageInteractionSchema.optional(),
 })
 export type Message = z.infer<typeof messageSchema>
+
+/**
+ * The per-message capabilities TDLib answers through `getMessageProperties`
+ * (offline). The context menu asks when it opens instead of deriving 编辑/转发/删除
+ * from `outgoing` and `kind`: TDLib owns the 48-hour edit window, protected
+ * content, per-chat rights and the "delete for me vs for everyone" split.
+ */
+export const messagePropertiesSchema = z.object({
+  canBeEdited: z.boolean(),
+  canBeForwarded: z.boolean(),
+  canBeDeletedOnlyForSelf: z.boolean(),
+  canBeDeletedForAllUsers: z.boolean(),
+  canBeCopied: z.boolean(),
+  canBeReplied: z.boolean(),
+})
+export type MessageProperties = z.infer<typeof messagePropertiesSchema>
 
 /**
  * A profile photo that finished downloading *after* the rows carrying it were

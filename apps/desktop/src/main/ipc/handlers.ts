@@ -175,6 +175,7 @@ export function createHandlers({
     'messages:send': (payload) => adapter.sendText(payload),
     'messages:edit': (payload) => adapter.editText(payload),
     'messages:delete': (payload) => adapter.deleteMessages(payload),
+    'messages:properties': (payload) => adapter.messageProperties(payload),
     'messages:forward': (payload) => adapter.forwardMessages(payload),
     'messages:read': (payload) => adapter.markRead(payload),
 
@@ -311,9 +312,10 @@ export function createHandlers({
     },
     'viewer:init': () => viewerState(),
     'viewer:save': async (payload) => {
+      const item = viewerItem(payload.fileId)
+      if (item?.canBeSaved === false) throw new AppError('forbidden', '受保护的内容不能保存')
       // Only files the protocol layer just produced are ever copied.
       const source = await localFile(payload.fileId)
-      const item = viewerItem(payload.fileId)
       const name = item?.fileName?.trim() || basename(source)
       const video = item?.kind === 'video'
       const options: Electron.SaveDialogOptions = {
@@ -333,9 +335,11 @@ export function createHandlers({
       return { canceled: false, path: result.filePath }
     },
     'viewer:copy': async (payload) => {
+      const item = viewerItem(payload.fileId)
+      if (item?.canBeSaved === false) throw new AppError('forbidden', '受保护的内容不能复制')
       // The clipboard holds bitmaps only; a video would need CF_HDROP, which
       // Electron does not expose, and the client does not offer it either.
-      if (viewerItem(payload.fileId)?.kind === 'video') {
+      if (item?.kind === 'video') {
         throw new AppError('not_implemented', '视频不支持复制到剪贴板')
       }
       const source = await localFile(payload.fileId)

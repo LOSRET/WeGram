@@ -9,6 +9,7 @@ import type {
   InvokeRequest,
   InvokeResponse,
   Message,
+  MessageProperties,
   ProxyConfig,
   ProxyTestResult,
   Self,
@@ -373,6 +374,12 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     toChatId: number
   }): Promise<void> {
     return actions.forwardMessages(this.actionDeps, input)
+  }
+
+  async messageProperties(
+    input: InvokeRequest<'messages:properties'>,
+  ): Promise<MessageProperties> {
+    return actions.messageProperties(this.actionDeps, input)
   }
 
   async markRead(input: { chatId: number; upToMessageId: number }): Promise<void> {

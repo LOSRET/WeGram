@@ -21,7 +21,7 @@ import {
   LoadingPlaceholder,
   NoChatPlaceholder,
 } from './Placeholders'
-import { createMessageActions } from './messageActions'
+import { createMessageActions, type PendingDelete } from './messageActions'
 import { useChatHistory } from './useChatHistory'
 
 /**
@@ -60,7 +60,7 @@ export function ChatPane() {
   const [seen, setSeen] = useState<{ chatId: number; messageId: number } | null>(null)
 
   const [forwarding, setForwarding] = useState<Message | null>(null)
-  const [deleting, setDeleting] = useState<Message | null>(null)
+  const [deleting, setDeleting] = useState<PendingDelete | null>(null)
   /**
    * 聊天信息 (design doc §9.9). Like the discussion view it keeps its content while
    * it slides out, so the open flag lives next to the unmount timer rather than in
@@ -426,7 +426,7 @@ export function ChatPane() {
               .getState()
               .setEditing({ chatId: activeChatId, messageId: message.id, text: message.text })
           }
-          onDelete={setDeleting}
+          onDelete={(message, forBoth) => setDeleting({ message, forBoth })}
           onForward={setForwarding}
           onCopy={actions.copy}
           onOpenComments={openComments}
@@ -512,14 +512,18 @@ export function ChatPane() {
 
       {deleting ? (
         <ConfirmDialog
-          title="删除这条消息？"
-          description="会同时从所有设备删除（for both sides）。"
-          confirmLabel="删除"
+          title={deleting.forBoth ? '撤回这条消息？' : '删除这条消息？'}
+          description={
+            deleting.forBoth
+              ? '会同时从所有设备删除（for both sides）。'
+              : '只会从当前设备删除，对方仍能看到。'
+          }
+          confirmLabel={deleting.forBoth ? '撤回' : '删除'}
           danger
           onConfirm={() => {
-            const message = deleting
+            const pending = deleting
             setDeleting(null)
-            void actions.removeMessage(message)
+            void actions.removeMessage(pending.message, pending.forBoth)
           }}
           onCancel={() => setDeleting(null)}
         />

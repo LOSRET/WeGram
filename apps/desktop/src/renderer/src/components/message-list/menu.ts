@@ -1,4 +1,4 @@
-import type { Message } from '@wegram/protocol'
+import type { Message, MessageProperties } from '@wegram/protocol'
 
 import type { MenuItem } from '../ContextMenu'
 
@@ -7,32 +7,55 @@ export interface MessageMenuHandlers {
   onCopy: (message: Message) => void
   onForward: (message: Message) => void
   onEdit: (message: Message) => void
-  onDelete: (message: Message) => void
+  onDelete: (message: Message, forBoth: boolean) => void
 }
 
 export interface MessageMenuOptions {
   /** A read-only conversation (a channel) has no composer to reply into. */
   canReply: boolean
+  /**
+   * TDLib's answer for this message, or null when the call failed: only the
+   * items that need no capability are offered then.
+   */
+  properties: MessageProperties | null
 }
 
 /**
- * The transcript's right-click menu. WeChat's order, with 编辑 only where it is
- * legal: our own plain text messages (media captions are edited elsewhere) and
- * 删除 marked as the dangerous row.
+ * The transcript's right-click menu.
+ *
+ * 编辑/转发/撤回 are TDLib's booleans (`getMessageProperties`), not guesses from
+ * `outgoing`/`kind`: the 48-hour edit window, protected content and the
+ * delete-for-me vs delete-for-everyone split live in TDLib. 编辑 still needs a
+ * plain text row, because this client only implements `editMessageText`; a
+ * caption's `can_be_edited` waits for `editMessageCaption`.
  */
 export function buildMessageMenuItems(
   message: Message,
   handlers: MessageMenuHandlers,
-  { canReply = true }: Partial<MessageMenuOptions> = {},
+  { canReply, properties }: MessageMenuOptions,
 ): MenuItem[] {
-  const items: MenuItem[] = canReply
-    ? [{ label: '回复', onSelect: () => handlers.onReply(message) }]
-    : []
-  if (message.text) items.push({ label: '复制', onSelect: () => handlers.onCopy(message) })
-  items.push({ label: '转发', onSelect: () => handlers.onForward(message) })
-  if (message.outgoing && message.kind === 'text') {
+  const items: MenuItem[] = []
+  if (canReply && (properties === null || properties.canBeReplied)) {
+    items.push({ label: '回复', onSelect: () => handlers.onReply(message) })
+  }
+  if (message.text.length > 0 && (properties === null || properties.canBeCopied)) {
+    items.push({ label: '复制', onSelect: () => handlers.onCopy(message) })
+  }
+  if (properties?.canBeForwarded) {
+    items.push({ label: '转发', onSelect: () => handlers.onForward(message) })
+  }
+  if (properties?.canBeEdited && message.kind === 'text') {
     items.push({ label: '编辑', onSelect: () => handlers.onEdit(message) })
   }
-  items.push({ label: '删除', danger: true, onSelect: () => handlers.onDelete(message) })
+  if (properties?.canBeDeletedForAllUsers && message.outgoing) {
+    items.push({ label: '撤回', onSelect: () => handlers.onDelete(message, true) })
+  }
+  if (
+    properties === null ||
+    properties.canBeDeletedOnlyForSelf ||
+    properties.canBeDeletedForAllUsers
+  ) {
+    items.push({ label: '删除', danger: true, onSelect: () => handlers.onDelete(message, false) })
+  }
   return items
 }

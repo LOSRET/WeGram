@@ -3,7 +3,12 @@ import { describe, expect, it } from 'vitest'
 
 import { buildViewerStrip } from './viewer'
 
-function message(id: number, kind: Message['kind'], media?: MessageMedia): Message {
+function message(
+  id: number,
+  kind: Message['kind'],
+  media?: MessageMedia,
+  overrides: Partial<Message> = {},
+): Message {
   return {
     id,
     chatId: 1,
@@ -14,6 +19,7 @@ function message(id: number, kind: Message['kind'], media?: MessageMedia): Messa
     kind,
     text: '',
     ...(media ? { media } : {}),
+    ...overrides,
   }
 }
 
@@ -67,6 +73,17 @@ describe('buildViewerStrip', () => {
   it('refuses to open when the clicked message is not in the strip', () => {
     expect(buildViewerStrip([message(1, 'photo', photo(11))], 'photo', 9)).toBeNull()
     expect(buildViewerStrip([message(5, 'text')], 'photo', 5)).toBeNull()
+  })
+
+  it('carries the save capability so protected media cannot be saved', () => {
+    const strip = buildViewerStrip(
+      [message(1, 'photo', photo(11)), message(2, 'photo', photo(12), { canBeSaved: false })],
+      'photo',
+      2,
+    )
+
+    expect(strip?.items[0]?.canBeSaved).toBeUndefined()
+    expect(strip?.items[1]?.canBeSaved).toBe(false)
   })
 
   it('skips media that has no file yet', () => {

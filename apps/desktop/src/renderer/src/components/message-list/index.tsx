@@ -1,8 +1,9 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
-import type { ChatSummary, Message } from '@wegram/protocol'
+import type { ChatSummary, Message, MessageProperties } from '@wegram/protocol'
 import { useCallback, useMemo, useRef, useState } from 'react'
 
 import { isSameDay } from '../../lib/format'
+import { invoke } from '../../lib/ipc'
 import { selfIdentity } from '../../lib/self'
 import { useAnchoredScroll } from '../../lib/useAnchoredScroll'
 import { useAppStore } from '../../store/useAppStore'
@@ -66,7 +67,7 @@ export interface MessageListProps {
   canReply: boolean
   onReply: (message: Message) => void
   onEdit: (message: Message) => void
-  onDelete: (message: Message) => void
+  onDelete: (message: Message, forBoth: boolean) => void
   onForward: (message: Message) => void
   onCopy: (message: Message) => void
   /** Opens the full-pane comment view of the message (design doc §9.8). */
@@ -77,6 +78,8 @@ interface MenuState {
   message: Message
   x: number
   y: number
+  /** null when `messages:properties` failed; the menu then keeps safe items only. */
+  properties: MessageProperties | null
 }
 
 /**
@@ -128,6 +131,8 @@ export function MessageList({
   const hostRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const [menu, setMenu] = useState<MenuState | null>(null)
+  /** Guards a properties answer that lands after closing or re-opening the menu. */
+  const menuRequest = useRef(0)
 
   const auth = useAppStore((state) => state.auth)
   // Photos of people that finished downloading after their rows were mapped
@@ -248,7 +253,19 @@ export function MessageList({
 
   /** One stable handler for every row: a fresh arrow per row defeats `memo`. */
   const openMenu = useCallback((message: Message, x: number, y: number): void => {
-    setMenu({ message, x, y })
+    const request = menuRequest.current + 1
+    menuRequest.current = request
+    const open = (properties: MessageProperties | null): void => {
+      if (request === menuRequest.current) setMenu({ message, x, y, properties })
+    }
+    void invoke('messages:properties', { chatId: message.chatId, messageId: message.id })
+      .then(open)
+      .catch(() => open(null))
+  }, [])
+
+  const closeMenu = useCallback((): void => {
+    menuRequest.current += 1
+    setMenu(null)
   }, [])
 
   return (
@@ -350,9 +367,9 @@ export function MessageList({
           items={buildMessageMenuItems(
             menu.message,
             { onReply, onCopy, onForward, onEdit, onDelete },
-            { canReply },
+            { canReply, properties: menu.properties },
           )}
-          onClose={() => setMenu(null)}
+          onClose={closeMenu}
         />
       ) : null}
     </div>

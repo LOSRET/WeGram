@@ -4,6 +4,7 @@ import {
   authStateSchema,
   connectionStateSchema,
   messageOpSchema,
+  messagePropertiesSchema,
   messageSchema,
   scrollAnchorSchema,
   selfSchema,
@@ -103,6 +104,8 @@ export const invokeChannels = [
   'messages:send',
   'messages:edit',
   'messages:delete',
+  /** Per-message capabilities for the context menu (`getMessageProperties`). */
+  'messages:properties',
   'messages:forward',
   'messages:read',
   'messages:sendSticker',
@@ -260,6 +263,10 @@ export const invokeSchemas = {
       forBoth: z.boolean(),
     }),
     response: noPayload,
+  },
+  'messages:properties': {
+    request: z.object({ chatId: z.number().int(), messageId: z.number().int() }),
+    response: messagePropertiesSchema,
   },
   'messages:forward': {
     request: z.object({

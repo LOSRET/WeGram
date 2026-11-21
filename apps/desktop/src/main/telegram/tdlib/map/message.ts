@@ -69,6 +69,7 @@ export async function mapMessage(
     senderName,
     ...(senderAvatarUrl ? { senderAvatarUrl } : {}),
     outgoing: Boolean(raw.is_outgoing),
+    ...(typeof raw.can_be_saved === 'boolean' ? { canBeSaved: raw.can_be_saved } : {}),
     date: Number(raw.date),
     kind: mapped.kind,
     text,

@@ -47,6 +47,18 @@ describe('mapMessage', () => {
     })
   })
 
+  it('carries can_be_saved so the viewer can refuse protected media', async () => {
+    const message = await mapMessage(makeContext(), 7, {
+      id: 102,
+      date: 10,
+      can_be_saved: false,
+      sender_id: { _: 'messageSenderUser', user_id: 42 },
+      content: { _: 'messageText', text: { text: 'protected' } },
+    })
+
+    expect(message.canBeSaved).toBe(false)
+  })
+
   it('carries a cached sender photo and queues one that is missing', async () => {
     const prefetchUserAvatars = vi.fn()
     const raw = {

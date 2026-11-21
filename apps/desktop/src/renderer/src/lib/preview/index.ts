@@ -317,6 +317,19 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       target.edited = true
       return target
     }
+    case 'messages:properties': {
+      const list = messagesByChat[store.chatId] ?? []
+      const target = list.find((item) => item.id === store.messageId)
+      if (!target) throw { code: 'internal', message: 'message not found' }
+      return {
+        canBeEdited: target.outgoing && target.kind === 'text',
+        canBeForwarded: true,
+        canBeDeletedOnlyForSelf: true,
+        canBeDeletedForAllUsers: target.outgoing,
+        canBeCopied: target.text.length > 0,
+        canBeReplied: true,
+      }
+    }
     case 'messages:delete': {
       const ids = store.messageIds as number[]
       messagesByChat[store.chatId] = (messagesByChat[store.chatId] ?? []).filter(
