@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { mediaSizeSchema } from './dto'
 import { appSettingsSchema } from './settings'
 
 /**
@@ -34,6 +35,14 @@ export const viewerItemSchema = z.object({
   duration: z.number().nonnegative().optional(),
   /** base64 JPEG, ~40px: paints the 预览 grid before a file has been fetched. */
   minithumbnail: z.string().optional(),
+  /**
+   * The bubble's thumbnail, painted sharp while the full picture downloads — the
+   * official client upsizes the picture it already has instead of showing a
+   * blank canvas, and this is the same idea.
+   */
+  thumbFileId: z.number().int().positive().optional(),
+  /** Photo variants, smallest first; the window picks the one it will display. */
+  sizes: z.array(mediaSizeSchema).optional(),
 })
 export type ViewerItem = z.infer<typeof viewerItemSchema>
 

@@ -1,4 +1,10 @@
-import { composeCommentAccess, nextReadState, pageAround, pageNewer, pageOlder } from '@wegram/mock-session'
+import {
+  composeCommentAccess,
+  nextReadState,
+  pageAround,
+  pageNewer,
+  pageOlder,
+} from '@wegram/mock-session'
 import type {
   AppSettings,
   AuthState,
@@ -328,6 +334,15 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       if (!url) throw { code: 'internal', message: 'unknown preview file' }
       return { path: url, url }
     }
+    case 'media:cancel':
+      // Nothing to stop: the preview's files are data URLs.
+      return undefined
+    case 'media:stream': {
+      // The preview cannot tail a download; it plays the whole fixture.
+      const url = previewFiles()[Number(store.fileId)]
+      if (!url) throw { code: 'internal', message: 'unknown preview file' }
+      return { url }
+    }
     case 'media:open': {
       const url = previewFiles()[Number(store.fileId)]
       if (url) window.open(url, '_blank', 'noopener')
@@ -384,7 +399,9 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'ui:saveRecentEmoji': {
       const list: unknown = store.emoji
       recentEmoji = Array.isArray(list)
-        ? list.filter((item): item is string => typeof item === 'string').slice(0, RECENT_EMOJI_LIMIT)
+        ? list
+            .filter((item): item is string => typeof item === 'string')
+            .slice(0, RECENT_EMOJI_LIMIT)
         : []
       return undefined
     }

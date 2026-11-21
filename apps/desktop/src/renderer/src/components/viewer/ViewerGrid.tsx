@@ -2,6 +2,8 @@ import type { ViewerItem } from '@wegram/protocol'
 import { useEffect, useState } from 'react'
 
 import { invoke } from '../../lib/ipc'
+import { nextOwner } from '../../lib/media'
+import { MEDIA_PRIORITY } from '../../lib/mediaPriority'
 
 /**
  * One cell of the 预览 board. Real media carries a base64 minithumbnail and paints
@@ -27,7 +29,11 @@ function PreviewCell({
   useEffect(() => {
     if (src || item.fileId <= 0) return
     let alive = true
-    invoke('media:download', { fileId: item.fileId, priority: 2 })
+    invoke('media:download', {
+      fileId: item.fileId,
+      priority: MEDIA_PRIORITY.deck,
+      owner: nextOwner('deck'),
+    })
       .then(({ url }) => {
         if (alive) setSrc(url)
       })

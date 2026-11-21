@@ -35,6 +35,7 @@ import {
   type MockFile,
 } from './constants'
 import { applyRead, simulateTransfer } from './effects'
+import { beginMockStream, downloadMockFile, mockDownloadedPrefix } from './files'
 import { buildFixtures } from './fixtures'
 import { searchChats, searchMessages } from './search'
 import { getMockStickerSet, listMockCustomEmoji, listMockStickerSets } from './stickers'
@@ -453,19 +454,20 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     return searchMessages(this.fixtures, input)
   }
 
-  async downloadFile(input: {
-    fileId: number
-    priority: number
-  }): Promise<{ path: string; url: string }> {
-    const file = this.assets.files.get(input.fileId)
-    if (!file) throw new AppError('internal', `Unknown mock file ${input.fileId}`)
-    await simulateTransfer(
-      { files: this.assets.files, emit: (event) => this.emit(event) },
-      input.fileId,
-      file.size,
-      false,
-    )
-    return { path: file.path, url: file.url }
+  async downloadFile(input: { fileId: number; priority: number }) {
+    return downloadMockFile(this.assets, (event) => this.emit(event), input)
+  }
+
+  async beginStream(input: { fileId: number; offset: number; priority: number }) {
+    return beginMockStream(this.assets, input)
+  }
+
+  async downloadedPrefix(input: { fileId: number; offset: number }) {
+    return mockDownloadedPrefix(this.assets, input)
+  }
+
+  async cancelDownload(_fileId: number) {
+    // Local fixtures: there is no transfer to stop.
   }
 
   async setProxy(config: ProxyConfig | null): Promise<void> {

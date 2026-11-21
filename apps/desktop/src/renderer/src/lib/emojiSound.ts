@@ -1,4 +1,5 @@
-import { ensureMedia } from './media'
+import { ensureMedia, nextOwner } from './media'
+import { MEDIA_PRIORITY } from './mediaPriority'
 
 /**
  * Plays an animated emoji's click sound (TDLib `animatedEmoji.sound`).
@@ -10,7 +11,9 @@ import { ensureMedia } from './media'
  */
 export async function playEmojiSound(fileId: number): Promise<void> {
   if (fileId <= 0) return
-  const url = await ensureMedia(fileId, 4).catch(() => undefined)
+  const url = await ensureMedia(fileId, MEDIA_PRIORITY.sound, nextOwner('emoji-sound')).catch(
+    () => undefined,
+  )
   if (!url) return
   const audio = new Audio(url)
   void audio.play().catch(() => undefined)

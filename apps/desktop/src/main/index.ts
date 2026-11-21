@@ -18,17 +18,8 @@ import type { TelegramAdapter } from './telegram/adapter'
 import { publishAdapterEvent } from './telegram/events'
 import { EventBus } from './telegram/updates'
 import { createLogger } from './util'
-import {
-  closeViewer,
-  setViewerTheme,
-} from './viewer'
-import {
-  applyTitleBarTheme,
-  createMainWindow,
-  raiseShellAboveViewer,
-  storedTheme,
-} from './windows'
-
+import { closeViewer, setViewerTheme } from './viewer'
+import { applyTitleBarTheme, createMainWindow, raiseShellAboveViewer, storedTheme } from './windows'
 
 const logger = createLogger('main')
 const isDev = !app.isPackaged
@@ -79,7 +70,7 @@ if (!app.requestSingleInstanceLock()) {
 async function bootstrap(): Promise<void> {
   const userDataDir = app.getPath('userData')
 
-  installMediaProtocol()
+  installMediaProtocol({ adapter: () => adapter })
 
   const store = new SettingsStore(join(userDataDir, 'settings.json'))
   store.load()
@@ -248,7 +239,6 @@ function showMainWindow(theme: 'light' | 'dark', closeLogin: 'immediate' | 'afte
   }
 }
 
-
 /**
  * Authorization can leave `ready` without the renderer asking: TDLib may close
  * the client, and 退出登录 is an invoke whose auth event arrives after the
@@ -271,7 +261,6 @@ function syncWindowsToAuth(state: AuthState): void {
   openLoginWindow()
   mainWindow.close()
 }
-
 
 /**
  * Minimal .env support for development: credentials must never be hard-coded
@@ -308,4 +297,3 @@ app.on('before-quit', () => {
   uiDb?.close()
   uiDb = null
 })
-

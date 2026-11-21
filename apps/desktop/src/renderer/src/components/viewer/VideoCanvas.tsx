@@ -35,10 +35,14 @@ const SEEK_STEP = 5
 export function VideoCanvas({
   item,
   url,
+  poster,
   canvas,
 }: {
   item: ViewerItem
+  /** The stream: the scheme handler tails the download (design doc §8.7). */
   url: string | null
+  /** The bubble's thumbnail, shown until the first frame decodes. */
+  poster: string | null
   /** The canvas the clip has to fit into, measured by the window. */
   canvas: Size
 }) {
@@ -208,7 +212,11 @@ export function VideoCanvas({
           ref={videoRef}
           className="wx-viewer__video"
           src={url}
-          poster={item.minithumbnail ? `data:image/jpeg;base64,${item.minithumbnail}` : undefined}
+          poster={
+            poster ??
+            (item.minithumbnail ? `data:image/jpeg;base64,${item.minithumbnail}` : undefined)
+          }
+          preload="auto"
           autoPlay
           playsInline
           style={

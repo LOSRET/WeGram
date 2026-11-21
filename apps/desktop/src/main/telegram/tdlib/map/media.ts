@@ -47,11 +47,26 @@ export function photoMedia(photo: TdObject | undefined): MessageMedia {
   // A small variant doubles as the bubble placeholder until the full file lands.
   const thumb = pickSmallestAtLeast(sizes, 160) ?? display
   const thumbFileId = Number(thumb?.photo?.id ?? 0)
+  /**
+   * Every size, smallest first: the bubble downloads the one that covers its box
+   * and the viewer asks for the largest (see `lib/mediaVariant.ts`). Without the
+   * table the renderer can only ask for `fileId`, i.e. the original — which is
+   * exactly the 1280 px download a 240 px bubble should not need.
+   */
+  const variants = sizes
+    .map((size) => ({
+      fileId: Number(size?.photo?.id ?? 0),
+      width: Number(size?.width ?? 0),
+      height: Number(size?.height ?? 0),
+    }))
+    .filter((size) => size.fileId > 0 && size.width > 0 && size.height > 0)
+    .sort((a, b) => a.width * a.height - b.width * b.height)
   return {
     fileId: Number(display?.photo?.id ?? 0),
     ...(thumb !== display && thumbFileId ? { thumbFileId } : {}),
     ...(display?.width ? { width: Number(display.width) } : {}),
     ...(display?.height ? { height: Number(display.height) } : {}),
+    ...(variants.length > 0 ? { sizes: variants } : {}),
     ...(photo?.minithumbnail?.data ? { minithumbnail: photo.minithumbnail.data } : {}),
     ...mediaUrls(display?.photo, thumb?.photo),
   }
@@ -61,7 +76,10 @@ export function photoMedia(photo: TdObject | undefined): MessageMedia {
  * A video or an animation. The two TDLib objects differ only in the name of
  * their file field, so one builder with `field` keeps the field table single.
  */
-export function videoMedia(value: TdObject | undefined, field: 'video' | 'animation'): MessageMedia {
+export function videoMedia(
+  value: TdObject | undefined,
+  field: 'video' | 'animation',
+): MessageMedia {
   const file = value?.[field]
   return {
     fileId: Number(file?.id ?? 0),

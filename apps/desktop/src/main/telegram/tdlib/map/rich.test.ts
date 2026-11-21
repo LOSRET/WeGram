@@ -50,14 +50,21 @@ describe('richText', () => {
   })
 
   it('uses the alternative text of a custom emoji', () => {
-    const mapped = richText({ _: 'richTextCustomEmoji', custom_emoji_id: '5', alternative_text: 'X' })
+    const mapped = richText({
+      _: 'richTextCustomEmoji',
+      custom_emoji_id: '5',
+      alternative_text: 'X',
+    })
     expect(mapped.text).toBe('X')
-    expect(mapped.entities).toEqual([{ type: 'customEmoji', offset: 0, length: 1, customEmojiId: '5' }])
+    expect(mapped.entities).toEqual([
+      { type: 'customEmoji', offset: 0, length: 1, customEmojiId: '5' },
+    ])
   })
 
   it('keeps the words of a node it has no entity for', () => {
-    expect(richText({ _: 'richTextEmailAddress', text: { _: 'richTextPlain', text: 'a@b' } }))
-      .toEqual({ text: 'a@b' })
+    expect(
+      richText({ _: 'richTextEmailAddress', text: { _: 'richTextPlain', text: 'a@b' } }),
+    ).toEqual({ text: 'a@b' })
   })
 })
 
@@ -176,7 +183,18 @@ describe('mapRichMessage', () => {
       {
         type: 'media',
         kind: 'photo',
-        media: { fileId: 12, thumbFileId: 13, width: 400, height: 300 },
+        media: {
+          fileId: 12,
+          thumbFileId: 13,
+          width: 400,
+          height: 300,
+          // Smallest first: the bubble asks for the variant that covers its box.
+          sizes: [
+            { fileId: 11, width: 100, height: 100 },
+            { fileId: 13, width: 200, height: 150 },
+            { fileId: 12, width: 400, height: 300 },
+          ],
+        },
         caption: { text: '图注' },
       },
     ])

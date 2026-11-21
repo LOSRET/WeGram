@@ -58,7 +58,9 @@ lib/useAnchoredScroll.ts  ready gate, stick-to-bottom, resize compensation
 lib/scrollGeometry.ts (pure, unit-tested) the ONE "is the reader at the bottom" rule
 lib/jumpSettle.ts    (pure, unit-tested) "has the jump to the newest message landed?"
 lib/history.ts       (pure, unit-tested) the ONE "may this empty page be cached" rule
-lib/media.ts          one-download-per-file dedupe
+lib/media.ts          per-owner request dedupe + cancel + the media URL/progress hooks
+lib/mediaVariant.ts   (pure, unit-tested) which photo size covers a box
+lib/mediaPriority.ts  (pure, unit-tested) the TDLib download priority ladder
 lib/emojiSound.ts     an animated emoji's click sound, fetched on the first click
 lib/viewer.ts         which messages become one viewer strip (pure, unit-tested)
 lib/player.ts         video player-bar maths: clocks, seek clamp, progress (pure, unit-tested)
@@ -179,6 +181,12 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   a dark-on-dark code does not scan, and keep its **four-module white quiet zone
   inside** the 136 px square (`qrDrawing`) — the sheet behind it is `#fafafa` /
   `#1e1e1f`, so "the page is the margin" leaves the code unscannable.
+- **A photo bubble asks for the size it draws, not the original.** `MessageMedia.sizes` is
+  smallest-first; `lib/mediaVariant.ts` picks the variant that covers
+  `box × devicePixelRatio`, TDLib's `thumbFileId` paints first, and `useInView` (half a
+  screen of margin) gates the download. Every `media:download` names an **owner**, so
+  `media:cancel` stops only that bubble — a video bubble never downloads the clip at all;
+  the viewer streams it through `media:stream`.
 - **A viewer photo must be allowed to outgrow the canvas.** Tailwind's preflight
   caps every `img` at `max-width: 100 %`, and an `img` is also a flex item (it
   shrinks by default), so the zoomed picture stopped dead at the window width —

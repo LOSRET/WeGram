@@ -113,6 +113,17 @@ export const invokeChannels = [
   'search:inChat',
   'media:pick',
   'media:download',
+  /**
+   * Drops one holder of a file's download. Main stops the transfer only when
+   * nobody is waiting for it any more — a bubble that scrolled away, a closed
+   * viewer — so two windows showing one photo never cancel each other.
+   */
+  'media:cancel',
+  /**
+   * A `wx-media://` URL for a video the viewer starts playing before TDLib has
+   * finished downloading it; the scheme handler streams the bytes as they land.
+   */
+  'media:stream',
   'media:open',
   'media:send',
   'stickers:sets',
@@ -300,8 +311,25 @@ export const invokeSchemas = {
     response: z.object({ paths: z.array(z.string()) }),
   },
   'media:download': {
-    request: z.object({ fileId: z.number().int(), priority: z.number().int().min(1).max(32) }),
+    request: z.object({
+      fileId: z.number().int(),
+      priority: z.number().int().min(1).max(32),
+      /**
+       * Who is waiting for this file. Holders share one transfer (a bubble and
+       * the viewer can show the same photo); `media:cancel` releases only this
+       * holder, and TDLib is told to stop when the last one leaves.
+       */
+      owner: z.string().min(1).max(64),
+    }),
     response: z.object({ path: z.string(), url: z.string() }),
+  },
+  'media:cancel': {
+    request: z.object({ fileId: z.number().int(), owner: z.string().min(1).max(64) }),
+    response: noPayload,
+  },
+  'media:stream': {
+    request: z.object({ fileId: z.number().int(), owner: z.string().min(1).max(64) }),
+    response: z.object({ url: z.string() }),
   },
   /** Hands a downloaded file to the OS (default app / media player). */
   'media:open': {

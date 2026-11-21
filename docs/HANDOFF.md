@@ -329,8 +329,11 @@ apps/desktop/src/main/
   viewer.ts, viewer-size.ts  the 图片和视频 BrowserWindow and its measured size maths
   ipc/router.ts              per-channel zod validation, Result envelope
   ipc/handlers.ts            one handler per invoke channel (incl. native file picker)
-  media/registry.ts          path → wx-media:// token registry (renderer never sees paths)
-  media/protocol.ts          protocol.handle('wx-media') with Range streaming + MIME
+  media/registry.ts          token → path | fileId registry (renderer never sees paths)
+  media/protocol.ts          protocol.handle('wx-media'): disk Range streams + the branch
+                             that tails a file TDLib is still downloading
+  media/stream.ts            (pure, unit-tested) the byte pump behind that branch
+  media/leases.ts            (pure, unit-tested) who still waits for a file's transfer
   media/image-size.ts        PNG/JPEG/WebP/GIF header probe (inputPhoto needs real sizes)
   telegram/adapter.ts        TelegramAdapter interface + event types (the seam)
   telegram/tdlib/           ONLY folder allowed to import `tdl` (index/client/actions/updates/avatar-cache/stickers/proxy/map)
@@ -371,7 +374,9 @@ apps/desktop/src/renderer/src/
   components/RichText.tsx    TL entity renderer (bold/italic/code/pre/link/spoiler)
   components/Composer.tsx    IME guard, reply bar, edit mode, draft debounce, attachments
   lib/useAnchoredScroll.ts   ready gate, 40px stick-to-bottom, resize compensation
-  lib/media.ts               one-download-per-file dedupe + media URL/progress hooks
+  lib/media.ts               per-owner request dedupe + media URL/progress hooks + cancel
+  lib/mediaVariant.ts        (pure, unit-tested) which photo size covers a box
+  lib/mediaPriority.ts       (pure, unit-tested) the TDLib download priority ladder
   lib/tgs.ts                 gzip guards + Lottie decode cache (LRU)
   lib/entities.ts            UTF-16 offset segmentation for TL entities
   components/PerfPanel.tsx   dev-only acceptance panel (?perf=1)
@@ -743,6 +748,33 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
   logged (`dropped N message(s) from the local cache — kept in the transcript`) and the
   renderer additionally refetches once when a transcript that *had* rows goes empty
   (`useChatHistory`), so no silent wipe can park the pane on the empty state again.
+- **A bubble must ask for the photo size its box needs, not the original.** `photoMedia` maps
+  the whole `photo.sizes` table into `MessageMedia.sizes`, and `lib/mediaVariant.ts` picks the
+  smallest variant that covers `box × devicePixelRatio` — a 240 px bubble on a 100 % display
+  wants the 320 px file, not the 1280 px one. Until then the DTO carried only the largest file
+  id, so every bubble downloaded the original; that was the biggest single cost of opening a
+  cold chat. `fileId` still names the largest (保存 / 复制 / the viewer want it), and a DTO
+  with `localUrl` already on disk skips the choice.
+- **`downloadFile(synchronous: true)` answers only when the file is complete, and the bytes it
+  has written so far are a sparse file: `stat().size` is the *full* size, not the readable
+  length.** Streaming therefore asks `getFileDownloadedPrefixSize(fileId, offset)` — the
+  contiguous run actually on disk from that offset — and reads the file directly (main and
+  TDLib share one process, so `readFilePart`, which its own docs call the fallback for apps
+  without filesystem access, is unnecessary). `downloadFile(offset, limit: 0, synchronous:
+  false)` starts or re-targets the transfer; a *different* offset is how a seek works, and it
+  cancels the previous range. On a stall the pump sends the same offset again once a second.
+- **A cancel has to be refcounted, or two windows cancel each other.** `media/leases.ts` counts
+  holders per file: `media:download` holds, `media:cancel` drops, `cancelDownloadFile` runs
+  only when the last holder leaves. Owners are per hook instance, not per effect run — a
+  StrictMode remount runs cleanup→setup, so the cleanup's cancel waits
+  `RELEASE_GRACE_MS` (250 ms) and a re-hold of the same file clears the timer. Without that,
+  the second mount waits on the in-flight promise its own cleanup just killed and the picture
+  never appears (dev only, which is exactly where it is hardest to notice).
+- **A video bubble must not download the clip.** It used to call `media:download` on mount at
+  priority 6, so a chat with a few videos queued every clip at once and starved the requests
+  the reader was waiting for. The bubble now fetches only the poster (TDLib's `thumbFileId`);
+  the viewer streams the file (design doc §8.7), so playback starts after a few hundred
+  kilobytes instead of after the whole clip.
 - `userData` is pinned to `%APPDATA%\WeGram` via `app.setName`/`setPath`, because
   the package name is `@wegram/desktop` and would otherwise create a nested folder.
 

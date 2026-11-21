@@ -462,6 +462,18 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     return actions.downloadFile(this.actionDeps, input)
   }
 
+  beginStream(input: { fileId: number; offset: number; priority: number }) {
+    return actions.beginStream(this.actionDeps, input)
+  }
+
+  downloadedPrefix(input: { fileId: number; offset: number }): Promise<number> {
+    return actions.downloadedPrefix(this.actionDeps, input)
+  }
+
+  cancelDownload(fileId: number): Promise<void> {
+    return actions.cancelDownload(this.actionDeps, fileId)
+  }
+
   async sendMedia(input: {
     chatId: number
     filePath: string

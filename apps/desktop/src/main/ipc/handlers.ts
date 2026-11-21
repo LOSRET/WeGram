@@ -6,6 +6,8 @@ import type { AppInfo } from '@wegram/protocol'
 import { app, BrowserWindow, clipboard, ClipboardItem, dialog, nativeImage, shell } from 'electron'
 
 import { closeLoginWindow } from '../login-window'
+import { drop, hold } from '../media/leases'
+import { registerStreamFile } from '../media/registry'
 import { resolveProxySecrets, toProxyView, toStoredProxy } from '../proxy'
 import type { SettingsStore } from '../store/settings'
 import type { UiDatabase } from '../store/ui-db'
@@ -69,9 +71,30 @@ export function createHandlers({
    * transcript's background fetches, so the file the reader is acting on wins.
    */
   const VIEWER_DOWNLOAD_PRIORITY = 32
+  /** Video playback: above the transcript, below a save the reader asked for. */
+  const STREAM_DOWNLOAD_PRIORITY = 28
+  /** Unique holder for a request main starts on its own (保存, 复制, 在文件夹中显示). */
+  let systemOwner = 0
+
+  /**
+   * A download the reader asked for. It holds the file while it runs so a bubble
+   * scrolling out of view (and cancelling its own interest in that photo) can
+   * never stop it.
+   */
   const localFile = async (fileId: number): Promise<string> => {
-    const { path } = await adapter.downloadFile({ fileId, priority: VIEWER_DOWNLOAD_PRIORITY })
-    return path
+    systemOwner += 1
+    const owner = `system-${systemOwner}`
+    hold(fileId, owner)
+    try {
+      const { path } = await adapter.downloadFile({
+        fileId,
+        priority: VIEWER_DOWNLOAD_PRIORITY,
+        owner,
+      })
+      return path
+    } finally {
+      drop(fileId, owner)
+    }
   }
 
   return {
@@ -157,7 +180,44 @@ export function createHandlers({
         : await dialog.showOpenDialog(options)
       return { paths: result.canceled ? [] : result.filePaths }
     },
-    'media:download': (payload) => adapter.downloadFile(payload),
+    /**
+     * One share of a file's transfer. The holder is dropped as soon as the call
+     * settles, so a late `media:cancel` from the same renderer cannot stop a
+     * download somebody else has taken over (the lease answers that itself).
+     */
+    'media:download': async (payload) => {
+      hold(payload.fileId, payload.owner)
+      try {
+        return await adapter.downloadFile(payload)
+      } finally {
+        drop(payload.fileId, payload.owner)
+      }
+    },
+    /** The reader (or their bubble) stopped waiting: stop only if nobody else does. */
+    'media:cancel': async (payload) => {
+      if (drop(payload.fileId, payload.owner)) {
+        await adapter.cancelDownload(payload.fileId)
+      }
+    },
+    /**
+     * A URL for a video that is not downloaded yet. The scheme handler tails the
+     * file (design doc §8.7), so the element starts playing while TDLib is still
+     * fetching the rest.
+     */
+    'media:stream': async (payload) => {
+      hold(payload.fileId, payload.owner)
+      try {
+        await adapter.beginStream({
+          fileId: payload.fileId,
+          offset: 0,
+          priority: STREAM_DOWNLOAD_PRIORITY,
+        })
+      } catch (error) {
+        drop(payload.fileId, payload.owner)
+        throw error
+      }
+      return { url: registerStreamFile(payload.fileId) }
+    },
     'media:open': async (payload) => {
       const path = await localFile(payload.fileId)
       // Only files the protocol layer just produced are ever opened.

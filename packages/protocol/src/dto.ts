@@ -120,6 +120,22 @@ export const messageEntitySchema = z.object({
 export type MessageEntity = z.infer<typeof messageEntitySchema>
 
 /**
+ * One downloadable variant of a photo (TDLib `photoSize`), smallest first in the
+ * parent's list.
+ *
+ * The official client never downloads the largest picture for a chat bubble: it
+ * asks for the smallest variant that still covers the box it is about to draw,
+ * and the largest one only when the reader opens the picture. Carrying the list
+ * is what lets `lib/mediaVariant.ts` make the same choice.
+ */
+export const mediaSizeSchema = z.object({
+  fileId: z.number().int().positive(),
+  width: z.number().int().nonnegative(),
+  height: z.number().int().nonnegative(),
+})
+export type MediaSize = z.infer<typeof mediaSizeSchema>
+
+/**
  * A media attachment. Download progress travels separately on `evt:file`, so the
  * message DTO stays immutable: only URLs that are already on disk are embedded.
  *
@@ -133,6 +149,13 @@ export const messageMediaSchema = z.object({
   mimeType: z.string().optional(),
   width: z.number().int().optional(),
   height: z.number().int().optional(),
+  /**
+   * Every size TDLib offers for a photo, smallest first (`fileId` above is the
+   * largest one, so the viewer, 保存 and 复制 keep asking for the full picture).
+   * Absent for videos, files and voices, and for a photo TDLib sent without its
+   * size table.
+   */
+  sizes: z.array(mediaSizeSchema).optional(),
   duration: z.number().int().optional(),
   stickerFormat: stickerFormatSchema.optional(),
   /**

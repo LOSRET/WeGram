@@ -171,6 +171,7 @@
 }
 
 .wx-photo__thumb,
+.wx-photo__preview,
 .wx-photo__image {
   position: absolute;
   inset: 0;
@@ -182,6 +183,25 @@
 .wx-photo__thumb {
   filter: blur(10px);
   transform: scale(1.06);
+}
+
+/* The sharp placeholder: TDLib's small size of the same picture, painted while
+   the file the reader is waiting for downloads (the official client's second
+   step between the blurred minithumbnail and the real thing). */
+.wx-photo__preview {
+  z-index: 1;
+}
+
+/* The picture fades in over the placeholder instead of popping in, so a photo
+   that lands while the reader is scrolling never flashes. */
+.wx-photo__image {
+  z-index: 2;
+  opacity: 0;
+  transition: opacity 160ms ease-out;
+}
+
+.wx-photo__image.is-loaded {
+  opacity: 1;
 }
 
 .wx-photo__pending {

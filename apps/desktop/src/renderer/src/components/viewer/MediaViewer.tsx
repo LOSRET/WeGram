@@ -45,7 +45,7 @@ export function MediaViewer() {
   const video = item?.kind === 'video'
   const fileId = item?.fileId ?? 0
 
-  const { url, loadError, progress } = useViewerItem(item)
+  const { url, previewUrl, loadError, progress } = useViewerItem(item)
   const zoom = useViewerZoom(item, video)
   const { zoomBy, toggleActualSize, rotate } = zoom
   const actions = createViewerActions({
@@ -151,13 +151,26 @@ export function MediaViewer() {
           onDoubleClick={video ? undefined : toggleActualSize}
         >
           {video && item ? (
-            <VideoCanvas key={item.fileId} item={item} url={url} canvas={zoom.canvas} />
+            <VideoCanvas
+              key={item.fileId}
+              item={item}
+              url={url}
+              poster={previewUrl}
+              canvas={zoom.canvas}
+            />
           ) : null}
 
-          {!video && url ? (
+          {/*
+            The thumbnail the bubble already had is painted first and the full
+            file replaces it in place — the official client's viewer never shows
+            a blank canvas while the original downloads. `onImageLoad` is only
+            told about the real picture: the small one must not become the size
+            the zoom is computed from.
+          */}
+          {!video && (url ?? previewUrl) ? (
             <img
-              className="wx-viewer__image"
-              src={url}
+              className={`wx-viewer__image${url ? '' : ' wx-viewer__image--preview'}`}
+              src={url ?? previewUrl ?? undefined}
               alt={item?.fileName ?? '图片'}
               draggable={false}
               style={
@@ -169,22 +182,19 @@ export function MediaViewer() {
                     }
                   : { maxWidth: '100%', maxHeight: '100%' }
               }
-              onLoad={(event) =>
+              onLoad={(event) => {
+                if (!url) return
                 zoom.onImageLoad({
                   width: event.currentTarget.naturalWidth,
                   height: event.currentTarget.naturalHeight,
                 })
-              }
+              }}
             />
           ) : null}
 
-          {!url && !loadError && !fatal ? (
+          {!url && !previewUrl && !loadError && !fatal ? (
             <div className="wx-viewer__status">
-              {progress === null ? (
-                <span className="wx-spinner" />
-              ) : (
-                percentOf(progress)
-              )}
+              {progress === null ? <span className="wx-spinner" /> : percentOf(progress)}
             </div>
           ) : null}
           {loadError ? (

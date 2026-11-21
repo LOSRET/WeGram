@@ -37,6 +37,10 @@ export function buildViewerStrip(
       ...(media.size ? { size: media.size } : {}),
       ...(kind === 'video' && media.duration ? { duration: media.duration } : {}),
       ...(media.minithumbnail ? { minithumbnail: media.minithumbnail } : {}),
+      ...(media.thumbFileId ? { thumbFileId: media.thumbFileId } : {}),
+      // The window picks its own variant: the box it paints into is not the
+      // bubble's, so the choice must travel with the item, not be made here.
+      ...(media.sizes ? { sizes: media.sizes } : {}),
     })
   }
 

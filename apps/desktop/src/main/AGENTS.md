@@ -27,7 +27,10 @@ telegram/tdlib/     client / updates / json.ts (the one "missing array" read) / 
 telegram/tdlib/actions/  TDLib requests as functions over ActionDeps, grouped into
                     chats / history / files / send / comments (index.ts re-exports);
                     message-input.ts holds the one send envelope
-media/              registry.ts (token → path) / protocol.ts (wx-media://) / image-size.ts
+media/              registry.ts (token → path | fileId) / protocol.ts (wx-media://: disk
+                    Range streams, plus the branch that tails a download) / stream.ts
+                    (the byte pump, pure) / leases.ts (per-file download holders, pure) /
+                    image-size.ts
 store/              ui-db.ts (all SQL) / settings.ts (proxy only)
 proxy*.ts           proxy DTO ↔ stored config
 security/secrets.ts safeStorage (DPAPI) seal/unseal
@@ -43,6 +46,11 @@ change belongs in the adapter.
 - **All `node:sqlite` calls live in `store/ui-db.ts`** (also lint-enforced).
   `settings.json` keeps only the proxy config, because it carries a sealed
   secret.
+- **A `wx-media://` token is a local path *or* a file id.** A file id means "TDLib is still
+  downloading this": `protocol.ts` tails the file and must measure readable bytes with
+  `getFileDownloadedPrefixSize`, never with `stat().size` (the file is sparse). Stopping a
+  transfer goes through `media/leases.ts`, so the shell's bubble and the viewer's window
+  cannot cancel each other's download.
 - **The renderer never sees a filesystem path.** Only the adapters may call
   `media/registry.ts` to mint a `wx-media://f/<token>` URL; `media/protocol.ts`
   resolves tokens and never request paths, and it must keep Range support.

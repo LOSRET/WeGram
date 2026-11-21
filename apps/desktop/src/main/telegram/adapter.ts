@@ -125,7 +125,9 @@ export interface TelegramAdapter {
    */
   listContacts(): Promise<Contact[]>
 
-  history(input: InvokeRequest<'messages:history'>): Promise<{ messages: Message[]; hasMore: boolean }>
+  history(
+    input: InvokeRequest<'messages:history'>,
+  ): Promise<{ messages: Message[]; hasMore: boolean }>
   /**
    * A window centred on one message. Used instead of paging back from the newest
    * page when the target (a saved reading position or the unread boundary) is
@@ -178,6 +180,21 @@ export interface TelegramAdapter {
   searchInChat(input: InvokeRequest<'search:inChat'>): Promise<Message[]>
 
   downloadFile(input: InvokeRequest<'media:download'>): Promise<{ path: string; url: string }>
+  /**
+   * Starts (or re-targets) a download at `offset` and answers where TDLib keeps
+   * the bytes plus the size the file will have. This is the streaming half of
+   * the `wx-media://` handler: video playback starts long before completion
+   * (design doc §8.7), so the renderer needs a URL for a file that is not here
+   * yet.
+   */
+  beginStream(input: { fileId: number; offset: number; priority: number }): Promise<{
+    path: string
+    size: number
+  }>
+  /** Contiguous bytes already on disk from `offset`; 0 while nothing arrived. */
+  downloadedPrefix(input: { fileId: number; offset: number }): Promise<number>
+  /** Stops a transfer no window is waiting for any more. */
+  cancelDownload(fileId: number): Promise<void>
 
   setProxy(config: ProxyConfig | null): Promise<void>
   testProxy(config: ProxyConfig): Promise<ProxyTestResult>

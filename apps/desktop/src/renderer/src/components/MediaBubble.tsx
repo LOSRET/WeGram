@@ -1,14 +1,24 @@
 import type { MessageMedia } from '@wegram/protocol'
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 
-import { ensureMedia, formatBytes, progressRatio, useFileProgress, useMediaUrl } from '../lib/media'
 import { formatDuration } from '../lib/format'
-import { percentOf, reserveBox } from '../lib/mediaBox'
 import { errorMessage, invoke } from '../lib/ipc'
+import {
+  ensureMedia,
+  formatBytes,
+  nextOwner,
+  progressRatio,
+  useFileProgress,
+  useMediaUrl,
+} from '../lib/media'
+import { percentOf, reserveBox } from '../lib/mediaBox'
+import { bubblePriority, MEDIA_PRIORITY, thumbPriority } from '../lib/mediaPriority'
+import { pickVariant } from '../lib/mediaVariant'
+import { useInView } from '../lib/useInView'
 import { openPhotoViewer, openVideoViewer } from '../lib/viewer'
 import { useViewerSource } from '../lib/viewerSource'
-import { PlayIcon } from './viewer/ViewerIcons'
 import { useAppStore } from '../store/useAppStore'
+import { PlayIcon } from './viewer/ViewerIcons'
 
 interface MediaBubbleProps {
   media: MessageMedia
@@ -31,6 +41,15 @@ interface MediaBubbleProps {
 
 const MAX_PHOTO_W = 240
 const MAX_PHOTO_H = 300
+
+/**
+ * How far outside the viewport a bubble's media starts downloading.
+ *
+ * About half a screen: the official client prefetches a screen ahead, so a
+ * picture is already there when it scrolls in. The download is cancelled again
+ * when the bubble leaves this margin.
+ */
+const MEDIA_PRELOAD_PX = 420
 
 /** A channel post's media may grow past WeChat's 240×300 bubble photograph. */
 export const CHANNEL_MEDIA_LIMITS = { maxWidth: 420, maxHeight: 480 } as const
@@ -60,10 +79,54 @@ export function channelMediaWidth(kind: 'photo' | 'video', media: MessageMedia):
 }
 
 /**
+ * The DTO narrowed to one file id, without the full picture's cached URL.
+ *
+ * A photo's `localUrl` belongs to its *largest* file; handing that URL to a
+ * variant would paint the original where a thumbnail was asked for. Only the DTO
+ * that already names that file keeps it.
+ */
+function mediaAt(media: MessageMedia, fileId: number): MessageMedia {
+  if (fileId === media.fileId) return media
+  const { localUrl: _fullUrl, ...rest } = media
+  return { ...rest, fileId }
+}
+
+/**
+ * The bubble's thumbnail: TDLib's second, small size of the same picture — the
+ * official client's "sharp placeholder" between the blurred minithumbnail and
+ * the picture the reader asked for.
+ */
+function thumbMediaOf(media: MessageMedia, primaryFileId: number): MessageMedia | undefined {
+  const thumbFileId = media.thumbFileId ?? 0
+  if (thumbFileId <= 0 || thumbFileId === primaryFileId) return undefined
+  const thumb = mediaAt(media, thumbFileId)
+  return media.thumbUrl ? { ...thumb, localUrl: media.thumbUrl } : thumb
+}
+
+/** The box a picture will be painted in, in device pixels (CSS px × DPR). */
+function deviceBox(
+  box: { width: number; height: number } | undefined,
+  maxWidth: number,
+  maxHeight: number,
+): { width: number; height: number } {
+  const ratio = window.devicePixelRatio || 1
+  const css = box ?? { width: maxWidth, height: maxHeight }
+  return { width: css.width * ratio, height: css.height * ratio }
+}
+
+/**
  * The media half of a message. Photos and videos reserve their final box from
  * the dimensions in the DTO before the file arrives (design doc §8.2 rule 4:
  * height changes on load must not move the anchored row), so the blur-up
  * thumbnail appears in place and the bubble never collapses.
+ *
+ * Loading follows the official client rather than "download the biggest file when
+ * the row mounts":
+ * - the minithumbnail paints instantly, then TDLib's small size sharpens it;
+ * - a photo asks for the smallest variant that still covers its box (§8.7);
+ * - nothing downloads until the bubble is about half a screen away, and the
+ *   transfer stops again once it leaves;
+ * - a video only fetches its poster here — the clip is streamed by the viewer.
  */
 export function MediaBubble({
   media,
@@ -123,10 +186,8 @@ function PhotoBubble({
   maxWidth: number
   maxHeight: number
 }) {
-  const url = useMediaUrl(media, 10)
-  const { ratio } = useBubbleProgress(media)
-  const progress = useFileProgress(media.fileId)
-  const uploading = Boolean(progress && !progress.completed && ratio !== undefined)
+  const [ref, view] = useInView<HTMLButtonElement>(MEDIA_PRELOAD_PX)
+  const [loadedUrl, setLoadedUrl] = useState<string>()
   // The pane this bubble is drawn in, for panes that do not live in the chat store.
   const source = useViewerSource()
 
@@ -138,8 +199,31 @@ function PhotoBubble({
         ...PHOTO_FALLBACK,
       })
 
+  // A picture already on disk is the picture: asking for a variant of it would
+  // download bytes we already have.
+  const variant = media.localUrl
+    ? undefined
+    : pickVariant(media.sizes, deviceBox(box, maxWidth, maxHeight))
+  const primaryId = variant?.fileId ?? media.fileId
+
+  const primaryMedia = useMemo(() => mediaAt(media, primaryId), [media, primaryId])
+  const thumbMedia = useMemo(() => thumbMediaOf(media, primaryId), [media, primaryId])
+
+  const primaryUrl = useMediaUrl(primaryMedia, bubblePriority(view.visible), view.armed)
+  const thumbUrl = useMediaUrl(thumbMedia, thumbPriority(view.visible), view.armed)
+
+  // Sending and receiving are different files here: the upload progress belongs
+  // to the file we sent, the percentage to the variant being downloaded.
+  const upload = useFileProgress(media.fileId)
+  const download = useFileProgress(primaryId)
+  const upRatio = progressRatio(upload)
+  const downRatio = progressRatio(download)
+  const sending = Boolean(upload && !upload.completed && upRatio !== undefined)
+  const ready = Boolean(primaryUrl && loadedUrl === primaryUrl)
+
   return (
     <button
+      ref={ref}
       type="button"
       className={`wx-photo${inAlbum ? ' wx-photo--album' : ''}`}
       style={box}
@@ -155,15 +239,25 @@ function PhotoBubble({
           aria-hidden
         />
       ) : null}
-      {url ? (
-        <img className="wx-photo__image" src={url} alt={media.fileName ?? '图片'} loading="lazy" />
-      ) : (
+      {thumbUrl && !ready ? (
+        <img className="wx-photo__preview" src={thumbUrl} alt="" aria-hidden />
+      ) : null}
+      {primaryUrl ? (
+        <img
+          className={`wx-photo__image${ready ? ' is-loaded' : ''}`}
+          src={primaryUrl}
+          alt={media.fileName ?? '图片'}
+          loading="lazy"
+          onLoad={() => setLoadedUrl(primaryUrl)}
+        />
+      ) : null}
+      {!primaryUrl && !thumbUrl && !media.minithumbnail ? (
         <span className="wx-photo__pending">
-          {ratio === undefined ? <span className="wx-spinner" /> : percentOf(ratio)}
+          {downRatio === undefined ? <span className="wx-spinner" /> : percentOf(downRatio)}
         </span>
-      )}
-      {url && uploading ? (
-        <span className="wx-photo__upload">{percentOf(ratio ?? 0)}</span>
+      ) : null}
+      {primaryUrl && sending ? (
+        <span className="wx-photo__upload">{percentOf(upRatio ?? 0)}</span>
       ) : null}
     </button>
   )
@@ -184,8 +278,7 @@ function VideoBubble({
   maxWidth: number
   maxHeight: number
 }) {
-  const url = useMediaUrl(media, 6)
-  const { ratio } = useBubbleProgress(media)
+  const [ref, view] = useInView<HTMLButtonElement>(MEDIA_PRELOAD_PX)
   const source = useViewerSource()
 
   const box = inAlbum
@@ -196,10 +289,15 @@ function VideoBubble({
         ...VIDEO_FALLBACK,
       })
 
+  const posterMedia = useMemo(() => thumbMediaOf(media, media.fileId), [media])
+  const posterUrl = useMediaUrl(posterMedia, thumbPriority(view.visible), view.armed)
+
   // Like a photo, a video opens in the client's 图片和视频 window — it does not
   // play inside the bubble, and the transport lives in that window's player bar.
+  // The clip itself is not downloaded here: the viewer streams it (§8.7).
   return (
     <button
+      ref={ref}
       type="button"
       className={`wx-video wx-video--poster${inAlbum ? ' wx-video--album' : ''}`}
       style={box}
@@ -208,20 +306,18 @@ function VideoBubble({
     >
       {media.minithumbnail ? (
         <img
-          className="wx-photo__thumb"
+          className="wx-video__thumb"
           src={`data:image/jpeg;base64,${media.minithumbnail}`}
           alt=""
           aria-hidden
         />
       ) : null}
+      {posterUrl ? <img className="wx-video__poster" src={posterUrl} alt="" aria-hidden /> : null}
       <span className="wx-video__play" aria-hidden>
         <PlayIcon size={inAlbum ? 26 : 34} />
       </span>
       {media.duration ? (
         <span className="wx-video__duration">{formatDuration(media.duration)}</span>
-      ) : null}
-      {!url && ratio !== undefined ? (
-        <span className="wx-video__progress">{percentOf(ratio)}</span>
       ) : null}
     </button>
   )
@@ -268,7 +364,7 @@ function FileBubble({ media }: { media: MessageMedia }) {
 }
 
 function VoiceBubble({ media }: { media: MessageMedia }) {
-  const url = useMediaUrl(media, 8)
+  const url = useMediaUrl(media, MEDIA_PRIORITY.idle)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [playing, setPlaying] = useState(false)
   const { ratio } = useBubbleProgress(media)
@@ -276,7 +372,7 @@ function VoiceBubble({ media }: { media: MessageMedia }) {
   const toggle = (): void => {
     const audio = audioRef.current
     if (!audio) {
-      void ensureMedia(media.fileId, 8).catch(() => undefined)
+      void ensureMedia(media.fileId, MEDIA_PRIORITY.idle, nextOwner('voice')).catch(() => undefined)
       return
     }
     if (playing) {

@@ -11,14 +11,16 @@ export interface InView {
 }
 
 /**
- * Visibility gate for one cell. `rootMargin` preloads a screen ahead so a sticker
- * does not visibly start from nothing when it scrolls into view.
+ * Visibility gate for one cell. `marginPx` preloads that far outside the
+ * viewport so a sticker does not visibly start from nothing when it scrolls into
+ * view; a photo bubble asks for about half a screen, because a picture that
+ * arrives while the reader is still scrolling reads as "instant".
  *
- * Shared by the sticker renderer and a premium sticker's effect: both draw a file
- * only once its box is about to be read, and both must keep playing while their
- * box is on screen.
+ * Shared by the sticker renderer, a premium sticker's effect and the media
+ * bubbles: each draws a file only once its box is about to be read, and each must
+ * keep playing while its box is on screen.
  */
-export function useInView<T extends Element>(): [RefObject<T | null>, InView] {
+export function useInView<T extends Element>(marginPx = PRELOAD_PX): [RefObject<T | null>, InView] {
   const ref = useRef<T | null>(null)
   const [state, setState] = useState<InView>({ visible: false, armed: false })
 
@@ -35,7 +37,7 @@ export function useInView<T extends Element>(): [RefObject<T | null>, InView] {
     }
     const check = (): void => {
       const rect = node.getBoundingClientRect()
-      apply(rect.bottom > -PRELOAD_PX && rect.top < window.innerHeight + PRELOAD_PX)
+      apply(rect.bottom > -marginPx && rect.top < window.innerHeight + marginPx)
     }
 
     // Geometry first: IntersectionObserver delivery rides the rendering pipeline and
@@ -48,14 +50,14 @@ export function useInView<T extends Element>(): [RefObject<T | null>, InView] {
 
     const observer = new IntersectionObserver(
       (entries) => apply(Boolean(entries[0]?.isIntersecting)),
-      { rootMargin: `${PRELOAD_PX}px 0px` },
+      { rootMargin: `${marginPx}px 0px` },
     )
     observer.observe(node)
     return () => {
       window.clearTimeout(retry)
       observer.disconnect()
     }
-  }, [])
+  }, [marginPx])
 
   return [ref, state]
 }
