@@ -1,5 +1,5 @@
 import { AppError } from '@wegram/protocol'
-import type { Message } from '@wegram/protocol'
+import type { CommentContent, CommentSendQuery, Message } from '@wegram/protocol'
 
 import type { CommentAccess, CommentJoinResult, CommentTarget } from '../../adapter'
 import { resolveCommentAccess, type ChatMemberKind } from '../../comment-access'
@@ -8,6 +8,7 @@ import type { TdObject } from '../client'
 import { mapMessage } from '../map/message'
 import type { ActionDeps } from './deps'
 import { inputText, sendAndMap } from './message-input'
+import { mediaContent, stickerContent } from './send'
 
 /** The protocol caps a page at 100; TDLib may answer with fewer by itself. */
 const MAX_COMMENTS = 100
@@ -59,18 +60,41 @@ export async function comments(
  * the chat to send to is not the one the button was pressed in: `getMessageThread`
  * answers both that chat and the thread's root id in it. A comment is a reply to
  * the root unless the reader is answering another comment.
+ *
+ * The comment box is the chat composer's card, so the payload is whatever that
+ * card produced: text, a sticker, or a local photo/document. Text clears the
+ * thread's draft; media and stickers carry TDLib's `options` field, as they do
+ * in a chat.
  */
 export async function sendComment(
   deps: ActionDeps,
-  input: { chatId: number; messageId: number; text: string; replyTo?: number },
+  input: CommentSendQuery,
 ): Promise<{ message: Message }> {
   const { chatId: discussionChatId, rootId } = await resolveThread(deps, input, {
     requireRoot: true,
   })
-  const { message } = await sendAndMap(deps, discussionChatId, inputText(input.text, true), {
+  const content = await commentContent(deps, input.content)
+  const { message } = await sendAndMap(deps, discussionChatId, content, {
     replyTo: input.replyTo ?? rootId,
+    ...(input.content.kind === 'text' ? {} : { options: null }),
   })
   return { message }
+}
+
+/** The `sendMessage` body for one comment payload. */
+async function commentContent(deps: ActionDeps, content: CommentContent): Promise<TdObject> {
+  switch (content.kind) {
+    case 'text':
+      return inputText(content.text, true)
+    case 'sticker':
+      return stickerContent(deps, content.fileId)
+    case 'media':
+      return mediaContent({
+        filePath: content.filePath,
+        kind: content.mediaKind,
+        ...(content.caption === undefined ? {} : { caption: content.caption }),
+      })
+  }
 }
 /** Discussion chat + thread root of a message, or a readable failure. */
 async function resolveThread(

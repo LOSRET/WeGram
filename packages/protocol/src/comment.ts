@@ -57,10 +57,31 @@ export const commentJoinResultSchema = z.object({
 })
 export type CommentJoinResult = z.infer<typeof commentJoinResultSchema>
 
+/**
+ * What to post into a thread (§9.8).
+ *
+ * The comment box is the chat composer's own card, so a comment is not always a
+ * line of text: the 表情 panel posts a sticker and the attach menu hands over a
+ * local file, exactly as they do in a chat. A photo or a document is the one
+ * payload that still lives in the thread's discussion group, which is why the
+ * adapter — not the renderer — resolves where it goes.
+ */
+export const commentContentSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('text'), text: z.string().min(1) }),
+  z.object({ kind: z.literal('sticker'), fileId: z.number().int() }),
+  z.object({
+    kind: z.literal('media'),
+    filePath: z.string().min(1),
+    mediaKind: z.enum(['photo', 'file']),
+    caption: z.string().optional(),
+  }),
+])
+export type CommentContent = z.infer<typeof commentContentSchema>
+
 export const commentSendSchema = commentTargetSchema.extend({
-  text: z.string().min(1),
   /** Comment id being answered; omitted posts at the thread root. */
   replyTo: z.number().int().optional(),
+  content: commentContentSchema,
 })
 export type CommentSendQuery = z.infer<typeof commentSendSchema>
 

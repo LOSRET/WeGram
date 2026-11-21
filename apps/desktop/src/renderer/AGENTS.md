@@ -28,11 +28,16 @@ components/message-list/  virtualiser + MessageRow + Divider + the scroll hooks:
                          views/time footer; the one-bubble channel composition is
                          styles/channel.css), PremiumStickerEffect (a Premium sticker's
                          second TGS, painted once at 1.49× the sticker and replayed on tap)
+components/composer/       ComposerCard: the ONE bordered input card (§8.4 + §9.8) — text,
+                         the 表情/收藏/文件/截图/语音 tool row, 发送, the attach menu and the
+                         ExpressionPicker. Both composers render it; a caller only says where
+                         a send goes, so the comment box is not a cut-down copy of a chat's.
 components/chat-pane/     render tree + useChatHistory (history/ modules) + messageActions +
                          CommentPanel (full-pane discussion view, slides in from the right;
-                         chat-style rows + the composer card, posts via messages:sendComment;
-                         non-members get the official client's 加入/申请加入 gate instead;
-                         opens at the top of the thread) + useCommentAnchor (that thread's
+                         chat-style rows + CommentComposer, the shared composer card posting
+                         text / sticker / photo-file through messages:sendComment; non-members
+                         get the official client's 加入/申请加入 gate instead; opens at the
+                         top of the thread) + useCommentAnchor (that thread's
                          reading position in ui.db; the default landing is the top) +
                          ChatInfoPanel (聊天信息, §9.9: a 314 px OVERLAY sheet — transform
                          only, the transcript keeps its width — with 搜索群成员 and the
@@ -60,6 +65,8 @@ components/chat-search/ SearchTabs (聊天 / 频道) and SearchHitRow (one messa
                         chat face, chat title, message preview, time)
 components/SearchField.tsx  the ONE search pill (label + input + optional trailing control)
 components/           the remaining visual concerns (Composer, MediaBubble, …)
+components/Composer.tsx  a chat's send path over ComposerCard: per-chat drafts, reply /
+                        edit banners, anchored-window reload, the channel's 收起 button
 lib/ipc.ts            thin `window.tg` wrapper
 lib/clipboard.ts      text copy for the contact card (navigator.clipboard + execCommand fallback)
 lib/format.ts         time / preview / avatar helpers (pure, unit-tested)

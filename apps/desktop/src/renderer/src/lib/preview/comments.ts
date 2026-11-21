@@ -1,7 +1,8 @@
 import { composeCommentAccess, pageOlder } from '@wegram/mock-session'
 import type { EventChannel, Message } from '@wegram/protocol'
 
-import { ME, now, previewCommentAccess, previewThreads } from './fixtures'
+import { stickerMedia } from '../stickerMedia'
+import { ME, now, PREVIEW_STICKERS, media, previewCommentAccess, previewThreads } from './fixtures'
 
 /**
  * The preview's comment-thread channels (design doc §9.8), split out of
@@ -47,16 +48,11 @@ export function handlePreviewComments(
     case 'messages:sendComment': {
       const thread = previewThreads[key]
       if (!thread) throw { code: 'not_implemented', message: '这个帖子还没有讨论群组，不能评论' }
-      const message: Message = {
-        id: thread.reduce((max, item) => Math.max(max, item.id), 0) + 1,
+      const message = commentRow(
         chatId,
-        senderId: ME.id,
-        senderName: '我',
-        outgoing: true,
-        date: now(),
-        kind: 'text',
-        text: String(query.text),
-      }
+        thread.reduce((max, item) => Math.max(max, item.id), 0) + 1,
+        query.content,
+      )
       thread.push(message)
       const target = (messagesByChat[chatId] ?? []).find((item) => item.id === messageId)
       if (target) {
@@ -79,5 +75,44 @@ export function handlePreviewComments(
       }
       return { message }
     }
+  }
+}
+
+/**
+ * The row one posted payload becomes, mirroring the mock adapter (§9.8).
+ *
+ * A comment carries whatever the reused composer card produced; the browser has
+ * no native file picker, so only text and stickers reach this point.
+ */
+function commentRow(chatId: number, id: number, payload: unknown): Message {
+  const content =
+    payload && typeof payload === 'object' ? (payload as { kind?: unknown; fileId?: unknown; text?: unknown }) : {}
+  if (content.kind === 'sticker') {
+    const sticker = PREVIEW_STICKERS.find((item) => item.fileId === Number(content.fileId))
+    if (!sticker) throw { code: 'internal', message: 'unknown sticker' }
+    return {
+      id,
+      chatId,
+      senderId: ME.id,
+      senderName: '我',
+      outgoing: true,
+      date: now(),
+      kind: 'sticker',
+      text: '',
+      media: media(sticker.fileId, stickerMedia(sticker)),
+    }
+  }
+  if (content.kind === 'media') {
+    throw { code: 'not_implemented', message: '浏览器预览不能发送本地文件' }
+  }
+  return {
+    id,
+    chatId,
+    senderId: ME.id,
+    senderName: '我',
+    outgoing: true,
+    date: now(),
+    kind: 'text',
+    text: String(content.text ?? ''),
   }
 }

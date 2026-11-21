@@ -11,8 +11,6 @@ export function useActiveStickerSet(activeSetId: string | null): {
   activeSet: StickerSet | null
   setLoading: boolean
   setError: string | null
-  /** Sending a sticker reports its failure in the same slot as loading does. */
-  reportError: (text: string) => void
 } {
   const [activeSet, setActiveSet] = useState<StickerSet | null>(null)
   const [setLoading, setSetLoading] = useState(false)
@@ -49,5 +47,5 @@ export function useActiveStickerSet(activeSetId: string | null): {
     }
   }, [activeSetId])
 
-  return { activeSet, setLoading, setError, reportError: setSetError }
+  return { activeSet, setLoading, setError }
 }

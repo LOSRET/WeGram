@@ -1,15 +1,12 @@
-import type { Message } from '@wegram/protocol'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import type { Message, Sticker } from '@wegram/protocol'
+import { useEffect, useRef, useState } from 'react'
 
 import { loadLatestWindow } from '../lib/anchoredWindow'
 import { useComposerInput } from '../lib/useComposerInput'
 import { errorMessage, invoke } from '../lib/ipc'
 import { messagePreview } from '../lib/format'
 import { useAppStore } from '../store/useAppStore'
-import { anchorOf, type PopupAnchor } from '../lib/popupPlacement'
-import { AnchoredPopup } from './ContextMenu'
-import { ChevronDownIcon, CubeTabIcon, EmojiIcon, FolderIcon, MicIcon, ScissorsIcon } from './Icon'
-import { ExpressionPicker } from './ExpressionPicker'
+import { ComposerCard } from './composer/ComposerCard'
 
 export interface ComposerEditing {
   messageId: number
@@ -31,6 +28,14 @@ interface ComposerProps {
   onCollapse?: () => void
 }
 
+/**
+ * A chat's composer (§8.4).
+ *
+ * The box itself is the shared `ComposerCard` — the comment panel renders the
+ * same one (§9.8) — so this file owns only what a *chat* send means: per-chat
+ * drafts in `ui.db`, the reply / edit banners, the anchored-window reload every
+ * send needs, and the 收起 button a channel adds.
+ */
 export function Composer({
   chatId,
   replyTo,
@@ -43,18 +48,13 @@ export function Composer({
 }: ComposerProps) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
-  const [picker, setPicker] = useState<'emoji' | null>(null)
-  const [attachAnchor, setAttachAnchor] = useState<PopupAnchor | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const draftTimer = useRef<number | null>(null)
-  /** Where the next render should put the caret after an emoji pick. */
-  const pendingCaret = useRef<number | null>(null)
 
   // Drafts are stored by the main process (§5.1) and restored per chat.
   useEffect(() => {
     let cancelled = false
     setText('')
-    setPicker(null)
     void (async () => {
       try {
         const draft = await invoke('ui:getDraft', { chatId })
@@ -68,16 +68,6 @@ export function Composer({
       cancelled = true
     }
   }, [chatId])
-
-  useEffect(() => {
-    const caret = pendingCaret.current
-    if (caret === null) return
-    pendingCaret.current = null
-    const node = textareaRef.current
-    if (!node) return
-    node.focus()
-    node.setSelectionRange(caret, caret)
-  }, [text])
 
   useEffect(() => {
     if (!editing) return
@@ -132,13 +122,11 @@ export function Composer({
    * touches the filesystem.
    */
   const attach = async (kind: 'photo' | 'file'): Promise<void> => {
-    setAttachAnchor(null)
     if (busy) return
     try {
       const picked = await invoke('media:pick', { kind })
       if (picked.paths.length === 0) return
       setBusy(true)
-      setPicker(null)
       const wasAnchored = await loadLatestWindow(chatId)
       const replyToId = replyTo?.id
       for (const filePath of picked.paths) {
@@ -160,30 +148,26 @@ export function Composer({
     }
   }
 
-  const closePicker = useCallback(() => setPicker(null), [])
-
   /**
-   * Picking an emoji inserts at the caret and keeps the panel open, the way the
-   * client does. The textarea may have lost focus to the button, so the caret is
-   * restored after the controlled value lands (the effect below).
+   * A sticker posted from the 表情 panel, through the chat's own send path.
+   * An anchored window cannot take the new row in place, so it returns to the
+   * newest page first and the list jumps once the row is in.
    */
-  const insertEmoji = (emoji: string): void => {
-    const node = textareaRef.current
-    const start = node?.selectionStart ?? text.length
-    const end = node?.selectionEnd ?? start
-    setText((current) => current.slice(0, start) + emoji + current.slice(end))
-    pendingCaret.current = start + emoji.length
-  }
-
-  const stickerSent = (): void => {
-    if (replyTo) onCancelReply()
+  const sendSticker = async (sticker: Sticker): Promise<void> => {
+    try {
+      const wasAnchored = await loadLatestWindow(chatId)
+      const result = await invoke('messages:sendSticker', { chatId, fileId: sticker.fileId })
+      useAppStore.getState().applyMessageOps(chatId, [{ op: 'new', message: result.message }])
+      if (wasAnchored) useAppStore.getState().requestJumpToLatest(chatId)
+      if (replyTo) onCancelReply()
+    } catch (error) {
+      useAppStore.getState().setError(errorMessage(error))
+    }
   }
 
   const notWired = (label: string): void => {
     useAppStore.getState().setToast(`${label}还没有接入`)
   }
-
-  const ready = !busy && text.trim().length > 0
 
   return (
     <div className="wx-composer">
@@ -207,123 +191,21 @@ export function Composer({
         </div>
       ) : null}
 
-      <div className="wx-composer__card">
-        <textarea
-          ref={textareaRef}
-          className="wx-composer__input"
-          placeholder={editing ? '编辑后回车保存，Esc 取消' : '输入消息'}
-          title="Enter 发送 · Shift+Enter 换行"
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          {...inputHandlers}
-        />
-
-        <div className="wx-composer__actions">
-          <div className="wx-composer__tools">
-            <button
-              className={`wx-tool-button${picker === 'emoji' ? ' wx-tool-button--active' : ''}`}
-              onClick={() => setPicker((current) => (current === 'emoji' ? null : 'emoji'))}
-              disabled={busy || Boolean(editing)}
-              title="表情"
-              aria-label="表情"
-            >
-              <EmojiIcon size={21} />
-            </button>
-            {/*
-              The client's cube is 收藏, not a second expression entry: the sticker
-              sets live as tabs inside the 表情 panel (docs/UI-HANDOFF.md, §5 delta 1).
-              Favourites have no protocol source yet, so this reports that like the
-              other unwired toolbar entries do.
-            */}
-            <button
-              className="wx-tool-button"
-              onClick={() => notWired('收藏')}
-              disabled={busy || Boolean(editing)}
-              title="收藏"
-              aria-label="收藏"
-            >
-              <CubeTabIcon size={21} />
-            </button>
-            <button
-              className="wx-tool-button"
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={(event) =>
-                setAttachAnchor(anchorOf(event.currentTarget.getBoundingClientRect()))
-              }
-              disabled={busy || Boolean(editing)}
-              title="发送文件"
-              aria-label="发送图片或文件"
-            >
-              <FolderIcon size={21} />
-            </button>
-            <button
-              className="wx-tool-button wx-tool-button--split"
-              onClick={() => notWired('截图')}
-              disabled={busy || Boolean(editing)}
-              title="截图"
-              aria-label="截图"
-            >
-              <ScissorsIcon size={20} />
-              <ChevronDownIcon size={9} className="wx-tool-button__chevron" />
-            </button>
-            <button
-              className="wx-tool-button"
-              onClick={() => notWired('语音消息')}
-              disabled={busy || Boolean(editing)}
-              title="语音消息"
-              aria-label="语音消息"
-            >
-              <MicIcon size={20} />
-            </button>
-          </div>
-
-          {onCollapse ? (
-            // The channel composer's way back to the 服务号 bar. Labelled, because
-            // an icon alone sat in the tool row and nobody found the way out.
-            <button
-              className="wx-composer__collapse"
-              onClick={onCollapse}
-              title="收起输入框，回到频道菜单"
-              aria-label="收起输入框"
-            >
-              <ChevronDownIcon size={15} />
-              收起
-            </button>
-          ) : null}
-
-          <button
-            className={`wx-send-button${ready ? ' wx-send-button--ready' : ''}`}
-            onClick={() => void submit()}
-            disabled={busy || text.trim().length === 0}
-          >
-            {editing ? '保存' : '发送'}
-          </button>
-        </div>
-      </div>
-
-      {attachAnchor ? (
-        <AnchoredPopup
-          anchor={attachAnchor}
-          placement={{ side: 'above' }}
-          onClose={() => setAttachAnchor(null)}
-        >
-          <button className="wx-context-menu__item" onClick={() => void attach('photo')}>
-            发送图片
-          </button>
-          <button className="wx-context-menu__item" onClick={() => void attach('file')}>
-            发送文件
-          </button>
-        </AnchoredPopup>
-      ) : null}
-
-      {picker ? (
-        <ExpressionPicker
-          chatId={chatId}
-          onPickEmoji={insertEmoji}
-          onSent={stickerSent}
-          onClose={closePicker}
-        />
-      ) : null}
+      <ComposerCard
+        value={text}
+        onChange={setText}
+        textareaRef={textareaRef}
+        placeholder={editing ? '编辑后回车保存，Esc 取消' : '输入消息'}
+        inputHandlers={inputHandlers}
+        busy={busy}
+        editing={Boolean(editing)}
+        sendLabel={editing ? '保存' : '发送'}
+        onSend={() => void submit()}
+        onSendSticker={(sticker) => void sendSticker(sticker)}
+        onAttach={(kind) => void attach(kind)}
+        onNotice={notWired}
+        {...(onCollapse ? { onCollapse } : {})}
+      />
     </div>
   )
 }

@@ -213,6 +213,15 @@
   flex: none;
 }
 
+/* The 表情 panel hangs 204 px left of the composer so it centres on the 表情
+   button in the chat column, which is free to overhang the conversation list.
+   The discussion view clips its own children — that is what hides the slide —
+   so here the overhang was cut off at the pane edge, taking the tab strip with
+   it. Inside the panel the card lines up with the input it belongs to instead. */
+.wx-comments-panel .wx-picker {
+  left: 12px;
+}
+
 /* The footer under the list: the composer, a join button, or a read-only hint. */
 .wx-comments-panel__footer {
   flex: none;

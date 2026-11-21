@@ -11,7 +11,6 @@ import {
 import { resolveCommentLanding } from '../../lib/commentAnchor'
 import { messagePreview } from '../../lib/format'
 import { selfIdentity } from '../../lib/self'
-import { useComposerInput } from '../../lib/useComposerInput'
 import { errorMessage, invoke } from '../../lib/ipc'
 import { ViewerSource } from '../../lib/viewerSource'
 import { useAppStore } from '../../store/useAppStore'
@@ -20,6 +19,7 @@ import { MessageRow } from '../message-list/MessageRow'
 import { senderAvatarUrl } from '../message-list/senderAvatar'
 import { OverlayScrollbar } from '../OverlayScrollbar'
 import { RichText } from '../RichText'
+import { CommentComposer } from './CommentComposer'
 import { useCommentAnchor } from './useCommentAnchor'
 
 type CommentAccess = InvokeResponse<'messages:commentInfo'>
@@ -60,8 +60,9 @@ function BackIcon() {
  * The comments are drawn with the transcript's own `MessageRow`, so they read like
  * any other conversation (avatar, sender, bubble, hover timestamp, media, stickers);
  * a comment is never allowed to open another discussion view, so its comment bar is
- * stripped. The input at the bottom is the chat composer's card: Enter sends through
- * `messages:sendComment`, which posts into the thread's own supergroup.
+ * stripped. The input at the bottom is the chat composer's own card (`ComposerCard`,
+ * rendered by `CommentComposer`): the full tool row, the 表情 panel and the attach
+ * menu, all posting through `messages:sendComment` into the thread's supergroup.
  *
  * The panel owns its own transcript: it opens at the top of the thread — the oldest
  * comment loaded, like a channel's comments in WeChat — loads older pages when the
@@ -94,8 +95,6 @@ export function CommentPanel({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [entered, setEntered] = useState(false)
-  const [draft, setDraft] = useState('')
-  const [sending, setSending] = useState(false)
   /**
    * The official client's comment gate (design doc §9.8): whether the account
    * may post in the discussion group, whether a join button is the next step,
@@ -111,11 +110,12 @@ export function CommentPanel({
   const listRef = useRef<HTMLDivElement | null>(null)
   const hostRef = useRef<HTMLDivElement | null>(null)
   const backRef = useRef<HTMLButtonElement | null>(null)
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const requestRef = useRef(0)
   const loadingRef = useRef(false)
   /** Scroll geometry captured before an older page is prepended. */
   const pendingRestoreRef = useRef<{ height: number; top: number } | null>(null)
+  /** Set when a posted comment is about to land: the list follows it down. */
+  const scrollToBottomRef = useRef(false)
   const landedRef = useRef(false)
 
   const auth = useAppStore((state) => state.auth)
@@ -312,6 +312,15 @@ export function CommentPanel({
     )
   }, [anchor, anchorKnown, page])
 
+  // A posted comment is appended at the end of the thread; reveal it. It runs
+  // here, not on a timer, so the new row's height is already measured.
+  useLayoutEffect(() => {
+    if (!scrollToBottomRef.current) return
+    scrollToBottomRef.current = false
+    const el = scrollRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [page])
+
   const onScroll = (): void => {
     scheduleSave()
     const el = scrollRef.current
@@ -324,6 +333,9 @@ export function CommentPanel({
   /** Appends the comment the input just posted and keeps the reader at the bottom. */
   const appendSent = (sent: Message): void => {
     const prepared = withoutCommentBar(sent)
+    // The move runs after the row is in the DOM (the layout effect above): a
+    // timer would measure the old scrollHeight and stop one row short.
+    scrollToBottomRef.current = true
     setPage((current) => {
       const next: ThreadPage = current
         ? { messages: [...current.messages, prepared], hasMore: current.hasMore }
@@ -331,35 +343,13 @@ export function CommentPanel({
       threadCache.set(key, next)
       return next
     })
-    window.setTimeout(() => {
-      const el = scrollRef.current
-      if (el) el.scrollTop = el.scrollHeight
-    }, 0)
   }
 
-  const send = async (): Promise<void> => {
-    const value = draft.trim()
-    if (!value || sending) return
-    setSending(true)
-    try {
-      const answer = await invoke('messages:sendComment', {
-        chatId: message.chatId,
-        messageId: message.id,
-        text: value,
-      })
-      setDraft('')
-      appendSent(answer.message)
-      // Slow mode restarts after every message; re-read the countdown.
-      void loadAccess()
-    } catch (err) {
-      useAppStore.getState().setError(errorMessage(err))
-    } finally {
-      setSending(false)
-    }
+  /** A posted comment joins the thread and restarts the slow-mode countdown. */
+  const posted = (sent: Message): void => {
+    appendSent(sent)
+    void loadAccess()
   }
-
-  /** Same Enter rule as the chat composer (§8.4). */
-  const { inputHandlers } = useComposerInput({ onSend: () => void send() })
 
   const post = message.text ? message.text : messagePreview(message)
   const stats = [
@@ -367,7 +357,6 @@ export function CommentPanel({
     message.interaction?.forwards ? `转发 ${formatCount(message.interaction.forwards)}` : '',
   ].filter(Boolean)
   const shown = page?.messages ?? []
-  const sendReady = !sending && slowLeft <= 0 && draft.trim().length > 0
 
   return (
     <section
@@ -474,32 +463,12 @@ export function CommentPanel({
             <span className="wx-comments-panel__hint">已申请加入讨论组，等待管理员通过</span>
           </div>
         ) : access.canComment ? (
-          <div className="wx-composer wx-comments-panel__composer">
-            {slowLeft > 0 ? (
-              <div className="wx-comments-panel__slow">慢速模式：{slowLeft} 秒后可发送</div>
-            ) : null}
-            <div className="wx-composer__card">
-              <textarea
-                ref={textareaRef}
-                className="wx-composer__input"
-                placeholder="写评论…"
-                title="Enter 发送 · Shift+Enter 换行"
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                {...inputHandlers}
-              />
-              <div className="wx-composer__actions">
-                <div className="wx-composer__tools" />
-                <button
-                  className={`wx-send-button${sendReady ? ' wx-send-button--ready' : ''}`}
-                  onClick={() => void send()}
-                  disabled={!sendReady}
-                >
-                  {sending ? '发送中' : '发送'}
-                </button>
-              </div>
-            </div>
-          </div>
+          <CommentComposer
+            chatId={message.chatId}
+            messageId={message.id}
+            slowLeft={slowLeft}
+            onSent={posted}
+          />
         ) : access.canJoin ? (
           <div className="wx-comments-panel__footer">
             <button

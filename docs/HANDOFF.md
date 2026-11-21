@@ -92,9 +92,19 @@ Greenfield → working skeleton in three milestones:
   `message.interaction_info` (comments, plus 阅读/转发 for channels) and live updates patch
   the counter through the new `interaction` message op instead of remapping the message.
   New channel `messages:comments`; new DTO `MessageInteraction`; mock fixtures carry two
-  group threads and the channel's 78-comment thread. Read-only: posting a comment is
-  deliberately not implemented (it needs the discussion chat's thread root id). Design:
-  `技术方案.md` §9.8.
+  group threads and the channel's 78-comment thread. Design:
+  `技术方案.md` §9.8. Posting landed later, and the box is now the full composer:
+- **完整的评论框 (2026-11-21)**: the discussion view's input used to be a stripped
+  textarea; it is now the chat composer's **own card** — `components/composer/ComposerCard.tsx`
+  (text, the 表情/收藏/文件/截图/语音 tool row, 发送, attach menu, expression panel) rendered by
+  both `Composer` (chat) and `CommentComposer` (thread). The two callers only own where a
+  send goes: drafts / reply-edit banners / anchored-window reloads for a chat, slow mode and
+  `messages:sendComment` for a comment. So `messages:sendComment` now carries a
+  discriminated `content` — text, a sticker, or a local photo/document — and the adapter
+  builds sticker/media content with the same `stickerContent` / `mediaContent` helpers a
+  chat send uses, replying to the thread root inside the discussion group. The 表情 panel no
+  longer sends by itself (`onSendSticker`), and the mock builds comment rows through the new
+  `packages/mock-adapter/src/media.ts`, so the two fakes and TDLib all answer the same shape.
 - **聊天信息 side panel (2026-11-21; group layout the same day)**: the header's "…"
   opens the client's 聊天信息 panel — a 314 px sheet that **overlays** the transcript and
   the composer (the owner corrected the first push version: the panel presses on the

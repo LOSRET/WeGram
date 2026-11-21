@@ -16,6 +16,10 @@ credentials (development only), plus the real PNG/WebP/TGS/WebM media it generat
 - `chats.ts` — conversation endpoints as one `createMockChats` factory (list/open/mute/
   pin/clear/members/rename/leave/pinned/invite link); `history.ts` — transcript paging.
 - `comments.ts`, `contacts.ts`, `search.ts`, `stickers.ts` — the remaining endpoints.
+- `media.ts` — the outgoing media/sticker row builders. A chat's send and a comment
+  thread's post build the same rows (§9.8: a comment can carry what the composer
+  produced), so both go through `buildMediaMessage` / `buildStickerMessage`; the
+  caller appends the row (transcript or thread) and starts the upload simulation.
 - `transcript.ts` — the one "append and announce" writer; `effects.ts` — read marker and
   transfer simulation; `traffic.ts` — ambient incoming messages.
 - Paging, read, comment and chat-list-order rules come from `@wegram/mock-session`.

@@ -2,11 +2,23 @@ import type { MessageMedia } from '@wegram/protocol'
 import { describe, expect, it } from 'vitest'
 
 import type { AdapterEvent } from '@wegram/adapter-contract'
+import { MockAssets } from './assets'
 import { commentAccessOf, commentsOf, joinGroupIn, postComment } from './comments'
 import { buildFixtures } from './fixtures'
 
 /** Only the media shim matters here; the threads are plain messages. */
 const mediaOf = (fileId: number): MessageMedia => ({ fileId })
+
+/**
+ * The builders a sticker or media comment would use. A text comment never
+ * touches them, and this fixture account owns no generated files.
+ */
+const sendDeps = () => ({
+  assets: new MockAssets((path: string) => path),
+  registerMedia: (path: string) => path,
+  probeImageSize: async () => null,
+  nextFileId: () => 1,
+})
 
 describe('mock fixtures with comment threads', () => {
   const fixtures = buildFixtures(mediaOf)
@@ -61,18 +73,19 @@ describe('mock fixtures with comment threads', () => {
     })
   })
 
-  it('posts a comment into the thread and patches the counter', () => {
+  it('posts a comment into the thread and patches the counter', async () => {
     // A fresh fixture map: this test mutates the thread it reads back.
     const own = buildFixtures(mediaOf)
     const events: AdapterEvent[] = []
-    const { message } = postComment(
+    const { message } = await postComment(
       {
         fixtures: own,
         emit: (event) => {
           events.push(event)
         },
+        sendDeps,
       },
-      { chatId: 2, messageId: 203, text: '我也来说两句' },
+      { chatId: 2, messageId: 203, content: { kind: 'text', text: '我也来说两句' } },
     )
 
     expect(message).toMatchObject({ chatId: 2, outgoing: true, text: '我也来说两句' })
@@ -87,14 +100,14 @@ describe('mock fixtures with comment threads', () => {
     expect(page.messages.at(-1)?.id).toBe(message.id)
   })
 
-  it('refuses to comment on a message without a thread', () => {
+  it('refuses to comment on a message without a thread', async () => {
     const own = buildFixtures(mediaOf)
-    expect(() =>
+    await expect(
       postComment(
-        { fixtures: own, emit: () => undefined },
-        { chatId: 2, messageId: 201, text: 'x' },
+        { fixtures: own, emit: () => undefined, sendDeps },
+        { chatId: 2, messageId: 201, content: { kind: 'text', text: 'x' } },
       ),
-    ).toThrow(/讨论群组/)
+    ).rejects.toThrow(/讨论群组/)
   })
 
   it('rejects an unknown chat instead of answering empty', () => {

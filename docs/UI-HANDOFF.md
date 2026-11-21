@@ -27,8 +27,8 @@ listed in "Known deltas" is a deliberate, documented difference.
 | `renderer/src/components/MessageList.tsx` | Bubbles, real sender photos on both sides (own avatar on the right; `senderAvatarUrl`, `evt:avatars`, `Self.avatarUrl`), hover-only timestamp/read receipt, day + unread separators. |
 | `renderer/src/components/message-list/CommentBar.tsx` | WeChat's 评论 N 条 bar under a bubble (design doc §9.8) — the handle, not the thread. It is a **channel post** feature: `isCommentablePost` (`lib/comments.ts`) draws it in a channel chat only, never for a group or private message even when TDLib reports `reply_info` (the official clients gate the same way). In a channel post it is the bubble's last row instead. |
 | `renderer/src/components/message-list/ChannelMeta.tsx` | A channel post's footer: eye + view count + time (+ 已编辑), inside the bubble or under a sticker. The channel composition itself is `styles/channel.css`. |
-| `renderer/src/components/chat-pane/CommentPanel.tsx` | Telegram's discussion view: the full chat pane, sliding in from the right (250 ms, `COMMENT_PANEL_ANIM_MS` unmount delay), pinned post, comments drawn with `MessageRow` (opens at the top of the thread, scroll-up paging, session cache, and the row the reader left restored through `useCommentAnchor` / `ui:saveCommentAnchor`) and the chat composer's card at the bottom (`messages:sendComment`). Styles: `styles/comments.css`. |
-| `renderer/src/components/Composer.tsx` | Bordered input card, toolbar under the text, attach menu, send button inside the card. A channel manages it through `onCollapse`: the channel composer shows a labelled 收起 button next to 发送 that puts the 服务号 bar back. |
+| `renderer/src/components/chat-pane/CommentPanel.tsx` | Telegram's discussion view: the full chat pane, sliding in from the right (250 ms, `COMMENT_PANEL_ANIM_MS` unmount delay), pinned post, comments drawn with `MessageRow` (opens at the top of the thread, scroll-up paging, session cache, and the row the reader left restored through `useCommentAnchor` / `ui:saveCommentAnchor`) and `CommentComposer` at the bottom — the same `ComposerCard` a chat uses, posting text / sticker / photo-file through `messages:sendComment`. Styles: `styles/comments.css`. |
+| `renderer/src/components/composer/ComposerCard.tsx` | The ONE bordered input card (§8.4): text, toolbar under it, attach menu, send button inside the card, 表情 panel. Both the chat's `Composer` and the comment box's `CommentComposer` render it; only where a send goes differs. A channel manages it through `onCollapse`: the channel composer shows a labelled 收起 button next to 发送 that puts the 服务号 bar back. |
 | `renderer/src/components/chat-pane/ChannelBar.tsx` | A channel's bottom edge instead of the composer: WeChat's 服务号 card — 静音 always, plus the keyboard switch on the right when `chats:canPost` says this account may post (the switch swaps the card for the composer). A read-only channel keeps only 静音, and its message menu has no 回复. |
 | `renderer/src/components/ExpressionPicker.tsx` | The composer's 表情/贴纸 panel: the client's 464 px card with 最近使用, the 10-column 所有表情 grid, a 搜索 tab and one tab per installed sticker set (with 下一页 paging). Picking an emoji inserts it at the caret; clicking a sticker sends it. |
 | `renderer/src/lib/emoji.ts` | The Unicode emoji catalogue with Chinese names/keywords, search and the recent-row merge (pure, unit-tested). |
@@ -877,11 +877,11 @@ transcript, and DSH refuses clicks on it. Use the Electron window instead.
     flash. Format matters: Apple's own `AppleColorEmoji.ttf` is sbix and Chromium on Windows
     does not paint it (verified: it falls back to Segoe), while CBDT renders; skin tones,
     flags and ZWJ families are `ccmp` ligatures, FE0F is absorbed by a one-rule-per-glyph
-    ligature. One deliberate hole: ASCII digits, `#` and `*` are kept out of the font's
-    cmap, because with the family first a digit would otherwise resolve to the font's blank
-    keycap component and the number would vanish — so keycaps (1️⃣, #️⃣) fall back to the
-    system emoji font. The chat-list and search previews inherit the font too. Provenance,
-    the licensing caveat and the regeneration steps: `renderer/src/assets/fonts/NOTICE.md`.
+    ligature. One deliberate hole: ASCII digits, `#` and `*` are kept out of the font's cmap,
+    because with the family first a digit would otherwise resolve to the font's blank keycap
+    component and the number would vanish — so keycaps (1️⃣, #️⃣) fall back to the system
+    emoji font. The chat-list and search previews inherit the font too. Provenance, the
+    licensing caveat and the regeneration steps: `renderer/src/assets/fonts/NOTICE.md`.
 
 ## 6. Suggested next steps, in order
 

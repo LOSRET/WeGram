@@ -1,10 +1,13 @@
-import type { Message, StickerSetSummary } from '@wegram/protocol'
+import type { Sticker, StickerSetSummary } from '@wegram/protocol'
 
 export interface ExpressionPickerProps {
-  chatId: number
   /** Inserts a picked emoji into the composer at the caret. */
   onPickEmoji: (emoji: string) => void
-  onSent: (message: Message) => void
+  /**
+   * Posts the clicked sticker through the composer's own send path: a chat's
+   * composer sends it to the chat, a comment box to the discussion thread.
+   */
+  onSendSticker: (sticker: Sticker) => void
   onClose: () => void
 }
 

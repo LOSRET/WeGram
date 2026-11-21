@@ -1,12 +1,8 @@
-import type { Sticker } from '@wegram/protocol'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-import { loadLatestWindow } from '../lib/anchoredWindow'
 import { searchEmoji } from '../lib/emoji'
-import { errorMessage, invoke } from '../lib/ipc'
 import { pageForIndex } from '../lib/pickerTabs'
 import { containsText, normalizeQuery } from '../lib/search'
-import { useAppStore } from '../store/useAppStore'
 import { EmojiBody } from './picker/EmojiBody'
 import { PickerTabs } from './picker/PickerTabs'
 import { SearchBody } from './picker/SearchBody'
@@ -21,8 +17,9 @@ import { useStickerSets } from './picker/useStickerSets'
  * The composer's expression picker (design doc §9.3), rebuilt against the client's
  * own 表情 panel: a 464×464 card floating above the input, 最近使用 over a 10-column
  * 所有表情 grid, and the tab strip (搜索 / 表情 / installed sets / 下一页) pinned to
- * the bottom. Emoji are inserted into the draft; a sticker from a set tab is sent
- * on click.
+ * the bottom. Emoji are inserted into the draft; a sticker from a set tab goes to
+ * the caller's send path on click (`onSendSticker`), so the same panel serves a
+ * chat and a comment thread.
  *
  * The panel always opens on 表情. The set tabs in the strip are the only way to
  * stickers: the composer's cube is 收藏, not a second expression entry.
@@ -34,7 +31,7 @@ import { useStickerSets } from './picker/useStickerSets'
  * This file owns the tab state and the composition; each concern has its own
  * module under `picker/`.
  */
-export function ExpressionPicker({ chatId, onPickEmoji, onSent, onClose }: ExpressionPickerProps) {
+export function ExpressionPicker({ onPickEmoji, onSendSticker, onClose }: ExpressionPickerProps) {
   const { sets } = useStickerSets()
   const [tab, setTab] = useState<PickerTab>({ kind: 'emoji' })
   const [page, setPage] = useState(0)
@@ -45,7 +42,7 @@ export function ExpressionPicker({ chatId, onPickEmoji, onSent, onClose }: Expre
   const bodyRef = useRef<HTMLDivElement>(null)
 
   const activeSetId = tab.kind === 'set' ? tab.id : null
-  const { activeSet, setLoading, setError, reportError } = useActiveStickerSet(activeSetId)
+  const { activeSet, setLoading, setError } = useActiveStickerSet(activeSetId)
   // The tab strip is wider than the pack name, so the body repeats it as a label —
   // available from the summary before the set itself has landed.
   const activeSetTitle =
@@ -59,20 +56,6 @@ export function ExpressionPicker({ chatId, onPickEmoji, onSent, onClose }: Expre
   const pickEmoji = (char: string): void => {
     onPickEmoji(char)
     remember(char)
-  }
-
-  const send = async (sticker: Sticker): Promise<void> => {
-    try {
-      // An anchored window cannot take the new row in place; return to the
-      // newest page first so the message lands where it will be visible.
-      const wasAnchored = await loadLatestWindow(chatId)
-      const result = await invoke('messages:sendSticker', { chatId, fileId: sticker.fileId })
-      useAppStore.getState().applyMessageOps(chatId, [{ op: 'new', message: result.message }])
-      if (wasAnchored) useAppStore.getState().requestJumpToLatest(chatId)
-      onSent(result.message)
-    } catch (cause) {
-      reportError(errorMessage(cause))
-    }
   }
 
   const stripItems: PickerStripItem[] = [
@@ -116,7 +99,7 @@ export function ExpressionPicker({ chatId, onPickEmoji, onSent, onClose }: Expre
             loading={setLoading}
             error={setError}
             set={activeSet}
-            onSend={(sticker) => void send(sticker)}
+            onSend={onSendSticker}
           />
         )}
       </div>

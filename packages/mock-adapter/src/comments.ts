@@ -13,6 +13,8 @@ import type {
   CommentTarget,
 } from '@wegram/adapter-contract'
 import type { Fixture } from './constants'
+import { simulateTransfer } from './effects'
+import { buildMediaMessage, buildStickerMessage, type MockSendDeps } from './media'
 import { outgoingMessage } from './transcript'
 
 /**
@@ -65,23 +67,26 @@ export function commentsOf(fixtures: Map<number, Fixture>, input: CommentQuery):
 /**
  * The mock's send path: append to the fixture thread and patch the parent's
  * counter, exactly the way the adapter emits it for `updateMessageInteractionInfo`.
+ *
+ * A comment is whatever the (reused) composer card produced: text, a sticker or
+ * a local file, built by the same helpers a chat's sends use (§9.8).
  */
-export function postComment(
-  deps: { fixtures: Map<number, Fixture>; emit: (event: AdapterEvent) => void },
+export async function postComment(
+  deps: {
+    fixtures: Map<number, Fixture>
+    emit: (event: AdapterEvent) => void
+    /** Lazy: the adapter's assets do not exist while its fields initialise. */
+    sendDeps: () => MockSendDeps
+  },
   input: CommentSendQuery,
-): { message: Message } {
+): Promise<{ message: Message }> {
   const fixture = deps.fixtures.get(input.chatId)
   if (!fixture) throw new AppError('internal', `Unknown mock chat ${input.chatId}`)
   const thread = fixture.comments?.[input.messageId]
   if (!thread) throw new AppError('not_implemented', '这个帖子还没有讨论群组，不能评论')
-  const message = outgoingMessage({
-    id: thread.reduce((max, item) => Math.max(max, item.id), 0) + 1,
-    chatId: input.chatId,
-    kind: 'text',
-    text: input.text,
-    replyTo: input.replyTo,
-  })
-  thread.push(message)
+  const id = thread.reduce((max, item) => Math.max(max, item.id), 0) + 1
+  const built = await buildComment(deps.sendDeps, input, id)
+  thread.push(built.message)
   const parent = fixture.messages.find((item) => item.id === input.messageId)
   const interaction = { ...parent?.interaction, comments: thread.length, canOpen: true }
   if (parent) parent.interaction = interaction
@@ -90,7 +95,57 @@ export function postComment(
     chatId: input.chatId,
     ops: [{ op: 'interaction', chatId: input.chatId, messageId: input.messageId, interaction }],
   })
-  return { message }
+  // A posted file uploads asynchronously, like TDLib does.
+  if (built.upload) {
+    void simulateTransfer(
+      { files: deps.sendDeps().assets.files, emit: deps.emit },
+      built.upload.fileId,
+      built.upload.size,
+      true,
+    )
+  }
+  return { message: built.message }
+}
+
+/** The row one posted payload becomes, and the upload it starts. */
+async function buildComment(
+  sendDeps: () => MockSendDeps,
+  input: CommentSendQuery,
+  id: number,
+): Promise<{ message: Message; upload?: { fileId: number; size: number } }> {
+  const chatId = input.chatId
+  switch (input.content.kind) {
+    case 'text':
+      return {
+        message: outgoingMessage({
+          id,
+          chatId,
+          kind: 'text',
+          text: input.content.text,
+          replyTo: input.replyTo,
+        }),
+      }
+    case 'sticker':
+      return {
+        message: buildStickerMessage(sendDeps(), {
+          id,
+          chatId,
+          fileId: input.content.fileId,
+          replyTo: input.replyTo,
+        }).message,
+      }
+    case 'media': {
+      const built = await buildMediaMessage(sendDeps(), {
+        id,
+        chatId,
+        filePath: input.content.filePath,
+        kind: input.content.mediaKind,
+        ...(input.content.caption === undefined ? {} : { caption: input.content.caption }),
+        replyTo: input.replyTo,
+      })
+      return { message: built.message, upload: { fileId: built.fileId, size: built.size } }
+    }
+  }
 }
 /** The mock's stand-in for the membership/permission rule of comment-access.ts. */
 export function commentAccessOf(
@@ -123,12 +178,13 @@ export function joinGroupIn(
 export function createMockComments(
   fixtures: Map<number, Fixture>,
   emit: (event: AdapterEvent) => void,
+  sendDeps: () => MockSendDeps,
 ) {
   return {
     comments: async (input: CommentQuery): Promise<CommentPage> => commentsOf(fixtures, input),
     info: async (input: CommentTarget): Promise<CommentAccess> => commentAccessOf(fixtures, input),
     join: async (input: CommentTarget): Promise<CommentJoinResult> => joinGroupIn(fixtures, input),
     send: async (input: CommentSendQuery): Promise<{ message: Message }> =>
-      postComment({ fixtures, emit }, input),
+      postComment({ fixtures, emit, sendDeps }, input),
   }
 }

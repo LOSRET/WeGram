@@ -37,6 +37,7 @@ longer load in one go):
 | --- | --- |
 | `viewer/MediaViewer.tsx` (586) | `MediaViewer.tsx` (~190) + `useViewerItem` (download/progress), `useViewerZoom` (fit/zoom/rotate/pan), `useViewerNotice`, `ViewerToolbar`, `ViewerGrid`, `viewerActions` (IPC), `viewerMenu` (menu as data, tested) |
 | `components/ExpressionPicker.tsx` (449) | `ExpressionPicker.tsx` (state + composition) + `picker/`: `useStickerSets`, `useActiveStickerSet`, `useRecentEmoji`, `usePickerDismiss`, `EmojiBody`, `SearchBody`, `StickerBody`, `PickerTabs`, `EmojiGrid`, `types` |
+| `components/Composer.tsx` (329; 2026-11-21) | `composer/ComposerCard.tsx` — the ONE bordered input card (text, tool row, 表情 panel, attach menu, 发送) both composers render — plus `Composer.tsx` (a chat's send path: per-chat drafts, reply/edit banners, anchored-window reload, 收起) and `chat-pane/CommentComposer.tsx` (a comment thread's send path, §9.8). `ExpressionPicker` lost its own send (`onSendSticker`), `usePickerDismiss` keeps Esc inside the picker, and the shared card pushes `CommentPanel` back under its line budget |
 | `screens/LoginWindow.tsx` (491) | `LoginWindow.tsx` (chrome + 4 bodies) + `login/`: `useLoginFlow`, `QrStep`, `ProfileStep`, `PhoneForm`, `LoginFooter`, `LoginHelp`, `loginCopy` (pure, tested) |
 | duplicated `Sticker → MessageMedia` | `lib/stickerMedia.ts` (tested), used by the picker and the browser preview |
 | `message-list/index.tsx` (476) | `index.tsx` (composition + render) + `useJumpToLatest`, `useLocateScroll`, `useLandingSave`, `useViewportSeen` |

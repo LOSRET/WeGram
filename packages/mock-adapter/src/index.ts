@@ -1,6 +1,4 @@
 import { randomUUID } from 'node:crypto'
-import { stat } from 'node:fs/promises'
-import { basename } from 'node:path'
 
 import { AppError } from '@wegram/protocol'
 import type {
@@ -11,7 +9,6 @@ import type {
   Contact,
   CustomEmojiSticker,
   Message,
-  MessageMedia,
   MessageProperties,
   ProxyConfig,
   ProxyTestResult,
@@ -27,15 +24,9 @@ import { MockAvatars } from './avatars'
 import { createMockChats } from './chats'
 import { createMockComments } from './comments'
 import { listMockContacts } from './contacts'
-import {
-  ME,
-  MOCK_CODE,
-  MOCK_PASSWORD,
-  mimeFromPath,
-  type Fixture,
-  type MockFile,
-} from './constants'
+import { ME, MOCK_CODE, MOCK_PASSWORD, type Fixture } from './constants'
 import { applyRead, simulateTransfer } from './effects'
+import { buildMediaMessage, buildStickerMessage, type MockSendDeps } from './media'
 import { beginMockStream, downloadMockFile, mockDownloadedPrefix } from './files'
 import { buildFixtures } from './fixtures'
 import {
@@ -84,8 +75,16 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   private auth: AuthState = { kind: 'idle' }
   private connection: ConnectionState = 'offline'
   private readonly fixtures = new Map<number, Fixture>()
-  /** The comment endpoints live in `./comments.ts`; fields keep this file small. */
-  private readonly commentApi = createMockComments(this.fixtures, (event) => this.emit(event))
+  /**
+   * The comment endpoints live in `./comments.ts`; fields keep this file small.
+   * Threads post the same rows a chat does, so they borrow `sendDeps` — read
+   * lazily, because the assets exist only after the constructor ran.
+   */
+  private readonly commentApi = createMockComments(
+    this.fixtures,
+    (event) => this.emit(event),
+    () => this.sendDeps(),
+  )
   readonly comments = this.commentApi.comments
   readonly commentInfo = this.commentApi.info
   readonly joinCommentGroup = this.commentApi.join
@@ -287,50 +286,19 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     replyTo?: number
   }): Promise<{ localId: string; message: Message }> {
     const fixture = this.requireFixture(input.chatId)
-    const info = await stat(input.filePath)
-    const size = input.kind === 'photo' ? await this.options.probeImageSize(input.filePath) : null
-    const fileId = this.nextFileId++
-    const file: MockFile = {
-      fileId,
-      path: input.filePath,
-      url: this.options.registerMedia(input.filePath),
-      name: basename(input.filePath),
-      size: info.size,
-      mimeType: mimeFromPath(input.filePath),
-      ...(size ?? {}),
-    }
-    this.assets.files.set(fileId, file)
-
-    const media: MessageMedia = {
-      fileId,
-      ...(file.mimeType ? { mimeType: file.mimeType } : {}),
-      fileName: file.name,
-      size: file.size,
-      localUrl: file.url,
-      ...(size ? { width: size.width, height: size.height } : {}),
-    }
-    const message = outgoingMessage({
+    const built = await buildMediaMessage(this.sendDeps(), {
+      ...input,
       id: this.nextMessageId++,
-      chatId: input.chatId,
-      kind: input.kind === 'photo' && size ? 'photo' : 'file',
-      text: input.caption ?? '',
-      media,
-      replyTo: input.replyTo,
     })
-    appendMessage(
-      { emit: (event) => this.emit(event) },
-      fixture,
-      message,
-      `[${message.kind === 'photo' ? '图片' : '文件'}] ${file.name}`,
-    )
+    appendMessage({ emit: (event) => this.emit(event) }, fixture, built.message, built.preview)
     // Upload progress is reported asynchronously, like TDLib does.
     void simulateTransfer(
       { files: this.assets.files, emit: (event) => this.emit(event) },
-      fileId,
-      info.size,
+      built.fileId,
+      built.size,
       true,
     )
-    return { localId: `mock-${message.id}`, message }
+    return { localId: `mock-${built.message.id}`, message: built.message }
   }
 
   async sendSticker(input: {
@@ -339,31 +307,19 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     replyTo?: number
   }): Promise<{ localId: string; message: Message }> {
     const fixture = this.requireFixture(input.chatId)
-    const sticker = this.assets.stickers.find((item) => item.fileId === input.fileId)
-    const file = this.assets.files.get(input.fileId)
-    if (!sticker || !file) throw new AppError('internal', `Unknown mock sticker ${input.fileId}`)
-    const message = outgoingMessage({
-      id: this.nextMessageId++,
-      chatId: input.chatId,
-      kind: 'sticker',
-      text: '',
-      media: {
-        fileId: sticker.fileId,
-        stickerFormat: sticker.format,
-        ...(sticker.emoji ? { stickerEmoji: sticker.emoji } : {}),
-        ...(sticker.width ? { width: sticker.width } : {}),
-        ...(sticker.height ? { height: sticker.height } : {}),
-        localUrl: file.url,
-      },
-      replyTo: input.replyTo,
-    })
-    appendMessage(
-      { emit: (event) => this.emit(event) },
-      fixture,
-      message,
-      `[贴纸] ${sticker.emoji ?? ''}`.trim(),
-    )
-    return { localId: `mock-${message.id}`, message }
+    const built = buildStickerMessage(this.sendDeps(), { ...input, id: this.nextMessageId++ })
+    appendMessage({ emit: (event) => this.emit(event) }, fixture, built.message, built.preview)
+    return { localId: `mock-${built.message.id}`, message: built.message }
+  }
+
+  /** What the outgoing-message builders need; also handed to the comment threads. */
+  private sendDeps(): MockSendDeps {
+    return {
+      assets: this.assets,
+      registerMedia: this.options.registerMedia,
+      probeImageSize: this.options.probeImageSize,
+      nextFileId: () => this.nextFileId++,
+    }
   }
 
   async listStickerSets(): Promise<StickerSetSummary[]> {
