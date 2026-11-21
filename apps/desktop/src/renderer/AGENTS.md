@@ -36,9 +36,10 @@ components/chat-pane/     render tree + useChatHistory (history/ modules) + mess
                          reading position in ui.db; the default landing is the top) +
                          ChatInfoPanel (聊天信息, §9.9: a 314 px OVERLAY sheet — transform
                          only, the transcript keeps its width — with 搜索群成员 and the
-                         member grid for groups, 群聊名称 / 群公告 / 群二维码 / 退出群聊 for
-                         groups and channels (a channel keeps the rows, not the grid) and
-                         the shared mute/pin/clear rows; 群二维码 opens screens/QrWindow.tsx, the
+                         member grid for groups, 群聊名称 / 群公告 / 群二维码 / 退出群聊 (频道
+                         名称 / 频道公告 / 频道二维码 / 退出频道 on a channel, which keeps the
+                         rows but not the grid) and the shared mute/pin/clear rows;
+                         群二维码 opens screens/QrWindow.tsx, the
                          rows live in ChatInfoRows.tsx, and the rename/invite sheets in
                          ChatInfoDialogs.tsx) + ChatInfoSearch
                          (in-panel 查找聊天内容 over search:inChat, picks a row → locate)

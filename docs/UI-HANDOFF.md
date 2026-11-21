@@ -392,8 +392,10 @@ against the client are listed separately.
 - **Channel** (2026-11-21, owner's instruction "频道的聊天信息面板复用群组的"): the group
   layout without the participant block — no 搜索群成员, no grid, no 添加. TDLib only hands
   a channel's member list to its administrators, so everyone else would get a fake
-  one-row grid of the channel itself; the rest (群聊名称, 群公告, 群二维码, 查找聊天内容,
-  mute/pin, 清空聊天记录, 退出群聊) stays, and 群公告 reads the channel's newest pinned post.
+  one-row grid of the channel itself; the rest stays with the channel's nouns:
+  频道名称 (rename sheet and toast too), 频道公告 (the channel's newest pinned post, or
+  未设置), 频道二维码, 查找聊天内容, mute/pin, 清空聊天记录 and 退出频道 (its confirm
+  dialog too). The QR window follows: 频道：…, 频道二维码, 公开频道。
 - **搜索群成员** is a *server* search: `chats:members` grew a `query` that goes straight
   to `searchChatMembers` (260 ms debounce). It is not a filter over the twelve rows the
   grid already has, and a query with no hits deliberately draws no tiles (not the group's

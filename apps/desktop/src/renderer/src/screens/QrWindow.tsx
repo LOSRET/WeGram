@@ -154,6 +154,7 @@ export function QrWindow() {
     return () => window.removeEventListener('keydown', onKey)
   }, [picking])
 
+  const channel = info?.chat.kind === 'channel'
   const faces = (info?.members ?? []).slice(0, 6)
   const names = (info?.members ?? [])
     .slice(0, 3)
@@ -175,21 +176,29 @@ export function QrWindow() {
       {error !== null ? (
         <p className="wx-qr-window__note">{error}</p>
       ) : info === null ? (
-        <p className="wx-qr-window__note">正在生成群二维码…</p>
+        <p className="wx-qr-window__note">正在生成二维码…</p>
       ) : (
         <>
           <div className="wx-qr-window__head">
             <GroupFaces info={info} faces={faces} userAvatars={userAvatars} />
-            <p className="wx-qr-window__title">群聊：{names || info.chat.title}</p>
+            <p className="wx-qr-window__title">
+              {channel ? '频道' : '群聊'}：{names || info.chat.title}
+            </p>
           </div>
 
           {info.invite === null ? (
             <p className="wx-qr-window__note">
-              这个群没有可分享的邀请链接。公开群，或拥有邀请权限的账号，才拿得到。
+              {channel
+                ? '这个频道没有可分享的邀请链接。公开频道，或拥有邀请权限的账号，才拿得到。'
+                : '这个群没有可分享的邀请链接。公开群，或拥有邀请权限的账号，才拿得到。'}
             </p>
           ) : (
             <>
-              <QrCode value={info.invite.link} size={280} label="群二维码" />
+              <QrCode
+                value={info.invite.link}
+                size={280}
+                label={channel ? '频道二维码' : '群二维码'}
+              />
               <p className="wx-qr-window__validity">
                 {info.invite.expiresAt
                   ? `该二维码 7 天内（${formatExpiry(info.invite.expiresAt)}前）有效，重新进入将更新`

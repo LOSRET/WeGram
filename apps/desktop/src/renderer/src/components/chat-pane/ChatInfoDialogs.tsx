@@ -11,11 +11,17 @@ import { QrCode } from '../QrCode'
  * (no `can_change_info` right) keeps the sheet open with the typed name.
  */
 export function RenameDialog({
+  title,
+  hint,
   initial,
   busy,
   onSave,
   onCancel,
 }: {
+  /** 群聊名称 for a group, 频道名称 for a channel. */
+  title: string
+  /** The line under the input: the same nouns as the title. */
+  hint: string
   initial: string
   busy: boolean
   onSave: (title: string) => void
@@ -33,7 +39,7 @@ export function RenameDialog({
           if (trimmed !== '' && !busy) onSave(trimmed)
         }}
       >
-        <div className="wx-dialog__title">群聊名称</div>
+        <div className="wx-dialog__title">{title}</div>
         <input
           className="wx-input"
           value={value}
@@ -42,7 +48,7 @@ export function RenameDialog({
           spellCheck={false}
           onChange={(event) => setValue(event.target.value)}
         />
-        <p className="wx-info-dialog__hint">修改后，将在群内通知其他成员。</p>
+        <p className="wx-info-dialog__hint">{hint}。</p>
         <div className="wx-dialog__actions">
           <button type="button" onClick={onCancel}>
             取消

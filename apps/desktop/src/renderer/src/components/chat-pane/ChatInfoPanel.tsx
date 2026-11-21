@@ -167,7 +167,7 @@ export function ChatInfoPanel({
     try {
       const updated = await invoke('chats:setTitle', { chatId: chat.id, title })
       useAppStore.getState().applyChatOps([{ op: 'upsert', chat: updated }])
-      useAppStore.getState().setToast('群聊名称已修改')
+      useAppStore.getState().setToast(isChannel ? '频道名称已修改' : '群聊名称已修改')
       setRenaming(false)
     } catch (error) {
       useAppStore.getState().setError(errorMessage(error))
@@ -195,6 +195,14 @@ export function ChatInfoPanel({
     : (isGroup && !queryEmpty && members.length === 0 ? [] : personTiles(members, chat)).map(
         (tile) => ({ ...tile, avatarUrl: tile.avatarUrl ?? userAvatars[tile.id] }),
       )
+
+  /** A channel's rows are the group's rows under the channel's own nouns. */
+  const renameTitle = isChannel ? '频道名称' : '群聊名称'
+  const renameHint = isChannel ? '修改后，将在频道内通知订阅者' : '修改后，将在群内通知其他成员'
+  const pinnedLabel = isChannel ? '频道公告' : '群公告'
+  const pinnedEmpty = isChannel ? '未设置' : '群主未设置'
+  const qrLabel = isChannel ? '频道二维码' : '群二维码'
+  const leaveLabel = isChannel ? '退出频道' : '退出群聊'
 
   return (
     <section className={`wx-info${entered ? ' is-open' : ''}`} aria-label="聊天信息" ref={panelRef}>
@@ -253,20 +261,16 @@ export function ChatInfoPanel({
           {hasChatRows ? (
             <>
               <div className="wx-info__stack">
+                <InfoRow label={renameTitle} hint={renameHint} onClick={() => setRenaming(true)} />
                 <InfoRow
-                  label="群聊名称"
-                  hint="修改后，将在群内通知其他成员"
-                  onClick={() => setRenaming(true)}
-                />
-                <InfoRow
-                  label="群公告"
-                  hint={pinned ? pinned.text : '群主未设置'}
+                  label={pinnedLabel}
+                  hint={pinned ? pinned.text : pinnedEmpty}
                   {...(pinned ? { onClick: () => onLocate(pinned.messageId) } : {})}
                 />
               </div>
               <div className="wx-info__rule" />
               <LinkRow
-                label="群二维码"
+                label={qrLabel}
                 icon={<QrGlyphIcon className="wx-info__qr" />}
                 // The client opens the QR as its own window, not a sheet in the chat.
                 onClick={() => {
@@ -300,7 +304,7 @@ export function ChatInfoPanel({
           {hasChatRows ? (
             <>
               <div className="wx-info__rule" />
-              <DangerRow label="退出群聊" onClick={() => setLeaving(true)} />
+              <DangerRow label={leaveLabel} onClick={() => setLeaving(true)} />
             </>
           ) : null}
         </div>
@@ -316,6 +320,8 @@ export function ChatInfoPanel({
       {renaming
         ? createPortal(
             <RenameDialog
+              title={renameTitle}
+              hint={renameHint}
               initial={chat.title}
               busy={renameBusy}
               onSave={(title) => void saveTitle(title)}
@@ -335,8 +341,12 @@ export function ChatInfoPanel({
       {leaving
         ? createPortal(
             <ConfirmDialog
-              title="退出群聊？"
-              description="退出后将不再接收这个群的消息；本机的聊天记录会保留。"
+              title={isChannel ? '退出频道？' : '退出群聊？'}
+              description={
+                isChannel
+                  ? '退出后将不再接收这个频道的消息；本机的聊天记录会保留。'
+                  : '退出后将不再接收这个群的消息；本机的聊天记录会保留。'
+              }
               confirmLabel="退出"
               danger
               onConfirm={() => void leaveGroup()}
