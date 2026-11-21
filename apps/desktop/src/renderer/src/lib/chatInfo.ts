@@ -26,10 +26,10 @@ export interface PersonTile {
 /**
  * Which faces the grid draws.
  *
- * A group or channel shows its members. A private chat has no member table — the
- * client draws the conversation's own face there — and a channel whose member list
- * needs administrator rights answers with an empty list, which lands on the same
- * fallback so the grid is never blank.
+ * A group shows the members it returned. A private chat has no member table — the
+ * client draws the conversation's own face there — and an empty member list lands
+ * on the same fallback so the grid is never blank. A channel draws no grid at all:
+ * TDLib hands its member list only to administrators (see `ChatInfoPanel`).
  */
 export function personTiles(members: ChatMember[], chat: ChatSummary): PersonTile[] {
   if (members.length > 0) {

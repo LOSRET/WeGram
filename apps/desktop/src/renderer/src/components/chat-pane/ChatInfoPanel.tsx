@@ -44,6 +44,11 @@ interface ChatInfoPanelProps {
  * 查找聊天内容, the mute/pin pair, 清空聊天记录 and 退出群聊. Rows WeChat has and
  * Telegram does not — 备注, 我在本群的昵称, 保存到通讯录, 显示群成员昵称 — are
  * deliberately absent (see docs/UI-HANDOFF.md §5).
+ *
+ * A channel reuses that layout without the member grid: TDLib only hands a
+ * channel's member list to its administrators, so the grid would be the
+ * channel's own face for everyone else. 群聊名称, 群公告, 群二维码, 查找聊天内容,
+ * the mute/pin pair, 清空聊天记录 and 退出群聊 all work on a channel.
  */
 export function ChatInfoPanel({
   chat,
@@ -70,6 +75,10 @@ export function ChatInfoPanel({
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
   const isGroup = chat.kind === 'group'
+  /** A channel draws every group row except the member grid (see the header). */
+  const isChannel = chat.kind === 'channel'
+  /** 群聊名称 / 群公告 / 群二维码 / 退出群聊: groups and channels, not private chats. */
+  const hasChatRows = chat.kind !== 'private'
 
   // Mount closed, open on the next paint. The timeout is the fallback for an
   // occluded window, where rAF is throttled (see AGENTS.md).
@@ -86,7 +95,9 @@ export function ChatInfoPanel({
   // not a filter over the twelve rows already on screen, so a query is debounced
   // the same way the in-chat search view is.
   useEffect(() => {
-    if (chat.kind === 'private') {
+    // Only a group draws the member grid; a channel's member list is
+    // administrator-only, so its panel skips the request entirely.
+    if (!isGroup) {
       setMembers([])
       return
     }
@@ -101,8 +112,8 @@ export function ChatInfoPanel({
           .then((list) => {
             if (!cancelled) setMembers(list)
           })
-          // A channel refuses its member list without administrator rights; the
-          // grid then keeps the conversation's own face instead of an error bar.
+          // A refused member list keeps the conversation's own face instead of
+          // an error bar (the grid is never blank).
           .catch(() => {
             if (!cancelled) setMembers([])
           })
@@ -113,11 +124,12 @@ export function ChatInfoPanel({
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [chat.id, chat.kind, memberQuery])
+  }, [chat.id, chat.kind, isGroup, memberQuery])
 
-  // 群公告: Telegram's newest pinned message. A group without one answers null.
+  // 群公告: Telegram's newest pinned message. A chat without one answers null;
+  // a private conversation has no pinned message at all.
   useEffect(() => {
-    if (chat.kind !== 'group') {
+    if (!hasChatRows) {
       setPinned(null)
       return
     }
@@ -132,7 +144,7 @@ export function ChatInfoPanel({
     return () => {
       cancelled = true
     }
-  }, [chat.id, chat.kind])
+  }, [chat.id, chat.kind, hasChatRows])
 
   // Esc closes whatever is on top: a dialog, the search view, then the panel.
   useEffect(() => {
@@ -178,9 +190,11 @@ export function ChatInfoPanel({
 
   /** A query with no hits must not fall back to the group's face: the grid is the answer. */
   const queryEmpty = memberQuery.trim() === ''
-  const tiles = (
-    isGroup && !queryEmpty && members.length === 0 ? [] : personTiles(members, chat)
-  ).map((tile) => ({ ...tile, avatarUrl: tile.avatarUrl ?? userAvatars[tile.id] }))
+  const tiles = isChannel
+    ? []
+    : (isGroup && !queryEmpty && members.length === 0 ? [] : personTiles(members, chat)).map(
+        (tile) => ({ ...tile, avatarUrl: tile.avatarUrl ?? userAvatars[tile.id] }),
+      )
 
   return (
     <section className={`wx-info${entered ? ' is-open' : ''}`} aria-label="聊天信息" ref={panelRef}>
@@ -188,51 +202,55 @@ export function ChatInfoPanel({
         <ChatInfoSearch chatId={chat.id} onBack={() => setSearching(false)} onPick={onLocate} />
       ) : (
         <div className="wx-info__scroll" ref={scrollRef}>
-          {isGroup ? (
-            <div className="wx-info__member-search">
-              <SearchField
-                value={memberQuery}
-                onValueChange={setMemberQuery}
-                placeholder="搜索群成员"
-              />
-            </div>
-          ) : null}
+          {!isChannel ? (
+            <>
+              {isGroup ? (
+                <div className="wx-info__member-search">
+                  <SearchField
+                    value={memberQuery}
+                    onValueChange={setMemberQuery}
+                    placeholder="搜索群成员"
+                  />
+                </div>
+              ) : null}
 
-          <div className="wx-info__people">
-            {tiles.map((tile) => (
-              <div className="wx-info__person" key={tile.id}>
-                <Avatar
-                  url={tile.avatarUrl}
-                  name={tile.title}
-                  colorId={tile.id}
-                  className="wx-info__avatar"
-                />
-                <span className="wx-info__name" title={tile.title}>
-                  {tile.title}
-                </span>
+              <div className="wx-info__people">
+                {tiles.map((tile) => (
+                  <div className="wx-info__person" key={tile.id}>
+                    <Avatar
+                      url={tile.avatarUrl}
+                      name={tile.title}
+                      colorId={tile.id}
+                      className="wx-info__avatar"
+                    />
+                    <span className="wx-info__name" title={tile.title}>
+                      {tile.title}
+                    </span>
+                  </div>
+                ))}
+                {isGroup ? (
+                  <button
+                    type="button"
+                    className="wx-info__person wx-info__person--add"
+                    onClick={() => setInvite({ title: '邀请成员' })}
+                  >
+                    <span className="wx-info__add-tile">
+                      <PlusIcon size={20} />
+                    </span>
+                    <span className="wx-info__name">添加</span>
+                  </button>
+                ) : null}
               </div>
-            ))}
-            {isGroup ? (
-              <button
-                type="button"
-                className="wx-info__person wx-info__person--add"
-                onClick={() => setInvite({ title: '邀请成员' })}
-              >
-                <span className="wx-info__add-tile">
-                  <PlusIcon size={20} />
-                </span>
-                <span className="wx-info__name">添加</span>
-              </button>
-            ) : null}
-          </div>
 
-          {isGroup && !queryEmpty && tiles.length === 0 ? (
-            <p className="wx-info__note">没有找到群成员</p>
+              {isGroup && !queryEmpty && tiles.length === 0 ? (
+                <p className="wx-info__note">没有找到群成员</p>
+              ) : null}
+
+              <div className="wx-info__rule" />
+            </>
           ) : null}
 
-          <div className="wx-info__rule" />
-
-          {isGroup ? (
+          {hasChatRows ? (
             <>
               <div className="wx-info__stack">
                 <InfoRow
@@ -279,7 +297,7 @@ export function ChatInfoPanel({
           <div className="wx-info__rule" />
 
           <DangerRow label="清空聊天记录" onClick={onRequestClear} />
-          {isGroup ? (
+          {hasChatRows ? (
             <>
               <div className="wx-info__rule" />
               <DangerRow label="退出群聊" onClick={() => setLeaving(true)} />
