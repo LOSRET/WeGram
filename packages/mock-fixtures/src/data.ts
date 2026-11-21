@@ -295,8 +295,10 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
       },
     ],
   }
-  // A group with discussion threads: two posts carry comment bars and their
-  // replies live only in the thread (design doc §9.8).
+  // A group whose rows carry TDLib-style threads, exactly as the server hands them
+  // to a discussion group: the data keeps `reply_info` and the replies, and the UI
+  // must still draw no comment bar for them (design doc §9.8 — only a channel post
+  // gets the handle; this fixture is what pins that gate).
   fixtures.set(
     2,
     withThreads(wegramGroup, {

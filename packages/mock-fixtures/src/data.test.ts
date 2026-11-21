@@ -45,7 +45,7 @@ describe('the fake account', () => {
     ])
   })
 
-  it('carries comment counts on the posts and the threads beside them', () => {
+  it('carries comment data on a channel post and on group rows the UI must not draw', () => {
     const group = seeds.get(2)
     const post = group?.messages.find((message) => message.id === 203)
     expect(group?.comments?.[203]).toHaveLength(7)

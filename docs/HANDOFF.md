@@ -540,6 +540,14 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
   `?? { comments: 0 }` fallback zeroed a real count and the bar vanished on the first
   view after opening the post (several posts in 心惊报 reproduced it; the fix keeps
   only the fields the update actually mentions).
+  (d) **The handle is a channel-post feature, not a `reply_info` one.** TDLib also
+  reports `reply_info` for rows inside a linked discussion group, and a count-only test
+  drew 写评论 under ordinary group messages. The official clients gate on the post
+  (tdesktop `checkDiscussionLink`, Android `hasDiscussion && isLinkedToChat`); checked
+  against Telegram Desktop 7.4.5 on 2026-11-21, those group rows carried no handle.
+  `isCommentablePost` now gates ours the same way: channel chats only — a discussion
+  group's history holds comments, never the post, so the thread a group row names is
+  one this client cannot open.
 - **Restoring a reading position needs all three pieces.** (a) the list must not mount
   before the stored anchor is known — a cached chat otherwise captures the bottom as its
   position; (b) `scrollToIndex` is only an estimate with dynamic row heights, so the

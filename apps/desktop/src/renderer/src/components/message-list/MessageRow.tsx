@@ -1,7 +1,7 @@
 import type { ChatSummary, Message } from '@wegram/protocol'
 import { memo, useState, type MouseEvent, type ReactNode } from 'react'
 
-import { hasCommentBar } from '../../lib/comments'
+import { hasCommentBar, isCommentablePost } from '../../lib/comments'
 import { formatMessageTime, messagePreview } from '../../lib/format'
 import { stickerBox } from '../../lib/stickerBox'
 import { Avatar } from '../Avatar'
@@ -170,7 +170,7 @@ export const MessageRow = memo(
         />
       ) : null
 
-    const commentBar = hasCommentBar(interaction) ? (
+    const commentBar = hasCommentBar(interaction) && isCommentablePost(chat) ? (
       <CommentBar interaction={interaction} onOpen={() => onOpenComments(first)} />
     ) : null
 

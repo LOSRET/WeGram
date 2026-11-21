@@ -6,6 +6,7 @@ import {
   commentKey,
   formatCount,
   hasCommentBar,
+  isCommentablePost,
   mergeComments,
 } from './comments'
 
@@ -33,6 +34,14 @@ describe('comment bar rules', () => {
     expect(hasCommentBar({ comments: 0 })).toBe(false)
     expect(hasCommentBar({ comments: 0, canOpen: true })).toBe(true)
     expect(hasCommentBar({ comments: 1, canOpen: true })).toBe(true)
+  })
+
+  it('draws the bar on a channel post, never on a group or private message', () => {
+    expect(isCommentablePost({ kind: 'channel' })).toBe(true)
+    // TDLib reports reply_info for these too; no official client draws the handle,
+    // and the thread they name cannot be opened from the group.
+    expect(isCommentablePost({ kind: 'group' })).toBe(false)
+    expect(isCommentablePost({ kind: 'private' })).toBe(false)
   })
 
   it('labels an unused thread as 写评论 and a used one with its count', () => {

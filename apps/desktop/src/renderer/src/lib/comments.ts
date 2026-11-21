@@ -1,4 +1,4 @@
-import type { Message, MessageInteraction } from '@wegram/protocol'
+import type { ChatSummary, Message, MessageInteraction } from '@wegram/protocol'
 
 /**
  * Rules behind the comment bar under a message (design doc §9.8).
@@ -42,6 +42,23 @@ export function hasCommentBar(
   interaction: MessageInteraction | undefined,
 ): interaction is MessageInteraction {
   return Boolean(interaction && (interaction.comments > 0 || interaction.canOpen))
+}
+
+/**
+ * Whether the row is one of the posts Telegram draws a comment section under.
+ *
+ * `hasCommentBar` alone is not the test. TDLib also fills `reply_info` for rows
+ * inside a linked discussion group, and trusting the count drew 写评论 under
+ * ordinary group messages — where no official client draws it (measured on
+ * Telegram Desktop 7.4.5, 2026-11-21: the same group rows carried no handle).
+ * The official clients gate on the post itself: tdesktop resolves the session's
+ * linked discussion channel (`checkDiscussionLink`), Android asks for
+ * `hasDiscussion && isLinkedToChat`. Only a channel's own posts are such rows
+ * here: a linked discussion group's history holds the comments, never the post,
+ * so the thread a group row names is one this client cannot open.
+ */
+export function isCommentablePost(chat: Pick<ChatSummary, 'kind'>): boolean {
+  return chat.kind === 'channel'
 }
 
 /** 评论 N 条 on a used thread, 写评论 on one that still has 0. */
