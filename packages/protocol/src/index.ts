@@ -1,6 +1,7 @@
 export * from './dto'
 export * from './boot'
 export * from './stickers'
+export * from './poll'
 export * from './comment'
 export * from './contact'
 export * from './settings'

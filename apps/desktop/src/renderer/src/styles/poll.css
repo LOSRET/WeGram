@@ -1,0 +1,296 @@
+/* ---------- Poll cards (design doc §9.10) ---------- */
+
+/* The bubble keeps WeChat's green/grey fill and the poll is a sheet inside it,
+   like WeChat's own vote card. pre-wrap from .wx-bubble would keep the JSX
+   indentation, so the card switches it off. */
+.wx-bubble--poll {
+  padding: 5px;
+  white-space: normal;
+}
+
+/* A channel poll keeps the 评论 handle flush with a 5 px frame, not the channel
+   post's usual 12 px text inset. */
+.wx-bubble--channel.wx-bubble--poll {
+  --wx-channel-pad-x: 5px;
+  --wx-channel-pad-b: 5px;
+  --wx-channel-bar-x: 8px;
+}
+
+.wx-poll {
+  display: flex;
+  flex-direction: column;
+  min-width: 230px;
+  max-width: 340px;
+  padding: 9px 10px 8px;
+  border-radius: 5px;
+  background: var(--wx-poll-surface);
+  color: var(--wx-text);
+}
+
+.wx-poll__head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 2px 7px;
+}
+
+.wx-poll__question {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+
+.wx-poll__description {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--wx-text-secondary);
+  word-break: break-word;
+}
+
+.wx-poll__options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wx-poll__option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 7px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--wx-text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wx-poll__option:hover:enabled {
+  background: var(--wx-row-hover);
+}
+
+.wx-poll__option:disabled {
+  cursor: default;
+}
+
+/* The voted share, painted behind the mark and the label. */
+.wx-poll__fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 4px;
+  background: var(--wx-poll-bar);
+  transition: width 0.2s ease;
+}
+
+.wx-poll__option--chosen .wx-poll__fill {
+  background: var(--wx-poll-bar-chosen);
+}
+
+/* A wrong quiz answer is a red band, never the green "your vote" one. */
+.wx-poll__option--wrong .wx-poll__fill {
+  background: var(--wx-poll-wrong-weak);
+}
+
+/* The fill is absolutely positioned, so the content must stack above it. */
+.wx-poll__mark,
+.wx-poll__label,
+.wx-poll__pct,
+.wx-poll__tag {
+  position: relative;
+}
+
+.wx-poll__mark {
+  flex: none;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--wx-poll-mark);
+  border-radius: 3px;
+  color: var(--wx-text-on-brand);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.wx-poll__mark--round {
+  border-radius: 50%;
+}
+
+.wx-poll__mark--on {
+  border-color: var(--wx-brand);
+  background: var(--wx-brand);
+}
+
+.wx-poll__label {
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.wx-poll__pct {
+  flex: none;
+  font-size: 11px;
+  color: var(--wx-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.wx-poll__tag {
+  flex: none;
+  padding: 0 3px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  color: var(--wx-poll-correct);
+  font-size: 10px;
+  line-height: 14px;
+}
+
+/* A quiz answer keeps its colour even when it has no votes yet: the correct row
+   is a green band, the picked wrong row a red one. */
+.wx-poll__option--correct {
+  background: var(--wx-poll-correct-weak);
+}
+
+.wx-poll__option--wrong {
+  background: var(--wx-poll-wrong-weak);
+}
+
+.wx-poll__option--correct .wx-poll__label {
+  color: var(--wx-poll-correct);
+  font-weight: 600;
+}
+
+.wx-poll__option--wrong .wx-poll__label {
+  color: var(--wx-poll-wrong);
+}
+
+.wx-poll__option--correct .wx-poll__mark {
+  border-color: var(--wx-poll-correct);
+  background: var(--wx-poll-correct);
+}
+
+.wx-poll__option--wrong .wx-poll__mark {
+  border-color: var(--wx-poll-wrong);
+  background: var(--wx-poll-wrong);
+}
+
+.wx-poll__actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 5px;
+}
+
+.wx-poll__submit {
+  padding: 4px 14px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--wx-brand);
+  color: var(--wx-text-on-brand);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.wx-poll__submit:hover {
+  background: var(--wx-brand-active);
+}
+
+.wx-poll__add {
+  align-self: flex-start;
+  padding: 4px 2px;
+  border: 0;
+  background: transparent;
+  color: var(--wx-brand-text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.wx-poll__add:hover {
+  opacity: 0.8;
+}
+
+.wx-poll__add-form {
+  display: flex;
+  gap: 4px;
+  padding-top: 4px;
+}
+
+.wx-poll__add-input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  border: 1px solid var(--wx-poll-line);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--wx-text);
+  font-size: 12px;
+  outline: none;
+}
+
+.wx-poll__add-input:focus {
+  border-color: var(--wx-brand);
+}
+
+.wx-poll__add-submit {
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--wx-brand);
+  color: var(--wx-text-on-brand);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.wx-poll__add-submit:disabled {
+  background: var(--wx-fill-disabled);
+  color: var(--wx-text-disabled);
+  cursor: default;
+}
+
+.wx-poll__solution {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+  padding: 5px 7px;
+  border-radius: 4px;
+  background: var(--wx-poll-bar);
+  color: var(--wx-text-secondary);
+  font-size: 12px;
+}
+
+.wx-poll__solution-title {
+  color: var(--wx-poll-correct);
+  font-weight: 600;
+}
+
+.wx-poll__solution-text {
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.wx-poll__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px solid var(--wx-poll-line);
+  color: var(--wx-text-secondary);
+  font-size: 11px;
+}
+
+.wx-poll__closed {
+  color: var(--wx-text-tertiary);
+}

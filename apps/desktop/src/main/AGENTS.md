@@ -26,10 +26,10 @@ telegram/           adapter.ts (re-export of the seam) / tdlib/ (real adapter) /
                     and probeImageSize, so the package imports no app code)
 telegram/tdlib/     lifecycle.ts (create / crash / restart the client, reports BootState) /
                     boot.ts (that state machine) / client / updates / json.ts (the one
-                    "missing array" read) / map/* (content, rich, media.ts holds the one
-                    media field table)
+                    "missing array" read) / map/* (content, rich, poll, media.ts holds the
+                    one media field table)
 telegram/tdlib/actions/  TDLib requests as functions over ActionDeps, grouped into
-                    chats / history / files / send / comments (index.ts re-exports);
+                    chats / history / files / send / comments / poll (index.ts re-exports);
                     message-input.ts holds the one send envelope
 telegram/tdlib/chat-api.ts  createChatApi: the chat seam methods (list/open/mute/pin/
                     members/title/join) as one object the adapter class binds; split

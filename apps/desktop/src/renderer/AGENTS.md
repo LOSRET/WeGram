@@ -23,7 +23,8 @@ store/                zustand: data defaults (initialState.ts), pure reducers, s
 components/message-list/  virtualiser + MessageRow + Divider + the scroll hooks:
                          useInitialPosition / usePrependRestore / useAnchorSave /
                          useLandingSave / useJumpToLatest / useLocateScroll / useViewportSeen;
-                         RichMessage (page blocks), ContactCard (vCards), InlineButtons,
+                         RichMessage (page blocks), ContactCard (vCards), PollBubble (the
+                         vote/quiz card, §9.10), InlineButtons,
                          CommentBar (评论 N 条 handle, §9.8), ChannelMeta (a channel post's
                          views/time footer; the one-bubble channel composition is
                          styles/channel.css), PremiumStickerEffect (a Premium sticker's
@@ -70,6 +71,8 @@ components/Composer.tsx  a chat's send path over ComposerCard: per-chat drafts, 
 lib/ipc.ts            thin `window.tg` wrapper
 lib/clipboard.ts      text copy for the contact card (navigator.clipboard + execCommand fallback)
 lib/format.ts         time / preview / avatar helpers (pure, unit-tested)
+lib/poll.ts           (pure, unit-tested) results visibility, votability, selection
+                      staging, footer/mode copy, quiz correctness
 lib/search.ts         normalizeQuery / containsText / matchSegments — the ONE reading of a
                       search box, and the hit emphasis a result row draws
 lib/useGlobalSearch.ts  the search panel's conversation hits: 260 ms debounce over

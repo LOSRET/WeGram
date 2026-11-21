@@ -217,6 +217,10 @@ export interface TelegramAdapter {
   joinCommentGroup(input: CommentTarget): Promise<CommentJoinResult>
   /** Posts a comment into the message's thread and answers the sent row. */
   sendComment(input: CommentSendQuery): Promise<{ message: Message }>
+  /** Changes this account's answer to a poll; an empty list retracts it. */
+  votePoll(input: InvokeRequest<'messages:vote'>): Promise<void>
+  /** Adds an answer option, when the poll says it may be added. */
+  addPollOption(input: InvokeRequest<'messages:addPollOption'>): Promise<void>
   sendText(input: InvokeRequest<'messages:send'>): Promise<{ localId: string; message: Message }>
   editText(input: InvokeRequest<'messages:edit'>): Promise<Message>
   deleteMessages(input: InvokeRequest<'messages:delete'>): Promise<void>

@@ -13,7 +13,8 @@ schemas), `errors.ts` (`AppError`) and the modules split out when a file hit its
 app settings, `app:info`), `viewer.ts` (the 图片和视频 window's payloads),
 `chat.ts` (the chat DTOs: kind/summary/member/pinned message/invite link/chat ops),
 `chats.ts` (the chat domain's channel keys and schemas), `qr.ts` (the 群二维码
-window's channels), `comment.ts` (the comment-thread contract, including what a
+window's channels), `poll.ts` (the poll DTO + the vote/add-option channels),
+`comment.ts` (the comment-thread contract, including what a
 comment carries: text, a sticker or a local file) and `search.ts` (the cross-chat
 message search schemas), with the
 channel tables of `chats.ts` and `qr.ts` spread into the two tables.

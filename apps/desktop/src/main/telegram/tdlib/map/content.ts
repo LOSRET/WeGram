@@ -1,9 +1,10 @@
-import type { Message, MessageEntity, RichBlock } from '@wegram/protocol'
+import type { Message, MessageEntity, Poll, RichBlock } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
 import { asArray } from '../json'
 import { mapEntities } from './entities'
 import { documentMedia, mediaFileUrl, mediaUrls, photoMedia, videoMedia, voiceMedia } from './media'
+import { mapPoll } from './poll'
 import { mapRichMessage, richPreview } from './rich'
 import { mapStickerFormat } from './sticker'
 
@@ -18,6 +19,7 @@ export function mapContent(content: TdObject): {
   media?: Message['media']
   rich?: RichBlock[]
   contact?: Message['contact']
+  poll?: Poll
 } {
   switch (content._) {
     case 'messageText': {
@@ -99,8 +101,17 @@ export function mapContent(content: TdObject): {
         media: voiceMedia(content.voice_note),
       }
     }
-    case 'messagePoll':
-      return { kind: 'poll', text: content.poll?.question?.text ?? '', entities: [] }
+    case 'messagePoll': {
+      // The question stays `text` for previews and quotes; the card itself is
+      // the mapped poll (design doc §9.10).
+      const poll = mapPoll(content)
+      return {
+        kind: 'poll',
+        text: content.poll?.question?.text ?? '',
+        entities: [],
+        ...(poll ? { poll } : {}),
+      }
+    }
     // Telegram's animated emoji: a message that is exactly one emoji. TDLib has
     // already resolved the "AnimatedEmoji" sticker for it, so the body is that
     // sticker (TGS / WebM / WebP) and the glyph only remains the text — previews,
@@ -236,6 +247,16 @@ export async function serviceText(content: TdObject, ctx: ServiceTextContext): P
       return content.is_closed ? `${who}关闭了话题` : `${who}重新打开了话题`
     case 'messageForumTopicIsHiddenToggled':
       return content.is_hidden ? `${who}隐藏了话题` : `${who}显示了话题`
+    // Adding an option to a poll posts a service row in the chat (TDLib
+    // messagePollOptionAdded); the option's own words travel in `text`.
+    case 'messagePollOptionAdded': {
+      const option = title(content.text?.text)
+      return option ? `${who}已将“${option}”添加到投票中` : `${who}向投票中添加了一个选项`
+    }
+    case 'messagePollOptionDeleted': {
+      const option = title(content.text?.text)
+      return option ? `${who}从投票中删除了选项“${option}”` : `${who}从投票中删除了一个选项`
+    }
     case 'messageContactRegistered':
       return `${who}加入了 Telegram`
     case 'messageSuggestProfilePhoto':
@@ -273,6 +294,8 @@ export const SERVICE_CONTENT_TYPES = new Set([
   'messageContactRegistered',
   'messageSuggestProfilePhoto',
   'messageCustomServiceAction',
+  'messagePollOptionAdded',
+  'messagePollOptionDeleted',
 ])
 
 interface ServiceTextContext {
@@ -302,6 +325,10 @@ function servicePreview(content: TdObject): string {
       return '置顶了一条消息'
     case 'messageScreenshotTaken':
       return '对聊天进行了截图'
+    case 'messagePollOptionAdded':
+      return '添加了投票选项'
+    case 'messagePollOptionDeleted':
+      return '删除了投票选项'
     case 'messageContactRegistered':
       return '加入了 Telegram'
     case 'messageCustomServiceAction':

@@ -3,6 +3,7 @@ import type { Message } from '@wegram/protocol'
 
 import type { FixtureOptions, FixtureSeed } from './seed'
 import { buildStressSeed } from './stress'
+import { groupPollMessages, pollMessage } from './polls'
 import { buildCommentThread } from './threads'
 
 /**
@@ -211,6 +212,8 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
           { downloadable: true },
         ),
       },
+      // One open poll and one unanswered quiz; see ./polls.ts.
+      ...groupPollMessages(at),
       {
         id: 206,
         chatId: 2,
@@ -304,6 +307,22 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
     },
     messages: [
       text(4, 401, 180, '会议纪要已经放到共享盘', false),
+      // A closed poll with real numbers and one answer this account already gave:
+      // the card must show the bars, the percentages and the 已结束 state.
+      pollMessage({
+        chatId: 4,
+        id: 404,
+        date: at(1),
+        senderId: 23,
+        senderName: '陈晨',
+        outgoing: false,
+        question: '下个迭代先做哪个？',
+        options: ['投票消息', '表情回应', '话题分组'],
+        votes: [12, 5, 3],
+        totalVoterCount: 20,
+        chosen: [0],
+        closed: true,
+      }),
       // Both mention kinds the transcript can jump from (§8.3): `mention` is the
       // literal @username main resolves with `searchPublicChat`, and
       // `mentionName` already carries the user id.

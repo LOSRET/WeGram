@@ -24,6 +24,7 @@ import {
   previewNewer,
   type PreviewMessagesStore,
 } from './messages'
+import { handlePreviewPoll } from './polls'
 import { handlePreviewQr, type PreviewQrStore } from './qr'
 import {
   clearPreviewHistory,
@@ -261,6 +262,10 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       return previewOpenUsername(chats, contacts, String(store.username ?? ''))
     case 'contacts:list':
       return contacts
+    /** Poll voting; its rules live in ./polls.ts. */
+    case 'messages:vote':
+    case 'messages:addPollOption':
+      return handlePreviewPoll(channel, store, previewMessagesStore)
     case 'messages:read': {
       const upTo = Number(store.upToMessageId)
       return previewMarkRead(
@@ -533,8 +538,7 @@ export function installPreviewBridge(): void {
     const message = msg(chatId, nextId++, text, false, 0)
     messagesByChat[chatId] = [...(messagesByChat[chatId] ?? []), message]
     emit('evt:messages', { chatId, ops: [{ op: 'new', message }] })
-    // Mirror the adapter: an incoming message also bumps the chat's unread count,
-    // which is what the row badge and the rail total read.
+    // Mirror the adapter: an arrival bumps the unread count the row reads.
     const chat = chats.find((item) => item.id === chatId)
     if (chat) {
       chat.unread += 1

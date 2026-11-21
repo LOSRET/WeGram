@@ -14,6 +14,7 @@ import { bootStateSchema } from './boot'
 import { chatOpSchema, chatSummarySchema } from './chat'
 import { chatInvokeChannels, chatInvokeSchemas } from './chats'
 import { qrInvokeChannels, qrInvokeSchemas } from './qr'
+import { pollInvokeChannels, pollInvokeSchemas } from './poll'
 import { customEmojiStickerSchema, stickerSetSchema, stickerSetSummarySchema } from './stickers'
 import {
   appInfoSchema,
@@ -66,6 +67,8 @@ export const invokeChannels = [
   ...chatInvokeChannels,
   /** 群二维码 is its own window; see ./qr.ts. */
   ...qrInvokeChannels,
+  /** Vote and add an option on a poll (see ./poll.ts). */
+  ...pollInvokeChannels,
   /**
    * The account's Telegram address book (通讯录). People, not conversations:
    * the list comes from TDLib's `getContacts`, so a contact without a private
@@ -198,6 +201,7 @@ export const invokeSchemas = {
   'boot:state': { request: noPayload, response: bootStateSchema },
   ...chatInvokeSchemas,
   ...qrInvokeSchemas,
+  ...pollInvokeSchemas,
   'contacts:list': { request: noPayload, response: z.array(contactSchema) },
   'messages:history': {
     request: z.object({

@@ -17,6 +17,8 @@ Pure rules that both fakes must answer identically:
   `comment-access.ts` rule) and `threadInteraction`.
 - `chatList.ts` — `sortChatList`: the chat list's order (pinned first, then newest
   activity), which both fakes serve.
+- `poll.ts` — `applyPollVote`: the fake vote arithmetic (first vote, change, retract,
+  multi-answer, quiz lock, percentages), shared by both fakes.
 
 The package imports nothing — no zod, no Node, no Electron, no React — because the
 renderer is a sandboxed page and `@wegram/mock-session` is bundled into it. Keep it

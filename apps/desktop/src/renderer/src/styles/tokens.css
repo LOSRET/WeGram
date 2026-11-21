@@ -29,7 +29,18 @@
   /* Bubbles */
   --wx-bubble-self: #95ec69;
   --wx-bubble-other: #eeeef0;
-  --wx-bubble-radius: 6px;
+  --wx-bubble-radius: 6px
+    /* Poll card (design doc §9.10): a lifted sheet inside the bubble, with the
+     voted share as a translucent bar behind the option text. */
+    --wx-poll-surface: rgba(255, 255, 255, 0.78);
+  --wx-poll-line: rgba(0, 0, 0, 0.07);
+  --wx-poll-bar: rgba(0, 0, 0, 0.07);
+  --wx-poll-bar-chosen: rgba(7, 193, 96, 0.28);
+  --wx-poll-mark: #b7b7b7;
+  --wx-poll-correct: #07c160;
+  --wx-poll-wrong: #fa5151;
+  --wx-poll-correct-weak: rgba(7, 193, 96, 0.16);
+  --wx-poll-wrong-weak: rgba(250, 81, 81, 0.16);
   /* Channel post (see styles/channel.css): the block's inner hairline, drawn in
      the bubble's own ink so it reads on the grey bubble and on the green own one. */
   --wx-channel-rule: rgba(0, 0, 0, 0.12);
@@ -66,8 +77,8 @@
   /* Typography — WeChat on Windows renders with YaHei UI. */
   /* The emoji font comes first and only claims the codepoints it owns (its cmap
    has no ASCII digits, so numbers and keycaps still render as text). */
-  --wx-font: 'WeGram Emoji', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Segoe UI', 'PingFang SC',
-    sans-serif;
+  --wx-font:
+    'WeGram Emoji', 'Microsoft YaHei UI', 'Microsoft YaHei', 'Segoe UI', 'PingFang SC', sans-serif;
   --wx-fs-body: 14px;
   --wx-lh-body: 1.45;
   --wx-fs-caption: 12px;
@@ -169,6 +180,15 @@
   --wx-row-pinned: rgba(255, 255, 255, 0.035);
   --wx-bubble-self: #35d28d;
   --wx-bubble-other: #2f2f30;
+  --wx-poll-surface: rgba(255, 255, 255, 0.06);
+  --wx-poll-line: rgba(255, 255, 255, 0.12);
+  --wx-poll-bar: rgba(255, 255, 255, 0.09);
+  --wx-poll-bar-chosen: rgba(7, 193, 96, 0.3);
+  --wx-poll-mark: #8a8a8f;
+  --wx-poll-correct: #35d28d;
+  --wx-poll-wrong: #ff6b6b;
+  --wx-poll-correct-weak: rgba(53, 210, 141, 0.18);
+  --wx-poll-wrong-weak: rgba(255, 107, 107, 0.18);
   /* Channel post hairline: a light line on the lifted #2F2F30 bubble. */
   --wx-channel-rule: rgba(255, 255, 255, 0.16);
   --wx-text: #e1e1e5;

@@ -37,6 +37,7 @@ import {
   type MockHistoryQuery,
   type MockNewerQuery,
 } from './history'
+import { createMockPolls } from './polls'
 import { mockMessageProperties } from './properties'
 import { searchChats, searchMessages, searchMessagesInScope } from './search'
 import { getMockStickerSet, listMockCustomEmoji, listMockStickerSets } from './stickers'
@@ -224,6 +225,10 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
 
   /** The chat endpoints; their rules live in ./chats.ts. */
   private readonly chatApi = createMockChats(this.fixtures, (event) => this.emit(event))
+  /** Poll voting / adding options; see ./polls.ts. */
+  private readonly pollApi = createMockPolls(this.fixtures, (event) => this.emit(event))
+  readonly votePoll = this.pollApi.votePoll
+  readonly addPollOption = this.pollApi.addPollOption
   readonly listChats = this.chatApi.listChats
   readonly getChat = this.chatApi.getChat
   readonly openChat = this.chatApi.openChat

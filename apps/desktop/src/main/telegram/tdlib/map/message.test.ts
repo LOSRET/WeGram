@@ -136,6 +136,19 @@ describe('mapMessage', () => {
     expect(resolveUserName.mock.calls.map(([id]) => id)).toEqual([3, 11, 12])
   })
 
+  it('composes a poll option notice instead of marking it unsupported', async () => {
+    const message = await mapMessage(makeContext(), 9, {
+      id: 4,
+      date: 10,
+      sender_id: { _: 'messageSenderUser', user_id: 3 },
+      is_outgoing: true,
+      content: { _: 'messagePollOptionAdded', text: { text: '4' } },
+    })
+
+    expect(message.kind).toBe('service')
+    expect(message.text).toBe('你已将“4”添加到投票中')
+  })
+
   it('marks an unhandled content type as unsupported instead of rendering empty', async () => {
     const message = await mapMessage(makeContext(), 9, {
       id: 3,

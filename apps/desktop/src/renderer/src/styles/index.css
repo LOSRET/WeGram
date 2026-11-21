@@ -32,6 +32,7 @@
 @import './rich-text.css';
 @import './rich-message.css';
 @import './cards.css';
+@import './poll.css';
 @import './viewer.css';
 @import './stickers.css';
 /* After the bubble and comment rules on purpose: a channel post re-shapes both. */

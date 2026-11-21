@@ -77,6 +77,7 @@ export async function mapMessage(
     ...(mapped.media ? { media: mapped.media } : {}),
     ...(mapped.rich?.length ? { rich: mapped.rich } : {}),
     ...(mapped.contact ? { contact: mapped.contact } : {}),
+    ...(mapped.poll ? { poll: mapped.poll } : {}),
     ...(buttons ? { buttons } : {}),
     ...(albumId ? { albumId } : {}),
     ...(raw.reply_to?.message_id ? { replyToId: raw.reply_to.message_id } : {}),

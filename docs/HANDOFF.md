@@ -210,6 +210,15 @@ screenshot, not guessed).
   buttons is `components/TelegramLink.tsx`. Invite/action links (`t.me/+…`, `joinchat`,
   `/addstickers`, `/share`, `/proxy`) still go to the OS, and modifier/middle clicks keep
   the "open outside" meaning. Group chat 4 in the fake account carries a `t.me` link.
+- **Polls (2026-11-21)**: `messagePoll` is now a real card, not just its question as
+  text. `Message.poll` (protocol `poll.ts`) carries the options, counters, flags and
+  quiz answer; `messages:vote` / `messages:addPollOption` drive `setPollAnswer` /
+  `addPollOption`, and TDLib's `updateMessageContent` remaps the row as a `replace`.
+  The card lives in `components/message-list/PollBubble.tsx` + `lib/poll.ts`, with
+  `--wx-poll-*` tokens in both themes; the fake account carries an open multi-answer
+  poll, an unanswered quiz and a closed poll with results. Switching an answer, a
+  retract (tap the chosen single answer), staging + 投票 for multi-answer, a quiz's
+  correct/wrong colours and 添加选项 were all checked in the browser preview.
 - Also fixed while testing: the login field regains focus after each step (it is
   disabled while a request is in flight, which used to drop the caret and force a click).
 
@@ -852,6 +861,19 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
   kilobytes instead of after the whole clip.
 - `userData` is pinned to `%APPDATA%\WeGram` via `app.setName`/`setPath`, because
   the package name is `@wegram/desktop` and would otherwise create a nested folder.
+
+- **Poll schema is newer than its version number suggests.** This build's TDLib
+  1.8.70 (commit c8828d50) already has `pollOption.id`, `option_order`,
+  `can_see_results`, `can_add_option` and `vote_restriction_reason`; the API is
+  message-addressed: `setPollAnswer` takes `chat_id`/`message_id`/`option_ids`, and
+  `option_ids` are **positions**, not the option id strings. A poll whose
+  `option_order` is non-empty must be drawn in that order while still voting by
+  position — the DTO keeps both. `messagePoll` also carries `description` and media
+  (both optional here); the poll card ignores option media for now.
+- **A vote is not echoed by the command.** `setPollAnswer` answers `Ok`; the changed
+  poll arrives later as `updateMessageContent` (already mapped to a `replace`), so the
+  renderer must not invent counters locally. Quiz correct answers are empty until the
+  account answers (or the poll closes).
 
 ## Decisions already locked (design doc §15)
 

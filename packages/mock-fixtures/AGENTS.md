@@ -17,6 +17,8 @@ Scope: the demo account both fakes serve — the Electron mock adapter
 - `threads.ts` — the comment authors, bodies and the id formula
   (`900 000 + messageId × 100 + index`), so a thread can never collide with a
   transcript id.
+- `polls.ts` — `pollMessage` and the group's open multi-answer poll + unanswered
+  quiz; the closed poll with results stays inline in `data.ts`.
 
 The data says *what* a message is, never *where its bytes live*: a media reference is
 a `fileId` plus the protocol fields (size, duration, format), and the caller's

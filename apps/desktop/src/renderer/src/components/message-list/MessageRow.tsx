@@ -12,6 +12,7 @@ import {
   channelMediaWidth,
 } from '../MediaBubble'
 import { ContactCard } from './ContactCard'
+import { PollBubble } from './PollBubble'
 import { ChannelMeta } from './ChannelMeta'
 import { InlineButtons } from './InlineButtons'
 import { RichMessage } from './RichMessage'
@@ -130,6 +131,7 @@ export const MessageRow = memo(
     // words kept for previews and 复制, so it must not be rendered as a body.
     const rich = first.kind === 'rich' && first.rich?.length ? first.rich : undefined
     const contact = first.kind === 'contact' ? first.contact : undefined
+    const poll = first.kind === 'poll' ? first.poll : undefined
     // An inline keyboard lives on the message, not in its content: text, photo
     // and rich bubbles all can carry one.
     const buttons = first.buttons?.length ? first.buttons : undefined
@@ -170,9 +172,10 @@ export const MessageRow = memo(
         />
       ) : null
 
-    const commentBar = hasCommentBar(interaction) && isCommentablePost(chat) ? (
-      <CommentBar interaction={interaction} onOpen={() => onOpenComments(first)} />
-    ) : null
+    const commentBar =
+      hasCommentBar(interaction) && isCommentablePost(chat) ? (
+        <CommentBar interaction={interaction} onOpen={() => onOpenComments(first)} />
+      ) : null
 
     return (
       <div className={`wx-message-row${first.outgoing ? ' wx-message-row--self' : ''}`}>
@@ -240,6 +243,22 @@ export const MessageRow = memo(
                 </div>
               ) : null}
               <ContactCard contact={contact} />
+              {channelMeta()}
+              {channel ? commentBar : null}
+            </div>
+          ) : poll ? (
+            <div
+              className={`wx-bubble wx-bubble--poll${
+                first.outgoing ? ' wx-bubble--self' : ''
+              }${channelBubble}`}
+              onContextMenu={openMenu}
+            >
+              {repliedTo ? (
+                <div className="wx-quote">
+                  {repliedTo.senderName}：{messagePreview(repliedTo)}
+                </div>
+              ) : null}
+              <PollBubble chatId={chat.id} messageId={first.id} poll={poll} />
               {channelMeta()}
               {channel ? commentBar : null}
             </div>

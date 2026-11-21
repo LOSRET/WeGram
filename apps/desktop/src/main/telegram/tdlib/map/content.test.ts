@@ -286,6 +286,8 @@ describe('previewContent', () => {
   it('describes service messages', () => {
     expect(previewContent({ _: 'messageChatChangeTitle' })).toBe('修改群聊名称')
     expect(previewContent({ _: 'messagePinMessage' })).toBe('置顶了一条消息')
+    expect(previewContent({ _: 'messagePollOptionAdded' })).toBe('添加了投票选项')
+    expect(previewContent({ _: 'messagePollOptionDeleted' })).toBe('删除了投票选项')
     expect(previewContent({ _: 'messageSomethingNew' })).toBe('')
   })
 
@@ -392,6 +394,24 @@ describe('serviceText', () => {
         ctx,
       ),
     ).toBe('Alice关闭了消息自动删除')
+  })
+
+  it('composes poll option added / deleted notices', async () => {
+    expect(await serviceText({ _: 'messagePollOptionAdded', text: { text: '4' } }, ctx)).toBe(
+      'Alice已将“4”添加到投票中',
+    )
+    expect(
+      await serviceText(
+        { _: 'messagePollOptionAdded', text: { text: '4' } },
+        { ...ctx, outgoing: true },
+      ),
+    ).toBe('你已将“4”添加到投票中')
+    expect(await serviceText({ _: 'messagePollOptionDeleted', text: { text: '4' } }, ctx)).toBe(
+      'Alice从投票中删除了选项“4”',
+    )
+    expect(await serviceText({ _: 'messagePollOptionAdded' }, ctx)).toBe(
+      'Alice向投票中添加了一个选项',
+    )
   })
 
   it('falls back to empty text for an unhandled service type', async () => {

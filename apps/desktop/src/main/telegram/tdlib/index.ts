@@ -348,6 +348,14 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     return actions.sendComment(this.actionDeps, input)
   }
 
+  async votePoll(input: InvokeRequest<'messages:vote'>): Promise<void> {
+    return actions.votePoll(this.actionDeps, input)
+  }
+
+  async addPollOption(input: InvokeRequest<'messages:addPollOption'>): Promise<void> {
+    return actions.addPollOption(this.actionDeps, input)
+  }
+
   async sendText(input: {
     chatId: number
     text: string
@@ -376,9 +384,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     return actions.forwardMessages(this.actionDeps, input)
   }
 
-  async messageProperties(
-    input: InvokeRequest<'messages:properties'>,
-  ): Promise<MessageProperties> {
+  async messageProperties(input: InvokeRequest<'messages:properties'>): Promise<MessageProperties> {
     return actions.messageProperties(this.actionDeps, input)
   }
 

@@ -178,6 +178,8 @@ export function createHandlers({
     'messages:properties': (payload) => adapter.messageProperties(payload),
     'messages:forward': (payload) => adapter.forwardMessages(payload),
     'messages:read': (payload) => adapter.markRead(payload),
+    'messages:vote': (payload) => adapter.votePoll(payload),
+    'messages:addPollOption': (payload) => adapter.addPollOption(payload),
 
     'search:global': (payload) => adapter.searchGlobal(payload),
     'search:inChat': (payload) => adapter.searchInChat(payload),

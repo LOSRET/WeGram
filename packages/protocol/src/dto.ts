@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { pollSchema } from './poll'
 import { stickerFormatSchema } from './stickers'
 
 /**
@@ -438,6 +439,8 @@ export const messageSchema = z.object({
   rich: z.array(richBlockSchema).optional(),
   /** Body of a kind 'contact' message. */
   contact: contactCardSchema.optional(),
+  /** Body of a kind 'poll' message (design doc §9.10). */
+  poll: pollSchema.optional(),
   /** Inline keyboard under the bubble: rows of buttons (TDLib `reply_markup`). */
   buttons: z.array(z.array(inlineButtonSchema)).optional(),
   /**

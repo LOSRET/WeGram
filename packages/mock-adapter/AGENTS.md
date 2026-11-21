@@ -15,7 +15,8 @@ credentials (development only), plus the real PNG/WebP/TGS/WebM media it generat
   PNG/WAV encoders.
 - `chats.ts` — conversation endpoints as one `createMockChats` factory (list/open/mute/
   pin/clear/members/rename/leave/pinned/invite link); `history.ts` — transcript paging.
-- `comments.ts`, `contacts.ts`, `search.ts`, `stickers.ts` — the remaining endpoints.
+- `comments.ts`, `contacts.ts`, `search.ts`, `stickers.ts`, `polls.ts` — the remaining
+  endpoints; `polls.ts` applies the shared vote rule and emits a `replace`.
 - `media.ts` — the outgoing media/sticker row builders. A chat's send and a comment
   thread's post build the same rows (§9.8: a comment can carry what the composer
   produced), so both go through `buildMediaMessage` / `buildStickerMessage`; the

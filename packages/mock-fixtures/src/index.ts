@@ -1,4 +1,6 @@
 export { buildFixtureSeeds } from './data'
+export { pollMessage } from './polls'
+export type { PollMessageOptions } from './polls'
 export type { FixtureOptions, FixtureSeed, SeedMedia } from './seed'
 export { buildCommentThread, COMMENT_AUTHORS, COMMENT_BODIES } from './threads'
 export type { ThreadAuthor, ThreadOptions } from './threads'
