@@ -19,6 +19,11 @@ describe('the fake account', () => {
     expect(album.map((message) => message.kind)).toEqual(['photo', 'video'])
   })
 
+  it('carries the two centered service rows the transcript draws', () => {
+    const rows = seeds.get(3)?.messages.filter((message) => message.kind === 'service') ?? []
+    expect(rows.map((message) => message.text)).toEqual(['未接听语音通话', '妈发送的图片已过期'])
+  })
+
   it('carries one animated emoji message, with its click sound', () => {
     const message = seeds.get(2)?.messages.find((item) => item.id === 208)
     expect(message).toMatchObject({

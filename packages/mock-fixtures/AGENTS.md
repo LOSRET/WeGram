@@ -19,6 +19,9 @@ Scope: the demo account both fakes serve — the Electron mock adapter
   transcript id.
 - `polls.ts` — `pollMessage` and the group's open multi-answer poll + unanswered
   quiz; the closed poll with results stays inline in `data.ts`.
+- `services.ts` — the demo's service rows (a missed call, a self-destructed photo):
+  the finished text a fixture carries, so the centered notices can be seen without
+  TDLib. Split out of `data.ts` for the same 550-line budget.
 
 The data says *what* a message is, never *where its bytes live*: a media reference is
 a `fileId` plus the protocol fields (size, duration, format), and the caller's

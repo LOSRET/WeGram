@@ -4,6 +4,7 @@ import type { Message } from '@wegram/protocol'
 import type { FixtureOptions, FixtureSeed } from './seed'
 import { buildStressSeed } from './stress'
 import { groupPollMessages, pollMessage } from './polls'
+import { serviceMessages } from './services'
 import { buildCommentThread } from './threads'
 
 /**
@@ -276,17 +277,18 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
       title: '妈',
       kind: 'private',
       userId: 37,
-      unread: 1,
+      unread: 3,
       pinned: false,
       muted: false,
-      lastMessageText: '晚上回来吃饭吗',
-      lastMessageAt: at(25),
+      lastMessageText: '[图片已过期]',
+      lastMessageAt: at(23),
       lastReadInboxMessageId: 301,
       lastReadOutboxMessageId: 0,
     },
     messages: [
       text(3, 301, 26, '降温了，多穿点', false),
       text(3, 302, 25, '晚上回来吃饭吗', false),
+      ...serviceMessages(at),
     ],
     // Digits only: TDLib hands phone numbers over without the leading +.
     contact: { username: 'mama_wegram', phone: '8613800000000', dcId: 4 },

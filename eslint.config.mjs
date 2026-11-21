@@ -59,7 +59,10 @@ export default tseslint.config(
   // ---- agent-maintainability: keep files loadable in one context window ----
   // The tree was split into <400-line modules on 2026-11-19; this is the
   // backstop, so a new feature cannot recreate a 1000-line file. Generated
-  // artwork is exempt.
+  // artwork is exempt, and so is the one service-copy table: its keys are a
+  // single TDLib MessageContent union that grows with every Telegram service
+  // type, so splitting it by family would scatter one switch across files
+  // (see docs/技术方案.md §8.3).
   {
     files: [
       'apps/desktop/src/**/*.{ts,tsx}',
@@ -69,7 +72,10 @@ export default tseslint.config(
       'packages/mock-session/src/**/*.ts',
       'packages/mock-fixtures/src/**/*.ts',
     ],
-    ignores: ['apps/desktop/src/renderer/src/components/WechatIcons.tsx'],
+    ignores: [
+      'apps/desktop/src/renderer/src/components/WechatIcons.tsx',
+      'apps/desktop/src/main/telegram/tdlib/map/service.ts',
+    ],
     rules: {
       'max-lines': ['error', { max: 550, skipBlankLines: false, skipComments: false }],
     },

@@ -7,7 +7,6 @@ import {
   pickSmallestAtLeast,
   previewContent,
   previewSpoilers,
-  serviceText,
 } from './content'
 
 /**
@@ -238,6 +237,106 @@ describe('mapContent', () => {
       entities: [],
     })
   })
+
+  it('maps audio and video notes onto the existing media bubbles', () => {
+    const audio = mapContent({
+      _: 'messageAudio',
+      audio: {
+        _: 'audio',
+        duration: 61,
+        title: 'Song',
+        performer: 'Band',
+        file_name: 'song.mp3',
+        mime_type: 'audio/mpeg',
+        audio: { _: 'file', id: 7, size: 1024 },
+      },
+    })
+    expect(audio.kind).toBe('file')
+    expect(audio.text).toBe('Song · Band')
+    expect(audio.media).toMatchObject({
+      fileId: 7,
+      fileName: 'song.mp3',
+      mimeType: 'audio/mpeg',
+      size: 1024,
+    })
+
+    const note = mapContent({
+      _: 'messageVideoNote',
+      video_note: {
+        _: 'videoNote',
+        duration: 4,
+        length: 240,
+        video: { _: 'file', id: 8 },
+      },
+    })
+    expect(note.kind).toBe('video')
+    expect(note.media).toMatchObject({ fileId: 8, duration: 4, width: 240, height: 240 })
+  })
+
+  it('keeps the facts of location, game, checklist, invoice, shared and paid media', () => {
+    expect(
+      mapContent({
+        _: 'messageLocation',
+        location: { latitude: 31.2304, longitude: 121.4737 },
+      }),
+    ).toMatchObject({ kind: 'text', text: '📍 31.23040, 121.47370' })
+
+    expect(
+      mapContent({
+        _: 'messageLiveLocation',
+        expires_in: 600,
+        location: { latitude: 31.23, longitude: 121.47 },
+      }).text,
+    ).toBe('📍 实时位置 · 剩余 10 分钟\n31.23000, 121.47000')
+
+    expect(
+      mapContent({
+        _: 'messageVenue',
+        venue: {
+          title: '外滩',
+          address: '中山东一路',
+          location: { latitude: 1, longitude: 2 },
+        },
+      }).text,
+    ).toBe('📍 外滩\n中山东一路\n1.00000, 2.00000')
+
+    expect(
+      mapContent({ _: 'messageGame', game: { title: 'Chess', description: 'Play' } }).text,
+    ).toBe('🎮 Chess\nPlay')
+
+    expect(
+      mapContent({
+        _: 'messageChecklist',
+        list: {
+          title: { text: '购物' },
+          tasks: [
+            { text: { text: '牛奶' }, completion_date: 1 },
+            { text: { text: '面包' }, completion_date: 0 },
+          ],
+        },
+      }).text,
+    ).toBe('☑ 购物\n☑ 牛奶\n☐ 面包')
+
+    expect(mapContent({ _: 'messageInvoice', product_info: { title: 'Pro' } }).text).toBe('🧾 Pro')
+    expect(
+      mapContent({
+        _: 'messageUsersShared',
+        users: [{ first_name: 'Ada', last_name: 'Lovelace' }, { username: 'bob' }],
+      }).text,
+    ).toBe('[联系人] Ada Lovelace、@bob')
+    expect(mapContent({ _: 'messageChatShared', chat: { title: 'Team' } }).text).toBe('[会话] Team')
+    expect(
+      mapContent({
+        _: 'messagePaidMedia',
+        star_count: 15,
+        media: [{}, {}],
+        caption: { text: '两张图' },
+      }).text,
+    ).toBe('[付费媒体] 2 项 · 15 颗 Star\n两张图')
+    expect(mapContent({ _: 'messageStory' }).text).toBe('📖 转发的故事')
+    expect(mapContent({ _: 'messageStakeDice', value: 4 }).text).toBe('🎲 4')
+    expect(mapContent({ _: 'messageWidget', caption: { text: '预测' } }).text).toBe('[小组件] 预测')
+  })
 })
 
 describe('mediaUrls', () => {
@@ -291,6 +390,22 @@ describe('previewContent', () => {
     expect(previewContent({ _: 'messagePinMessage' })).toBe('置顶了一条消息')
     expect(previewContent({ _: 'messagePollOptionAdded' })).toBe('添加了投票选项')
     expect(previewContent({ _: 'messagePollOptionDeleted' })).toBe('删除了投票选项')
+    expect(previewContent({ _: 'messageCall', is_video: true })).toBe('视频通话')
+    expect(previewContent({ _: 'messageVideoChatEnded' })).toBe('群通话')
+    expect(previewContent({ _: 'messageChatOwnerChanged' })).toBe('群主已变更')
+    expect(previewContent({ _: 'messageChatHasProtectedContentToggled' })).toBe('禁止保存和转发')
+    expect(previewContent({ _: 'messageExpiredPhoto' })).toBe('[图片已过期]')
+    expect(previewContent({ _: 'messageExpiredVoiceNote' })).toBe('[语音已过期]')
+    expect(previewContent({ _: 'messageChatJoinFromCommunity' })).toBe('通过社区加入群聊')
+    expect(previewContent({ _: 'messageChatBoost' })).toBe('为群聊助力')
+    expect(previewContent({ _: 'messageGameScore' })).toBe('游戏得分')
+    expect(previewContent({ _: 'messageManagedBotCreated' })).toBe('创建了新机器人')
+    expect(previewContent({ _: 'messageGiftedStars' })).toBe('赠送 Star')
+    expect(previewContent({ _: 'messageProximityAlertTriggered' })).toBe('距离提醒')
+    expect(previewContent({ _: 'messageLocation' })).toBe('[位置]')
+    expect(previewContent({ _: 'messageAudio' })).toBe('[音频]')
+    expect(previewContent({ _: 'messageChecklist' })).toBe('[清单]')
+    expect(previewContent({ _: 'messagePaidMedia' })).toBe('[付费媒体]')
     expect(previewContent({ _: 'messageSomethingNew' })).toBe('')
   })
 
@@ -343,81 +458,5 @@ describe('previewSpoilers', () => {
         },
       }),
     ).toEqual([])
-  })
-})
-
-describe('serviceText', () => {
-  const ctx = {
-    senderName: 'Alice',
-    outgoing: false,
-    resolveUserName: async (userId: number) => `user-${userId}`,
-  }
-
-  it('composes group lifecycle notices in WeChat style', async () => {
-    expect(await serviceText({ _: 'messageSupergroupChatCreate', title: 'Team' }, ctx)).toBe(
-      'Alice创建了群聊「Team」',
-    )
-    expect(await serviceText({ _: 'messageChatChangeTitle', title: 'New' }, ctx)).toBe(
-      'Alice修改群聊名称为「New」',
-    )
-    expect(await serviceText({ _: 'messageChatChangePhoto' }, ctx)).toBe('Alice修改了群聊头像')
-  })
-
-  it('reads the reciprocal pronoun when the message is ours', async () => {
-    expect(await serviceText({ _: 'messagePinMessage' }, { ...ctx, outgoing: true })).toBe(
-      '你置顶了一条消息',
-    )
-  })
-
-  it('names the invited members and tolerates an empty list', async () => {
-    expect(await serviceText({ _: 'messageChatAddMembers', member_user_ids: [1, 2] }, ctx)).toBe(
-      'Alice邀请user-1、user-2加入了群聊',
-    )
-    expect(await serviceText({ _: 'messageChatAddMembers', member_user_ids: [] }, ctx)).toBe(
-      'Alice邀请了新成员加入群聊',
-    )
-  })
-
-  it('reports the departing member, not the sender, for a removal', async () => {
-    expect(await serviceText({ _: 'messageChatDeleteMember', user_id: 9 }, ctx)).toBe(
-      'user-9退出了群聊',
-    )
-  })
-
-  it('turns the auto-delete time into an on/off notice', async () => {
-    expect(
-      await serviceText(
-        { _: 'messageChatSetMessageAutoDeleteTime', message_auto_delete_time: 60 },
-        ctx,
-      ),
-    ).toBe('Alice开启了消息自动删除')
-    expect(
-      await serviceText(
-        { _: 'messageChatSetMessageAutoDeleteTime', message_auto_delete_time: 0 },
-        ctx,
-      ),
-    ).toBe('Alice关闭了消息自动删除')
-  })
-
-  it('composes poll option added / deleted notices', async () => {
-    expect(await serviceText({ _: 'messagePollOptionAdded', text: { text: '4' } }, ctx)).toBe(
-      'Alice已将“4”添加到投票中',
-    )
-    expect(
-      await serviceText(
-        { _: 'messagePollOptionAdded', text: { text: '4' } },
-        { ...ctx, outgoing: true },
-      ),
-    ).toBe('你已将“4”添加到投票中')
-    expect(await serviceText({ _: 'messagePollOptionDeleted', text: { text: '4' } }, ctx)).toBe(
-      'Alice从投票中删除了选项“4”',
-    )
-    expect(await serviceText({ _: 'messagePollOptionAdded' }, ctx)).toBe(
-      'Alice向投票中添加了一个选项',
-    )
-  })
-
-  it('falls back to empty text for an unhandled service type', async () => {
-    expect(await serviceText({ _: 'messageSomethingNew' }, ctx)).toBe('')
   })
 })

@@ -47,6 +47,7 @@ longer load in one go):
 | `protocol/dto.ts` at its cap (custom-emoji channel, 2026-11-20) | `protocol/stickers.ts`: format enum, `Sticker`, sticker sets, `CustomEmojiSticker`; `messageMediaSchema` stays in `dto.ts` and imports the format |
 | `mock-fixtures/data.ts` at its cap (custom-emoji fixture, 2026-11-20) | `stress.ts`: the 5000-message chat 99 as `buildStressSeed`; `data.ts` calls it |
 | `tdlib/index.ts` at its cap (custom-emoji channel, 2026-11-20) | `tdlib/map/resolvers.ts`: `createResolvers` (cached `getUser`/`getChat` lookups) over the adapter's maps |
+| `tdlib/map/content.ts` at its cap (service messages, 2026-11-21) | `tdlib/map/service.ts`: `serviceText` / `SERVICE_CONTENT_TYPES` / `servicePreview` — the one TDLib service-copy table, deliberately exempt from `max-lines` in `eslint.config.mjs` (one protocol union; see `docs/技术方案.md` §8.3). `previewContent` stays in `content.ts` and imports `servicePreview` |
 
 Behaviour was not changed: every doc comment moved with its code, no channel/DTO/`wx-*`
 name was touched, and no scroll timing was rewritten. New pure tests: `viewerMenu`,
@@ -267,8 +268,11 @@ map/context.ts    MapperContext (chatTitles, chatAvatarUrls, stickerSizes, resol
 map/chat.ts       mapChat, mapChatKind, mapConnectionState
 map/message.ts    mapMessage
 map/entities.ts   mapEntities + the TL entity type table   (added — see below)
-map/content.ts    mapContent, serviceText, previewContent, size/label helpers
+map/content.ts    mapContent, previewContent, size/label helpers
                   (the media readers moved to map/media.ts and are re-exported here)
+map/service.ts    serviceText / SERVICE_CONTENT_TYPES / servicePreview: the one
+                  TDLib service-copy table (max-lines exempt — see docs/技术方案.md §8.3)
+                  (tests live in service.test.ts)
 map/media.ts      mediaUrls / pickLargest / pickSmallestAtLeast: the media fields both
                   mapContent and the rich mapper read (added with rich messages)
 map/buttons.ts    buttonTarget / inlineButtonOf / mapReplyMarkup: the one address rule
@@ -287,7 +291,8 @@ Three deliberate deviations from the sketch above, all for acyclic imports:
 2. **`map/user.ts`** holds `mapUser`, used by both `me()` and `resolveUserName` — it is not a
    chat mapper, so it did not belong in `map/chat.ts`.
 3. **`previewContent` lives in `map/content.ts`** (it is built from `extractText` /
-   `mapContentLabel` / `servicePreview`), not duplicated in `map/chat.ts`.
+   `mapContentLabel` and `servicePreview` from `map/service.ts`), not duplicated in
+   `map/chat.ts`.
 
 Mechanics worth keeping: every helper module takes a small **deps interface** defined in that
 module (`ActionDeps`, `ProxyDeps`, `UpdateDeps`, `StickerDeps`, `AvatarCacheOptions`) and

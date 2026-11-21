@@ -6,6 +6,7 @@ import { mapEntities } from './entities'
 import { documentMedia, mediaFileUrl, mediaUrls, photoMedia, videoMedia, voiceMedia } from './media'
 import { mapPoll } from './poll'
 import { mapRichMessage, richPreview } from './rich'
+import { servicePreview } from './service'
 import { mapStickerFormat } from './sticker'
 
 // Re-exported on purpose: this is where message media has always been read from,
@@ -179,163 +180,153 @@ export function mapContent(content: TdObject): {
       const rich = mapRichMessage(content.message)
       return { kind: 'rich', text: rich.text, entities: [], rich: rich.blocks }
     }
+    // An audio file is a document with a title and a performer: the file bubble
+    // downloads it, and its caption carries what the file name often does not.
+    case 'messageAudio': {
+      const audio = content.audio ?? {}
+      const title = typeof audio.title === 'string' ? audio.title : ''
+      const performer = typeof audio.performer === 'string' ? audio.performer : ''
+      return {
+        kind: 'file',
+        text: [title, performer].filter(Boolean).join(' · '),
+        entities: [],
+        media: documentMedia(audio),
+      }
+    }
+    // A round video note is a square MP4 in TDLib, so the existing video bubble
+    // and viewer draw and play it unchanged.
+    case 'messageVideoNote': {
+      const note = content.video_note ?? {}
+      const file = note.video
+      const length = Number(note.length) || 0
+      return {
+        kind: 'video',
+        text: '',
+        entities: [],
+        media: {
+          fileId: Number(file?.id ?? 0),
+          ...(note.thumbnail?.file?.id ? { thumbFileId: Number(note.thumbnail.file.id) } : {}),
+          ...(note.duration ? { duration: Number(note.duration) } : {}),
+          ...(length ? { width: length, height: length } : {}),
+          ...mediaUrls(file, note.thumbnail?.file),
+        },
+      }
+    }
+    // No map tiles, story viewer, payment flow or HTML-widget renderer yet: these
+    // keep the row and its facts in a text bubble instead of dropping the message
+    // into the "unsupported" fallback.
+    case 'messageLocation': {
+      const point = pointOf(content.location)
+      return { kind: 'text', text: point ? `📍 ${point}` : '📍 位置', entities: [] }
+    }
+    case 'messageLiveLocation': {
+      const point = pointOf(content.location)
+      const minutes = Math.ceil((Number(content.expires_in) || 0) / 60)
+      const head = minutes > 0 ? `📍 实时位置 · 剩余 ${minutes} 分钟` : '📍 实时位置'
+      return { kind: 'text', text: [head, point].filter(Boolean).join('\n'), entities: [] }
+    }
+    case 'messageVenue': {
+      const venue = content.venue ?? {}
+      const title = typeof venue.title === 'string' ? venue.title : ''
+      const address = typeof venue.address === 'string' ? venue.address : ''
+      return {
+        kind: 'text',
+        text: [`📍 ${title || '位置'}`, address, pointOf(venue.location)]
+          .filter(Boolean)
+          .join('\n'),
+        entities: [],
+      }
+    }
+    case 'messageGame': {
+      const game = content.game ?? {}
+      const title = typeof game.title === 'string' ? game.title : ''
+      const description = typeof game.description === 'string' ? game.description : ''
+      return {
+        kind: 'text',
+        text: [`🎮 ${title || '游戏'}`, description].filter(Boolean).join('\n'),
+        entities: [],
+      }
+    }
+    case 'messageStakeDice': {
+      const value = Number(content.value) || 0
+      return { kind: 'text', text: value > 0 ? `🎲 ${value}` : '🎲', entities: [] }
+    }
+    case 'messageStory':
+      return { kind: 'text', text: '📖 转发的故事', entities: [] }
+    case 'messageWidget': {
+      const caption = content.caption?.text ?? ''
+      return {
+        kind: 'text',
+        text: caption ? `[小组件] ${caption}` : '[小组件]',
+        entities: [],
+      }
+    }
+    case 'messageChecklist': {
+      const list = content.list ?? {}
+      const title = typeof list.title?.text === 'string' ? list.title.text : ''
+      const tasks = asArray<TdObject>(list.tasks)
+      const lines = tasks
+        .slice(0, 6)
+        .map((task) =>
+          `${Number(task?.completion_date) > 0 ? '☑' : '☐'} ${task?.text?.text ?? ''}`.trim(),
+        )
+      const more = tasks.length > 6 ? `… 共 ${tasks.length} 项` : ''
+      return {
+        kind: 'text',
+        text: [`☑ ${title || '清单'}`, ...lines, more].filter(Boolean).join('\n'),
+        entities: [],
+      }
+    }
+    case 'messageInvoice': {
+      const product = content.product_info ?? {}
+      const title = typeof product.title === 'string' ? product.title : ''
+      return { kind: 'text', text: `🧾 ${title || '账单'}`, entities: [] }
+    }
+    case 'messageUsersShared': {
+      const users = asArray<TdObject>(content.users)
+      const names = users.map(sharedUserName).filter(Boolean)
+      return {
+        kind: 'text',
+        text: `[联系人] ${names.join('、') || `${users.length} 位联系人`}`,
+        entities: [],
+      }
+    }
+    case 'messageChatShared': {
+      const shared = content.chat ?? {}
+      return { kind: 'text', text: `[会话] ${sharedChatName(shared)}`, entities: [] }
+    }
+    case 'messagePaidMedia': {
+      const items = asArray<TdObject>(content.media)
+      const caption = content.caption?.text ?? ''
+      const stars = Number(content.star_count) || 0
+      const head = `[付费媒体] ${items.length} 项${stars > 0 ? ` · ${stars} 颗 Star` : ''}`
+      return { kind: 'text', text: [head, caption].filter(Boolean).join('\n'), entities: [] }
+    }
     default:
       return { kind: 'service', text: '', entities: [] }
   }
 }
 
-/**
- * Human-readable text for a TDLib service message. TDLib itself ships no text
- * for these — the client must compose it (WeChat-style, Chinese).
- */
-export async function serviceText(content: TdObject, ctx: ServiceTextContext): Promise<string> {
-  const who = ctx.outgoing ? '你' : ctx.senderName
-  const title = (value: unknown): string => (typeof value === 'string' && value ? value : '')
-  switch (content._) {
-    case 'messageBasicGroupChatCreate':
-    case 'messageSupergroupChatCreate': {
-      const name = title(content.title)
-      return name ? `${who}创建了群聊「${name}」` : `${who}创建了群聊`
-    }
-    case 'messageChatUpgradeFrom':
-    case 'messageChatUpgradeTo':
-      return '群聊已升级为超级群组'
-    case 'messageChatChangeTitle': {
-      const name = title(content.title)
-      return name ? `${who}修改群聊名称为「${name}」` : `${who}修改了群聊名称`
-    }
-    case 'messageChatChangePhoto':
-      return `${who}修改了群聊头像`
-    case 'messageChatDeletePhoto':
-      return `${who}移除了群聊头像`
-    case 'messageChatAddMembers': {
-      const ids: number[] = asArray<number>(content.member_user_ids)
-      const names = await Promise.all(ids.map((id) => ctx.resolveUserName(Number(id))))
-      if (names.length === 0) return `${who}邀请了新成员加入群聊`
-      return `${who}邀请${names.join('、')}加入了群聊`
-    }
-    case 'messageChatJoinByLink':
-      return `${who}通过邀请链接加入了群聊`
-    case 'messageChatJoinByRequest':
-      return `${who}加入了群聊`
-    case 'messageChatDeleteMember': {
-      // The deleted member is the subject, not necessarily the sender.
-      const name = await ctx.resolveUserName(Number(content.user_id))
-      return `${name}退出了群聊`
-    }
-    case 'messagePinMessage':
-      return `${who}置顶了一条消息`
-    case 'messageScreenshotTaken':
-      return `${who}对聊天进行了截图`
-    case 'messageChatSetBackground':
-      return `${who}修改了聊天背景`
-    case 'messageChatSetTheme':
-      return `${who}修改了聊天主题`
-    case 'messageChatSetTtl':
-      return `${who}修改了消息自动删除定时`
-    case 'messageChatSetMessageAutoDeleteTime':
-      return Number(content.message_auto_delete_time) > 0
-        ? `${who}开启了消息自动删除`
-        : `${who}关闭了消息自动删除`
-    case 'messageForumTopicCreated': {
-      const name = title(content.name)
-      return name ? `${who}创建了话题「${name}」` : `${who}创建了话题`
-    }
-    case 'messageForumTopicEdited':
-      return `${who}编辑了话题`
-    case 'messageForumTopicIsClosedToggled':
-      return content.is_closed ? `${who}关闭了话题` : `${who}重新打开了话题`
-    case 'messageForumTopicIsHiddenToggled':
-      return content.is_hidden ? `${who}隐藏了话题` : `${who}显示了话题`
-    // Adding an option to a poll posts a service row in the chat (TDLib
-    // messagePollOptionAdded); the option's own words travel in `text`.
-    case 'messagePollOptionAdded': {
-      const option = title(content.text?.text)
-      return option ? `${who}已将“${option}”添加到投票中` : `${who}向投票中添加了一个选项`
-    }
-    case 'messagePollOptionDeleted': {
-      const option = title(content.text?.text)
-      return option ? `${who}从投票中删除了选项“${option}”` : `${who}从投票中删除了一个选项`
-    }
-    case 'messageContactRegistered':
-      return `${who}加入了 Telegram`
-    case 'messageSuggestProfilePhoto':
-      return `${who}建议你使用新的头像`
-    case 'messageCustomServiceAction':
-      return typeof content.text === 'string' ? content.text : ''
-    default:
-      return ''
-  }
+/** `31.23042, 121.47370`; empty when TDLib sent no usable point. */
+function pointOf(value: TdObject | undefined): string {
+  const latitude = Number(value?.latitude)
+  const longitude = Number(value?.longitude)
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return ''
+  return `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`
 }
 
-/** TDLib content types that are service messages (centered transcript notices). */
-export const SERVICE_CONTENT_TYPES = new Set([
-  'messageBasicGroupChatCreate',
-  'messageSupergroupChatCreate',
-  'messageChatUpgradeFrom',
-  'messageChatUpgradeTo',
-  'messageChatChangeTitle',
-  'messageChatChangePhoto',
-  'messageChatDeletePhoto',
-  'messageChatAddMembers',
-  'messageChatJoinByLink',
-  'messageChatJoinByRequest',
-  'messageChatDeleteMember',
-  'messagePinMessage',
-  'messageScreenshotTaken',
-  'messageChatSetBackground',
-  'messageChatSetTheme',
-  'messageChatSetTtl',
-  'messageChatSetMessageAutoDeleteTime',
-  'messageForumTopicCreated',
-  'messageForumTopicEdited',
-  'messageForumTopicIsClosedToggled',
-  'messageForumTopicIsHiddenToggled',
-  'messageContactRegistered',
-  'messageSuggestProfilePhoto',
-  'messageCustomServiceAction',
-  'messagePollOptionAdded',
-  'messagePollOptionDeleted',
-])
-
-interface ServiceTextContext {
-  senderName: string
-  outgoing: boolean
-  resolveUserName: (userId: number) => Promise<string>
+function sharedUserName(user: TdObject | undefined): string {
+  const name = [user?.first_name, user?.last_name]
+    .filter((part): part is string => typeof part === 'string' && part.length > 0)
+    .join(' ')
+  if (name) return name
+  return typeof user?.username === 'string' && user.username ? `@${user.username}` : ''
 }
 
-function servicePreview(content: TdObject): string {
-  switch (content._) {
-    case 'messageBasicGroupChatCreate':
-    case 'messageSupergroupChatCreate':
-      return '创建群聊'
-    case 'messageChatChangeTitle':
-      return '修改群聊名称'
-    case 'messageChatChangePhoto':
-      return '修改群聊头像'
-    case 'messageChatDeletePhoto':
-      return '移除群聊头像'
-    case 'messageChatAddMembers':
-    case 'messageChatJoinByLink':
-    case 'messageChatJoinByRequest':
-      return '加入群聊'
-    case 'messageChatDeleteMember':
-      return '退出群聊'
-    case 'messagePinMessage':
-      return '置顶了一条消息'
-    case 'messageScreenshotTaken':
-      return '对聊天进行了截图'
-    case 'messagePollOptionAdded':
-      return '添加了投票选项'
-    case 'messagePollOptionDeleted':
-      return '删除了投票选项'
-    case 'messageContactRegistered':
-      return '加入了 Telegram'
-    case 'messageCustomServiceAction':
-      return typeof content.text === 'string' ? content.text : ''
-    default:
-      return ''
-  }
+function sharedChatName(chat: TdObject): string {
+  if (typeof chat.title === 'string' && chat.title) return chat.title
+  if (typeof chat.username === 'string' && chat.username) return `@${chat.username}`
+  return '会话'
 }
 
 export function previewContent(content: TdObject | undefined): string {
@@ -368,6 +359,33 @@ function mapContentLabel(content: TdObject | undefined): string {
         .join(' ')
       return name ? `[名片] ${name}` : '[名片]'
     }
+    case 'messageAudio':
+      return '[音频]'
+    case 'messageVideoNote':
+      return '[视频消息]'
+    case 'messageLocation':
+    case 'messageVenue':
+      return '[位置]'
+    case 'messageLiveLocation':
+      return '[实时位置]'
+    case 'messageGame':
+      return '[游戏]'
+    case 'messageStakeDice':
+      return '[骰子]'
+    case 'messageStory':
+      return '[故事]'
+    case 'messageWidget':
+      return '[小组件]'
+    case 'messageChecklist':
+      return '[清单]'
+    case 'messageInvoice':
+      return '[账单]'
+    case 'messageUsersShared':
+      return '[联系人]'
+    case 'messageChatShared':
+      return '[会话]'
+    case 'messagePaidMedia':
+      return '[付费媒体]'
     default:
       return ''
   }

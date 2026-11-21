@@ -2,7 +2,8 @@ import type { Message, MessageInteraction } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
 import { mapReplyMarkup } from './buttons'
-import { mapContent, serviceText, SERVICE_CONTENT_TYPES } from './content'
+import { mapContent } from './content'
+import { serviceText, SERVICE_CONTENT_TYPES } from './service'
 import type { MapperContext } from './context'
 
 /**
@@ -57,6 +58,7 @@ export async function mapMessage(
           senderName,
           outgoing: Boolean(raw.is_outgoing),
           resolveUserName: (userId: number) => ctx.resolveUserName(userId),
+          resolveChatTitle: (chatId: number) => ctx.resolveChatTitle(chatId),
         })
       : '[暂不支持的消息]'
   }

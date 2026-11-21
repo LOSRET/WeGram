@@ -149,6 +149,32 @@ describe('mapMessage', () => {
     expect(message.text).toBe('你已将“4”添加到投票中')
   })
 
+  it('composes a call notice and an expired-media notice instead of dropping them', async () => {
+    const call = await mapMessage(makeContext(), 3, {
+      id: 5,
+      date: 10,
+      sender_id: { _: 'messageSenderUser', user_id: 37 },
+      content: {
+        _: 'messageCall',
+        is_video: true,
+        discard_reason: { _: 'callDiscardReasonMissed' },
+        duration: 0,
+      },
+    })
+    expect(call.kind).toBe('service')
+    expect(call.text).toBe('未接听视频通话')
+
+    const expired = await mapMessage(makeContext(), 3, {
+      id: 6,
+      date: 10,
+      sender_id: { _: 'messageSenderUser', user_id: 37 },
+      is_outgoing: true,
+      content: { _: 'messageExpiredPhoto' },
+    })
+    expect(expired.kind).toBe('service')
+    expect(expired.text).toBe('你发送的图片已过期')
+  })
+
   it('marks an unhandled content type as unsupported instead of rendering empty', async () => {
     const message = await mapMessage(makeContext(), 9, {
       id: 3,
