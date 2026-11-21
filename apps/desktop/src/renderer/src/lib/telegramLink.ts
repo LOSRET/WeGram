@@ -34,6 +34,17 @@ const USERNAME = /^[A-Za-z0-9_]+$/
  */
 const SUPERGROUP_CHAT_ID_BASE = 1_000_000_000_000
 
+/**
+ * A link carries a post's *server* number; TDLib message ids are that number
+ * shifted left by 20 (`MessageId.h`: `server_message_id << 20`, the low 20 bits
+ * are the type tag). Passing the raw number to `messages:around` made TDLib
+ * answer 400 "Invalid value of parameter from_message_id specified" — most post
+ * numbers are not a valid MessageId at all — and for the rest it located an
+ * unrelated message. The conversion belongs next to the chat-id arithmetic below
+ * and is pinned by the unit tests.
+ */
+const MESSAGE_ID_SHIFT = 2 ** 20
+
 /** Path words that name a Telegram website page or an action, not a chat. */
 const NOT_A_CHAT = new Set([
   'addemoji',
@@ -74,15 +85,15 @@ function fromPath(url: URL): TelegramLinkTarget | null {
   if (name === 'c') {
     const chatId = internalChatId(rest[0])
     if (chatId === null) return null
-    const messageId = positiveInt(rest[1])
-    if (rest.length > 1 && messageId === null) return null
-    return messageId === null ? { kind: 'chat', chatId } : { kind: 'chat', chatId, messageId }
+    const messageId = linkedMessageId(rest[1])
+    if (rest[1] !== undefined && messageId === undefined) return null
+    return messageId === undefined ? { kind: 'chat', chatId } : { kind: 'chat', chatId, messageId }
   }
   if (name === undefined || name.startsWith('+') || NOT_A_CHAT.has(name)) return null
   if (!USERNAME.test(name)) return null
-  const messageId = positiveInt(rest[0])
-  if (rest.length > 0 && messageId === null) return null
-  return messageId === null
+  const messageId = linkedMessageId(rest[0])
+  if (rest[0] !== undefined && messageId === undefined) return null
+  return messageId === undefined
     ? { kind: 'username', username: name }
     : { kind: 'username', username: name, messageId }
 }
@@ -93,8 +104,8 @@ function fromTg(url: URL): TelegramLinkTarget | null {
   if (action === 'resolve') {
     const username = url.searchParams.get('domain') ?? ''
     if (!USERNAME.test(username)) return null
-    const messageId = positiveInt(url.searchParams.get('post'))
-    return messageId === null
+    const messageId = linkedMessageId(url.searchParams.get('post') ?? undefined)
+    return messageId === undefined
       ? { kind: 'username', username }
       : { kind: 'username', username, messageId }
   }
@@ -107,8 +118,10 @@ function fromTg(url: URL): TelegramLinkTarget | null {
     if (chatId === null || chatId === 0) return null
     // A private chat's id is the user id; TDLib opens it with createPrivateChat.
     if (chatId > 0) return { kind: 'user', userId: chatId }
-    const messageId = positiveInt(url.searchParams.get('message_id'))
-    return messageId === null ? { kind: 'chat', chatId } : { kind: 'chat', chatId, messageId }
+    const messageId = linkedMessageId(url.searchParams.get('message_id') ?? undefined)
+    return messageId === undefined
+      ? { kind: 'chat', chatId }
+      : { kind: 'chat', chatId, messageId }
   }
   return null
 }
@@ -118,6 +131,14 @@ function internalChatId(value: string | undefined): number | null {
   if (internal === null) return null
   const chatId = SUPERGROUP_CHAT_ID_BASE + internal
   return Number.isSafeInteger(chatId) ? -chatId : null
+}
+
+/** A link's post number as a TDLib message id; `undefined` when it is not one. */
+function linkedMessageId(raw: string | undefined): number | undefined {
+  const post = positiveInt(raw)
+  if (post === null) return undefined
+  const id = post * MESSAGE_ID_SHIFT
+  return Number.isSafeInteger(id) ? id : undefined
 }
 
 function positiveInt(value: string | null | undefined): number | null {
