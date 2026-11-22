@@ -7,6 +7,7 @@ import type {
   Message,
   MessageOp,
   PeerStatus,
+  SendKey,
   UserAvatar,
 } from '@wegram/protocol'
 import type { StateCreator } from 'zustand'
@@ -66,6 +67,8 @@ export interface AppData {
   connection: ConnectionState
   info: AppInfo | null
   theme: 'light' | 'dark'
+  /** 发送消息's rule; the composer reads it when an Enter lands (evt:settings). */
+  sendKey: SendKey
   chats: ChatSummary[]
   activeChatId: number | null
   messagesByChat: Record<number, Message[]>
@@ -127,6 +130,7 @@ export interface AuthActions {
   setConnection: (state: ConnectionState) => void
   setInfo: (info: AppInfo) => void
   setTheme: (theme: 'light' | 'dark') => void
+  setSendKey: (sendKey: SendKey) => void
   /** Clears every chat/message/media field, used on logout. */
   reset: () => void
 }

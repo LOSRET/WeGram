@@ -170,6 +170,10 @@ export const invokeChannels = [
   'ui:saveRecentEmoji',
   'settings:get',
   'settings:set',
+  /** Opens (or focuses) the standalone settings window (design doc §9.11). */
+  'settings:open',
+  /** The settings window's own × / Esc. It does not close the shell. */
+  'settings:close',
   'proxy:get',
   'proxy:set',
   'proxy:test',
@@ -483,6 +487,8 @@ export const invokeSchemas = {
     request: z.object({ patch: appSettingsSchema.partial() }),
     response: noPayload,
   },
+  'settings:open': { request: noPayload, response: noPayload },
+  'settings:close': { request: noPayload, response: noPayload },
   'proxy:get': { request: noPayload, response: proxyConfigSchema.nullable() },
   'proxy:set': { request: z.object({ config: proxyConfigSchema.nullable() }), response: noPayload },
   'proxy:test': {

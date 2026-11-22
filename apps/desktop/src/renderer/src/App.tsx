@@ -112,6 +112,19 @@ export function App() {
         track(event.seq)
         store.setConnection(event.payload)
       }),
+      /**
+       * 设置 → 外观 (or the OS, while 跟随系统 is on) repaints the shell from here.
+       * The settings window sends the change, so without this event the shell would
+       * keep the old theme until the next restart (design doc §9.11.4).
+       */
+      window.tg.on('evt:theme', (event) => {
+        track(event.seq)
+        useAppStore.getState().setTheme(event.payload.theme)
+      }),
+      window.tg.on('evt:settings', (event) => {
+        track(event.seq)
+        useAppStore.getState().setSendKey(event.payload.sendKey)
+      }),
       window.tg.on('evt:chats', (event) => {
         track(event.seq)
         store.applyChatOps(event.payload.ops)
@@ -210,6 +223,7 @@ export function App() {
         store.setInfo(info)
         store.setAuth(authState)
         store.setTheme(settings.theme)
+        store.setSendKey(settings.sendKey)
       } catch (error) {
         store.setError(errorMessage(error))
       }

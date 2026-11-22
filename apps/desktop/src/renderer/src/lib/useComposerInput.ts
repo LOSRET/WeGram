@@ -1,6 +1,7 @@
 import type { KeyboardEvent } from 'react'
 import { useRef } from 'react'
 
+import { useAppStore } from '../store/useAppStore'
 import { shouldSend } from './composerInput'
 
 export interface ComposerKeyHandlers {
@@ -16,6 +17,10 @@ export interface ComposerKeyHandlers {
  * copied; the comment one had already lost the Shift+Enter comment. What cannot
  * be shared is the JSX — the tool rows differ — so this returns props to spread
  * onto the textarea instead of a component.
+ *
+ * 发送消息 is read at keydown time, not captured per render: the setting can change
+ * while a composer is mounted (evt:settings), and a stale rule is the kind of bug
+ * that only shows up after the second visit to 设置.
  */
 export function useComposerInput(handlers: ComposerKeyHandlers) {
   const composingRef = useRef(false)
@@ -38,9 +43,12 @@ export function useComposerInput(handlers: ComposerKeyHandlers) {
           {
             key: event.key,
             shiftKey: event.shiftKey,
+            ctrlKey: event.ctrlKey,
+            metaKey: event.metaKey,
             nativeComposing: event.nativeEvent.isComposing,
           },
           composingRef.current,
+          useAppStore.getState().sendKey,
         )
         if (!send) return
         event.preventDefault()

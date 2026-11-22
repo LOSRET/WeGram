@@ -5,6 +5,7 @@ import { chatOpSchema } from './chat'
 import { authStateSchema, connectionStateSchema, userAvatarSchema } from './dto'
 import { messageOpSchema } from './message-ops'
 import { peerStatusSchema } from './presence'
+import { sendKeySchema } from './settings'
 import { appErrorSchema } from './errors'
 
 /**
@@ -25,6 +26,13 @@ export const eventChannels = [
   /** The startup phase changed; terminal kinds stop the login spinner. */
   'evt:boot',
   'evt:connection',
+  /**
+   * The resolved theme changed: 设置 → 外观, or the OS while the preference is
+   * "follow the system". Every window repaints from it (design doc §9.11.4).
+   */
+  'evt:theme',
+  /** 发送消息's Enter rule changed; the shell's composers read it from here. */
+  'evt:settings',
   'evt:chats',
   'evt:messages',
   /**
@@ -52,6 +60,8 @@ export const eventSchemas = {
   'evt:auth': envelope(authStateSchema),
   'evt:boot': envelope(bootStateSchema),
   'evt:connection': envelope(connectionStateSchema),
+  'evt:theme': envelope(z.object({ theme: z.enum(['light', 'dark']) })),
+  'evt:settings': envelope(z.object({ sendKey: sendKeySchema })),
   'evt:chats': envelope(z.object({ ops: z.array(chatOpSchema) })),
   'evt:messages': envelope(z.object({ chatId: z.number().int(), ops: z.array(messageOpSchema) })),
   'evt:avatars': envelope(z.object({ avatars: z.array(userAvatarSchema) })),

@@ -12,6 +12,7 @@ export const DATA_DEFAULTS: AppData = {
   connection: 'offline',
   info: null,
   theme: 'light',
+  sendKey: 'enter',
   chats: [],
   activeChatId: null,
   messagesByChat: {},

@@ -24,7 +24,9 @@ import {
   viewerItem,
   viewerState,
 } from '../viewer'
-import { storedTheme } from '../windows'
+import { closeSettingsWindow, openSettingsWindow } from '../settings-window'
+import { getCloseBehavior, getSendKey, setCloseBehavior, setSendKey } from '../store/prefs'
+import { resolveTheme, storedTheme, themePreference } from '../windows'
 import type { IpcHandlerMap } from './router'
 
 export interface HandlerDeps {
@@ -34,6 +36,11 @@ export interface HandlerDeps {
   info: AppInfo
   /** Lets the shell repaint the native window-controls overlay on theme change. */
   onThemeChange?: (theme: 'light' | 'dark') => void
+  /**
+   * 发送消息's rule changed: the shell's composers follow it through evt:settings,
+   * so the change applies without a restart.
+   */
+  onSendKeyChange?: (sendKey: 'enter' | 'ctrlEnter') => void
   /**
    * Opens the shell window and dismisses the login window. Called by the login
    * window's 进入 button; the caller guards that authorization finished.
@@ -69,6 +76,7 @@ export function createHandlers({
   uiDb,
   info,
   onThemeChange,
+  onSendKeyChange,
   onLoginEnter,
   onAuthInteraction,
   onLocate,
@@ -149,7 +157,12 @@ export function createHandlers({
       onAuthInteraction()
       return adapter.restartAuth()
     },
-    'auth:logout': () => adapter.logout(),
+    'auth:logout': async () => {
+      // 设置 draws the account that is leaving; it must not stay up showing an
+      // identity that no longer exists (design doc §9.11.5).
+      closeSettingsWindow()
+      await adapter.logout()
+    },
     'auth:me': () => adapter.me(),
 
     'chats:list': (payload) => adapter.listChats(payload),
@@ -341,13 +354,32 @@ export function createHandlers({
       uiDb.setSetting(RECENT_EMOJI_KEY, JSON.stringify(payload.emoji.slice(0, RECENT_EMOJI_LIMIT)))
     },
 
-    'settings:get': () => ({ theme: storedTheme(uiDb) }),
+    'settings:get': () => ({
+      theme: storedTheme(uiDb),
+      themePreference: themePreference(uiDb),
+      closeBehavior: getCloseBehavior(uiDb),
+      sendKey: getSendKey(uiDb),
+    }),
     'settings:set': (payload) => {
-      if (payload.patch.theme) {
-        uiDb.setSetting('theme', payload.patch.theme)
-        onThemeChange?.(payload.patch.theme)
+      // A patch that names `theme` is an explicit choice (the rail menu's 深色模式
+      // toggle); `themePreference` is the settings window's three-way control.
+      const preference = payload.patch.themePreference ?? payload.patch.theme
+      if (preference) {
+        uiDb.setSetting('theme', preference)
+        onThemeChange?.(resolveTheme(preference))
+      }
+      if (payload.patch.closeBehavior) setCloseBehavior(uiDb, payload.patch.closeBehavior)
+      if (payload.patch.sendKey) {
+        setSendKey(uiDb, payload.patch.sendKey)
+        onSendKeyChange?.(payload.patch.sendKey)
       }
     },
+    /**
+     * 设置 is its own window, so the shell only asks for it. The anchor is whichever
+     * window asked, which is what puts the sheet on the right display (§9.11.1).
+     */
+    'settings:open': () => openSettingsWindow(storedTheme(uiDb), BrowserWindow.getFocusedWindow()),
+    'settings:close': () => closeSettingsWindow(),
 
     'proxy:get': () => toProxyView(store.get().proxy),
     'proxy:set': async (payload) => {

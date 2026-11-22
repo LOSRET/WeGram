@@ -1,0 +1,309 @@
+/* ==========================================================================
+   设置, the standalone window (design doc §9.11).
+
+   The window is frameless and paints its own chrome: no card, no backdrop, no
+   drop shadow (those belong to the window and the DWM). Both columns run the full
+   height; the top 40 px is the grab strip. Every colour is a token — the measured
+   values live in docs/UI-HANDOFF.md §2.10.
+   ========================================================================== */
+
+.wx-settings {
+  --wx-set-nav: #eeeef0;
+  --wx-set-divider: #f0f0f0;
+  --wx-set-pill: #f2f2f2;
+  --wx-set-pill-hover: #e9e9e9;
+
+  position: fixed;
+  inset: 0;
+  display: flex;
+  overflow: hidden;
+  background: var(--wx-pane);
+  color: var(--wx-text);
+  font-family: var(--wx-font);
+  font-size: var(--wx-fs-body);
+  user-select: none;
+}
+
+[data-theme='dark'] .wx-settings {
+  --wx-set-nav: #2f2f30;
+  --wx-set-divider: #272728;
+  --wx-set-pill: #303031;
+  --wx-set-pill-hover: #3a3a3c;
+}
+
+/* The whole window is frameless; only this strip moves it. */
+.wx-settings__drag {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 2;
+  height: 40px;
+  -webkit-app-region: drag;
+}
+
+.wx-settings__close {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  z-index: 3;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wx-text-secondary);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.wx-settings__close:hover {
+  background: var(--wx-row-hover);
+  color: var(--wx-text);
+}
+
+/* ---- nav column ---------------------------------------------------------- */
+
+.wx-set-nav {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  width: 160px;
+  padding-top: 40px;
+  background: var(--wx-set-nav);
+}
+
+.wx-set-nav__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 20px;
+  border: 0;
+  background: transparent;
+  color: var(--wx-text);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wx-set-nav__item:hover {
+  background: var(--wx-row-hover);
+}
+
+.wx-set-nav__item.is-active {
+  background: var(--wx-row-active);
+  color: #fff;
+}
+
+.wx-set-nav__icon {
+  display: inline-flex;
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.wx-set-nav__icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ---- content column ------------------------------------------------------ */
+
+.wx-settings__body {
+  flex: 1;
+  min-width: 0;
+  padding: 40px 40px 24px;
+  overflow-y: auto;
+}
+
+.wx-set-group__title {
+  margin: 20px 0 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--wx-set-divider);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--wx-text);
+}
+
+.wx-set-group:first-child .wx-set-group__title {
+  margin-top: 0;
+}
+
+.wx-set-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 50px;
+  border-bottom: 1px solid var(--wx-set-divider);
+}
+
+.wx-set-row--tall {
+  min-height: 62px;
+  padding: 10px 0;
+}
+
+.wx-set-row--action {
+  width: 100%;
+  border-top: 0;
+  border-right: 0;
+  border-left: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wx-set-row--action:hover {
+  background: var(--wx-row-hover);
+}
+
+.wx-set-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.wx-set-row__label {
+  font-size: 14px;
+}
+
+.wx-set-row__desc {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--wx-text-secondary);
+}
+
+.wx-set-row__control {
+  display: flex;
+  flex: none;
+  align-items: center;
+  margin-left: auto;
+}
+
+/* ---- controls ------------------------------------------------------------ */
+
+.wx-set-select {
+  position: relative;
+  display: inline-flex;
+}
+
+.wx-set-select__input {
+  appearance: none;
+  height: 28px;
+  padding: 0 30px 0 10px;
+  border: 0;
+  border-radius: 6px;
+  outline: none;
+  background: var(--wx-set-pill);
+  color: var(--wx-text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.wx-set-select__input:hover {
+  background: var(--wx-set-pill-hover);
+}
+
+.wx-set-select__badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--wx-brand);
+  color: #fff;
+  font-size: 11px;
+  line-height: 20px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.wx-set-button {
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--wx-set-pill);
+  color: var(--wx-text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.wx-set-button:hover {
+  background: var(--wx-set-pill-hover);
+}
+
+.wx-set-button--danger {
+  color: var(--wx-danger);
+}
+
+/* ---- account header ------------------------------------------------------ */
+
+.wx-set-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  border-bottom: 1px solid var(--wx-set-divider);
+}
+
+.wx-set-profile__avatar {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--wx-set-pill);
+  color: #fff;
+  font-size: 16px;
+}
+
+.wx-set-profile__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.wx-set-profile__name {
+  font-size: 15px;
+}
+
+.wx-set-profile__handle {
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+}
+
+/* ---- misc ---------------------------------------------------------------- */
+
+.wx-set-error {
+  margin: 12px 0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: rgba(250, 81, 81, 0.1);
+  color: var(--wx-danger);
+  font-size: 12px;
+}
+
+.wx-set-muted {
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+}
+
+.wx-set-disclaimer {
+  margin: 28px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--wx-text-secondary);
+}

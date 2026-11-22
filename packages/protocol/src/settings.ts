@@ -14,12 +14,23 @@ import { z } from 'zod'
  *
  * Secrets crossing IPC are always `MASK` when already stored; sending `MASK`
  * back on `proxy:set` means "keep the stored secret" (design doc §6.4).
+ *
+ * `http` is a plain HTTP proxy used through CONNECT (TDLib's `proxyTypeHttp`
+ * with `http_only: false`); TDLib cannot speak TLS to the proxy itself, so
+ * `https://` proxy URLs are rejected by the parser.
  */
 export const MASK = '***' as const
 
 export const proxyConfigSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('socks5'),
+    host: z.string().min(1),
+    port: z.number().int().min(1).max(65535),
+    username: z.string().optional(),
+    password: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal('http'),
     host: z.string().min(1),
     port: z.number().int().min(1).max(65535),
     username: z.string().optional(),
@@ -58,8 +69,29 @@ export type NetworkSettings = z.infer<typeof networkSettingsSchema>
  */
 export const RECENT_EMOJI_LIMIT = 10
 
+/**
+ * 外观 has three states: an explicit light/dark, or "follow the system". The
+ * resolved value is what every window paints with; the preference is what the
+ * settings window stores (design doc §9.11.4).
+ */
+export const themePreferenceSchema = z.enum(['system', 'light', 'dark'])
+export type ThemePreference = z.infer<typeof themePreferenceSchema>
+
+/** What the shell's × does: hide into the tray, or quit. */
+export const closeBehaviorSchema = z.enum(['tray', 'quit'])
+export type CloseBehavior = z.infer<typeof closeBehaviorSchema>
+
+/** 发送消息's Enter rule, WeChat's own pair. */
+export const sendKeySchema = z.enum(['enter', 'ctrlEnter'])
+export type SendKey = z.infer<typeof sendKeySchema>
+
 export const appSettingsSchema = z.object({
+  /** The theme every window should paint with — always resolved, never 'system'. */
   theme: z.enum(['light', 'dark']),
+  /** The stored preference ('system' follows the OS and is resolved on read). */
+  themePreference: themePreferenceSchema,
+  closeBehavior: closeBehaviorSchema,
+  sendKey: sendKeySchema,
 })
 export type AppSettings = z.infer<typeof appSettingsSchema>
 

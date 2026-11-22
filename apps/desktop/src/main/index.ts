@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import type { AppInfo, AuthState } from '@wegram/protocol'
-import { app, BrowserWindow, dialog, session } from 'electron'
+import { app, BrowserWindow, dialog, nativeTheme, session } from 'electron'
 
 import { parseApiCredentials } from './credentials'
 import { createHandlers } from './ipc/handlers'
@@ -14,6 +14,7 @@ import { NotificationCenter } from './notifications'
 import { storedProxyToConfig } from './proxy'
 import { parseProxyUrl } from './proxy-url'
 import { SettingsStore } from './store/settings'
+import { getCloseBehavior } from './store/prefs'
 import { UiDatabase } from './store/ui-db'
 import { createAdapter } from './telegram'
 import type { TelegramAdapter } from './telegram/adapter'
@@ -21,8 +22,16 @@ import { publishAdapterEvent } from './telegram/events'
 import { EventBus } from './telegram/updates'
 import { createTray, destroyTray } from './tray'
 import { createLogger } from './util'
-import { closeViewer, setViewerTheme } from './viewer'
-import { applyTitleBarTheme, createMainWindow, raiseShellAboveViewer, storedTheme } from './windows'
+import { closeSettingsWindow, setSettingsTheme } from './settings-window'
+import { closeViewer, hideViewerWithShell, setViewerTheme, showViewerWithShell } from './viewer'
+import {
+  applyTitleBarTheme,
+  createMainWindow,
+  raiseShellAboveViewer,
+  resolveTheme,
+  storedTheme,
+  themePreference,
+} from './windows'
 
 const logger = createLogger('main')
 const isDev = !app.isPackaged
@@ -86,6 +95,13 @@ async function bootstrap(): Promise<void> {
   const db = new UiDatabase(join(userDataDir, 'ui.db'))
   db.open()
   uiDb = db
+
+  // 跟随系统: while the preference is 'system' the OS is the only thing that can
+  // tell us the theme changed, and every window (plus the shell renderer through
+  // evt:theme) has to follow it.
+  nativeTheme.on('updated', () => {
+    if (themePreference(db) === 'system') applyTheme(resolveTheme('system'))
+  })
 
   // A viewer opened before the first theme change must still get a dark strip,
   // so seed the module with the stored theme instead of defaulting to light.
@@ -213,10 +229,15 @@ async function bootstrap(): Promise<void> {
       store,
       uiDb: db,
       info,
-      onThemeChange: (theme) => {
-        applyTitleBarTheme(mainWindow, theme)
-        setViewerTheme(theme)
-      },
+      // Every window repaints from here: the shell's native strip, the viewer, the
+      // settings window and the shell renderer (via evt:theme). Missing one is how
+      // "I switched to dark and this window stayed light" happens (design doc §9.11.4).
+      onThemeChange: applyTheme,
+      /**
+       * 发送消息 changed in the settings window: the shell's composers read the
+       * rule from the store, so it is delivered like any other state change.
+       */
+      onSendKeyChange: (sendKey) => bus?.publish('evt:settings', { sendKey }),
       // The login window's 进入 button: the shell takes over, the login window goes.
       onLoginEnter: () => showMainWindow(storedTheme(db), 'after-ready'),
       onAuthInteraction: () => {
@@ -250,6 +271,7 @@ async function bootstrap(): Promise<void> {
         return
       }
       raiseShellAboveViewer(win)
+      showViewerWithShell()
     },
   })
 
@@ -263,6 +285,17 @@ async function bootstrap(): Promise<void> {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) openLoginWindow()
   })
+}
+
+/**
+ * Applies one resolved theme everywhere it is visible. The renderer half arrives
+ * through `evt:theme`; the three native windows have to be repainted here.
+ */
+function applyTheme(theme: 'light' | 'dark'): void {
+  applyTitleBarTheme(mainWindow, theme)
+  setViewerTheme(theme)
+  setSettingsTheme(theme)
+  bus?.publish('evt:theme', { theme })
 }
 
 /** Opens (or re-focuses) the standalone login window. */
@@ -299,12 +332,26 @@ function showMainWindow(theme: 'light' | 'dark', closeLogin: 'immediate' | 'afte
   win.on('focus', () => {
     if (!win.isDestroyed()) win.flashFrame(false)
   })
+  /**
+   * 关闭主窗口 follows 通用's preference: hide into the tray, or quit as before.
+   * Hiding is not closing, so the windows that a quit would take down must be dealt
+   * with here — otherwise the reader gets a settings sheet floating over nothing.
+   */
+  win.on('close', (event) => {
+    if (quitting) return
+    if (getCloseBehavior(uiDb) === 'tray') {
+      event.preventDefault()
+      closeSettingsWindow()
+      hideViewerWithShell()
+      win.hide()
+    }
+  })
   win.on('closed', () => {
     if (mainWindow === win) mainWindow = null
-    // The viewer is a separate top-level window, so it does not die with this one:
-    // close it explicitly, or signing out would leave a picture window floating and
-    // `window-all-closed` would never fire.
+    // The viewer and the settings window are separate top-level windows: they do not
+    // die with this one, and `window-all-closed` would never fire if they lingered.
     closeViewer()
+    closeSettingsWindow()
   })
   if (closeLogin === 'immediate') {
     // First sign-in: the login window must not linger on the profile step. The
@@ -365,6 +412,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   // The adapter stop below emits `auth: closed`; that is a teardown, not a logout.
   quitting = true
+  closeSettingsWindow()
   bus?.dispose()
   bus = null
   unregisterIpc()

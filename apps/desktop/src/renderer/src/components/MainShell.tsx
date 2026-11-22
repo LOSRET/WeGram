@@ -7,7 +7,6 @@ import { ChatPane } from './chat-pane'
 import { NoChatPlaceholder } from './chat-pane/Placeholders'
 import { ContactDetail, ContactsList } from './contacts'
 import { PlusMenu } from './PlusMenu'
-import { ProxyPanel } from './ProxyPanel'
 import { SectionPlaceholder } from './SectionPlaceholder'
 import { SideRail, type ShellSection } from './SideRail'
 import { errorMessage, invoke } from '../lib/ipc'
@@ -30,7 +29,6 @@ export function MainShell() {
 
   /** The conversation column's global search: the server answers, the list draws. */
   const [query, setQuery] = useState('')
-  const [proxyOpen, setProxyOpen] = useState(false)
   /** The rail's "≡" menu (settings / theme / sign out). */
   const [menu, setMenu] = useState<Anchor | null>(null)
   /** The list header's "+" menu (发起群聊 / 添加朋友 / 写笔记). */
@@ -104,6 +102,18 @@ export function MainShell() {
   )
 
   const showUnavailable = useCallback((label: string) => setToast(`${label}还没有接入`), [setToast])
+
+  /**
+   * 设置 is its own window (design doc §9.11): the shell only asks for it, and a
+   * failure is the shell's to report because the window never opened to show it.
+   */
+  const openSettings = useCallback(async (): Promise<void> => {
+    try {
+      await invoke('settings:open')
+    } catch (cause) {
+      setError(errorMessage(cause))
+    }
+  }, [setError])
 
   /**
    * 发消息 on a contact card: TDLib creates the private chat on first use and
@@ -257,29 +267,11 @@ export function MainShell() {
           x={menu.x}
           y={menu.y}
           onClose={() => setMenu(null)}
-          onOpenSettings={() => setProxyOpen(true)}
-        />
-      ) : null}
-
-      {proxyOpen ? (
-        <ProxyPanel
-          onClose={() => {
-            setProxyOpen(false)
-            void refreshChats()
-          }}
+          onOpenSettings={() => void openSettings()}
         />
       ) : null}
 
       {toast ? <div className="wx-toast">{toast}</div> : null}
     </div>
   )
-}
-
-async function refreshChats(): Promise<void> {
-  try {
-    const chats = await invoke('chats:list', { limit: 100, offset: 0 })
-    useAppStore.getState().setChats(chats)
-  } catch {
-    // A failed refresh after the settings dialog is not worth interrupting the user.
-  }
 }

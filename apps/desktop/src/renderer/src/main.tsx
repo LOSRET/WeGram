@@ -10,6 +10,7 @@ import { installPreviewBridge } from '@renderer/lib/preview-bridge'
 import { queryClient } from '@renderer/lib/query'
 import { LoginWindow } from '@renderer/screens/LoginWindow'
 import { QrWindow } from '@renderer/screens/QrWindow'
+import { SettingsWindow } from '@renderer/screens/SettingsWindow'
 
 // Browser preview (pnpm web): no preload script exists, so install a mock bridge.
 installPreviewBridge()
@@ -32,6 +33,8 @@ createRoot(container).render(
         <LoginWindow />
       ) : route.startsWith('#qr') ? (
         <QrWindow />
+      ) : route.startsWith('#settings') ? (
+        <SettingsWindow />
       ) : (
         <App />
       )}

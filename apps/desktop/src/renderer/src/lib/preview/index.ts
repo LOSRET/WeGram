@@ -130,7 +130,12 @@ const previewPins = new Map<number, ChatPinnedMessage>()
 let openChatId: number | null = null
 let proxy: ProxyConfig | null = null
 let preferIpv6 = false
-let settings: AppSettings = { theme: 'light' }
+let settings: AppSettings = {
+  theme: 'light',
+  themePreference: 'light',
+  closeBehavior: 'quit',
+  sendKey: 'enter',
+}
 
 /** What the 群二维码 handlers read; their rules live in ./qr.ts. */
 const previewQrStore: PreviewQrStore = {
@@ -395,8 +400,15 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'settings:set': {
       const patch = store.patch as Partial<AppSettings>
       settings = { ...settings, ...patch }
+      // The preview has no OS theme source, so 跟随系统 resolves to light there.
+      if (patch.themePreference) {
+        settings.theme = patch.themePreference === 'dark' ? 'dark' : 'light'
+      }
       return undefined
     }
+    case 'settings:open':
+    case 'settings:close':
+      return undefined
     case 'proxy:get':
       return proxy
     case 'proxy:set':

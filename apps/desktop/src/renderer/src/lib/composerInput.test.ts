@@ -23,6 +23,15 @@ describe('shouldSend', () => {
     expect(shouldSend(enter({ key: 'Escape' }), false)).toBe(false)
   })
 
+  it('sends on Ctrl/⌘+Enter when 发送消息 is Ctrl+Enter', () => {
+    expect(shouldSend(enter({ ctrlKey: true }), false, 'ctrlEnter')).toBe(true)
+    expect(shouldSend(enter({ metaKey: true }), false, 'ctrlEnter')).toBe(true)
+  })
+
+  it('keeps a bare Enter as a newline when 发送消息 is Ctrl+Enter', () => {
+    expect(shouldSend(enter(), false, 'ctrlEnter')).toBe(false)
+  })
+
   it('never sends while a composition is live', () => {
     expect(shouldSend(enter(), true)).toBe(false)
     expect(shouldSend(enter({ nativeComposing: true }), false)).toBe(false)

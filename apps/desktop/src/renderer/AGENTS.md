@@ -10,6 +10,10 @@ only adds what is specific to this layer.
 main.tsx              route by hash: plain = shell, #viewer = viewer, #login = login window
 App.tsx               shell only (auth ready) + the ONE place that subscribes to evt:*
 screens/LoginWindow.tsx  the standalone login window: chrome + its four bodies
+screens/SettingsWindow.tsx  the 设置 window (`#settings`, design doc §9.11): a frameless
+                         640×558 sheet with its own nav (batch A: 账号与安全 / 通用 / 网络与代理 /
+                         关于) and `components/settings/` panels; it owns no shell state and
+                         repaints from `evt:theme`
 screens/QrWindow.tsx     the 群二维码 window (`#qr`, design doc §9.9): a frameless 360×560
                          sheet with the member collage, 群聊：…, the code, its validity
                          line and 转发给朋友 / 复制图片 / 保存图片. It owns no shell state
@@ -64,6 +68,11 @@ components/contacts/      通讯录: ContactsList (service rows + address book b
                          ContactDetail (the card)
 components/picker/        the expression panel's data hooks and body components
 components/ExpressionPicker.tsx  the picker's state + composition
+components/settings/      the 设置 panels: SettingsNav / SettingsGroup / SettingsRow /
+                         SettingsSelect + AccountPanel / GeneralPanel / NetworkPanel /
+                         AboutPanel (styles/settings.css holds the measured tokens)
+components/proxy/         ProxyForm: the one proxy form, shown by the login window's
+                         modal (`ProxyPanel`) and inline by 网络与代理
 components/viewer/        the 图片和视频 window: MediaViewer shell + useViewerItem /
                          useViewerZoom + ViewerToolbar / ViewerGrid + viewerMenu / viewerActions
 components/ProfileCard.tsx  资料卡: the person sheet a private chat's title and the

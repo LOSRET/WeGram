@@ -14,6 +14,8 @@ app-window.ts       the ONE BrowserWindow factory (security webPreferences, rout
 windows.ts          the shell window: geometry, theme repaint, minimize↔viewer wiring
 login-window.ts     the frameless 280×373 login BrowserWindow (#login), close/refocus
 viewer.ts           the 图片和视频 window; unowned on purpose (see below), pins/hides it
+settings-window.ts  the 设置 window: frameless 640×558, NOT parented (design doc §9.11);
+                    the shell's close, 退出登录 and before-quit close it explicitly
 qr-window.ts        the 群二维码 window: frameless 360×560, parented to the shell (closes
                     with it), owns the chat it draws for qr:info and the window's ×
 notifications.ts    desktop toasts from TDLib's notification stream; suppresses the chat

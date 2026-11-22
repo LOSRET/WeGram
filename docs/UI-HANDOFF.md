@@ -484,6 +484,53 @@ against the client are listed separately.
   path (`searchMessages` + `chat_type_filter`) matches TDLib 1.8.70's scheme but was
   not exercised against the account that session.
 
+### 2.10 The settings window (added 2026-11-22)
+
+微信 4.x 的 设置 is a **separate top-level window**, not an overlay: the chat behind it is
+not dimmed and keeps working, the 8 px radius and the drop shadow are the window's (DWM),
+the × is self-drawn and there is no title strip. §9.11 of the design doc builds it as
+`#settings` — 640×558, frameless, **no parent**.
+
+Measured at 125 % (800×698 device px → 640×558 CSS):
+
+| Metric | Device px | CSS |
+|---|---|---|
+| window | 800×698 | 640×558 |
+| nav column width | 200 | 160 |
+| nav row height | 50 | 40 |
+| content padding (left/right) | 50 | 40 |
+| row, single line | 63 | 50 |
+| row, with a caption | 78 | 62 |
+| group heading | 16 | 13 |
+| nav icon | 20 | 16 |
+
+Palette (sampled from the light and dark client):
+
+| Element | Light | Dark |
+|---|---|---|
+| content background | `#FAFAFA` | `#1E1E1F` |
+| nav background | `#EEEEF0` | `#2F2F30` |
+| selected nav row | `#15AC70` | `#0DA869` |
+| primary text (row label, group heading) | `#19191A` | `#E1E1E5` |
+| caption / description | `#9F9FA6` | `#7B7B80` |
+| divider | `#F0F0F0` | `#272728` |
+| select pill | `#F2F2F2` | `#303031` |
+| switch, on | `#00C375` | `#00A361` |
+| switch, off | `#EDEDED` | `#29292A` |
+
+- Both columns run the **full window height**; there is no horizontal rule under a title
+  strip. The top 40 px is empty drag space on both sides, not a bar.
+- Group headings are the primary text colour at 13 px, **not grey** (the darkest pixel of
+  账号 in the light client is #19191A).
+- Do not draw the card's radius or shadow in CSS — they belong to the window. Only if a
+  measurement shows frameless windows losing the DWM radius should this fall back to a
+  transparent window with CSS chrome.
+- The window must repaint on `evt:theme`: the window that *changes* the theme is the one
+  most likely to keep drawing the old one.
+- Controls: select pills are 28 px high with a 12 px label and a green chevron badge at the
+  right; switches are 40×22 with a white knob; the 快捷键 key-capture control is the same
+  pill shape, with 按下... as its empty state.
+
 ## 3. Icon provenance (this is the part people get wrong)
 
 **Where the real artwork came from.** `C:\Program Files\Tencent\Weixin\4.2.0.13\Weixin.dll`

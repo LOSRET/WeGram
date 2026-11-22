@@ -1,4 +1,5 @@
 import type { BrowserWindow } from 'electron'
+import { nativeTheme } from 'electron'
 
 import { attachNavigationPolicy, createAppWindow } from './app-window'
 import type { UiDatabase } from './store/ui-db'
@@ -56,8 +57,26 @@ function shellTitleBarOverlay(theme: 'light' | 'dark'): Electron.TitleBarOverlay
   }
 }
 
+/** 外观's three states; 'theme' in ui.db holds this value (design doc §9.11.4). */
+export type ThemePreference = 'system' | 'light' | 'dark'
+
+export function themePreference(uiDb: UiDatabase | null): ThemePreference {
+  const raw = uiDb?.getSetting('theme')
+  return raw === 'dark' || raw === 'light' || raw === 'system' ? raw : 'light'
+}
+
+/**
+ * Resolves a preference to the theme windows actually paint with. 'system' is the
+ * only state whose answer can change without the reader touching the app, which is
+ * why a resolved theme is never stored.
+ */
+export function resolveTheme(preference: ThemePreference): 'light' | 'dark' {
+  if (preference === 'system') return nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
+  return preference
+}
+
 export function storedTheme(uiDb: UiDatabase | null): 'light' | 'dark' {
-  return uiDb?.getSetting('theme') === 'dark' ? 'dark' : 'light'
+  return resolveTheme(themePreference(uiDb))
 }
 
 /**
