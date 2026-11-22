@@ -118,6 +118,8 @@ export function ProfileCard({ userId, onOpenChat, onClose }: ProfileCardProps) {
     try {
       setCommonChats(await invoke('users:commonChats', { userId, limit: 50 }))
     } catch (error) {
+      // Collapse rather than leave the row spinning: the next tap retries.
+      setCommonOpen(false)
       fail(error)
     }
   }
