@@ -29,8 +29,8 @@
   /* Bubbles */
   --wx-bubble-self: #95ec69;
   --wx-bubble-other: #eeeef0;
-  --wx-bubble-radius: 6px
-    /* Poll card (design doc §9.10): a lifted sheet inside the bubble, with the
+  --wx-bubble-radius: 6px;
+  /* Poll card (design doc §9.10): a lifted sheet inside the bubble, with the
      voted share as a translucent bar behind the option text. */
     --wx-poll-surface: rgba(255, 255, 255, 0.78);
   --wx-poll-line: rgba(0, 0, 0, 0.07);
