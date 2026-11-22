@@ -34,8 +34,9 @@ components/composer/       ComposerCard: the ONE bordered input card (§8.4 + §
                          ExpressionPicker. Both composers render it; a caller only says where
                          a send goes, so the comment box is not a cut-down copy of a chat's.
                          useVoiceRecording / VoiceControls: 语音消息's click-to-record state
-                         machine and the in-card cancel × / dot meter / send ↑; 发语音 is
-                         the circled mic beside 发送, the tool-row mic is 语音转文字.
+                         machine and the in-card bar: cancel ×, a dotted pill and the
+                         send circle whose hover reveal expands it into green 发送; 发语音
+                         is the circled mic beside 发送, the tool-row mic is 语音转文字.
 lib/voice/            语音消息's audio path: oggOpus.ts (pure, unit-tested — OGG pages,
                       lacing, OpusHead/OpusTags, the OGG CRC-32) and recorder.ts
                       (getUserMedia → AudioContext 48 kHz → ScriptProcessor → WebCodecs
@@ -338,10 +339,13 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   in that first moment is stored as `want` and applied when the recorder lands.
   Keep the clip on the base64 OGG IPC path (the renderer has no filesystem) and
   keep `lib/voice/oggOpus.ts` pure and tested — Chromium cannot record OGG, so
-  the container is written here, not by a library. The recording pill is the
-  发送 button itself (green, dots either side, 180 ms grow-in), and the bubble is
-  `components/VoiceBubble.tsx`: 13", width from `lib/voiceBubble.ts`, waves on the
-  side the client puts them — never a play triangle plus a drawn waveform.
+  the container is written here, not by a library. The recording bar is one
+  button with two layers: a grey pill with the dots and a green send circle at
+  its right end, and a `clip-path: circle()` reveal on hover that turns it into
+  the green 发送 bar (both inside the same button, or the expansion would swallow
+  the click). The bubble is `components/VoiceBubble.tsx`: 13", width from
+  `lib/voiceBubble.ts`, waves on the side the client puts them — never a play
+  triangle plus a drawn waveform.
 - **标为未读 is a dot, not a count.** `ChatSummary.markedUnread` draws a bare
   `.wx-badge--dot` when `unread` is 0; opening the chat clears the flag (the adapter
   does it). Do not render it through the count badge.

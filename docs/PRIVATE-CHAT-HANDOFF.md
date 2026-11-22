@@ -75,8 +75,9 @@ and mock + browser preview answer the same channel. The renderer records with We
 and muxes OGG/Opus itself (`lib/voice/oggOpus.ts`, unit-tested); the UI is WeChat 4.x's in-card recorder
 (`components/composer/useVoiceRecording.ts` + `VoiceControls.tsx`): 发语音 is the circled microphone
 **beside 发送** (the tool-row mic is 语音转文字, i.e. dictation, and stays a placeholder); a click starts the
-clip, 发送 grows into a green pill with the dots on both sides and a cancel × appears to its left, and the
-bubble is the client's own — width from the clip (`lib/voiceBubble.ts`), seconds as 13", waves on the other
+clip, the right cluster becomes the recording bar — cancel ×, a grey pill with the dots travelling across
+it and a green send circle at its right end; hovering that circle expands it over the pill (a circular
+reveal) into the green 发送 bar. The bubble is the client's own — width from the clip (`lib/voiceBubble.ts`), seconds as 13", waves on the other
 side (`components/VoiceBubble.tsx`). Esc/× cancel and 60 s auto-sends, plus a `chatActionRecordingVoiceNote`
 while the mic is live | No new dependency: Chromium hands over raw Opus packets through `AudioEncoder`, so the
 WebM→OGG muxer decision (§9.5) is moot. The waveform is sent **empty** on purpose (§6.1). **Mock Electron pass
@@ -360,9 +361,11 @@ How it was built (the audit's assumptions above held except where noted):
 - **UI:** WeChat 4.x's in-card recorder, not a floating panel. The entry is the
   circled microphone **beside 发送**; the tool-row mic is 语音转文字 (dictation) in
   the client and has no engine here, so it stays a 还没有接入 placeholder. A click
-  on 发语音 starts a clip: 发送 itself grows into a green pill with the label in the
-  middle and animated dots on both sides, and a grey cancel × appears to its left.
-  Clicking the pill sends (no push-to-talk on the desktop), Esc and × cancel, 60 s
+  on 发语音 starts a clip and the right cluster becomes the pressed bar: a grey
+  cancel ×, a grey pill with the green dots travelling across it, and a green
+  circle holding the send arrow at its right end. Hovering that circle expands it
+  over the whole pill — a `clip-path: circle()` reveal — where 发送 and its dots
+  live; clicking sends (no push-to-talk on the desktop), Esc and × cancel, 60 s
   sends itself. A send/cancel pressed while the microphone is still opening is
   remembered in the session ref and applied when the recorder lands
   (`useVoiceRecording.ts`).

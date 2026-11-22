@@ -1,15 +1,18 @@
 import { formatDuration } from '../../lib/format'
 
-/** Dots either side of 发送, as many as the client prints. */
-const DOTS_PER_SIDE = 4
+/** Dots either side of 发送 once the bar is expanded, as many as the client prints. */
+const DOTS_IN_PILL = 6
+const DOTS_AROUND_LABEL = 4
 
 /**
- * 语音消息's in-card recording controls.
+ * 语音消息's in-card recording bar.
  *
- * WeChat does not put a dot meter and an arrow here: the 发送 button *grows* into
- * a green pill with 发送 in the middle and animated dots on both sides, and a
- * cancel cross appears to its left. Clicking the pill stops and sends. The whole
- * row lives inside the composer card.
+ * Pressed state (WeChat 4.x): a cancel cross, a grey pill with the green dots
+ * travelling across it and a green circle holding the send arrow at the pill's
+ * right end. Hovering that region expands the green circle over the whole pill —
+ * a circular reveal — which is where 发送 and its dots appear; clicking it sends.
+ * Both layers live in one button, so the expansion is a `clip-path` transition
+ * rather than a second control that would swallow the click.
  */
 export function VoiceControls({
   seconds,
@@ -40,15 +43,37 @@ export function VoiceControls({
         aria-label="发送语音"
       >
         <span className="wx-voice-ctl__dots" aria-hidden>
-          {Array.from({ length: DOTS_PER_SIDE }, (_, index) => (
-            <span key={index} style={{ animationDelay: `${index * 120}ms` }} />
+          {Array.from({ length: DOTS_IN_PILL }, (_, index) => (
+            <span key={index} style={{ animationDelay: `${index * 110}ms` }} />
           ))}
         </span>
-        <span className="wx-voice-ctl__label">发送</span>
-        <span className="wx-voice-ctl__dots" aria-hidden>
-          {Array.from({ length: DOTS_PER_SIDE }, (_, index) => (
-            <span key={index} style={{ animationDelay: `${(DOTS_PER_SIDE - index) * 120}ms` }} />
-          ))}
+        <span className="wx-voice-ctl__expand" aria-hidden>
+          <span className="wx-voice-ctl__dots">
+            {Array.from({ length: DOTS_AROUND_LABEL }, (_, index) => (
+              <span key={index} style={{ animationDelay: `${index * 110}ms` }} />
+            ))}
+          </span>
+          <span className="wx-voice-ctl__label">发送</span>
+          <span className="wx-voice-ctl__dots">
+            {Array.from({ length: DOTS_AROUND_LABEL }, (_, index) => (
+              <span
+                key={index}
+                style={{ animationDelay: `${(DOTS_AROUND_LABEL - index) * 110}ms` }}
+              />
+            ))}
+          </span>
+        </span>
+        <span className="wx-voice-ctl__circle" aria-hidden>
+          <svg width="15" height="15" viewBox="0 0 14 14">
+            <path
+              d="M7 11.4V3.2M3.4 6.8 7 3.2l3.6 3.6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         </span>
       </button>
     </div>
