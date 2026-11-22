@@ -55,12 +55,24 @@ import { CallBubbleIcon } from './WechatIcons'
 export function VoiceMessageIcon({ size = 20, ...rest }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden {...rest}>
-      <circle cx="12" cy="12" r="9.1" stroke="currentColor" strokeWidth="1.5" />
-      <circle cx="8.9" cy="12" r="1.15" fill="currentColor" />
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" />
+      {/*
+        The dot and its two sound arcs share one centre (9.7, 12) and mirror on
+        the horizontal axis, so the glyph is symmetric — arcs drawn by eye from
+        arbitrary start points came out visibly lopsided. The group's own centre
+        lands on the circle's (11.9 vs 12), which is what keeps it looking upright.
+      */}
+      <circle cx="9.7" cy="12" r="1.15" fill="currentColor" />
       <path
-        d="M11.3 8.9a4.5 4.5 0 0 1 0 6.2M14.2 6.7a7.6 7.6 0 0 1 0 10.6M17.1 4.8a10.4 10.4 0 0 1 0 14.4"
+        d="M11.86 9.92A3 3 0 0 1 11.86 14.08"
         stroke="currentColor"
-        strokeWidth="1.5"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+      <path
+        d="M13.8 8.19A5.6 5.6 0 0 1 13.8 15.81"
+        stroke="currentColor"
+        strokeWidth="1.4"
         strokeLinecap="round"
       />
     </svg>
