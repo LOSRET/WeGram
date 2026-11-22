@@ -23,6 +23,28 @@ describe('parseProxyUrl', () => {
     })
   })
 
+  it('unbrackets an IPv6 SOCKS5 literal (TDLib wants the bare address)', () => {
+    expect(parseProxyUrl('socks5://[::1]:1080')).toEqual({
+      type: 'socks5',
+      host: '::1',
+      port: 1080,
+    })
+    expect(parseProxyUrl('socks5://[2001:db8::1]:1080')).toEqual({
+      type: 'socks5',
+      host: '2001:db8::1',
+      port: 1080,
+    })
+  })
+
+  it('unbrackets an IPv6 MTProxy literal', () => {
+    expect(parseProxyUrl('mtproto://[2001:db8::1]:443?secret=dd0123456789abcdef')).toEqual({
+      type: 'mtproto',
+      host: '2001:db8::1',
+      port: 443,
+      secret: 'dd0123456789abcdef',
+    })
+  })
+
   it('keeps SOCKS5 credentials and decodes them', () => {
     expect(parseProxyUrl('socks5://user:p%40ss%3Aword@proxy.example.com:1080')).toEqual({
       type: 'socks5',
