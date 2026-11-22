@@ -79,6 +79,38 @@ export function VoiceMessageIcon({ size = 20, ...rest }: IconProps) {
   )
 }
 
+/**
+ * The waves printed inside a 语音消息 bubble: the dot and its two arcs, without
+ * the circle that the composer's 发语音 button carries. Same centre rule as
+ * VoiceMessageIcon, so both glyphs read as the same sound.
+ */
+export function VoiceWaveIcon({ size = 16, ...rest }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden
+      {...rest}
+    >
+      <circle cx="5.4" cy="12" r="1.9" fill="currentColor" />
+      <path
+        d="M9.4 7.6A6.3 6.3 0 0 1 9.4 16.4"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M13.6 4.2A10.2 10.2 0 0 1 13.6 19.8"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
 export function ChevronRightIcon({ size = 12, ...rest }: IconProps) {
   return (
     <svg

@@ -494,39 +494,56 @@
   background: var(--wx-brand);
 }
 
+/* 语音消息, the client's way: the bubble is the strip itself — seconds with a
+   double-prime on one side, the sound waves on the other, no play triangle and
+   no drawn waveform. The width grows with the clip (lib/voiceBubble.ts). */
 .wx-voice {
   display: flex;
+  flex-direction: row-reverse;
   align-items: center;
-  gap: 8px;
-  width: 172px;
-  padding: 6px 10px;
+  justify-content: space-between;
+  gap: 10px;
+  height: 40px;
+  padding: 0 12px;
   border: none;
-  border-radius: 3px;
+  border-radius: var(--wx-bubble-radius);
   background: transparent;
   color: inherit;
-  font-size: 13px;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
 }
 
-.wx-voice__icon {
-  font-size: 12px;
-  color: var(--wx-text-secondary);
+/* Own messages print 13" first and the waves after it, like the client. */
+.wx-voice--self {
+  flex-direction: row;
 }
 
 .wx-voice__wave {
-  flex: 1;
-  overflow: hidden;
-  white-space: nowrap;
-  letter-spacing: 1px;
-  color: var(--wx-text-secondary);
-  opacity: 0.55;
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.8;
 }
 
 .wx-voice--playing .wx-voice__wave {
-  color: var(--wx-brand-text);
   opacity: 1;
+  animation: wx-voice-pulse 900ms ease-in-out infinite;
 }
 
 .wx-voice__time {
-  font-size: 11px;
-  color: var(--wx-text-secondary);
+  line-height: 1;
+}
+
+/* 语音消息 owns its padding: the bubble is exactly the strip the button draws. */
+.wx-bubble--voice {
+  padding: 0;
+}
+
+@keyframes wx-voice-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.12);
+  }
 }

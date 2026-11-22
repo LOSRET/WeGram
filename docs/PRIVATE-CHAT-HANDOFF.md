@@ -74,9 +74,11 @@ below is one commit, `pnpm verify`-green, on `feat/private-chat-p1`.
 and mock + browser preview answer the same channel. The renderer records with WebCodecs (`lib/voice/recorder.ts`)
 and muxes OGG/Opus itself (`lib/voice/oggOpus.ts`, unit-tested); the UI is WeChat 4.x's in-card recorder
 (`components/composer/useVoiceRecording.ts` + `VoiceControls.tsx`): 发语音 is the circled microphone
-**beside 发送** (the tool-row mic is 语音转文字, i.e. dictation, and stays a placeholder), a click starts the
-clip, and the send button gives way to a cancel ×, a live dot meter and the green send ↑ (Esc cancels, 60 s
-auto-sends) — plus a `chatActionRecordingVoiceNote` while the mic is live | No new dependency: Chromium hands over raw Opus packets through `AudioEncoder`, so the
+**beside 发送** (the tool-row mic is 语音转文字, i.e. dictation, and stays a placeholder); a click starts the
+clip, 发送 grows into a green pill with the dots on both sides and a cancel × appears to its left, and the
+bubble is the client's own — width from the clip (`lib/voiceBubble.ts`), seconds as 13", waves on the other
+side (`components/VoiceBubble.tsx`). Esc/× cancel and 60 s auto-sends, plus a `chatActionRecordingVoiceNote`
+while the mic is live | No new dependency: Chromium hands over raw Opus packets through `AudioEncoder`, so the
 WebM→OGG muxer decision (§9.5) is moot. The waveform is sent **empty** on purpose (§6.1). **Mock Electron pass
 done** (fake media device): 2 s hold → a voice bubble whose `<audio>` decodes the clip (`duration 1.9`,
 `readyState 4`), chat preview `[语音]`, no error bar, and the recorded file is a valid 4-page OGG (OpusHead,
@@ -358,11 +360,18 @@ How it was built (the audit's assumptions above held except where noted):
 - **UI:** WeChat 4.x's in-card recorder, not a floating panel. The entry is the
   circled microphone **beside 发送**; the tool-row mic is 语音转文字 (dictation) in
   the client and has no engine here, so it stays a 还没有接入 placeholder. A click
-  on 发语音 starts a clip, and 发送 gives way to the client's three controls: a grey
-  cancel ×, a 9-dot live meter and the green send ↑. Sending is a click (no
-  push-to-talk on the desktop), Esc and × cancel, 60 s sends itself. A
-  send/cancel pressed while the microphone is still opening is remembered in the
-  session ref and applied when the recorder lands (`useVoiceRecording.ts`).
+  on 发语音 starts a clip: 发送 itself grows into a green pill with the label in the
+  middle and animated dots on both sides, and a grey cancel × appears to its left.
+  Clicking the pill sends (no push-to-talk on the desktop), Esc and × cancel, 60 s
+  sends itself. A send/cancel pressed while the microphone is still opening is
+  remembered in the session ref and applied when the recorder lands
+  (`useVoiceRecording.ts`).
+- **Bubble:** the client's, not Telegram's. `MessageMedia.kind = 'voice'` draws
+  `components/VoiceBubble.tsx`: a plain bubble whose width follows the clip
+  (`lib/voiceBubble.ts`, 74 px + 2.1 px/s, capped at 200), the seconds printed as
+  `13"` with the sound waves on the other side — time then waves for an outgoing
+  row, mirrored for an incoming one — and no play triangle or drawn waveform. The
+  whole bubble plays, and the waves pulse while it does.
 - **Mic permission:** main narrows `media` to the shell window
   (`session.setPermissionRequestHandler` + `setPermissionCheckHandler`); every
   other permission keeps Electron's default. The login, 群二维码 and viewer

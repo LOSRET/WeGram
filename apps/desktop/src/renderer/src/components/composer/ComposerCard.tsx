@@ -238,7 +238,6 @@ export function ComposerCard({
 
           {voice.recording ? (
             <VoiceControls
-              level={voice.level}
               seconds={voice.seconds}
               onCancel={voice.cancel}
               onSend={voice.send}

@@ -98,6 +98,7 @@ feature itself is in the 2026-11-21 handoff bullet.
 | --- | --- |
 | `tdlib/index.ts` (send family + the new `sendVoiceNote`) | `tdlib/send-api.ts`: `createSendApi` returns send/edit/delete/forward/read/typing/retry/media/album/sticker/voice as one object the class binds as fields, lazily reading `actionDeps` (the `chat-api.ts` / `user-api.ts` shape) |
 | `renderer/lib/preview/index.ts` at 550 (the invoke switch) | `renderer/lib/preview/sends.ts`: `handlePreviewSend` owns the nine outgoing/row-mutating message channels, and the switch dispatches them in one `case` group |
+| `renderer/components/MediaBubble.tsx` at 550 (the voice strip) | `renderer/components/VoiceBubble.tsx`: 语音消息's bubble, which shares nothing with the photo/video/file geometry |
 
 Both moves are call-shape-preserving: the seam signatures and the preview's answers are
 unchanged, and the feature's own status note is in `docs/PRIVATE-CHAT-HANDOFF.md` §6.1.

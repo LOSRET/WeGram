@@ -324,6 +324,8 @@ export const MessageRow = memo(
                   kind={mediaKind}
                   chatId={chat.id}
                   messageId={first.id}
+                  // 语音消息 mirrors its seconds/waves by side, like the client's.
+                  outgoing={first.outgoing}
                   // Telegram's GIF badge steps aside when the animation has a caption.
                   showAnimationBadge={!caption}
                   // A channel post is Telegram's card, so its photo may grow past

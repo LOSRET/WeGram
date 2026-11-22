@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatDuration } from '../lib/format'
 import { errorMessage, invoke } from '../lib/ipc'
 import {
-  ensureMedia,
   formatBytes,
   nextOwner,
   progressRatio,
@@ -14,12 +13,13 @@ import {
   useMediaUrl,
 } from '../lib/media'
 import { percentOf, reserveBox } from '../lib/mediaBox'
-import { bubblePriority, MEDIA_PRIORITY, thumbPriority } from '../lib/mediaPriority'
+import { bubblePriority, thumbPriority } from '../lib/mediaPriority'
 import { pickVariant } from '../lib/mediaVariant'
 import { useInView } from '../lib/useInView'
 import { openPhotoViewer, openVideoViewer } from '../lib/viewer'
 import { useViewerSource } from '../lib/viewerSource'
 import { useAppStore } from '../store/useAppStore'
+import { VoiceBubble } from './VoiceBubble'
 import { PlayIcon } from './viewer/ViewerIcons'
 
 interface MediaBubbleProps {
@@ -44,6 +44,11 @@ interface MediaBubbleProps {
    * caption (the text is the label there), so the row turns it off when it has one.
    */
   showAnimationBadge?: boolean
+  /**
+   * The row is the reader's own. Only 语音消息 uses it: WeChat mirrors the bubble
+   * (outgoing prints 13" then the waves, incoming the waves then 13").
+   */
+  outgoing?: boolean
 }
 
 const MAX_PHOTO_W = 240
@@ -144,6 +149,7 @@ export function MediaBubble({
   maxWidth = MAX_PHOTO_W,
   maxHeight = MAX_PHOTO_H,
   showAnimationBadge = true,
+  outgoing = false,
 }: MediaBubbleProps) {
   const inAlbum = variant === 'album'
   if (kind === 'photo') {
@@ -182,7 +188,7 @@ export function MediaBubble({
       />
     )
   }
-  if (kind === 'voice') return <VoiceBubble media={media} />
+  if (kind === 'voice') return <VoiceBubble media={media} outgoing={outgoing} />
   return <FileBubble media={media} />
 }
 
@@ -490,52 +496,3 @@ function FileBubble({ media }: { media: MessageMedia }) {
   )
 }
 
-function VoiceBubble({ media }: { media: MessageMedia }) {
-  const url = useMediaUrl(media, MEDIA_PRIORITY.idle)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-  const [playing, setPlaying] = useState(false)
-  const { ratio } = useBubbleProgress(media)
-
-  const toggle = (): void => {
-    const audio = audioRef.current
-    if (!audio) {
-      void ensureMedia(media.fileId, MEDIA_PRIORITY.idle, nextOwner('voice')).catch(() => undefined)
-      return
-    }
-    if (playing) {
-      audio.pause()
-      setPlaying(false)
-    } else {
-      void audio
-        .play()
-        .then(() => setPlaying(true))
-        .catch(() => undefined)
-    }
-  }
-
-  return (
-    <button
-      type="button"
-      className={`wx-voice${playing ? ' wx-voice--playing' : ''}`}
-      onClick={toggle}
-      title="语音消息"
-    >
-      <span className="wx-voice__icon">{playing ? '❚❚' : '▶'}</span>
-      <span className="wx-voice__wave" aria-hidden>
-        {'▁▃▅▇▅▃▁'.repeat(3)}
-      </span>
-      <span className="wx-voice__time">
-        {!url && ratio !== undefined ? percentOf(ratio) : formatDuration(media.duration)}
-      </span>
-      {url ? (
-        <audio
-          ref={audioRef}
-          src={url}
-          onEnded={() => setPlaying(false)}
-          onPause={() => setPlaying(false)}
-          hidden
-        />
-      ) : null}
-    </button>
-  )
-}

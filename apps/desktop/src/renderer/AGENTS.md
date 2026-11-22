@@ -87,6 +87,10 @@ components/ChatList.tsx  the conversation column: pill (server search panel, §2
 components/chat-search/ SearchTabs (聊天 / 频道) and SearchHitRow (one message hit:
                         chat face, chat title, message preview, time)
 components/SearchField.tsx  the ONE search pill (label + input + optional trailing control)
+components/VoiceBubble.tsx  语音消息's bubble: the client's strip — seconds as 13", the
+                        waves on the other side (mirrored by side), width from the clip
+                        (`lib/voiceBubble.ts`), waves pulsing while it plays; split out of
+                        MediaBubble.tsx when that file reached its line cap
 components/           the remaining visual concerns (Composer, MediaBubble, …)
 components/Composer.tsx  a chat's send path over ComposerCard: per-chat drafts, reply /
                         edit banners, anchored-window reload, the channel's 收起 button
@@ -334,7 +338,10 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   in that first moment is stored as `want` and applied when the recorder lands.
   Keep the clip on the base64 OGG IPC path (the renderer has no filesystem) and
   keep `lib/voice/oggOpus.ts` pure and tested — Chromium cannot record OGG, so
-  the container is written here, not by a library.
+  the container is written here, not by a library. The recording pill is the
+  发送 button itself (green, dots either side, 180 ms grow-in), and the bubble is
+  `components/VoiceBubble.tsx`: 13", width from `lib/voiceBubble.ts`, waves on the
+  side the client puts them — never a play triangle plus a drawn waveform.
 - **标为未读 is a dot, not a count.** `ChatSummary.markedUnread` draws a bare
   `.wx-badge--dot` when `unread` is 0; opening the chat clears the flag (the adapter
   does it). Do not render it through the count badge.

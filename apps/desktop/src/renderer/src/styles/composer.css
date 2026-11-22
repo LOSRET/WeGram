@@ -220,8 +220,9 @@
 
 /* ---------- 语音消息 ----------
    In the client, 发语音 is the circled microphone beside 发送 (the tool-row mic is
-   语音转文字), and a click starts recording: 发送 is replaced by the cancel cross,
-   the live dot meter and the green send arrow, all inside the card. */
+   语音转文字), and a click starts recording: 发送 grows into a green pill with
+   animated dots on both sides, a cancel cross appears to its left, and clicking
+   the pill sends. */
 
 .wx-voice-message {
   display: inline-flex;
@@ -265,6 +266,7 @@
   color: var(--wx-text-secondary);
   font-size: 16px;
   line-height: 1;
+  animation: wx-voice-fade 140ms ease-out;
 }
 
 .wx-voice-ctl__cancel:hover {
@@ -272,41 +274,73 @@
   color: var(--wx-text);
 }
 
-/* The live meter: a quiet pill with the dots travelling across it. */
-.wx-voice-ctl__meter {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  width: 168px;
-  height: 30px;
-  border-radius: 15px;
-  background: var(--wx-divider);
-}
-
-.wx-voice-ctl__meter span {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--wx-brand);
-  transition:
-    opacity 90ms linear,
-    transform 90ms linear;
-}
-
+/* 发送 itself, expanded: it grows out of the button the reader clicked. */
 .wx-voice-ctl__send {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
+  gap: 10px;
+  width: 168px;
   height: 30px;
-  padding: 0;
+  padding: 0 14px;
   border: none;
-  border-radius: 50%;
+  border-radius: 15px;
   background: var(--wx-brand);
   color: var(--wx-text-on-brand);
+  font-size: 13px;
+  transform-origin: right center;
+  animation: wx-voice-grow 180ms ease-out;
 }
 
 .wx-voice-ctl__send:hover {
   background: var(--wx-brand-active);
+}
+
+.wx-voice-ctl__label {
+  letter-spacing: 0.5px;
+}
+
+.wx-voice-ctl__dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wx-voice-ctl__dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.35;
+  animation: wx-voice-dot 1s ease-in-out infinite;
+}
+
+@keyframes wx-voice-grow {
+  from {
+    opacity: 0;
+    transform: scaleX(0.35);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes wx-voice-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes wx-voice-dot {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
 }
