@@ -89,6 +89,34 @@ export async function buildMediaMessage(
   }
 }
 
+/**
+ * Builds the rows of one album (相册). Telegram keys them by `media_album_id`,
+ * so every row carries the same id and the transcript folds them into one bubble;
+ * the ids come from the caller's counter, like a real send.
+ */
+export async function buildAlbumMessages(
+  deps: MockSendDeps,
+  input: {
+    chatId: number
+    albumId: string
+    items: Array<{ filePath: string; kind: MediaKind; caption?: string }>
+    takeId: () => number
+    replyTo?: number
+  },
+): Promise<BuiltMedia[]> {
+  const built: BuiltMedia[] = []
+  for (const item of input.items) {
+    const row = await buildMediaMessage(deps, {
+      ...item,
+      id: input.takeId(),
+      chatId: input.chatId,
+      ...(input.replyTo === undefined ? {} : { replyTo: input.replyTo }),
+    })
+    built.push({ ...row, message: { ...row.message, albumId: input.albumId } })
+  }
+  return built
+}
+
 /** Builds the row a sticker from the picker becomes. */
 export function buildStickerMessage(
   deps: Pick<MockSendDeps, 'assets'>,

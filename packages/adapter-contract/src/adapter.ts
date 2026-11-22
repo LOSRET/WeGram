@@ -279,6 +279,14 @@ export interface TelegramAdapter {
 
   /** Sends a local file as a photo or a document (design doc §1: media upload). */
   sendMedia(input: InvokeRequest<'media:send'>): Promise<{ localId: string; message: Message }>
+  /**
+   * 相册: several local photos in one Telegram album (TDLib `sendMessageAlbum`).
+   * The answer carries every item, in transcript order, each mapped like any
+   * other message — the album id is what makes the transcript fold them.
+   */
+  sendAlbum(
+    input: InvokeRequest<'media:sendAlbum'>,
+  ): Promise<{ localIds: string[]; messages: Message[] }>
   sendSticker(input: InvokeRequest<'messages:sendSticker'>): Promise<{
     localId: string
     message: Message

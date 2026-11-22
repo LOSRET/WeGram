@@ -43,6 +43,7 @@ export function handlePreviewMedia(
       return undefined
     }
     case 'media:send':
+    case 'media:sendAlbum':
       throw { code: 'not_implemented', message: '浏览器预览不能发送本地文件' }
     default:
       return undefined

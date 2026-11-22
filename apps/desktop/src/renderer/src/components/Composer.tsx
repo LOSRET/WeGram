@@ -1,6 +1,7 @@
 import type { Message, Sticker } from '@wegram/protocol'
 import { useEffect, useRef, useState } from 'react'
 
+import { albumSendOf } from '../lib/albumSend'
 import { loadLatestWindow } from '../lib/anchoredWindow'
 import { TypingPing } from '../lib/typingPing'
 import { useComposerInput } from '../lib/useComposerInput'
@@ -153,6 +154,11 @@ export function Composer({
    * Picks local files and sends them straight away, like WeChat's + panel. The
    * picker lives in the main process (native dialog), so the renderer never
    * touches the filesystem.
+   *
+   * Several photos become ONE Telegram album (`sendMessageAlbum`), which arrives
+   * as the folded bubble the transcript already draws for a received album; the
+   * rule for when that applies is `lib/albumSend.ts`. Everything else is one
+   * message per file.
    */
   const attach = async (kind: 'photo' | 'file'): Promise<void> => {
     if (busy) return
@@ -162,18 +168,35 @@ export function Composer({
       setBusy(true)
       const wasAnchored = await loadLatestWindow(chatId)
       const replyToId = replyTo?.id
-      for (const filePath of picked.paths) {
-        const result = await invoke('media:send', {
+      const album = albumSendOf(picked.paths, kind)
+      if (album) {
+        const result = await invoke('media:sendAlbum', {
           chatId,
-          filePath,
-          kind,
+          items: album,
           ...(replyToId === undefined ? {} : { replyTo: replyToId }),
         })
-        useAppStore.getState().applyMessageOps(chatId, [{ op: 'new', message: result.message }])
+        useAppStore.getState().applyMessageOps(
+          chatId,
+          result.messages.map((message) => ({ op: 'new' as const, message })),
+        )
+      } else {
+        for (const filePath of picked.paths) {
+          const result = await invoke('media:send', {
+            chatId,
+            filePath,
+            kind,
+            ...(replyToId === undefined ? {} : { replyTo: replyToId }),
+          })
+          useAppStore.getState().applyMessageOps(chatId, [{ op: 'new', message: result.message }])
+        }
       }
       if (replyToId !== undefined) onCancelReply()
       if (wasAnchored) useAppStore.getState().requestJumpToLatest(chatId)
-      useAppStore.getState().setToast(kind === 'photo' ? '已发送图片' : '已发送文件')
+      useAppStore
+        .getState()
+        .setToast(
+          album ? `已发送 ${album.length} 张图片` : kind === 'photo' ? '已发送图片' : '已发送文件',
+        )
     } catch (error) {
       useAppStore.getState().setError(errorMessage(error))
     } finally {

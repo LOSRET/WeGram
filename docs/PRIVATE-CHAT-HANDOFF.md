@@ -60,6 +60,7 @@ below is one commit, `pnpm verify`-green, on `feat/private-chat-p1`.
 
 | Gap | Landed in | Notes |
 |---|---|---|
+| 相册发送 | `media:sendAlbum`; `sendMessageAlbum` in `actions/send.ts`; `lib/albumSend.ts`; `components/Composer.tsx` attach path | 2–10 photos in ONE call, answered as `Messages`; every row carries the album id, so the transcript folds them into the bubble it already draws for a received album. The rule for when that applies (photos only, 2–10) is pure and tested; a document selection still sends one message per file, because `rows.ts` only folds photo/video. Mock adapter gets an album builder that shares one `media_album_id`; the browser preview cannot send files at all (no local path), so it refuses like `media:send`. |
 | 图片说明编辑 | `messages:editCaption`; `editMessageCaption` in `actions/send.ts`; `lib/editTarget.ts`; menu 编辑 / 编辑说明 | The row's kind picks the call (`can_be_edited` covers both): text edits go through `editMessageText`, media captions through `editMessageCaption`. `show_caption_above_media` is read back with `getMessage` first, so an edit never moves a caption from above the picture to below it. An empty caption clears it (the composer allows an empty save only on that path). Mock + browser preview both implement it. |
 
 ## 1. What already works (do not rebuild it)
@@ -129,7 +130,7 @@ person-days, for this repo's conventions.
 | P1 | Block / unblock | No entry point | `setMessageSenderBlockList` (pass `null` to unblock), `getBlockedMessageSenders` | 1 |
 | P1 | Report chat / message | No entry point | `reportChat` (two-phase: empty `option_id` first), `chat.can_be_reported`, `messageProperties.can_report_chat` | 1 |
 | P1 | Add / remove contact, 备注 | 通讯录 is read-only (`getContacts` only); 添加备注名 placeholder | `addContact` + `importedContact`, `removeContacts`, `setUserNote`, `userFullInfo.note` | 2 |
-| P1 | Album send | Multi-select sends N separate messages | `sendMessageAlbum` (returns `Messages`) | 1–2 |
+| P1 | Album send | ~~Multi-select sends N separate messages~~ — **done**, see the P1 status table | `sendMessageAlbum` (returns `Messages`) | 1–2 |
 | P1 | Caption edit | ~~Edit menu is gated to `kind === 'text'`~~ — **done**, see the P1 status table | `editMessageCaption` | 0.5–1 |
 | P1 | Speech-to-text | None | `recognizeSpeech` + `can_recognize_speech` + `speech_recognition_result` | 1 |
 | P1 | Pinned message bar | `getChatPinnedMessage` is used for 群公告 only; private chats skip it | `pinChatMessage` / `unpinChatMessage` + `can_be_pinned` | 1 |

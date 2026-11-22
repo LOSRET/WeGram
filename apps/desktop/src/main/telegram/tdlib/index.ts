@@ -462,6 +462,15 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     return actions.sendMedia(this.actionDeps, input)
   }
 
+  /** 相册: several photos in one album; see `actions/send.ts sendAlbum`. */
+  async sendAlbum(input: {
+    chatId: number
+    items: Array<{ filePath: string; kind: MediaKind; caption?: string }>
+    replyTo?: number
+  }): Promise<{ localIds: string[]; messages: Message[] }> {
+    return actions.sendAlbum(this.actionDeps, input)
+  }
+
   async sendSticker(input: {
     chatId: number
     fileId: number

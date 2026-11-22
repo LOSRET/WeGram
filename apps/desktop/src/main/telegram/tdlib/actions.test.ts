@@ -10,6 +10,7 @@ import {
   historyNewer,
   openChat,
   openUsernameChat,
+  sendAlbum,
   setChatMuted,
 } from './actions'
 import type { ActionDeps, PostPermissionDeps } from './actions'
@@ -329,6 +330,61 @@ describe('setChatMuted', () => {
       show_preview: false,
       use_default_sound: false,
     })
+  })
+})
+
+describe('sendAlbum', () => {
+  /** One item of the album TDLib answers with: the id is the group. */
+  function rawItem(id: number, albumId: string): TdObject {
+    return {
+      id,
+      date: 1_700_000_000,
+      is_outgoing: true,
+      sender_id: { _: 'messageSenderUser', user_id: 7 },
+      media_album_id: albumId,
+      content: {
+        _: 'messagePhoto',
+        photo: { _: 'photo', sizes: [] },
+        caption: { _: 'formattedText', text: '', entities: [] },
+        show_caption_above_media: false,
+        has_spoiler: false,
+      },
+    }
+  }
+
+  it('sends every item in one call and keeps the album id on the rows', async () => {
+    const { deps, calls } = makeDeps((method) => {
+      if (method._ === 'sendMessageAlbum')
+        return { messages: [rawItem(901, '270'), rawItem(902, '270')] }
+      throw new Error(`unexpected ${String(method._)}`)
+    })
+
+    const result = await sendAlbum(deps, {
+      chatId: 1,
+      // Documents on purpose: a photo item would probe a real file for its size.
+      items: [
+        { filePath: 'C:/a.pdf', kind: 'file' },
+        { filePath: 'C:/b.pdf', kind: 'file' },
+      ],
+      replyTo: 5,
+    })
+
+    // One round trip for the whole album: sending them one by one is what made
+    // a multi-select arrive as N separate bubbles.
+    expect(calls).toHaveLength(1)
+    expect(calls[0]).toMatchObject({
+      _: 'sendMessageAlbum',
+      chat_id: 1,
+      reply_to: { _: 'inputMessageReplyToMessage', message_id: 5 },
+    })
+    const contents = calls[0]?.input_message_contents as TdObject[]
+    expect(contents.map((content) => content._)).toEqual([
+      'inputMessageDocument',
+      'inputMessageDocument',
+    ])
+    expect(result.messages.map((message) => message.id)).toEqual([901, 902])
+    expect(result.messages.map((message) => message.albumId)).toEqual(['270', '270'])
+    expect(result.localIds).toEqual(['td-901', 'td-902'])
   })
 })
 

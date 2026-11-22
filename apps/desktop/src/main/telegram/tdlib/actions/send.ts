@@ -8,7 +8,7 @@ import { asArray } from '../json'
 import { mapMessage } from '../map/message'
 import type { ActionDeps } from './deps'
 import { history } from './history'
-import { formattedText, inputText, sendAndMap } from './message-input'
+import { formattedText, inputText, replyTo, sendAndMap } from './message-input'
 
 export async function sendText(
   deps: ActionDeps,
@@ -221,6 +221,44 @@ export async function sendMedia(
     replyTo: input.replyTo,
     options: null,
   })
+}
+
+/**
+ * 相册: several local files as one Telegram album (`sendMessageAlbum`).
+ *
+ * Telegram has no "message with several media": an album is 2–10 messages
+ * sharing `media_album_id`, sent in one call and answered as `Messages`. Every
+ * answer is mapped like a normal send, so the rows carry the album id and the
+ * transcript folds them back into one bubble (design doc §8.6).
+ *
+ * The content builders are the single-send ones: a photo sent as an album item
+ * is the same `inputMessagePhoto`. TDLib requires one shared
+ * `show_caption_above_media` across the group, which the builders already fix to
+ * false for every photo — so the constraint cannot be violated by a caller.
+ */
+export async function sendAlbum(
+  deps: ActionDeps,
+  input: {
+    chatId: number
+    items: Array<{ filePath: string; kind: MediaKind; caption?: string }>
+    replyTo?: number
+  },
+): Promise<{ localIds: string[]; messages: Message[] }> {
+  const contents: TdObject[] = []
+  for (const item of input.items) contents.push(await mediaContent(item))
+  const response = await deps.invoke({
+    _: 'sendMessageAlbum',
+    chat_id: input.chatId,
+    topic_id: null,
+    reply_to: replyTo(input.replyTo),
+    options: null,
+    input_message_contents: contents,
+  })
+  const messages: Message[] = []
+  for (const raw of asArray<TdObject>(response?.messages)) {
+    messages.push(await mapMessage(deps.mapper, input.chatId, raw))
+  }
+  return { localIds: messages.map((message) => `td-${message.id}`), messages }
 }
 
 /**

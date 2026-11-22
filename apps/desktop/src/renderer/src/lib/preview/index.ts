@@ -417,6 +417,7 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'media:stream':
     case 'media:open':
     case 'media:send':
+    case 'media:sendAlbum':
       return handlePreviewMedia(channel, store, (url) => window.open(url, '_blank', 'noopener'))
     case 'stickers:sets': {
       const set = previewStickerSet()

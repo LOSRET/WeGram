@@ -255,6 +255,11 @@ export function createHandlers({
       const failure = await shell.openPath(path)
       if (failure) throw new AppError('internal', `Failed to open file: ${failure}`)
     },
+    'media:sendAlbum': (payload) => {
+      const empty = payload.items.find((item) => !item.filePath.trim())
+      if (empty) throw new AppError('invalid_payload', 'Empty file path')
+      return adapter.sendAlbum(payload)
+    },
     'media:send': (payload) => {
       if (!payload.filePath.trim()) throw new AppError('invalid_payload', 'Empty file path')
       return adapter.sendMedia(payload)

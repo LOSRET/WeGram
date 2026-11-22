@@ -125,6 +125,8 @@ export const invokeChannels = [
    */
   'search:messages',
   'media:pick',
+  /** 相册发送: several photos as one folded bubble. */
+  'media:sendAlbum',
   'media:download',
   /**
    * Drops one holder of a file's download. Main stops the transfer only when
@@ -354,6 +356,32 @@ export const invokeSchemas = {
   'media:open': {
     request: z.object({ fileId: z.number().int() }),
     response: noPayload,
+  },
+  /**
+   * 相册: several local files as ONE Telegram album (`sendMessageAlbum`), so they
+   * arrive as a folded bubble instead of N messages. 2–10 items, photos only —
+   * that is the set the transcript folds back into one row (design doc §8.6).
+   */
+  'media:sendAlbum': {
+    request: z.object({
+      chatId: z.number().int(),
+      items: z
+        .array(
+          z.object({
+            filePath: z.string().min(1),
+            kind: z.enum(['photo', 'file']),
+            caption: z.string().optional(),
+          }),
+        )
+        .min(2)
+        .max(10),
+      replyTo: z.number().int().optional(),
+    }),
+    /** `localIds` line up with `messages`: the composer tracks one per row. */
+    response: z.object({
+      localIds: z.array(z.string()),
+      messages: z.array(messageSchema),
+    }),
   },
   'media:send': {
     request: z.object({
