@@ -13,6 +13,7 @@ import { reportInvokeChannels, reportInvokeSchemas } from './report'
 import { chatInvokeChannels, chatInvokeSchemas } from './chats'
 import { qrInvokeChannels, qrInvokeSchemas } from './qr'
 import { pollInvokeChannels, pollInvokeSchemas } from './poll'
+import { networkInvokeChannels, networkInvokeSchemas } from './network'
 import { customEmojiStickerSchema, stickerSetSchema, stickerSetSummarySchema } from './stickers'
 import {
   appInfoSchema,
@@ -172,6 +173,7 @@ export const invokeChannels = [
   'proxy:get',
   'proxy:set',
   'proxy:test',
+  ...networkInvokeChannels,
   'app:info',
   /** The login window's 进入 button: main swaps it for the shell window. */
   'login:enter',
@@ -487,6 +489,7 @@ export const invokeSchemas = {
     request: z.object({ config: proxyConfigSchema }),
     response: proxyTestResultSchema,
   },
+  ...networkInvokeSchemas,
   'app:info': { request: noPayload, response: appInfoSchema },
   'login:enter': { request: noPayload, response: noPayload },
   'login:close': { request: noPayload, response: noPayload },

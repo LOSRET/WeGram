@@ -4,6 +4,8 @@ import { errorMessage, invoke } from '../lib/ipc'
 import { useAppStore } from '../store/useAppStore'
 import { useEffect, useState } from 'react'
 
+import { Switch } from './Switch'
+
 interface ProxyPanelProps {
   onClose: () => void
   /**
@@ -25,12 +27,14 @@ export function ProxyPanel({ onClose, onError }: ProxyPanelProps) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [secret, setSecret] = useState('')
+  const [preferIpv6, setPreferIpv6] = useState(false)
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
 
   useEffect(() => {
     void (async () => {
       try {
-        const config = await invoke('proxy:get')
+        const [config, network] = await Promise.all([invoke('proxy:get'), invoke('network:get')])
+        setPreferIpv6(network.preferIpv6)
         if (!config) return
         setType(config.type)
         setHost(config.host)
@@ -97,6 +101,16 @@ export function ProxyPanel({ onClose, onError }: ProxyPanelProps) {
     }
   }
 
+  const toggleIpv6 = async (next: boolean) => {
+    setPreferIpv6(next)
+    try {
+      await invoke('network:set', { preferIpv6: next })
+    } catch (error) {
+      setPreferIpv6(!next)
+      setStatus({ kind: 'fail', text: errorMessage(error) })
+    }
+  }
+
   const test = async () => {
     const config = buildConfig()
     if (!config) {
@@ -147,7 +161,7 @@ export function ProxyPanel({ onClose, onError }: ProxyPanelProps) {
               className="wx-input"
               value={host}
               onChange={(event) => setHost(event.target.value)}
-              placeholder="127.0.0.1"
+              placeholder="127.0.0.1 或 ::1"
             />
           </div>
           <div className="wx-field">
@@ -196,6 +210,15 @@ export function ProxyPanel({ onClose, onError }: ProxyPanelProps) {
           </div>
         )}
 
+        <div className="wx-switch-row">
+          <span>优先使用 IPv6（prefer_ipv6）</span>
+          <Switch
+            checked={preferIpv6}
+            label="优先使用 IPv6"
+            onChange={(next) => void toggleIpv6(next)}
+          />
+        </div>
+
         {status.kind !== 'idle' ? (
           <div
             className={`wx-status${status.kind === 'ok' ? ' wx-status--ok' : ''}${
@@ -220,7 +243,8 @@ export function ProxyPanel({ onClose, onError }: ProxyPanelProps) {
 
         <div className="wx-hint">
           代理在 TDLib 初始化参数之后、任何网络请求之前应用；密码与 secret 通过 Windows DPAPI
-          加密保存，渲染层只拿掩码。
+          加密保存，渲染层只拿掩码。IPv6 默认关闭：网络或代理只有 IPv6 时再打开，路由不完整时
+          反而更慢。
         </div>
       </div>
     </div>

@@ -379,6 +379,12 @@ export interface TelegramAdapter {
 
   setProxy(config: ProxyConfig | null): Promise<void>
   testProxy(config: ProxyConfig): Promise<ProxyTestResult>
+  /**
+   * TDLib's writable `prefer_ipv6` option: IPv6 DC addresses become the first
+   * choice instead of a fallback (design doc §6.4). Before the client exists the
+   * value is remembered and applied when one is created.
+   */
+  setPreferIpv6(prefer: boolean): Promise<void>
 }
 
 /** Shared emitter plumbing for the concrete adapters. */

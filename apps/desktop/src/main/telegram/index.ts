@@ -16,6 +16,8 @@ export interface CreateAdapterOptions {
   apiHash?: string
   userDataDir: string
   initialProxy: ProxyConfig | null
+  /** TDLib's `prefer_ipv6`; see `network:set` and design doc §6.4. */
+  initialPreferIpv6: boolean
   /**
    * Development only. A packaged build refuses to start without credentials
    * (`main/index.ts`), so it also ignores `WEGRAM_ADAPTER=mock`: a release artifact
@@ -65,6 +67,7 @@ export function createAdapter(options: CreateAdapterOptions): TelegramAdapter {
       filesDirectory: join(sessionDir, 'files'),
       useTestDc: testDc,
       initialProxy: options.initialProxy,
+      initialPreferIpv6: options.initialPreferIpv6,
       ...(options.applicationVersion
         ? { applicationVersion: options.applicationVersion }
         : {}),

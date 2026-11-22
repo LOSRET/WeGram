@@ -10,7 +10,8 @@ schemas + inferred types), `channels.ts` (channel tables and their request/respo
 schemas), `errors.ts` (`AppError`) and the modules split out when a file hit its
 550-line budget — `stickers.ts` (formats, `Sticker`, sticker sets, custom emoji),
 `contact.ts` (the 通讯录 `Contact` row), `settings.ts` (proxy,
-app settings, `app:info`), `viewer.ts` (the 图片和视频 window's payloads),
+app settings, `app:info`), `network.ts` (the TDLib network-option channels —
+`prefer_ipv6`), `viewer.ts` (the 图片和视频 window's payloads),
 `chat.ts` (the chat DTOs: kind/summary/member/pinned message/invite link/chat ops),
 `chats.ts` (the chat domain's channel keys and schemas), `qr.ts` (the 群二维码
 window's channels), `poll.ts` (the poll DTO + the vote/add-option channels),
@@ -23,8 +24,8 @@ duration + reply, and its send channel), `presence.ts` (peer status, the active-
 report) and `user.ts` (the 资料卡 DTO + its 备注 / 共同群聊 / 添加联系人 channels),
 `report.ts` (the phased 举报 contract for a person and for one message),
 `reaction.ts` (the 表情回应 chip DTO, display-only for now) and `properties.ts` (the
-per-message capability answer the context menu reads). The channel tables of `chats.ts`, `qr.ts`, `send.ts` and `presence.ts` are
-spread into the two command tables; `events.ts` owns its own.
+per-message capability answer the context menu reads). The channel tables of `chats.ts`, `qr.ts`, `send.ts`, `presence.ts` and
+`network.ts` are spread into the two command tables; `events.ts` owns its own.
 The package is exported straight from source (`src/index.ts`, no build step), so
 `pnpm typecheck` in the consumer is the only build. A new field that pushes `dto.ts`
 over the budget is a signal to split the domain out, not to raise the cap.

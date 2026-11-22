@@ -160,6 +160,7 @@ async function bootstrap(): Promise<void> {
     ...(apiHash ? { apiHash } : {}),
     userDataDir,
     initialProxy,
+    initialPreferIpv6: store.get().preferIpv6,
     allowMock: isDev,
     applicationVersion: app.getVersion(),
   })

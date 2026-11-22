@@ -44,6 +44,8 @@ export interface TdlibAdapterOptions {
   databaseDirectory: string
   filesDirectory: string
   initialProxy: ProxyConfig | null
+  /** TDLib's `prefer_ipv6` as stored in settings.json. */
+  initialPreferIpv6?: boolean
   /** Sent as TDLib's `application_version`; main passes app.getVersion(). */
   applicationVersion?: string
   /**
@@ -72,6 +74,8 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   private auth: AuthState = { kind: 'idle' }
   private connection: ConnectionState = 'offline'
   private proxy: ProxyConfig | null = null
+  /** TDLib's prefer_ipv6; re-applied to every client the lifecycle creates. */
+  private preferIpv6 = false
   private readonly userNames = new Map<number, string>()
   /** Chat titles, used for `messageSenderChat` (channel posts, anonymous admins). */
   private readonly chatTitles = new Map<number, string>()
@@ -97,6 +101,9 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
 
   constructor(private readonly options: TdlibAdapterOptions) {
     super()
+
+    // Remembered before any client exists: the lifecycle applies it at start.
+    this.preferIpv6 = this.options.initialPreferIpv6 === true
 
     // Built first: its photo cache is part of the mapper context.
     this.avatars = new AvatarCache({
@@ -204,6 +211,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
       handleUpdate: (update) => this.handleUpdate(update),
       setAuth: (state) => this.setAuth(state),
       proxy: this.proxyDeps,
+      preferIpv6: () => this.preferIpv6,
       onReset: () => {
         this.selfUserId = null
         this.setAuth({ kind: 'idle' })
@@ -460,6 +468,17 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
 
   async testProxy(config: ProxyConfig): Promise<ProxyTestResult> {
     return testProxyConfig(this.proxyDeps, config)
+  }
+
+  async setPreferIpv6(prefer: boolean): Promise<void> {
+    this.preferIpv6 = prefer
+    // Before `start()` the value is only remembered; the lifecycle applies it.
+    if (!this.lifecycle.getClient()) return
+    await this.invoke({
+      _: 'setOption',
+      name: 'prefer_ipv6',
+      value: { _: 'optionValueBoolean', value: prefer },
+    })
   }
 
   private async invoke(method: TdObject): Promise<any> {

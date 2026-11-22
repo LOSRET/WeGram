@@ -462,6 +462,10 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     return { ok: true, latencyMs: 1 }
   }
 
+  async setPreferIpv6(_prefer: boolean): Promise<void> {
+    // Fixtures never leave the machine: there is no address family to prefer.
+  }
+
   /* ---------- fixture plumbing ---------- */
 
   private completeLogin(): void {

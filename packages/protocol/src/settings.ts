@@ -42,6 +42,16 @@ export const proxyTestResultSchema = z.object({
 export type ProxyTestResult = z.infer<typeof proxyTestResultSchema>
 
 /**
+ * TDLib network preferences the settings surface owns (design doc §6.4).
+ *
+ * `preferIpv6` is TDLib's writable `prefer_ipv6` option: with it on, the DC
+ * connection list keeps only IPv6 addresses and the client resolves proxy hosts
+ * with AAAA first. Off keeps TDLib's default (IPv4 first, IPv6 as a fallback).
+ */
+export const networkSettingsSchema = z.object({ preferIpv6: z.boolean() })
+export type NetworkSettings = z.infer<typeof networkSettingsSchema>
+
+/**
  * The picker's 最近使用 row holds this many, newest first. Main truncates on
  * save and the renderer draws what it gets; the protocol caps the request so a
  * stale renderer cannot grow the stored list.

@@ -52,7 +52,7 @@ media/              registry.ts (token → path | fileId) / protocol.ts (wx-medi
                     (the byte pump, pure) / leases.ts (per-file download holders, pure) /
                     image-size.ts / voice-file.ts (a recorded 语音消息's temporary OGG:
                     written by the handler, pruned at startup once stale)
-store/              ui-db.ts (all SQL) / settings.ts (proxy only)
+store/              ui-db.ts (all SQL) / settings.ts (proxy + TDLib network options)
 proxy*.ts           proxy DTO ↔ stored config
 security/secrets.ts safeStorage (DPAPI) seal/unseal
 ```
@@ -65,8 +65,8 @@ change belongs in the adapter.
 ## Rules that have already cost a debugging session
 
 - **All `node:sqlite` calls live in `store/ui-db.ts`** (also lint-enforced).
-  `settings.json` keeps only the proxy config, because it carries a sealed
-  secret.
+  `settings.json` keeps only what must be known before any window exists: the
+  proxy config (sealed secret) and the TDLib network options (`prefer_ipv6`).
 - **A `wx-media://` token is a local path *or* a file id.** A file id means "TDLib is still
   downloading this": `protocol.ts` tails the file and must measure readable bytes with
   `getFileDownloadedPrefixSize`, never with `stat().size` (the file is sparse). Stopping a

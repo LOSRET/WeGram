@@ -20,13 +20,16 @@ export type StoredProxy = StoredProxySocks5 | StoredProxyMtproto
 
 export interface StoredState {
   proxy: StoredProxy | null
+  /** TDLib's `prefer_ipv6`; applied by the adapter at startup and on change. */
+  preferIpv6: boolean
 }
 
-const DEFAULT_STATE: StoredState = { proxy: null }
+const DEFAULT_STATE: StoredState = { proxy: null, preferIpv6: false }
 
 /**
- * Small JSON store that only holds what carries a sealed secret (the proxy
- * configuration). Everything else that is UI state lives in `ui.db` (§5.1).
+ * Small JSON store that holds what must be known before any window exists (the
+ * proxy configuration, which carries a sealed secret, and the TDLib network
+ * options). Everything else that is UI state lives in `ui.db` (§5.1).
  */
 export class SettingsStore {
   private state: StoredState = { ...DEFAULT_STATE }
@@ -36,7 +39,7 @@ export class SettingsStore {
   load(): void {
     try {
       const parsed = JSON.parse(readFileSync(this.file, 'utf8')) as Partial<StoredState>
-      this.state = { proxy: parsed.proxy ?? null }
+      this.state = { proxy: parsed.proxy ?? null, preferIpv6: parsed.preferIpv6 === true }
     } catch {
       this.state = { ...DEFAULT_STATE }
     }
@@ -48,6 +51,11 @@ export class SettingsStore {
 
   setProxy(proxy: StoredProxy | null): void {
     this.state.proxy = proxy
+    this.save()
+  }
+
+  setPreferIpv6(preferIpv6: boolean): void {
+    this.state.preferIpv6 = preferIpv6
     this.save()
   }
 

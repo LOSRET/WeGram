@@ -364,6 +364,13 @@ export function createHandlers({
     'proxy:test': (payload) =>
       adapter.testProxy(resolveProxySecrets(payload.config, store.get().proxy)),
 
+    'network:get': () => ({ preferIpv6: store.get().preferIpv6 }),
+    'network:set': async (payload) => {
+      // Same rule as the proxy: only persist what the protocol layer accepted.
+      await adapter.setPreferIpv6(payload.preferIpv6)
+      store.setPreferIpv6(payload.preferIpv6)
+    },
+
     'viewer:open': (payload) => {
       const focused = BrowserWindow.getFocusedWindow()
       openViewer(payload, isViewerWindow(focused) ? null : focused)

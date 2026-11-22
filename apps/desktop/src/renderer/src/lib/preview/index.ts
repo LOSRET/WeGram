@@ -129,6 +129,7 @@ const previewPins = new Map<number, ChatPinnedMessage>()
 /** The chat the UI last opened; the dev injector below delivers arrivals into it. */
 let openChatId: number | null = null
 let proxy: ProxyConfig | null = null
+let preferIpv6 = false
 let settings: AppSettings = { theme: 'light' }
 
 /** What the 群二维码 handlers read; their rules live in ./qr.ts. */
@@ -403,6 +404,11 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       return undefined
     case 'proxy:test':
       return { ok: true, latencyMs: 3 } satisfies ProxyTestResult
+    case 'network:get':
+      return { preferIpv6 }
+    case 'network:set':
+      preferIpv6 = Boolean(store.preferIpv6)
+      return undefined
     /**
      * The viewer is its own Electron window, so the browser preview can only
      * record the request (a photo or video click is a no-op there).

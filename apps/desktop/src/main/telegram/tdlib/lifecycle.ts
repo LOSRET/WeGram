@@ -27,6 +27,8 @@ export interface TdlibLifecycleDeps extends TdlibClientOptions {
   /** Authorization follows the client: a crash ends as `closed`. */
   setAuth(state: AuthState): void
   proxy: ProxyDeps
+  /** TDLib's `prefer_ipv6`, read again on every (re)start. */
+  preferIpv6: () => boolean
   /** Clears per-client adapter state (our own user id) before a restart. */
   onReset(): void
 }
@@ -131,6 +133,10 @@ export class TdlibLifecycle {
       this.deps.setAuth({ kind: 'closed' })
     })
 
+    // Network preference first: it decides which DC addresses new connections
+    // may use, and TDLib replans the existing ones when the option changes.
+    this.applyPreferIpv6(client)
+
     // Proxy must be in place before any network request (§6.4). tdl queues
     // requests until it has sent the TDLib parameters, so calling it here is
     // both safe and early enough.
@@ -187,5 +193,21 @@ export class TdlibLifecycle {
 
     this.deps.onReset()
     await this.start()
+  }
+
+  /** Best effort: a failed option must not keep the client from coming up. */
+  private applyPreferIpv6(client: TdClientLike): void {
+    void client
+      .invoke({
+        _: 'setOption',
+        name: 'prefer_ipv6',
+        value: { _: 'optionValueBoolean', value: this.deps.preferIpv6() },
+      })
+      .catch((error) => {
+        this.deps.logger.warn(
+          'failed to set prefer_ipv6:',
+          error instanceof Error ? error.message : error,
+        )
+      })
   }
 }
