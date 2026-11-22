@@ -36,6 +36,16 @@
   text-overflow: ellipsis;
 }
 
+/* The private chat's title is a button (资料卡): same metrics as the <h1>, with
+   the browser's button chrome removed so the header does not move by a pixel. */
+.wx-chat__title--clickable {
+  padding: 0;
+  border: none;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
 .wx-chat__typing {
   margin-left: 8px;
   font-size: 12px;

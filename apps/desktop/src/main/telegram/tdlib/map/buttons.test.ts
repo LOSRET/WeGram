@@ -53,7 +53,11 @@ describe('buttonStyleOf', () => {
   it('carries the style into the DTO only when there is one', () => {
     expect(
       inlineButtonOf(
-        { text: '确认', style: { _: 'buttonStyleSuccess' }, type: { _: 'inlineKeyboardButtonTypeCallback', data: 'a' } },
+        {
+          text: '确认',
+          style: { _: 'buttonStyleSuccess' },
+          type: { _: 'inlineKeyboardButtonTypeCallback', data: 'a' },
+        },
         '确认',
       ),
     ).toEqual({ text: '确认', callback: true, style: 'success' })

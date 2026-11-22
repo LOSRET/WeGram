@@ -15,6 +15,12 @@ interface ChatHeaderProps {
   /** The 聊天信息 panel is showing; the "…" button is its switch. */
   infoOpen: boolean
   onToggleInfo: () => void
+  /**
+   * 资料卡: private chats only. The title itself is the way in, like WeChat's,
+   * where tapping the name opens that person's card — a group has no single
+   * person to describe, so it gets no handler.
+   */
+  onOpenProfile?: () => void
 }
 
 /**
@@ -27,17 +33,38 @@ interface ChatHeaderProps {
  * never re-flows when it appears or disappears. Typing wins over status — both
  * describe the same person and a typing peer is the more immediate fact.
  */
-export function ChatHeader({ title, typing, peerStatus, infoOpen, onToggleInfo }: ChatHeaderProps) {
+export function ChatHeader({
+  title,
+  typing,
+  peerStatus,
+  infoOpen,
+  onToggleInfo,
+  onOpenProfile,
+}: ChatHeaderProps) {
+  const faces = (
+    <>
+      <span className="wx-chat__name">{title}</span>
+      {typing ? (
+        <span className="wx-chat__typing">对方正在输入…</span>
+      ) : peerStatus ? (
+        <span className="wx-chat__status">{formatPeerStatus(peerStatus, Date.now())}</span>
+      ) : null}
+    </>
+  )
   return (
     <header className="wx-chat__header">
-      <h1 className="wx-chat__title">
-        <span className="wx-chat__name">{title}</span>
-        {typing ? (
-          <span className="wx-chat__typing">对方正在输入…</span>
-        ) : peerStatus ? (
-          <span className="wx-chat__status">{formatPeerStatus(peerStatus, Date.now())}</span>
-        ) : null}
-      </h1>
+      {onOpenProfile ? (
+        <button
+          type="button"
+          className="wx-chat__title wx-chat__title--clickable"
+          title="查看资料"
+          onClick={onOpenProfile}
+        >
+          {faces}
+        </button>
+      ) : (
+        <h1 className="wx-chat__title">{faces}</h1>
+      )}
       <div className="wx-chat__header-actions">
         <button className="wx-ghost-btn" title="语音通话" disabled aria-label="语音通话">
           <CallMenuIcon size={19} />

@@ -55,9 +55,7 @@ export const eventSchemas = {
   'evt:chats': envelope(z.object({ ops: z.array(chatOpSchema) })),
   'evt:messages': envelope(z.object({ chatId: z.number().int(), ops: z.array(messageOpSchema) })),
   'evt:avatars': envelope(z.object({ avatars: z.array(userAvatarSchema) })),
-  'evt:status': envelope(
-    z.object({ userId: z.number().int(), status: peerStatusSchema }),
-  ),
+  'evt:status': envelope(z.object({ userId: z.number().int(), status: peerStatusSchema })),
   'evt:typing': envelope(
     z.object({
       chatId: z.number().int(),

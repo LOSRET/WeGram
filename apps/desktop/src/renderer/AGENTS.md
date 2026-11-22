@@ -57,6 +57,9 @@ components/picker/        the expression panel's data hooks and body components
 components/ExpressionPicker.tsx  the picker's state + composition
 components/viewer/        the 图片和视频 window: MediaViewer shell + useViewerItem /
                          useViewerZoom + ViewerToolbar / ViewerGrid + viewerMenu / viewerActions
+components/ProfileCard.tsx  资料卡: the person sheet a private chat's title and the
+                        通讯录 card's 更多资料 open (简介 / 备注 / 共同群聊 / 添加或删除
+                        联系人, all through `users:*`)
 components/Avatar.tsx    the ONE avatar box (photo or initials); the box class it is given
                         is the positioned element, which is the rule that once cost a session
 components/CustomEmoji.tsx  a Premium custom emoji in text: its sticker art at 20 px,

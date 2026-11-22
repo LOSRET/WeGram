@@ -173,6 +173,10 @@ export function createHandlers({
     'chats:inviteLink': (payload) => adapter.inviteLink(payload.chatId, payload.temporary),
     'contacts:list': () => adapter.listContacts(),
     'users:status': (payload) => adapter.userStatus(payload.userId),
+    'users:profile': (payload) => adapter.userProfile(payload.userId),
+    'users:setNote': (payload) => adapter.setUserNote(payload.userId, payload.note),
+    'users:setContact': (payload) =>
+      adapter.setUserContact(payload.userId, payload.contact, payload.sharePhone),
     'ui:setActiveChat': (payload) => setActiveChat(payload.chatId),
 
     'messages:history': (payload) => adapter.history(payload),

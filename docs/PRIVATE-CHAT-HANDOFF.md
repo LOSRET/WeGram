@@ -61,6 +61,7 @@ below is one commit, `pnpm verify`-green, on `feat/private-chat-p1`.
 | Gap | Landed in | Notes |
 |---|---|---|
 | 相册发送 | `media:sendAlbum`; `sendMessageAlbum` in `actions/send.ts`; `lib/albumSend.ts`; `components/Composer.tsx` attach path | 2–10 photos in ONE call, answered as `Messages`; every row carries the album id, so the transcript folds them into the bubble it already draws for a received album. The rule for when that applies (photos only, 2–10) is pure and tested; a document selection still sends one message per file, because `rows.ts` only folds photo/video. Mock adapter gets an album builder that shares one `media_album_id`; the browser preview cannot send files at all (no local path), so it refuses like `media:send`. |
+| 资料卡 / 备注 / 加删联系人 | `users:profile` / `users:setNote` / `users:setContact` (`protocol/user.ts`); `actions/users.ts`; `map/user.ts mapUserProfile`; `tdlib/user-api.ts`; `components/ProfileCard.tsx` + `styles/profile.css` | One card for a private chat's **title** and the 通讯录 card's 更多资料 (and 添加备注名): avatar, name, Telegram号, 备注 (Telegram's cloud-synced note, editable inline), 简介, 共同群聊 count, 手机号, and 添加/删除联系人. Every write answers the refreshed card, so no field is patched locally. Mock + browser preview implement the same three channels. Deferred: the 共同群聊 **list** (`getGroupsInCommon`), 拉黑 and 举报 — next batch. |
 | 图片说明编辑 | `messages:editCaption`; `editMessageCaption` in `actions/send.ts`; `lib/editTarget.ts`; menu 编辑 / 编辑说明 | The row's kind picks the call (`can_be_edited` covers both): text edits go through `editMessageText`, media captions through `editMessageCaption`. `show_caption_above_media` is read back with `getMessage` first, so an edit never moves a caption from above the picture to below it. An empty caption clears it (the composer allows an empty save only on that path). Mock + browser preview both implement it. |
 
 ## 1. What already works (do not rebuild it)
@@ -126,10 +127,10 @@ person-days, for this repo's conventions.
 | P0 | Desktop notifications / tray | No `updateNotification*`, no `Notification`, no tray | `updateNotificationGroup`, `updateNotification` | 2–3 |
 | P1 | Voice message recording/send | Toolbar entry only toasts 还没有接入 | `inputMessageVoiceNote` + `inputVoiceNote` + `chatActionRecordingVoiceNote` | 3–5 |
 | P1 | Reactions | Not in DTO, no renderer, no updates | `addMessageReaction` / `removeMessageReaction` / `setMessageReactions`, `getMessageAvailableReactions`, `updateMessageReactions`, `interaction_info.reactions` | 2–3 |
-| P1 | Peer profile card | Chat title/avatar not clickable; `ContactDetail` 更多资料/备注 are placeholders; panel face is a plain `div` | `getUserFullInfo` (bio, note, `group_in_common_count`, `block_list`, `can_be_called`), `getGroupsInCommon` | 2–3 |
+| P1 | Peer profile card | ~~Chat title/avatar not clickable; `ContactDetail` 更多资料/备注 are placeholders~~ — **card done**, see the P1 status table (共同群聊 list + panel face still open) | `getUserFullInfo` (bio, note, `group_in_common_count`, `block_list`, `can_be_called`), `getGroupsInCommon` | 2–3 |
 | P1 | Block / unblock | No entry point | `setMessageSenderBlockList` (pass `null` to unblock), `getBlockedMessageSenders` | 1 |
 | P1 | Report chat / message | No entry point | `reportChat` (two-phase: empty `option_id` first), `chat.can_be_reported`, `messageProperties.can_report_chat` | 1 |
-| P1 | Add / remove contact, 备注 | 通讯录 is read-only (`getContacts` only); 添加备注名 placeholder | `addContact` + `importedContact`, `removeContacts`, `setUserNote`, `userFullInfo.note` | 2 |
+| P1 | Add / remove contact, 备注 | ~~通讯录 is read-only; 添加备注名 placeholder~~ — **done**, see the P1 status table | `addContact` + `importedContact`, `removeContacts`, `setUserNote`, `userFullInfo.note` | 2 |
 | P1 | Album send | ~~Multi-select sends N separate messages~~ — **done**, see the P1 status table | `sendMessageAlbum` (returns `Messages`) | 1–2 |
 | P1 | Caption edit | ~~Edit menu is gated to `kind === 'text'`~~ — **done**, see the P1 status table | `editMessageCaption` | 0.5–1 |
 | P1 | Speech-to-text | None | `recognizeSpeech` + `can_recognize_speech` + `speech_recognition_result` | 1 |

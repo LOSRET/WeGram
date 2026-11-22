@@ -10,6 +10,7 @@ import { Composer } from '../Composer'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { ForwardDialog } from '../ForwardDialog'
 import { MessageList } from '../message-list'
+import { ProfileCard } from '../ProfileCard'
 import { ChannelBar } from './ChannelBar'
 import { ChatHeader } from './ChatHeader'
 import { ChatInfoPanel } from './ChatInfoPanel'
@@ -87,6 +88,8 @@ export function ChatPane() {
   const [muteBusy, setMuteBusy] = useState(false)
   /** The same guard for 置顶聊天. */
   const [pinBusy, setPinBusy] = useState(false)
+  /** 资料卡: the person this private chat is with, or null while it is closed. */
+  const [profileUserId, setProfileUserId] = useState<number | null>(null)
 
   /**
    * The full-pane discussion view (design doc §9.8). It stays mounted while it
@@ -350,6 +353,9 @@ export function ChatPane() {
         peerStatus={peerStatus}
         infoOpen={infoOpen}
         onToggleInfo={toggleInfo}
+        {...(chat.kind === 'private' && chat.userId !== undefined
+          ? { onOpenProfile: () => setProfileUserId(chat.userId ?? null) }
+          : {})}
       />
 
       {loadingHistory && messages.length === 0 ? (
@@ -469,6 +475,10 @@ export function ChatPane() {
           open={comments.open}
           onClose={closeComments}
         />
+      ) : null}
+
+      {profileUserId !== null ? (
+        <ProfileCard userId={profileUserId} onClose={() => setProfileUserId(null)} />
       ) : null}
 
       {forwarding ? (

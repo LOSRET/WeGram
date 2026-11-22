@@ -86,7 +86,9 @@ export function handlePreviewComments(
  */
 function commentRow(chatId: number, id: number, payload: unknown): Message {
   const content =
-    payload && typeof payload === 'object' ? (payload as { kind?: unknown; fileId?: unknown; text?: unknown }) : {}
+    payload && typeof payload === 'object'
+      ? (payload as { kind?: unknown; fileId?: unknown; text?: unknown })
+      : {}
   if (content.kind === 'sticker') {
     const sticker = PREVIEW_STICKERS.find((item) => item.fileId === Number(content.fileId))
     if (!sticker) throw { code: 'internal', message: 'unknown sticker' }

@@ -1,0 +1,189 @@
+/* ==========================================================================
+   资料卡 (the person card, P1): the sheet a private chat's title and the
+   通讯录 card's 更多资料 open. It reuses the shell's .wx-modal geometry and adds
+   only the rows; every colour comes from tokens.css.
+   ========================================================================== */
+
+.wx-profile {
+  width: 340px;
+  padding: 16px 18px 18px;
+  gap: 12px;
+}
+
+.wx-profile__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wx-profile__heading {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--wx-text);
+}
+
+.wx-profile__close {
+  border: none;
+  background: none;
+  padding: 0 2px;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--wx-text-tertiary);
+  cursor: pointer;
+}
+
+.wx-profile__identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* The avatar box owns its own geometry (Avatar's rule); only its size is here. */
+.wx-profile__avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 6px;
+}
+
+.wx-profile__names {
+  min-width: 0;
+}
+
+.wx-profile__name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--wx-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wx-profile__handle {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--wx-text-tertiary);
+}
+
+.wx-profile__rule {
+  height: 1px;
+  background: var(--wx-divider);
+}
+
+.wx-profile__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wx-profile__row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.wx-profile__label {
+  flex: none;
+  width: 56px;
+  color: var(--wx-text-secondary);
+}
+
+.wx-profile__value {
+  flex: 1;
+  min-width: 0;
+  color: var(--wx-text);
+  word-break: break-word;
+}
+
+.wx-profile__link {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 13px;
+  text-align: left;
+  color: var(--wx-link);
+  cursor: pointer;
+}
+
+.wx-profile__link:disabled {
+  color: var(--wx-text-disabled);
+  cursor: default;
+}
+
+.wx-profile__note-editor {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.wx-profile__note-input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  border: 1px solid var(--wx-field-line);
+  border-radius: 4px;
+  background: var(--wx-elevated);
+  font: inherit;
+  font-size: 13px;
+  color: var(--wx-text);
+}
+
+.wx-profile__note-input:focus {
+  outline: none;
+  border-color: var(--wx-brand);
+}
+
+.wx-profile__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wx-profile__primary {
+  height: 32px;
+  border: none;
+  border-radius: 4px;
+  background: var(--wx-brand);
+  color: var(--wx-text-on-brand);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.wx-profile__primary:hover {
+  background: var(--wx-brand-active);
+}
+
+.wx-profile__action {
+  height: 30px;
+  border: 1px solid var(--wx-line-strong);
+  border-radius: 4px;
+  background: var(--wx-elevated);
+  color: var(--wx-text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.wx-profile__action:hover {
+  background: var(--wx-row-hover);
+}
+
+.wx-profile__action--danger {
+  color: var(--wx-danger);
+}
+
+.wx-profile__action:disabled {
+  color: var(--wx-text-disabled);
+  cursor: default;
+}
+
+.wx-profile__loading {
+  padding: 12px 0;
+  font-size: 13px;
+  color: var(--wx-text-secondary);
+}

@@ -31,7 +31,15 @@ export interface FixtureSeed {
    * The real adapter reads the same fields from TDLib's `getContacts` + `user`.
    * Phones are stored the way TDLib hands them over: digits with no leading +.
    */
-  contact?: { username?: string; phone?: string; dcId?: number }
+  contact?: {
+    username?: string
+    phone?: string
+    dcId?: number
+    /** 简介 (`userFullInfo.bio`); the 资料卡 draws it when present. */
+    bio?: string
+    /** 备注 (`userFullInfo.note`) — Telegram's cloud-synced note, not a remark. */
+    note?: string
+  }
   /**
    * Comment threads by message id (design doc §9.8). TDLib keeps them in the
    * message thread — a channel's linked discussion group — not in the transcript.

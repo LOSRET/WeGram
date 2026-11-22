@@ -26,6 +26,7 @@ import {
   type PreviewMessagesStore,
 } from './messages'
 import { handlePreviewPoll } from './polls'
+import { createPreviewProfileState, handlePreviewProfile } from './profile'
 import { handlePreviewUi } from './ui'
 import { handlePreviewQr, type PreviewQrStore } from './qr'
 import {
@@ -115,6 +116,8 @@ function clearQrTimer(): void {
 const previewMessagesStore: PreviewMessagesStore = { chats, messagesByChat, emit }
 
 let nextId = 9000
+/** 资料卡's in-session 备注 / 联系人 overrides (the preview has no store to write). */
+const previewProfile = createPreviewProfileState()
 /** The chat the UI last opened; the dev injector below delivers arrivals into it. */
 let openChatId: number | null = null
 let proxy: ProxyConfig | null = null
@@ -268,6 +271,10 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       return previewOpenUsername(chats, contacts, String(store.username ?? ''))
     case 'contacts:list':
       return contacts
+    case 'users:profile':
+    case 'users:setNote':
+    case 'users:setContact':
+      return handlePreviewProfile(channel, store, previewProfile, contacts)
     case 'users:status': {
       const chat = chats.find((item) => item.userId === Number(store.userId))
       return chat ? { kind: 'offline', wasOnline: now() - 5_400 } : null

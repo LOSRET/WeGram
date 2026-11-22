@@ -12,6 +12,7 @@ import { chatSummarySchema } from './chat'
 import type { EventChannel, EventEnvelope } from './events'
 import { sendInvokeChannels, sendInvokeSchemas } from './send'
 import { presenceInvokeChannels, presenceInvokeSchemas } from './presence'
+import { userInvokeChannels, userInvokeSchemas } from './user'
 import { chatInvokeChannels, chatInvokeSchemas } from './chats'
 import { qrInvokeChannels, qrInvokeSchemas } from './qr'
 import { pollInvokeChannels, pollInvokeSchemas } from './poll'
@@ -116,6 +117,8 @@ export const invokeChannels = [
   /** Outgoing typing and failed-message retry; see ./send.ts. */
   ...sendInvokeChannels,
   ...presenceInvokeChannels,
+  /** 资料卡: the person card and its 备注 / 联系人 writes; see ./user.ts. */
+  ...userInvokeChannels,
   'search:global',
   'search:inChat',
   /**
@@ -309,6 +312,7 @@ export const invokeSchemas = {
   },
   ...sendInvokeSchemas,
   ...presenceInvokeSchemas,
+  ...userInvokeSchemas,
   'search:global': {
     request: z.object({ q: z.string().min(1), limit: z.number().int().positive().max(50) }),
     response: z.array(chatSummarySchema),

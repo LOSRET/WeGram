@@ -27,6 +27,7 @@ import { listMockContacts } from './contacts'
 import { ME, MOCK_CODE, MOCK_PASSWORD, type Fixture } from './constants'
 import { createMockEdits } from './edits'
 import { createMockSends } from './sends'
+import { createMockUsers } from './users'
 import { applyRead } from './effects'
 import type { MockSendDeps } from './media'
 import { beginMockStream, downloadMockFile, mockDownloadedPrefix } from './files'
@@ -275,6 +276,18 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   readonly pinnedMessage = this.chatApi.pinnedMessage
   readonly inviteLink = this.chatApi.inviteLink
   readonly userStatus = this.chatApi.userStatus
+
+  /** 资料卡's data and its two writes; the rules live in ./users.ts. */
+  private readonly users = createMockUsers(this.fixtures)
+  async userProfile(userId: number) {
+    return this.users.profile({ userId })
+  }
+  async setUserNote(userId: number, note: string) {
+    return this.users.setNote({ userId, note })
+  }
+  async setUserContact(userId: number, contact: boolean) {
+    return this.users.setContact({ userId, contact })
+  }
 
   /** The mock address book; see `listMockContacts`. */
   async listContacts(): Promise<Contact[]> {

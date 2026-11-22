@@ -509,7 +509,6 @@ export type UserAvatar = z.infer<typeof userAvatarSchema>
    550-line budget: the op table is its own concern and the schema it carries is
    the only thing here that changes with every new event. */
 
-
 /**
  * Where the reader stopped in a chat (design doc §8.2 rule 5).
  *

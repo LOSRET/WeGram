@@ -409,7 +409,10 @@ async function handleAuthorizationState(
  * messages have no UI to open yet). The chat title needs a `getChat`, which
  * TDLib serves from its cache; a chat that vanished is not worth a failure.
  */
-async function emitNotification(deps: UpdateDeps, notification: TdObject | undefined): Promise<void> {
+async function emitNotification(
+  deps: UpdateDeps,
+  notification: TdObject | undefined,
+): Promise<void> {
   if (!notification) return
   const type = notification.type
   if (type?._ !== 'notificationTypeNewMessage' || !type.message) return

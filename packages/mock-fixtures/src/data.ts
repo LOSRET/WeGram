@@ -291,7 +291,13 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
       ...serviceMessages(at),
     ],
     // Digits only: TDLib hands phone numbers over without the leading +.
-    contact: { username: 'mama_wegram', phone: '8613800000000', dcId: 4 },
+    contact: {
+      username: 'mama_wegram',
+      phone: '8613800000000',
+      dcId: 4,
+      bio: '每天散步一小时。',
+      note: '妈妈',
+    },
   })
 
   fixtures.set(4, {

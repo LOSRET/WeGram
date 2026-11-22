@@ -33,6 +33,8 @@
 @import './rich-message.css';
 @import './cards.css';
 @import './poll.css';
+/* 资料卡: the person sheet the header title and 更多资料 open. */
+@import './profile.css';
 @import './viewer.css';
 @import './stickers.css';
 /* After the bubble and comment rules on purpose: a channel post re-shapes both. */

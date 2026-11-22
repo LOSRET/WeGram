@@ -34,6 +34,7 @@ import { setProxy as applyProxyConfig, testProxy as testProxyConfig } from './pr
 import type { ProxyDeps } from './proxy'
 import * as stickers from './stickers'
 import { createChatApi } from './chat-api'
+import { createUserApi } from './user-api'
 import { createUpdateHandler } from './updates'
 
 export interface TdlibAdapterOptions {
@@ -403,9 +404,15 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     return actions.markRead(this.actionDeps, input)
   }
 
-  async userStatus(userId: number) {
-    return actions.userStatus(this.actionDeps, userId)
-  }
+  /**
+   * 在线 / 最后上线 and 资料卡. The methods live in `user-api.ts` so this class
+   * stays inside its line budget; the deps are read lazily.
+   */
+  private readonly userApi = createUserApi(() => this.actionDeps)
+  readonly userStatus = this.userApi.userStatus
+  readonly userProfile = this.userApi.userProfile
+  readonly setUserNote = this.userApi.setUserNote
+  readonly setUserContact = this.userApi.setUserContact
 
   async sendTyping(chatId: number, typing: boolean): Promise<void> {
     return actions.sendTyping(this.actionDeps, chatId, typing)

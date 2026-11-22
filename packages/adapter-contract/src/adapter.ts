@@ -21,6 +21,7 @@ import type {
   StickerSet,
   StickerSetSummary,
   UserAvatar,
+  UserProfile,
   InvokeRequest,
   InvokeResponse,
 } from '@wegram/protocol'
@@ -215,6 +216,12 @@ export interface TelegramAdapter {
   listContacts(): Promise<Contact[]>
   /** Online / last seen for one user; `null` when TDLib has no status to show. */
   userStatus(userId: number): Promise<PeerStatus | null>
+  /** 资料卡: identity, 简介, 备注, 共同群聊 and the 拉黑 flag for one person. */
+  userProfile(userId: number): Promise<UserProfile>
+  /** 备注: writes Telegram's cloud-synced note and answers the refreshed card. */
+  setUserNote(userId: number, note: string): Promise<UserProfile>
+  /** 添加为联系人 / 删除联系人; answers the refreshed card. */
+  setUserContact(userId: number, contact: boolean, sharePhone?: boolean): Promise<UserProfile>
 
   history(
     input: InvokeRequest<'messages:history'>,

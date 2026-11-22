@@ -39,6 +39,9 @@ telegram/tdlib/actions/  TDLib requests as functions over ActionDeps, grouped in
 telegram/tdlib/chat-api.ts  createChatApi: the chat seam methods (list/open/mute/pin/
                     members/title/join) as one object the adapter class binds; split
                     out of index.ts when the 频道底栏 methods hit its line budget
+telegram/tdlib/user-api.ts  createUserApi: the person seam methods (userStatus and
+                    资料卡's profile / note / contact writes) as one bound object,
+                    split out of index.ts at the same budget
 media/              registry.ts (token → path | fileId) / protocol.ts (wx-media://: disk
                     Range streams, plus the branch that tails a download) / stream.ts
                     (the byte pump, pure) / leases.ts (per-file download holders, pure) /
