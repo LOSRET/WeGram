@@ -17,6 +17,12 @@ export interface EditingState {
   chatId: number
   messageId: number
   text: string
+  /**
+   * A media row's 说明 rather than a text message: the composer saves it through
+   * `messages:editCaption`, and an empty box removes the caption. See
+   * `lib/editTarget.ts` for which rows can take either path.
+   */
+  caption?: boolean
 }
 
 /** Progress of one file: own uploads and incoming downloads share the shape. */

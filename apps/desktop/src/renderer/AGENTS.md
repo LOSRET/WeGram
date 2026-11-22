@@ -92,6 +92,8 @@ lib/composerInput.ts  (pure, unit-tested) Enter / Shift+Enter / IME rule
 lib/typingPing.ts     (pure, unit-tested) 对方正在输入 throttle: one ping, 3.5 s refresh,
                       cancel on empty/send/blur
 lib/presence.ts       (pure, unit-tested) 在线 / 最后上线 copy for the peer-status DTO
+lib/editTarget.ts     (pure, unit-tested) which edit path a row has: 编辑 (text) or
+                      编辑说明 (a media caption), and the menu's word for each
 lib/useComposerInput.ts  composition ref + textarea props, shared by both composers
 lib/contacts.ts       通讯录 initial/grouping, pinyin via ICU (pure, unit-tested)
 lib/entities.ts       TL entity → text segments (pure, unit-tested)
@@ -293,6 +295,11 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   does it). Do not render it through the count badge.
 - **The peer-status line is part of the title, in the same 48 px header**, and typing
   wins over it when both exist; a second header row would move the transcript.
+- **编辑 vs 编辑说明 is `lib/editTarget.ts`'s decision, not the menu's.** TDLib's
+  `can_be_edited` covers `editMessageText`, `editMessageCaption` and the reply markup,
+  so the flag alone would offer 编辑 on a poll (where it means "stop it") or on a
+  sticker (an emoji, not a caption). A caption row also saves through its own channel
+  and may legitimately save an empty box — it removes the 说明.
 - User-facing copy is Chinese (`回复`/`复制`/`转发`…), code, identifiers and
   comments are English.
 

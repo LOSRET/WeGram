@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   beginStream,
+  editCaption,
   canGetMembers,
   canPost,
   history,
@@ -328,6 +329,59 @@ describe('setChatMuted', () => {
       show_preview: false,
       use_default_sound: false,
     })
+  })
+})
+
+describe('editCaption', () => {
+  /** A photo row: the caption lives on the content, next to its 'above' flag. */
+  function photoRow(caption: string, above: boolean): TdObject {
+    return {
+      id: 900,
+      date: 1_700_000_000,
+      is_outgoing: true,
+      sender_id: { _: 'messageSenderUser', user_id: 7 },
+      content: {
+        _: 'messagePhoto',
+        photo: { _: 'photo', sizes: [] },
+        caption: { _: 'formattedText', text: caption, entities: [] },
+        show_caption_above_media: above,
+        has_spoiler: false,
+      },
+    }
+  }
+
+  it('edits the caption and keeps it above the picture when it was there', async () => {
+    const { deps, calls } = makeDeps((method) => {
+      if (method._ === 'getMessage') return photoRow('old', true)
+      if (method._ === 'editMessageCaption') return photoRow('new', true)
+      throw new Error(`unexpected ${String(method._)}`)
+    })
+
+    const message = await editCaption(deps, { chatId: 1, messageId: 900, caption: 'new' })
+
+    // The 'above' flag only exists on the content, so it is read back first:
+    // editing must not slide a caption from above the photo to below it.
+    expect(calls.map((call) => call._)).toEqual(['getMessage', 'editMessageCaption'])
+    expect(calls[1]).toMatchObject({
+      chat_id: 1,
+      message_id: 900,
+      reply_markup: null,
+      caption: { _: 'formattedText', text: 'new' },
+      show_caption_above_media: true,
+    })
+    expect(message).toMatchObject({ id: 900, kind: 'photo', text: 'new' })
+  })
+
+  it('removes the caption with a null, which is how TDLib clears one', async () => {
+    const { deps, calls } = makeDeps((method) => {
+      if (method._ === 'getMessage') return photoRow('old', false)
+      if (method._ === 'editMessageCaption') return photoRow('', false)
+      throw new Error(`unexpected ${String(method._)}`)
+    })
+
+    await editCaption(deps, { chatId: 1, messageId: 900, caption: '   ' })
+
+    expect(calls[1]).toMatchObject({ caption: null, show_caption_above_media: false })
   })
 })
 

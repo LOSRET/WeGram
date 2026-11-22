@@ -370,6 +370,15 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     return actions.editText(this.actionDeps, input)
   }
 
+  /** 编辑说明: a media message's caption; see `actions/editCaption`. */
+  async editCaption(input: {
+    chatId: number
+    messageId: number
+    caption: string
+  }): Promise<Message> {
+    return actions.editCaption(this.actionDeps, input)
+  }
+
   async deleteMessages(input: {
     chatId: number
     messageIds: number[]

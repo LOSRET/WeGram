@@ -47,6 +47,7 @@ import {
   setPreviewTitle,
   type PreviewChatStore,
 } from './chats'
+import { editTargetOf } from '../editTarget'
 import { stickerMedia } from '../stickerMedia'
 import {
   ME,
@@ -112,7 +113,6 @@ function clearQrTimer(): void {
 
 /** The message rules' view of this session; see ./messages.ts. */
 const previewMessagesStore: PreviewMessagesStore = { chats, messagesByChat, emit }
-
 
 let nextId = 9000
 /** The chat the UI last opened; the dev injector below delivers arrivals into it. */
@@ -288,7 +288,10 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
         delete row.sendingState
         delete row.sendError
         delete row.canRetry
-        emit('evt:messages', { chatId: store.chatId, ops: [{ op: 'replace', message: { ...row } }] })
+        emit('evt:messages', {
+          chatId: store.chatId,
+          ops: [{ op: 'replace', message: { ...row } }],
+        })
       }
       return undefined
     }
@@ -348,12 +351,22 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       target.edited = true
       return target
     }
+    case 'messages:editCaption': {
+      const list = messagesByChat[store.chatId] ?? []
+      const target = list.find((item) => item.id === store.messageId)
+      if (!target) throw { code: 'internal', message: 'message not found' }
+      target.text = String(store.caption ?? '')
+      target.edited = true
+      return { ...target }
+    }
     case 'messages:properties': {
       const list = messagesByChat[store.chatId] ?? []
       const target = list.find((item) => item.id === store.messageId)
       if (!target) throw { code: 'internal', message: 'message not found' }
       return {
-        canBeEdited: target.outgoing && target.kind === 'text',
+        // Text edits and 编辑说明 are different calls but share TDLib's flag; the
+        // row's own kind decides which one the menu offers (`lib/editTarget.ts`).
+        canBeEdited: target.outgoing && editTargetOf(target) !== null,
         canBeForwarded: true,
         canBeDeletedOnlyForSelf: true,
         canBeDeletedForAllUsers: target.outgoing,

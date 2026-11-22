@@ -1,5 +1,6 @@
 import type { Message, MessageProperties } from '@wegram/protocol'
 
+import { editLabel, editTargetOf } from '../../lib/editTarget'
 import type { MenuItem } from '../ContextMenu'
 
 export interface MessageMenuHandlers {
@@ -26,9 +27,9 @@ export interface MessageMenuOptions {
  *
  * 编辑/转发/撤回 are TDLib's booleans (`getMessageProperties`), not guesses from
  * `outgoing`/`kind`: the 48-hour edit window, protected content and the
- * delete-for-me vs delete-for-everyone split live in TDLib. 编辑 still needs a
- * plain text row, because this client only implements `editMessageText`; a
- * caption's `can_be_edited` waits for `editMessageCaption`.
+ * delete-for-me vs delete-for-everyone split live in TDLib. The flag covers
+ * three edit calls and this client implements two, so the row's kind decides
+ * the label and the channel: 编辑 for text, 编辑说明 for a caption.
  */
 export function buildMessageMenuItems(
   message: Message,
@@ -49,8 +50,11 @@ export function buildMessageMenuItems(
   if (properties?.canBeForwarded) {
     items.push({ label: '转发', onSelect: () => handlers.onForward(message) })
   }
-  if (properties?.canBeEdited && message.kind === 'text') {
-    items.push({ label: '编辑', onSelect: () => handlers.onEdit(message) })
+  // 编辑 / 编辑说明: the row's kind picks the call (`lib/editTarget.ts`), TDLib's
+  // flag says whether it is allowed at all.
+  const editTarget = properties?.canBeEdited ? editTargetOf(message) : null
+  if (editTarget) {
+    items.push({ label: editLabel(editTarget), onSelect: () => handlers.onEdit(message) })
   }
   if (properties?.canBeDeletedForAllUsers && message.outgoing) {
     items.push({ label: '撤回', onSelect: () => handlers.onDelete(message, true) })

@@ -204,19 +204,26 @@ describe('buildMessageMenuItems', () => {
     expect(labels(message(1), props({ canBeCopied: false }))).not.toContain('复制')
   })
 
-  it('offers edit only where the text edit path can actually run', () => {
+  it('offers the edit path the row can actually run', () => {
     expect(labels(message(1, { outgoing: true }), props({ canBeEdited: true }))).toContain('编辑')
-    // TDLib may allow editing a caption, but this client only implements editMessageText.
+    // A caption is its own call (editMessageCaption), so it has its own word.
     expect(
       labels(
         message(1, { outgoing: true, kind: 'photo', media: { fileId: 1 } }),
         props({ canBeEdited: true }),
       ),
-    ).not.toContain('编辑')
-    // The 48-hour window / permissions are TDLib's answer, not "it is ours".
+    ).toContain('编辑说明')
+    // A sticker's emoji is not a caption: no edit path exists for it here.
     expect(
-      labels(message(1, { outgoing: true }), props({ canBeEdited: false })),
-    ).not.toContain('编辑')
+      labels(
+        message(1, { outgoing: true, kind: 'sticker', text: '', media: { fileId: 1 } }),
+        props({ canBeEdited: true }),
+      ),
+    ).not.toContain('编辑说明')
+    // The 48-hour window / permissions are TDLib's answer, not "it is ours".
+    expect(labels(message(1, { outgoing: true }), props({ canBeEdited: false }))).not.toContain(
+      '编辑',
+    )
   })
 
   it('hides forward when TDLib says the content is protected', () => {
@@ -263,10 +270,7 @@ describe('buildMessageMenuItems', () => {
 
   it('hides delete when neither local delete nor revoke is allowed', () => {
     expect(
-      labels(
-        message(1),
-        props({ canBeDeletedOnlyForSelf: false, canBeDeletedForAllUsers: false }),
-      ),
+      labels(message(1), props({ canBeDeletedOnlyForSelf: false, canBeDeletedForAllUsers: false })),
     ).not.toContain('删除')
   })
 
@@ -391,9 +395,9 @@ describe('pickSeenUpTo', () => {
   })
 
   it('has nothing seen without rows', () => {
-    expect(
-      pickSeenUpTo({ items: [], sizerOffset: 0, viewportHeight: 400, idAt: () => 1 }),
-    ).toEqual({ newestIndex: -1, newestId: null })
+    expect(pickSeenUpTo({ items: [], sizerOffset: 0, viewportHeight: 400, idAt: () => 1 })).toEqual(
+      { newestIndex: -1, newestId: null },
+    )
   })
 
   it('skips a row whose message is gone (a shrunk transcript)', () => {

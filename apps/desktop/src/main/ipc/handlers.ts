@@ -184,6 +184,7 @@ export function createHandlers({
     'messages:sendComment': (payload) => adapter.sendComment(payload),
     'messages:send': (payload) => adapter.sendText(payload),
     'messages:edit': (payload) => adapter.editText(payload),
+    'messages:editCaption': (payload) => adapter.editCaption(payload),
     'messages:delete': (payload) => adapter.deleteMessages(payload),
     'messages:properties': (payload) => adapter.messageProperties(payload),
     'messages:forward': (payload) => adapter.forwardMessages(payload),

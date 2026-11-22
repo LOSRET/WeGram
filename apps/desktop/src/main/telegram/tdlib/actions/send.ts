@@ -37,6 +37,38 @@ export async function editText(
   return updated
 }
 
+/**
+ * 编辑说明: rewrite a media message's caption.
+ *
+ * A caption belongs to the *content* (photo, video, animation, document, voice),
+ * so this is `editMessageCaption`, not an edit of the message text. TDLib wants
+ * `show_caption_above_media` on every call and the content type is the only place
+ * that flag lives for the ones that have it, so the current row is read first:
+ * editing a caption must not move it from above the picture to below it. The
+ * other content types have no such flag and default to below.
+ */
+export async function editCaption(
+  deps: ActionDeps,
+  input: { chatId: number; messageId: number; caption: string },
+): Promise<Message> {
+  const current = await deps.invoke({
+    _: 'getMessage',
+    chat_id: input.chatId,
+    message_id: input.messageId,
+  })
+  const above = current?.content?.show_caption_above_media === true
+  const caption = input.caption.trim()
+  const response = await deps.invoke({
+    _: 'editMessageCaption',
+    chat_id: input.chatId,
+    message_id: input.messageId,
+    reply_markup: null,
+    caption: caption.length > 0 ? formattedText(input.caption) : null,
+    show_caption_above_media: above,
+  })
+  return mapMessage(deps.mapper, input.chatId, response)
+}
+
 export async function deleteMessages(
   deps: ActionDeps,
   input: { chatId: number; messageIds: number[]; forBoth: boolean },

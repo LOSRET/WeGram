@@ -252,6 +252,11 @@ export interface TelegramAdapter {
   addPollOption(input: InvokeRequest<'messages:addPollOption'>): Promise<void>
   sendText(input: InvokeRequest<'messages:send'>): Promise<{ localId: string; message: Message }>
   editText(input: InvokeRequest<'messages:edit'>): Promise<Message>
+  /**
+   * 编辑说明: rewrites a media message's caption (TDLib `editMessageCaption`) and
+   * answers the message the server stored. An empty caption removes it.
+   */
+  editCaption(input: InvokeRequest<'messages:editCaption'>): Promise<Message>
   deleteMessages(input: InvokeRequest<'messages:delete'>): Promise<void>
   forwardMessages(input: InvokeRequest<'messages:forward'>): Promise<void>
   markRead(input: InvokeRequest<'messages:read'>): Promise<void>

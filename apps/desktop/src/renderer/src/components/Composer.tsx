@@ -12,6 +12,8 @@ import { ComposerCard } from './composer/ComposerCard'
 export interface ComposerEditing {
   messageId: number
   text: string
+  /** A media row's 说明 (saved through `messages:editCaption`); an empty box clears it. */
+  caption?: boolean
 }
 
 interface ComposerProps {
@@ -119,7 +121,9 @@ export function Composer({
 
   const submit = async (): Promise<void> => {
     const value = text.trim()
-    if (!value || busy) return
+    // An empty caption is a real edit — it removes the 说明 — while an empty
+    // message body is not a send and an empty text edit is not an edit.
+    if (busy || (!value && !editing?.caption)) return
     setBusy(true)
     try {
       if (editing) {
@@ -202,7 +206,7 @@ export function Composer({
     <div className="wx-composer">
       {editing ? (
         <div className="wx-composer-bar">
-          <span>正在编辑消息</span>
+          <span>{editing.caption ? '正在编辑说明' : '正在编辑消息'}</span>
           <button className="wx-composer-bar__close" onClick={onCancelEdit} title="取消编辑">
             ×
           </button>
@@ -225,7 +229,13 @@ export function Composer({
         onChange={changeText}
         onBlur={() => pingerRef.current?.stop()}
         textareaRef={textareaRef}
-        placeholder={editing ? '编辑后回车保存，Esc 取消' : '输入消息'}
+        placeholder={
+          editing
+            ? editing.caption
+              ? '编辑说明，清空后回车可删除'
+              : '编辑后回车保存，Esc 取消'
+            : '输入消息'
+        }
         inputHandlers={inputHandlers}
         busy={busy}
         editing={Boolean(editing)}

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { loadLatestWindow } from '../../lib/anchoredWindow'
 import { INFO_PANEL_ANIM_MS } from '../../lib/chatInfo'
+import { editTargetOf } from '../../lib/editTarget'
 import { errorMessage, invoke } from '../../lib/ipc'
 import { useAppStore } from '../../store/useAppStore'
 import { Composer } from '../Composer'
@@ -387,9 +388,12 @@ export function ChatPane() {
             if (isChannel) setChannelInputChatId(activeChatId)
           }}
           onEdit={(message) =>
-            useAppStore
-              .getState()
-              .setEditing({ chatId: activeChatId, messageId: message.id, text: message.text })
+            useAppStore.getState().setEditing({
+              chatId: activeChatId,
+              messageId: message.id,
+              text: message.text,
+              ...(editTargetOf(message) === 'caption' ? { caption: true } : {}),
+            })
           }
           onDelete={(message, forBoth) => setDeleting({ message, forBoth })}
           onForward={setForwarding}
@@ -407,7 +411,9 @@ export function ChatPane() {
           replyTo={replyTo}
           editing={editingForChat}
           onSend={actions.send}
-          onSaveEdit={actions.saveEdit}
+          onSaveEdit={(messageId, text) =>
+            actions.saveEdit(messageId, text, editingForChat?.caption === true)
+          }
           onCancelReply={() => useAppStore.getState().setReplyTo(activeChatId, null)}
           onCancelEdit={() => useAppStore.getState().setEditing(null)}
           {...(isChannel ? { onCollapse: () => setChannelInputChatId(null) } : {})}

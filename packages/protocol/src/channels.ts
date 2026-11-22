@@ -105,6 +105,8 @@ export const invokeChannels = [
   'messages:sendComment',
   'messages:send',
   'messages:edit',
+  /** 编辑说明: a media message's caption (`editMessageCaption`), not its text. */
+  'messages:editCaption',
   'messages:delete',
   /** Per-message capabilities for the context menu (`getMessageProperties`). */
   'messages:properties',
@@ -259,6 +261,15 @@ export const invokeSchemas = {
       chatId: z.number().int(),
       messageId: z.number().int(),
       text: z.string(),
+    }),
+    response: messageSchema,
+  },
+  /** 编辑说明: an empty caption removes it, which is TDLib's null `caption`. */
+  'messages:editCaption': {
+    request: z.object({
+      chatId: z.number().int(),
+      messageId: z.number().int(),
+      caption: z.string().max(4096),
     }),
     response: messageSchema,
   },
@@ -481,7 +492,6 @@ export type InvokeResponse<C extends InvokeChannel> = z.output<
 >
 
 /** The event tables live in ./events.ts (that file hit its own budget line). */
-
 
 /** The only API the preload script exposes on `window.tg`. */
 export interface TgBridge {

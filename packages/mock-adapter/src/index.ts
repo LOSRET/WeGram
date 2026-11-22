@@ -25,6 +25,7 @@ import { createMockChats } from './chats'
 import { createMockComments } from './comments'
 import { listMockContacts } from './contacts'
 import { ME, MOCK_CODE, MOCK_PASSWORD, type Fixture } from './constants'
+import { createMockEdits } from './edits'
 import { applyRead, simulateTransfer } from './effects'
 import { buildMediaMessage, buildStickerMessage, type MockSendDeps } from './media'
 import { beginMockStream, downloadMockFile, mockDownloadedPrefix } from './files'
@@ -99,7 +100,9 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
    * `WEGRAM_MOCK_FAIL_SEND=1` fails the next text send once, so the 未发送 row and
    * 重试 can be exercised without a network: the retry then succeeds normally.
    */
-  private failNextSend = /^(1|true|yes|on)$/i.test(process.env['WEGRAM_MOCK_FAIL_SEND']?.trim() ?? '')
+  private failNextSend = /^(1|true|yes|on)$/i.test(
+    process.env['WEGRAM_MOCK_FAIL_SEND']?.trim() ?? '',
+  )
   /** Pending fake QR confirmation; the scan is simulated on this timer. */
   private qrTimer: NodeJS.Timeout | null = null
 
@@ -353,31 +356,16 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     return listMockCustomEmoji(this.assets, ids)
   }
 
-  async editText(input: { chatId: number; messageId: number; text: string }): Promise<Message> {
-    const target = this.requireMessage(input.chatId, input.messageId)
-    target.text = input.text
-    target.edited = true
-    this.emit({
-      type: 'messages',
-      chatId: input.chatId,
-      ops: [{ op: 'edit', chatId: input.chatId, messageId: input.messageId, text: input.text }],
-    })
-    return { ...target }
-  }
-
-  async deleteMessages(input: {
-    chatId: number
-    messageIds: number[]
-    forBoth: boolean
-  }): Promise<void> {
-    const fixture = this.requireFixture(input.chatId)
-    fixture.messages = fixture.messages.filter((m) => !input.messageIds.includes(m.id))
-    this.emit({
-      type: 'messages',
-      chatId: input.chatId,
-      ops: [{ op: 'delete', chatId: input.chatId, messageIds: input.messageIds }],
-    })
-  }
+  /**
+   * Message edits — 编辑, 编辑说明, delete and 重试. They all rewrite one fixture row
+   * and announce the op that describes it, so their rules live in ./edits.ts and
+   * this class only binds them.
+   */
+  private readonly edits = createMockEdits(this.fixtures, (event) => this.emit(event))
+  readonly editText = this.edits.editText
+  readonly editCaption = this.edits.editCaption
+  readonly deleteMessages = this.edits.deleteMessages
+  readonly resendMessages = this.edits.resendMessages
 
   async messageProperties(input: {
     chatId: number
@@ -404,26 +392,6 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   /** 对方正在输入: a fixture peer never reads it, so the mock only acknowledges. */
   async sendTyping(_chatId: number, _typing: boolean): Promise<void> {
     // Nothing to tell a fake peer.
-  }
-
-  /**
-   * 重试 a failed fixture message. The failed row stays in the transcript (TDLib
-   * keeps those too); resending clears its state and announces the replacement.
-   */
-  async resendMessages(chatId: number, messageIds: number[]): Promise<void> {
-    const fixture = this.requireFixture(chatId)
-    for (const id of messageIds) {
-      const message = fixture.messages.find((item) => item.id === id)
-      if (!message) continue
-      delete message.sendingState
-      delete message.sendError
-      delete message.canRetry
-      this.emit({
-        type: 'messages',
-        chatId,
-        ops: [{ op: 'replace', message: { ...message } }],
-      })
-    }
   }
 
   async markRead(input: { chatId: number; upToMessageId: number }): Promise<void> {

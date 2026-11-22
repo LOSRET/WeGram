@@ -6,7 +6,12 @@ import { useAppStore } from '../../store/useAppStore'
 
 export interface MessageActions {
   send: (text: string, replyToMessageId: number | undefined) => Promise<void>
-  saveEdit: (messageId: number, text: string) => Promise<void>
+  /**
+   * Saves the composer's edit banner. `caption` routes a media row's 说明 to
+   * `messages:editCaption`; the answer replaces the row (TDLib re-maps its
+   * content), so the transcript keeps the server's own copy.
+   */
+  saveEdit: (messageId: number, text: string, caption: boolean) => Promise<void>
   removeMessage: (message: Message, forBoth: boolean) => Promise<void>
   forward: (message: Message, toChatId: number) => Promise<void>
   copy: (message: Message) => void
@@ -52,9 +57,19 @@ export function createMessageActions(activeChatId: number): MessageActions {
       if (wasAnchored) store.requestJumpToLatest(activeChatId)
     },
 
-    saveEdit: async (messageId, text) => {
-      const updated = await invoke('messages:edit', { chatId: activeChatId, messageId, text })
+    saveEdit: async (messageId, text, caption) => {
       const store = useAppStore.getState()
+      if (caption) {
+        const updated = await invoke('messages:editCaption', {
+          chatId: activeChatId,
+          messageId,
+          caption: text,
+        })
+        store.applyMessageOps(activeChatId, [{ op: 'replace', message: updated }])
+        store.setEditing(null)
+        return
+      }
+      const updated = await invoke('messages:edit', { chatId: activeChatId, messageId, text })
       store.applyMessageOps(activeChatId, [
         { op: 'edit', chatId: activeChatId, messageId, text: updated.text },
       ])
