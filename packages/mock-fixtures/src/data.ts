@@ -314,7 +314,15 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
       lastReadOutboxMessageId: 0,
     },
     messages: [
-      text(4, 401, 180, '会议纪要已经放到共享盘', false),
+      // 表情回应 on a received row: the chips and the chosen tint must draw
+      // without a server (WeChat has no reactions; the group does).
+      {
+        ...text(4, 401, 180, '会议纪要已经放到共享盘', false),
+        reactions: [
+          { emoji: '👍', count: 3 },
+          { emoji: '🎉', count: 1, chosen: true },
+        ],
+      },
       // A closed poll with real numbers and one answer this account already gave:
       // the card must show the bars, the percentages and the 已结束 state.
       pollMessage({

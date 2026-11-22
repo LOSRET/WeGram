@@ -170,3 +170,37 @@ describe('PENDING_OPS_LIMIT / EMPTY_MESSAGES', () => {
     expect(EMPTY_MESSAGES).toEqual([])
   })
 })
+describe('reduceOps reactions', () => {
+  const withReactions = (): Message =>
+    message(1, { reactions: [{ emoji: '👍', count: 2, chosen: true }] })
+
+  it('replaces the chips with the list TDLib sent', () => {
+    const op: MessageOp = {
+      op: 'reactions',
+      chatId: 1,
+      messageId: 1,
+      reactions: [{ emoji: '🎉', count: 4 }],
+    }
+    const { list } = reduceOps([withReactions()], [op])
+    // The update carries the complete list, so it is replaced — not merged.
+    expect(list[0]?.reactions).toEqual([{ emoji: '🎉', count: 4 }])
+  })
+
+  it('removes the chips when the last reaction is taken back', () => {
+    const op: MessageOp = { op: 'reactions', chatId: 1, messageId: 1, reactions: [] }
+    const { list } = reduceOps([withReactions()], [op])
+    expect(list[0]?.reactions).toBeUndefined()
+  })
+
+  it('leaves other rows alone', () => {
+    const op: MessageOp = {
+      op: 'reactions',
+      chatId: 1,
+      messageId: 2,
+      reactions: [{ emoji: '👍', count: 1 }],
+    }
+    const { list } = reduceOps([withReactions(), message(2)], [op])
+    expect(list[0]?.reactions).toEqual([{ emoji: '👍', count: 2, chosen: true }])
+    expect(list[1]?.reactions).toEqual([{ emoji: '👍', count: 1 }])
+  })
+})

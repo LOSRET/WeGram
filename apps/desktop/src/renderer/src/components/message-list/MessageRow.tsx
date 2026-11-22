@@ -5,6 +5,7 @@ import { hasCommentBar, isCommentablePost } from '../../lib/comments'
 import { formatMessageTime, messagePreview } from '../../lib/format'
 import { stickerBox } from '../../lib/stickerBox'
 import { Avatar } from '../Avatar'
+import { CustomEmoji } from '../CustomEmoji'
 import {
   CHANNEL_MEDIA_INSET,
   CHANNEL_MEDIA_LIMITS,
@@ -144,6 +145,12 @@ export const MessageRow = memo(
     const buttons = first.buttons?.length ? first.buttons : undefined
     // Telegram puts an album's caption on one of its items (normally the first).
     const caption = messages.find((message) => message.text) ?? null
+    /**
+     * 表情回应: an album shares one row, so the chips of its last item stand for the
+     * group — Telegram draws them on the album's tail the same way. Display only:
+     * WeChat has no reactions, so there is no picker yet (see protocol/reaction.ts).
+     */
+    const reactions = last.reactions?.length ? last.reactions : undefined
     const showSender = !first.outgoing && chat.kind !== 'private'
     const channelBubble = channel ? ' wx-bubble--channel' : ''
     /**
@@ -330,6 +337,24 @@ export const MessageRow = memo(
               {channel ? commentBar : null}
             </div>
           )}
+          {reactions ? (
+            <div className="wx-reactions">
+              {reactions.map((reaction, index) => (
+                <span
+                  key={reaction.emoji ?? reaction.customEmojiId ?? `reaction-${index}`}
+                  className={`wx-reaction${reaction.chosen ? ' wx-reaction--chosen' : ''}`}
+                  title={`${reaction.count} 人回应`}
+                >
+                  {reaction.customEmojiId ? (
+                    <CustomEmoji id={reaction.customEmojiId} glyph="🙂" />
+                  ) : (
+                    <span className="wx-reaction__emoji">{reaction.emoji}</span>
+                  )}
+                  <span className="wx-reaction__count">{reaction.count}</span>
+                </span>
+              ))}
+            </div>
+          ) : null}
           {/* Telegram's inline keyboard is attached to the message, not to its
               bubble: under it, on the transcript's own background, so the buttons
               read as their own control strip instead of part of the body. */}

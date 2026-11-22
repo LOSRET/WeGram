@@ -210,3 +210,43 @@
 [data-theme='dark'] .wx-empty-chat__glyph {
   color: #2a2a2c;
 }
+
+/* 表情回应 (Telegram reactions, display only): one pill per reaction under the
+   bubble, the chosen ones tinted with the brand's weak green. The stacking
+   container already right-aligns a self message's children. */
+.wx-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.wx-reaction {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 11px;
+  background: var(--wx-bubble-other);
+  color: var(--wx-text);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.wx-reaction--chosen {
+  background: var(--wx-brand-weak);
+}
+
+.wx-reaction__emoji {
+  font-size: 14px;
+}
+
+.wx-reaction__count {
+  color: var(--wx-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.wx-reaction--chosen .wx-reaction__count {
+  color: var(--wx-brand-text);
+}

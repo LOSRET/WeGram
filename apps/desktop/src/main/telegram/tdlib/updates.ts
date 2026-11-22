@@ -16,7 +16,7 @@ import { previewContent } from './map/content'
 import { mapConnectionBoot, mapConnectionState } from './map/chat'
 import type { MapperContext } from './map/context'
 import { isTranscriptRemoval } from './map/deletion'
-import { mapMessage } from './map/message'
+import { mapMessage, mapReactions } from './map/message'
 import { mapPeerStatus } from './map/status'
 
 /** What the update stream needs from the adapter. */
@@ -126,6 +126,28 @@ export function createUpdateHandler(deps: UpdateDeps): (update: TdObject) => Pro
               chatId: update.chat_id,
               messageId: update.message_id,
               interaction: patch,
+            },
+          ],
+        })
+        return
+      }
+      /**
+       * 表情回应 changed. The update carries the complete list (`reactions[]`) and
+       * only this row's message id, so the row is patched rather than remapped —
+       * a message with a busy reaction list would otherwise be re-fetched and
+       * re-mapped on every chip somebody else taps.
+       */
+      case 'updateMessageReactions': {
+        const reactions = mapReactions({ interaction_info: { reactions: update } }) ?? []
+        deps.emit({
+          type: 'messages',
+          chatId: update.chat_id,
+          ops: [
+            {
+              op: 'reactions',
+              chatId: update.chat_id,
+              messageId: update.message_id,
+              reactions,
             },
           ],
         })

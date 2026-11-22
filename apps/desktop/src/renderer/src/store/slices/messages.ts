@@ -193,8 +193,7 @@ export const createMessagesSlice: SliceCreator<MessageActions> = (set) => ({
       const buffered = state.olderPagesByChat[chatId]
       const stale =
         buffered !== undefined &&
-        (list[0]?.id !== buffered.afterId ||
-          !bufferStillUsable(buffered, split?.applicable ?? ops))
+        (list[0]?.id !== buffered.afterId || !bufferStillUsable(buffered, split?.applicable ?? ops))
       let olderPagesByChat = state.olderPagesByChat
       if (stale) {
         olderPagesByChat = { ...state.olderPagesByChat }

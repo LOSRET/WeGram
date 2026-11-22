@@ -73,7 +73,12 @@ function Block({ block, chatId, messageId }: BlockProps) {
     case 'media':
       return (
         <figure className="wx-rich__media">
-          <MediaBubble media={block.media} kind={block.kind} chatId={chatId} messageId={messageId} />
+          <MediaBubble
+            media={block.media}
+            kind={block.kind}
+            chatId={chatId}
+            messageId={messageId}
+          />
           {block.caption ? (
             <figcaption className="wx-rich__caption">
               <RichText text={block.caption.text} entities={block.caption.entities} />
@@ -118,7 +123,15 @@ const SECTION_SIZE: Record<number, string> = {
   6: '12px',
 }
 
-function TextBlock({ role, size, text }: { role: RichTextRole; size?: number; text: RichFormatted }) {
+function TextBlock({
+  role,
+  size,
+  text,
+}: {
+  role: RichTextRole
+  size?: number
+  text: RichFormatted
+}) {
   const className = `wx-rich__text wx-rich__text--${role}`
   const body = <RichText text={text.text} entities={text.entities} />
   if (role === 'title') return <h2 className={className}>{body}</h2>

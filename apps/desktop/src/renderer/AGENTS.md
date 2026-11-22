@@ -296,6 +296,11 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
 - **对方正在输入 is throttled in `lib/typingPing.ts`, and its IPC call never raises an
   error.** One ping, one refresh per 3.5 s, cancel on empty / send / blur / chat switch.
   Do not move the throttle into the composer's onChange or add a per-keystroke call.
+- **表情回应 are displayed, never offered.** `MessageRow` draws the chips from
+  `Message.reactions` (`updateMessageReactions` replaces the whole list, so the
+  `reactions` op replaces rather than merges); a custom-emoji reaction is its
+  sticker art by int64-id string. WeChat has no reactions, so there is no picker
+  until the owner signs one off — do not add a tap-to-react gesture before that.
 - **标为未读 is a dot, not a count.** `ChatSummary.markedUnread` draws a bare
   `.wx-badge--dot` when `unread` is 0; opening the chat clears the flag (the adapter
   does it). Do not render it through the count badge.

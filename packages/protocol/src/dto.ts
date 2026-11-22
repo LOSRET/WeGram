@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { pollSchema } from './poll'
+import { messageReactionSchema } from './reaction'
 import { stickerFormatSchema } from './stickers'
 
 /**
@@ -474,6 +475,11 @@ export const messageSchema = z.object({
   canRetry: z.boolean().optional(),
   /** Views / forwards / comments under the message; absent when there are none. */
   interaction: messageInteractionSchema.optional(),
+  /**
+   * 表情回应 (TDLib `interaction_info.reactions`), newest first as TDLib sends
+   * them; absent when the message carries none. Display only — see `reaction.ts`.
+   */
+  reactions: z.array(messageReactionSchema).optional(),
 })
 export type Message = z.infer<typeof messageSchema>
 

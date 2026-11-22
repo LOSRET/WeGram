@@ -85,6 +85,17 @@ export function reduceOps(
         next = updated
         break
       }
+      /**
+       * 表情回应: TDLib sends the complete list, so this replaces the chips; an
+       * empty answer removes them (the last person took their reaction back).
+       */
+      case 'reactions':
+        next = next.map((item) => {
+          if (item.id !== op.messageId) return item
+          const { reactions: _previous, ...rest } = item
+          return op.reactions.length > 0 ? { ...rest, reactions: op.reactions } : rest
+        })
+        break
       case 'interaction':
         // A counter patch, never a replacement: an update carries only the
         // fields that changed (a view count, a fresh reply count), so merging

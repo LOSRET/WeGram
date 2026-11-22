@@ -1,4 +1,4 @@
-import type { Message, MessageInteraction } from '@wegram/protocol'
+import type { Message, MessageInteraction, MessageReaction } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
 import { mapReplyMarkup } from './buttons'
@@ -52,6 +52,7 @@ export async function mapMessage(
   const buttons = mapReplyMarkup(raw.reply_markup)
   const albumId = albumIdOf(raw)
   const interaction = mapInteraction(raw)
+  const reactions = mapReactions(raw)
   let text = mapped.text
   if (mapped.kind === 'service' && text === '') {
     text = SERVICE_CONTENT_TYPES.has(content._)
@@ -87,7 +88,34 @@ export async function mapMessage(
     ...(raw.edit_date ? { edited: true } : {}),
     ...sending,
     ...(interaction ? { interaction } : {}),
+    ...(reactions ? { reactions } : {}),
   }
+}
+
+/**
+ * 表情回应 under a message (TDLib `interaction_info.reactions`).
+ *
+ * The list is TDLib's own order (most reacted first); a reaction is either a
+ * standard emoji or a Premium custom emoji whose id is an int64 — carried as a
+ * string so it can be looked up as sticker art without rounding. A reaction
+ * whose type is neither is dropped instead of drawn as an empty chip.
+ */
+export function mapReactions(raw: TdObject): MessageReaction[] | undefined {
+  const list = raw.interaction_info?.reactions?.reactions
+  if (!Array.isArray(list) || list.length === 0) return undefined
+  const reactions: MessageReaction[] = []
+  for (const entry of list as TdObject[]) {
+    const type = entry.reaction_type
+    const count = Number(entry.total_count ?? 0)
+    if (!Number.isFinite(count) || count <= 0) continue
+    const chosen = entry.is_chosen === true ? { chosen: true } : {}
+    if (type?._ === 'reactionTypeEmoji' && typeof type.emoji === 'string' && type.emoji) {
+      reactions.push({ emoji: type.emoji, count, ...chosen })
+    } else if (type?._ === 'reactionTypeCustomEmoji' && type.custom_emoji_id !== undefined) {
+      reactions.push({ customEmojiId: String(type.custom_emoji_id), count, ...chosen })
+    }
+  }
+  return reactions.length > 0 ? reactions : undefined
 }
 
 /**

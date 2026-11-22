@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { messageInteractionSchema, messageSchema } from './dto'
+import { messageReactionSchema } from './reaction'
 
 /**
  * One patch against a loaded transcript (`evt:messages`).
@@ -59,6 +60,16 @@ export const messageOpSchema = z.discriminatedUnion('op', [
     chatId: z.number().int(),
     oldId: z.number().int(),
     message: messageSchema,
+  }),
+  /**
+   * 表情回应 moved (`updateMessageReactions`). The update carries the complete list
+   * rather than a delta, so it replaces the row's chips; an empty list clears them.
+   */
+  z.object({
+    op: z.literal('reactions'),
+    chatId: z.number().int(),
+    messageId: z.number().int(),
+    reactions: z.array(messageReactionSchema),
   }),
   z.object({
     op: z.literal('interaction'),
