@@ -233,28 +233,54 @@
   white-space: nowrap;
 }
 
-/* 举报 sheet: the reason rows (one per option Telegram offered) and the comment
-   box the last phase may ask for. Same sheet geometry as the confirm dialog. */
+/* 举报: Telegram's report sheet — a left-aligned title, the server's reasons as
+   plain rows with a trailing chevron (not bordered buttons), and one 关闭 link at
+   the bottom. The comment step replaces the list with its box and a 举报 button. */
+.wx-report {
+  width: 380px;
+  /* Taller than .wx-modal's 80vh on purpose: Telegram's sheet shows the whole
+     reason list, and only a very long one scrolls. */
+  max-height: 92vh;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.wx-report__title {
+  margin: 0;
+  padding: 18px 20px 10px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--wx-text);
+}
+
 .wx-report__options {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  /* Telegram's reason list is nine rows: scroll it rather than push the sheet
-     past the window. Popover-style bar; the sheet is not a virtualised pane. */
-  max-height: 320px;
+  padding: 0 8px 8px;
+  /* Telegram's own report list is eleven rows; the sheet should hold that without
+     scrolling. Only a longer server list gets an inner scroll — and when the card
+     itself is clamped by .wx-modal's max-height, min-height: 0 lets this list be
+     the part that shrinks instead of clipping the footer. */
+  max-height: 480px;
+  min-height: 0;
   overflow-y: auto;
   scrollbar-width: thin;
 }
 
 .wx-report__option {
-  height: 32px;
-  border: 1px solid var(--wx-line-strong);
-  border-radius: 4px;
-  background: var(--wx-elevated);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 6px;
+  background: none;
   color: var(--wx-text);
-  font-size: 13px;
+  font-size: 14px;
   text-align: left;
-  padding: 0 10px;
   cursor: pointer;
 }
 
@@ -267,15 +293,84 @@
   cursor: default;
 }
 
+/* A reason Telegram words long ("It's not illegal, but must be taken down"):
+   one line with an ellipsis, the row itself stays one height. */
+.wx-report__option-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.wx-report__chevron {
+  flex: none;
+  color: var(--wx-text-tertiary);
+}
+
+.wx-report__step {
+  padding: 0 20px 4px;
+}
+
+.wx-report__hint {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--wx-text-secondary);
+}
+
 .wx-report__comment {
   width: 100%;
-  min-height: 72px;
-  padding: 6px 8px;
+  min-height: 84px;
+  padding: 8px 10px;
   border: 1px solid var(--wx-field-line);
-  border-radius: 4px;
+  border-radius: 6px;
   background: var(--wx-elevated);
   font: inherit;
   font-size: 13px;
   color: var(--wx-text);
   resize: vertical;
+}
+
+.wx-report__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 14px 12px;
+}
+
+.wx-report__submit {
+  height: 30px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 5px;
+  background: var(--wx-brand);
+  color: var(--wx-text-on-brand);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.wx-report__submit:hover {
+  background: var(--wx-brand-active);
+}
+
+.wx-report__submit:disabled {
+  color: var(--wx-text-disabled);
+  cursor: default;
+}
+
+.wx-report__close {
+  height: 30px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  color: var(--wx-link);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.wx-report__close:hover {
+  background: var(--wx-row-hover);
 }
