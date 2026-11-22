@@ -8,6 +8,7 @@ import type { EventChannel, EventEnvelope } from './events'
 import { sendInvokeChannels, sendInvokeSchemas } from './send'
 import { presenceInvokeChannels, presenceInvokeSchemas } from './presence'
 import { userInvokeChannels, userInvokeSchemas } from './user'
+import { reportInvokeChannels, reportInvokeSchemas } from './report'
 import { chatInvokeChannels, chatInvokeSchemas } from './chats'
 import { qrInvokeChannels, qrInvokeSchemas } from './qr'
 import { pollInvokeChannels, pollInvokeSchemas } from './poll'
@@ -119,6 +120,8 @@ export const invokeChannels = [
   ...presenceInvokeChannels,
   /** 资料卡: the person card and its 备注 / 联系人 writes; see ./user.ts. */
   ...userInvokeChannels,
+  /** 举报: the phased reportChat contract, for a person or one message; ./report.ts. */
+  ...reportInvokeChannels,
   'search:global',
   'search:inChat',
   /**
@@ -317,6 +320,7 @@ export const invokeSchemas = {
   ...sendInvokeSchemas,
   ...presenceInvokeSchemas,
   ...userInvokeSchemas,
+  ...reportInvokeSchemas,
   'search:global': {
     request: z.object({ q: z.string().min(1), limit: z.number().int().positive().max(50) }),
     response: z.array(chatSummarySchema),

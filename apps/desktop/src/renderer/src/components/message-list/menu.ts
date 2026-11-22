@@ -14,6 +14,8 @@ export interface MessageMenuHandlers {
   onTranscribe: (message: Message) => void
   /** 置顶消息 / 取消置顶 for this chat's one pinned message. */
   onTogglePin: (message: Message) => void
+  /** 举报: report this one message to Telegram's moderators (a phased sheet). */
+  onReport: (message: Message) => void
 }
 
 export interface MessageMenuOptions {
@@ -74,6 +76,11 @@ export function buildMessageMenuItems(
       label: pinnedMessageId === message.id ? '取消置顶' : '置顶',
       onSelect: () => handlers.onTogglePin(message),
     })
+  }
+  // 举报: TDLib's `can_report_chat` decides (moderator-reportable content, the
+  // chat kind). The sheet files it against this chat with this message attached.
+  if (properties?.canReportChat) {
+    items.push({ label: '举报', danger: true, onSelect: () => handlers.onReport(message) })
   }
   if (properties?.canBeDeletedForAllUsers && message.outgoing) {
     items.push({ label: '撤回', onSelect: () => handlers.onDelete(message, true) })

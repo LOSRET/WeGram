@@ -11,6 +11,7 @@ import type { UnreadMarker } from '../../store/useAppStore'
 import { ContextMenu } from '../ContextMenu'
 import { JumpToLatestIcon } from '../Icon'
 import { OverlayScrollbar } from '../OverlayScrollbar'
+import { ReportDialog } from '../ReportDialog'
 import { DaySeparator, UnreadDivider } from './Divider'
 import { MessageRow } from './MessageRow'
 import { buildMessageMenuItems } from './menu'
@@ -142,6 +143,8 @@ export function MessageList({
   const hostRef = useRef<HTMLDivElement | null>(null)
   const contentRef = useRef<HTMLDivElement | null>(null)
   const [menu, setMenu] = useState<MenuState | null>(null)
+  /** 举报: the row whose phased report sheet is open (one message at a time). */
+  const [report, setReport] = useState<Message | null>(null)
   /** Guards a properties answer that lands after closing or re-opening the menu. */
   const menuRequest = useRef(0)
 
@@ -378,10 +381,27 @@ export function MessageList({
           y={menu.y}
           items={buildMessageMenuItems(
             menu.message,
-            { onReply, onCopy, onForward, onEdit, onDelete, onResend, onTranscribe, onTogglePin },
+            {
+              onReply,
+              onCopy,
+              onForward,
+              onEdit,
+              onDelete,
+              onResend,
+              onTranscribe,
+              onTogglePin,
+              onReport: (message) => setReport(message),
+            },
             { canReply, properties: menu.properties, pinnedMessageId },
           )}
           onClose={closeMenu}
+        />
+      ) : null}
+
+      {report ? (
+        <ReportDialog
+          target={{ kind: 'message', chatId: chat.id, messageId: report.id }}
+          onClose={() => setReport(null)}
         />
       ) : null}
     </div>

@@ -22,5 +22,7 @@ export const messagePropertiesSchema = z.object({
   canRecognizeSpeech: z.boolean().optional(),
   /** 置顶: TDLib `can_be_pinned` (the chat's pin right, protected content). */
   canBePinned: z.boolean().optional(),
+  /** 举报: TDLib `can_report_chat` — the message may be reported to moderators. */
+  canReportChat: z.boolean().optional(),
 })
 export type MessageProperties = z.infer<typeof messagePropertiesSchema>

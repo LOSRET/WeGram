@@ -24,7 +24,15 @@ export const PROFILE_CHANNELS = [
   'users:setBlocked',
   'users:report',
   'users:commonChats',
+  'messages:report',
 ] as const
+
+/** The preview's reasons: the same list for a person and for one message. */
+const REPORT_OPTIONS = [
+  { id: 'spam', text: '垃圾信息' },
+  { id: 'violence', text: '涉及暴力或危险行为' },
+  { id: 'other', text: '其他' },
+]
 
 export type PreviewProfileChannel = (typeof PROFILE_CHANNELS)[number]
 
@@ -108,17 +116,12 @@ export function handlePreviewProfile(
       // The preview mirrors the mock: reasons first, then the report lands.
       const optionId = typeof payload['optionId'] === 'string' ? payload['optionId'] : ''
       find(contacts, userId)
-      if (!optionId) {
-        return {
-          reported: false,
-          title: '举报这个用户',
-          options: [
-            { id: 'spam', text: '垃圾信息' },
-            { id: 'violence', text: '涉及暴力或危险行为' },
-            { id: 'other', text: '其他' },
-          ],
-        }
-      }
+      if (!optionId) return { reported: false, title: '举报这个用户', options: REPORT_OPTIONS }
+      return { reported: true }
+    }
+    case 'messages:report': {
+      const optionId = typeof payload['optionId'] === 'string' ? payload['optionId'] : ''
+      if (!optionId) return { reported: false, title: '举报这条消息', options: REPORT_OPTIONS }
       return { reported: true }
     }
   }

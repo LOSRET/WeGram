@@ -297,7 +297,9 @@ export function ProfileCard({ userId, onOpenChat, onClose }: ProfileCardProps) {
         )}
       </div>
 
-      {reportOpen ? <ReportDialog userId={userId} onClose={() => setReportOpen(false)} /> : null}
+      {reportOpen ? (
+        <ReportDialog target={{ kind: 'user', userId }} onClose={() => setReportOpen(false)} />
+      ) : null}
     </div>
   )
 }

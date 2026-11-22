@@ -19,9 +19,10 @@ comment carries: text, a sticker or a local file), `search.ts` (the cross-chat
 message search schemas), `events.ts` (the `evt:*` tables + `EventChannel`/`EventEnvelope`,
 moved out of `channels.ts` at its budget), `message-ops.ts` (the `MessageOp` patch table),
 `send.ts` (outgoing typing + resend), `presence.ts` (peer status, the active-chat
-report) and `user.ts` (the 资料卡 DTO + its 备注 / 共同群聊 / 添加联系人 channels), `reaction.ts` (the
-表情回应 chip DTO, display-only for now) and `properties.ts` (the per-message
-capability answer the context menu reads). The channel tables of `chats.ts`, `qr.ts`, `send.ts` and `presence.ts` are
+report) and `user.ts` (the 资料卡 DTO + its 备注 / 共同群聊 / 添加联系人 channels),
+`report.ts` (the phased 举报 contract for a person and for one message),
+`reaction.ts` (the 表情回应 chip DTO, display-only for now) and `properties.ts` (the
+per-message capability answer the context menu reads). The channel tables of `chats.ts`, `qr.ts`, `send.ts` and `presence.ts` are
 spread into the two command tables; `events.ts` owns its own.
 The package is exported straight from source (`src/index.ts`, no build step), so
 `pnpm typecheck` in the consumer is the only build. A new field that pushes `dto.ts`

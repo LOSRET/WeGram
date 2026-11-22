@@ -141,4 +141,19 @@ describe('block and report', () => {
     const second = await users.report({ userId: 37, optionId: first.options?.[0]?.id })
     expect(second.reported).toBe(true)
   })
+
+  it('files a one-message report through the same two phases', async () => {
+    const users = createMockUsers(fixture())
+
+    const first = await users.reportMessage({ chatId: 3, messageId: 301 })
+    expect(first.reported).toBe(false)
+    expect(first.options?.length).toBeGreaterThan(1)
+
+    const second = await users.reportMessage({
+      chatId: 3,
+      messageId: 301,
+      optionId: first.options?.[1]?.id ?? 'spam',
+    })
+    expect(second.reported).toBe(true)
+  })
 })

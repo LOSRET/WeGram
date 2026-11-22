@@ -36,32 +36,6 @@ export const userProfileSchema = z.object({
 })
 export type UserProfile = z.infer<typeof userProfileSchema>
 
-/**
- * One answer of `reportChat`, as the card's 举报 sheet consumes it.
- *
- * TDLib answers in phases and the client must keep the reason id it was handed:
- * `reported: false` with `options` is "choose a reason", `textRequired` is "that
- * reason also wants a comment", and `reported: true` is the end of the road.
- * `messagesRequired` means Telegram wants specific messages instead of a chat —
- * that is a per-message path this client does not offer yet.
- */
-export const chatReportSchema = z.object({
-  reported: z.boolean(),
-  /** The sheet's title for the reason list (TDLib supplies it per chat kind). */
-  title: z.string().optional(),
-  options: z.array(z.object({ id: z.string(), text: z.string() })).optional(),
-  /** The chosen reason wants a comment before the report can be filed. */
-  textRequired: z.boolean().optional(),
-  /**
-   * With `textRequired`: the id the follow-up call must send along with the
-   * comment. TDLib hands back a different one for that step, so it travels.
-   */
-  optionId: z.string().optional(),
-  /** Telegram wants messages picked, which this client does not offer. */
-  messagesRequired: z.boolean().optional(),
-})
-export type ChatReport = z.infer<typeof chatReportSchema>
-
 export const userInvokeChannels = [
   /** 资料卡: one `getUser` + `getUserFullInfo` pair, mapped into the card. */
   'users:profile',
@@ -74,12 +48,6 @@ export const userInvokeChannels = [
   'users:setContact',
   /** 拉黑 / 取消拉黑 (`setMessageSenderBlockList`); answers the refreshed card. */
   'users:setBlocked',
-  /**
-   * 举报 (`reportChat`), which TDLib answers in phases: the first call names the
-   * reasons, a second one carries the chosen reason (and the comment Telegram may
-   * ask for). See `ChatReport`.
-   */
-  'users:report',
   /**
    * 共同群聊: the group chats this account has in common with one person
    * (TDLib `getGroupsInCommon`). The card asks only when the reader opens the
@@ -110,20 +78,6 @@ export const userInvokeSchemas = {
   'users:setBlocked': {
     request: z.object({ userId: z.number().int(), blocked: z.boolean() }),
     response: userProfileSchema,
-  },
-  /**
-   * 举报. `optionId` is a TDLib `bytes` value that came back from a previous step,
-   * kept verbatim as a base64 string: it identifies a reason **and** whether that
-   * reason still wants a comment, so it must not be interpreted by the client.
-   */
-  'users:report': {
-    request: z.object({
-      userId: z.number().int(),
-      optionId: z.string().optional(),
-      /** The comment the chosen reason asks for, when it asks for one. */
-      text: z.string().max(4000).optional(),
-    }),
-    response: chatReportSchema,
   },
   /** 共同群聊: one page of TDLib `getGroupsInCommon`, as chat-list rows. */
   'users:commonChats': {

@@ -17,6 +17,7 @@ describe('messageProperties', () => {
         can_be_replied: true,
         can_recognize_speech: false,
         can_be_pinned: true,
+        can_report_chat: true,
       }
     })
 
@@ -29,6 +30,7 @@ describe('messageProperties', () => {
       canBeReplied: true,
       canRecognizeSpeech: false,
       canBePinned: true,
+      canReportChat: true,
     })
   })
 

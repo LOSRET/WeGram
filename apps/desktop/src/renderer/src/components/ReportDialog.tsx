@@ -1,11 +1,19 @@
 import type { ChatReport } from '@wegram/protocol'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { errorMessage, invoke } from '../lib/ipc'
 import { useAppStore } from '../store/useAppStore'
 
+/**
+ * What the sheet reports. One sheet serves both entry points — the 资料卡's
+ * 举报 and the message menu's — because Telegram's phased answer is the same
+ * either way; only the channel and its payload differ.
+ */
+export type ReportTarget =
+  { kind: 'user'; userId: number } | { kind: 'message'; chatId: number; messageId: number }
+
 interface ReportDialogProps {
-  userId: number
+  target: ReportTarget
   onClose: () => void
 }
 
@@ -17,36 +25,64 @@ interface ReportDialogProps {
  * they arrived and never interpreted here.
  *
  * `messagesRequired` is Telegram asking for specific messages instead of a chat;
- * this client has no per-message report path, so the sheet says so instead of
- * pretending the report was filed.
+ * the message menu's path sends them, so the chat-level answer points there
+ * rather than pretending the report was filed.
  */
-export function ReportDialog({ userId, onClose }: ReportDialogProps) {
+export function ReportDialog({ target, onClose }: ReportDialogProps) {
   const [report, setReport] = useState<ChatReport | null>(null)
   const [comment, setComment] = useState('')
   const [busy, setBusy] = useState(false)
 
+  /**
+   * The ids, not the `target` object: a caller builds a fresh literal every
+   * render, and an object dependency would re-run the first request forever.
+   */
+  const userId = target.kind === 'user' ? target.userId : null
+  const chatId = target.kind === 'message' ? target.chatId : null
+  const messageId = target.kind === 'message' ? target.messageId : null
+
+  /**
+   * `onClose` is usually an inline arrow. Reading it through a ref keeps the one
+   * initial request from re-running every time the parent re-renders — a
+   * re-render would reset the sheet to "正在读取举报原因…" mid-flow.
+   */
+  const closeRef = useRef(onClose)
+  useEffect(() => {
+    closeRef.current = onClose
+  }, [onClose])
+
+  const ask = useCallback(
+    (input: { optionId?: string; text?: string } = {}): Promise<ChatReport> => {
+      if (userId !== null) return invoke('users:report', { userId, ...input })
+      if (chatId !== null && messageId !== null) {
+        return invoke('messages:report', { chatId, messageId, ...input })
+      }
+      return Promise.reject(new Error('举报目标缺失'))
+    },
+    [userId, chatId, messageId],
+  )
+
   useEffect(() => {
     let cancelled = false
-    void invoke('users:report', { userId })
+    void ask()
       .then((answer) => {
         if (!cancelled) setReport(answer)
       })
       .catch((error) => {
         if (cancelled) return
         useAppStore.getState().setError(errorMessage(error))
-        onClose()
+        closeRef.current()
       })
     return () => {
       cancelled = true
     }
-  }, [userId, onClose])
+  }, [ask])
 
   const submit = async (optionId: string, text?: string): Promise<void> => {
     if (busy) return
     setBusy(true)
     try {
-      const answer = await invoke('users:report', {
-        userId,
+      const answer = await ask({
         optionId,
         ...(text === undefined || text.length === 0 ? {} : { text }),
       })
@@ -56,7 +92,7 @@ export function ReportDialog({ userId, onClose }: ReportDialogProps) {
         return
       }
       if (answer.messagesRequired) {
-        useAppStore.getState().setError('Telegram 要求选择具体消息，本客户端暂不支持')
+        useAppStore.getState().setError('Telegram 要求指定具体消息，请在该消息的菜单里举报')
         setBusy(false)
         return
       }

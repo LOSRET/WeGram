@@ -29,5 +29,6 @@ export async function messageProperties(
     canBeReplied: Boolean(raw?.can_be_replied),
     canRecognizeSpeech: Boolean(raw?.can_recognize_speech),
     canBePinned: Boolean(raw?.can_be_pinned),
+    canReportChat: Boolean(raw?.can_report_chat),
   }
 }

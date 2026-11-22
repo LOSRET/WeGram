@@ -28,6 +28,21 @@ notifications with a tray icon. Measured notes and the still-unverified parts ar
 "Private-chat P0 batch — measured notes" below; the audit document keeps the P1/P2
 backlog.
 
+**Private-chat P1 batch (same day):** the audit's P1 list is closed except for three
+items that need the owner. Landed: 相册发送 (one `sendMessageAlbum` call), 置顶消息栏,
+语音转文字, 表情回应 (display only), 拉黑 + 举报 (a person **and** one message, one
+phased `reportChat` sheet), the 资料卡 with 备注 / 共同群聊 (count + a page of chat rows
+fetched on demand) / 添加删除联系人, 编辑说明 for a media caption, and the 聊天信息
+panel's face opening that card. Still open: **voice notes** (the codec spike in
+`docs/PRIVATE-CHAT-HANDOFF.md` §10b says Chromium records WebM/Opus, not the OGG/Opus
+TDLib wants — a muxer dependency needs approval), the **reactions picker** (WeChat has
+no reactions; display-only until the owner signs one off) and the 置顶消息 bar's
+product call. **No test DC was available in this session either**, so the P1 TDLib
+writes (`sendMessageAlbum`, `pinChatMessage`, `setUserNote`, `setMessageSenderBlockList`,
+`reportChat`, `editMessageCaption`, `recognizeSpeech`, `addContact`, `removeContacts`,
+`getGroupsInCommon`) are compile- and mock-verified only — run `pnpm tdlib:test-dc`
+before calling them proven.
+
 ## Where things stand
 
 Greenfield → working skeleton in three milestones:

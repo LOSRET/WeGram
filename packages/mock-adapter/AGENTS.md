@@ -20,8 +20,9 @@ credentials (development only), plus the real PNG/WebP/TGS/WebM media it generat
 - `edits.ts` — 编辑 / 编辑说明 / delete / 重试 as one `createMockEdits` factory: each
   rewrites one fixture row and announces the op that describes it (a text edit is an
   `edit`, a caption is a `replace`).
-- `users.ts` — 资料卡 for the fixture people: the card's data plus its 备注 and
-  添加/删除联系人 writes, kept in an in-session override map (nothing persists).
+- `users.ts` — 资料卡 for the fixture people: the card's data, 共同群聊 (from the
+  seed's `commonChatIds`), its 备注 / 添加删除联系人 writes and the phased 举报 answer
+  (person and one message), kept in an in-session override map (nothing persists).
 - `sends.ts` — the outgoing path (text / one media file / 相册 / sticker) as one
   `createMockSends` factory: build the row, append it, start the fake upload. It is
   constructed in `MockAdapter`'s constructor rather than as a field initializer,

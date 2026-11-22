@@ -12,6 +12,13 @@ import type { Fixture } from './constants'
  * both parts and remembers the two things the card can change. Nothing is
  * persisted: restarting the app resets the fake account, like every other fixture.
  */
+/** The fake's reasons: the same list for a person and for one message. */
+const REPORT_OPTIONS = [
+  { id: 'spam', text: '垃圾信息' },
+  { id: 'violence', text: '涉及暴力或危险行为' },
+  { id: 'other', text: '其他' },
+]
+
 interface Overrides {
   note?: string
   contact?: boolean
@@ -108,15 +115,23 @@ export function createMockUsers(fixtures: Map<number, Fixture>) {
   }): Promise<ChatReport> => {
     findFixture(input.userId)
     if (!input.optionId) {
-      return {
-        reported: false,
-        title: '举报这个用户',
-        options: [
-          { id: 'spam', text: '垃圾信息' },
-          { id: 'violence', text: '涉及暴力或危险行为' },
-          { id: 'other', text: '其他' },
-        ],
-      }
+      return { reported: false, title: '举报这个用户', options: REPORT_OPTIONS }
+    }
+    return { reported: true }
+  }
+
+  /**
+   * 举报 one message: the fake files it at once, with the same phases as the
+   * person path — the transcript's menu must not need a mock-only branch.
+   */
+  const reportMessage = async (input: {
+    chatId: number
+    messageId: number
+    optionId?: string
+    text?: string
+  }): Promise<ChatReport> => {
+    if (!input.optionId) {
+      return { reported: false, title: '举报这条消息', options: REPORT_OPTIONS }
     }
     return { reported: true }
   }
@@ -128,5 +143,5 @@ export function createMockUsers(fixtures: Map<number, Fixture>) {
     return read(input.userId)
   }
 
-  return { profile, commonChats, setNote, setContact, setBlocked, report }
+  return { profile, commonChats, setNote, setContact, setBlocked, report, reportMessage }
 }

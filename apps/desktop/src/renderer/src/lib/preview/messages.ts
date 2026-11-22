@@ -114,6 +114,7 @@ export function previewMessageProperties(
   canBeReplied: boolean
   canRecognizeSpeech: boolean
   canBePinned: boolean
+  canReportChat: boolean
 } {
   const target = (store.messagesByChat[chatId] ?? []).find((item) => item.id === messageId)
   if (!target) throw { code: 'internal', message: 'message not found' }
@@ -129,5 +130,7 @@ export function previewMessageProperties(
     canRecognizeSpeech: target.kind === 'voice',
     // The fixture has no pin rights to model: every row can be pinned.
     canBePinned: true,
+    // 举报 is about a peer's row; TDLib answers false for your own messages.
+    canReportChat: !target.outgoing,
   }
 }

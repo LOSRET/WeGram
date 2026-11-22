@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { userCommonChats } from './actions'
+import { reportMessage, userCommonChats } from './actions'
 import type { ActionDeps } from './actions'
 import type { TdObject } from './client'
 import type { MapperContext } from './map/context'
@@ -82,5 +82,43 @@ describe('userCommonChats (共同群聊)', () => {
       offset_chat_id: 0,
       limit: 50,
     })
+  })
+})
+
+describe('reportMessage (举报 one message)', () => {
+  it('files it against the chat with the message id attached', async () => {
+    const { deps, calls } = makeDeps((method) =>
+      method._ === 'reportChat'
+        ? {
+            _: 'reportChatResultOptionRequired',
+            title: '举报这条消息',
+            options: [{ _: 'reportOption', id: 'c3BhbQ==', text: '垃圾信息' }],
+          }
+        : null,
+    )
+
+    const answer = await reportMessage(deps, { chatId: -1001, messageId: 42 })
+
+    // The ids are what make it a per-message report instead of a chat one.
+    expect(calls[0]).toEqual({
+      _: 'reportChat',
+      chat_id: -1001,
+      option_id: '',
+      message_ids: [42],
+      text: '',
+    })
+    expect(answer).toMatchObject({ reported: false, title: '举报这条消息' })
+    expect(answer.options?.[0]?.text).toBe('垃圾信息')
+  })
+
+  it('sends the chosen reason and the comment back verbatim', async () => {
+    const { deps, calls } = makeDeps((method) =>
+      method._ === 'reportChat' ? { _: 'reportChatResultOk' } : null,
+    )
+
+    await expect(
+      reportMessage(deps, { chatId: 1, messageId: 2, optionId: 'c3BhbQ==', text: '说明' }),
+    ).resolves.toEqual({ reported: true })
+    expect(calls[0]).toMatchObject({ option_id: 'c3BhbQ==', message_ids: [2], text: '说明' })
   })
 })

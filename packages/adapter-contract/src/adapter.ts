@@ -240,6 +240,12 @@ export interface TelegramAdapter {
    * files the report (a reason may then ask for a comment, which the answer says).
    */
   reportUser(userId: number, input: { optionId?: string; text?: string }): Promise<ChatReport>
+  /**
+   * 举报 one message: the same phased `reportChat`, filed against its chat with the
+   * message id attached. The context menu offers it only where TDLib's
+   * `messageProperties.can_report_chat` says the message may be reported.
+   */
+  reportMessage(input: InvokeRequest<'messages:report'>): Promise<ChatReport>
 
   history(
     input: InvokeRequest<'messages:history'>,

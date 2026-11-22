@@ -162,3 +162,25 @@ export async function reportUser(
   })
   return mapReportResult(result as TdObject | undefined)
 }
+
+/**
+ * 举报 one message (`reportChat` with `message_ids`).
+ *
+ * Same phased call as a chat-level report — the first answer names the reasons,
+ * the second files it — but the ids travel with it, so the moderators see the
+ * actual row. `messageProperties.can_report_chat` is the gate the context menu
+ * asks before it offers the item; TDLib refuses the call otherwise.
+ */
+export async function reportMessage(
+  deps: Pick<ActionDeps, 'invoke'>,
+  input: { chatId: number; messageId: number; optionId?: string; text?: string },
+): Promise<ChatReport> {
+  const result = await deps.invoke({
+    _: 'reportChat',
+    chat_id: input.chatId,
+    option_id: input.optionId ?? '',
+    message_ids: [input.messageId],
+    text: input.text ?? '',
+  })
+  return mapReportResult(result as TdObject | undefined)
+}

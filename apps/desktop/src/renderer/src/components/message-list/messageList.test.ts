@@ -174,6 +174,7 @@ describe('buildMessageMenuItems', () => {
     onResend: (_message: Message) => undefined,
     onTranscribe: (_message: Message) => undefined,
     onTogglePin: (_message: Message) => undefined,
+    onReport: (_message: Message) => undefined,
   }
   const props = (overrides: Partial<MessageProperties> = {}): MessageProperties => ({
     canBeEdited: false,
@@ -234,6 +235,13 @@ describe('buildMessageMenuItems', () => {
     // Without the capability (no trial left, wrong kind) the item is not offered.
     expect(labels(voice, props({ canRecognizeSpeech: false }))).not.toContain('转文字')
     expect(labels(message(1), props({ canRecognizeSpeech: true }))).not.toContain('转文字')
+  })
+
+  it('offers 举报 only where TDLib says the message may be reported', () => {
+    expect(labels(message(1), props({ canReportChat: true }))).toContain('举报')
+    // An omitted flag is "not allowed": the menu never guesses a moderator right.
+    expect(labels(message(1))).not.toContain('举报')
+    expect(labels(message(1), props({ canReportChat: false }))).not.toContain('举报')
   })
 
   it('offers 置顶 where TDLib allows it, and 取消置顶 on the pinned row', () => {

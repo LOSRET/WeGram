@@ -33,5 +33,7 @@ export function mockMessageProperties(
     canRecognizeSpeech: message.kind === 'voice',
     // The fake has no pin rights to model: every row can be pinned.
     canBePinned: true,
+    // 举报 is about a peer's row; TDLib answers false for your own messages.
+    canReportChat: !message.outgoing,
   }
 }

@@ -46,6 +46,10 @@ export function createUserApi(getDeps: () => ActionDeps) {
       input: { optionId?: string; text?: string },
     ): Promise<ChatReport> => actions.reportUser(getDeps(), { userId, ...input }),
 
+    /** 举报 one message: the same phases, filed against its chat + message id. */
+    reportMessage: async (input: InvokeRequest<'messages:report'>): Promise<ChatReport> =>
+      actions.reportMessage(getDeps(), input),
+
     /** 添加为联系人 / 删除联系人; answers the refreshed card. */
     setUserContact: async (
       userId: number,
