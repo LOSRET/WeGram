@@ -1,4 +1,4 @@
-import type { ChatReport, UserProfile } from '@wegram/protocol'
+import type { ChatReport, ChatSummary, UserProfile } from '@wegram/protocol'
 import { AppError } from '@wegram/protocol'
 
 import type { Fixture } from './constants'
@@ -28,6 +28,15 @@ export function createMockUsers(fixtures: Map<number, Fixture>) {
     throw new AppError('invalid_payload', `Mock 账号里没有用户 ${userId}`)
   }
 
+  /** 共同群聊: the fixture's group chats this person shares with the account. */
+  const commonChatsOf = (userId: number): ChatSummary[] => {
+    const fixture = findFixture(userId)
+    return (fixture.commonChatIds ?? []).flatMap((id) => {
+      const shared = fixtures.get(id)
+      return shared?.chat.kind === 'group' ? [{ ...shared.chat }] : []
+    })
+  }
+
   const read = (userId: number): UserProfile => {
     const fixture = findFixture(userId)
     const override = overrides.get(userId) ?? {}
@@ -41,8 +50,7 @@ export function createMockUsers(fixtures: Map<number, Fixture>) {
       ...(chat.avatarUrl ? { avatarUrl: chat.avatarUrl } : {}),
       ...(contact?.bio ? { bio: contact.bio } : {}),
       ...(note ? { note } : {}),
-      // The fixture account has no shared-group membership table.
-      commonChats: 0,
+      commonChats: commonChatsOf(userId).length,
       // Everyone in the fake address book is a contact unless this session
       // removed them; the card's button then offers 添加为联系人.
       isContact: override.contact ?? true,
@@ -51,6 +59,27 @@ export function createMockUsers(fixtures: Map<number, Fixture>) {
   }
 
   const profile = async (input: { userId: number }): Promise<UserProfile> => read(input.userId)
+
+  /**
+   * 共同群聊, one page at a time. The fixture ids act as the cursor: TDLib's
+   * `offset_chat_id` means "start from this chat", which is the same as the index
+   * of that id in the list.
+   */
+  const commonChats = async (input: {
+    userId: number
+    offset?: number
+    limit?: number
+  }): Promise<ChatSummary[]> => {
+    const all = commonChatsOf(input.userId)
+    const start =
+      input.offset === undefined
+        ? 0
+        : Math.max(
+            0,
+            all.findIndex((chat) => chat.id === input.offset),
+          )
+    return all.slice(start, start + (input.limit ?? 50))
+  }
 
   /** An empty note clears it, which is how TDLib reads an empty `formattedText`. */
   const setNote = async (input: { userId: number; note: string }): Promise<UserProfile> => {
@@ -99,5 +128,5 @@ export function createMockUsers(fixtures: Map<number, Fixture>) {
     return read(input.userId)
   }
 
-  return { profile, setNote, setContact, setBlocked, report }
+  return { profile, commonChats, setNote, setContact, setBlocked, report }
 }

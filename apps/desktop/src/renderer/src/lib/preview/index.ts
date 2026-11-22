@@ -29,7 +29,7 @@ import {
   type PreviewMessagesStore,
 } from './messages'
 import { handlePreviewPoll } from './polls'
-import { createPreviewProfileState, handlePreviewProfile } from './profile'
+import { createPreviewProfileState, handlePreviewProfile, isProfileChannel } from './profile'
 import { handlePreviewUi } from './ui'
 import { handlePreviewQr, type PreviewQrStore } from './qr'
 import {
@@ -61,6 +61,7 @@ import {
   messagesByChat,
   msg,
   now,
+  previewCommonChatsFor,
   previewCustomEmoji,
   previewStickerSet,
   PREVIEW_STICKERS,
@@ -139,6 +140,12 @@ const previewQrStore: PreviewQrStore = {
 
 async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown> {
   const store = payload as Record<string, any>
+
+  // 资料卡 and its 举报 writes: one guard, so a channel costs an array entry in
+  // `profile.ts` instead of another block in this file.
+  if (isProfileChannel(channel)) {
+    return handlePreviewProfile(channel, store, previewProfile, contacts, previewCommonChatsFor)
+  }
 
   switch (channel) {
     case 'app:info':
@@ -276,12 +283,6 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       return previewOpenUsername(chats, contacts, String(store.username ?? ''))
     case 'contacts:list':
       return contacts
-    case 'users:profile':
-    case 'users:setNote':
-    case 'users:setContact':
-    case 'users:setBlocked':
-    case 'users:report':
-      return handlePreviewProfile(channel, store, previewProfile, contacts)
     case 'users:status': {
       const chat = chats.find((item) => item.userId === Number(store.userId))
       return chat ? { kind: 'offline', wasOnline: now() - 5_400 } : null

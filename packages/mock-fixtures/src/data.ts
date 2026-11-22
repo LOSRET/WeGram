@@ -299,6 +299,8 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
       bio: '每天散步一小时。',
       note: '妈妈',
     },
+    // 共同群聊: the two groups in this account she is also in.
+    commonChatIds: [2, 4],
   })
 
   fixtures.set(4, {

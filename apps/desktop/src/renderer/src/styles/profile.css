@@ -188,6 +188,51 @@
   color: var(--wx-text-secondary);
 }
 
+/* 共同群聊: the rows the count opens. On demand and scrollable, so a person who
+   shares twenty groups does not push the card past the window. */
+.wx-profile__common {
+  display: flex;
+  flex-direction: column;
+  max-height: 168px;
+  overflow-y: auto;
+  /* A popover-style thin bar; the card is not a virtualised pane. */
+  scrollbar-width: thin;
+}
+
+.wx-profile__chat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 2px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wx-profile__chat:hover {
+  background: var(--wx-row-hover);
+}
+
+.wx-profile__chat-avatar {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 4px;
+}
+
+.wx-profile__chat-title {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--wx-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* 举报 sheet: the reason rows (one per option Telegram offered) and the comment
    box the last phase may ask for. Same sheet geometry as the confirm dialog. */
 .wx-report__options {

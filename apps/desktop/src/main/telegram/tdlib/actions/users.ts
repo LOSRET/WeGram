@@ -1,9 +1,11 @@
-import type { ChatReport, PeerStatus, UserProfile } from '@wegram/protocol'
+import type { ChatReport, ChatSummary, PeerStatus, UserProfile } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
+import { asArray } from '../json'
 import { mapReportResult } from '../map/report'
 import { mapPeerStatus } from '../map/status'
 import { mapUserProfile } from '../map/user'
+import { fetchChatSummary } from './chats'
 import type { ActionDeps } from './deps'
 import { formattedText } from './message-input'
 
@@ -37,6 +39,31 @@ export async function userProfile(deps: ActionDeps, userId: number): Promise<Use
   ])
   deps.mapper.prefetchUserAvatars([userId])
   return mapUserProfile(deps.mapper, user, full)
+}
+
+/**
+ * 共同群聊: TDLib's `getGroupsInCommon`, one page at a time.
+ *
+ * The answer is a `Chats` object of ids (the same shape `getChats` answers), so
+ * every id is mapped into the summary the chat list draws; the photos come second
+ * exactly like `listChats`, because a card that had to wait for downloads would
+ * open blank.
+ */
+export async function userCommonChats(
+  deps: ActionDeps,
+  input: { userId: number; offset?: number; limit?: number },
+): Promise<ChatSummary[]> {
+  const response = await deps.invoke({
+    _: 'getGroupsInCommon',
+    user_id: input.userId,
+    // 0 is TDLib's "first page", not a chat id that exists.
+    offset_chat_id: input.offset ?? 0,
+    limit: input.limit ?? 50,
+  })
+  const ids = asArray<number>(response.chat_ids)
+  const summaries = await Promise.all(ids.map((id) => fetchChatSummary(deps, id)))
+  deps.prefetchChatAvatars(ids)
+  return summaries
 }
 
 /**

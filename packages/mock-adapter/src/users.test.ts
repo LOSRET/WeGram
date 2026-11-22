@@ -77,6 +77,49 @@ describe('createMockUsers', () => {
   })
 })
 
+/** The person from `fixture()` plus one group they share with the account. */
+function fixtureWithGroup(): Map<number, Fixture> {
+  const map = fixture()
+  map.set(2, {
+    chat: {
+      id: 2,
+      title: 'WeGram 产品群',
+      kind: 'group',
+      unread: 0,
+      pinned: false,
+      muted: false,
+    },
+    messages: [],
+  })
+  const person = map.get(3)
+  if (!person) throw new Error('fixture 3 is missing')
+  // One id resolves to the group above; the other is gone, like a chat TDLib
+  // dropped from the list after the id was cached.
+  person.commonChatIds = [2, 404]
+  return map
+}
+
+describe('共同群聊', () => {
+  it('counts the groups the fixture says are shared', async () => {
+    const users = createMockUsers(fixtureWithGroup())
+    await expect(users.profile({ userId: 37 })).resolves.toMatchObject({ commonChats: 1 })
+  })
+
+  it('answers the shared groups as chat rows and skips an id that is gone', async () => {
+    const users = createMockUsers(fixtureWithGroup())
+    await expect(users.commonChats({ userId: 37 })).resolves.toMatchObject([
+      { id: 2, title: 'WeGram 产品群', kind: 'group' },
+    ])
+  })
+
+  it("pages from TDLib's offset chat id", async () => {
+    const users = createMockUsers(fixtureWithGroup())
+    await expect(users.commonChats({ userId: 37, offset: 2 })).resolves.toEqual([
+      { id: 2, title: 'WeGram 产品群', kind: 'group', unread: 0, pinned: false, muted: false },
+    ])
+  })
+})
+
 describe('block and report', () => {
   it('marks the person blocked and answers the refreshed card', async () => {
     const users = createMockUsers(fixture())

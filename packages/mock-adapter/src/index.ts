@@ -283,6 +283,9 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   async userProfile(userId: number) {
     return this.users.profile({ userId })
   }
+  async commonChats(input: { userId: number; offset?: number; limit?: number }) {
+    return this.users.commonChats(input)
+  }
   async setUserNote(userId: number, note: string) {
     return this.users.setNote({ userId, note })
   }

@@ -224,6 +224,11 @@ export interface TelegramAdapter {
   userStatus(userId: number): Promise<PeerStatus | null>
   /** 资料卡: identity, 简介, 备注, 共同群聊 and the 拉黑 flag for one person. */
   userProfile(userId: number): Promise<UserProfile>
+  /**
+   * 共同群聊: one page of the group chats this account shares with one person
+   * (TDLib `getGroupsInCommon`, asked when the card's row is opened).
+   */
+  commonChats(input: InvokeRequest<'users:commonChats'>): Promise<ChatSummary[]>
   /** 备注: writes Telegram's cloud-synced note and answers the refreshed card. */
   setUserNote(userId: number, note: string): Promise<UserProfile>
   /** 添加为联系人 / 删除联系人; answers the refreshed card. */

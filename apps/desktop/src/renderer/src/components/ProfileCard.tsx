@@ -1,8 +1,9 @@
-import type { UserProfile } from '@wegram/protocol'
+import type { ChatSummary, UserProfile } from '@wegram/protocol'
 import { useCallback, useEffect, useState } from 'react'
 
 import { formatPhone } from '../lib/format'
 import { errorMessage, invoke } from '../lib/ipc'
+import { activateChat } from '../lib/openChat'
 import { useAppStore } from '../store/useAppStore'
 import { Avatar } from './Avatar'
 import { ReportDialog } from './ReportDialog'
@@ -26,9 +27,9 @@ interface ProfileCardProps {
  * together. 备注 is Telegram's cloud-synced note (not a local remark), and every
  * write answers the refreshed card, so the sheet never guesses.
  *
- * The 拉黑 / 举报 entries are deliberately absent until their batch lands: a
- * button that cannot do anything is worse than no button (WeChat's own card
- * hides them for people you cannot act on).
+ * 共同群聊 is fetched separately, when the reader opens the row: TDLib answers a
+ * page of chat summaries per call, and a card that is merely glanced at should
+ * not pay for a list nobody asked to see.
  */
 export function ProfileCard({ userId, onOpenChat, onClose }: ProfileCardProps) {
   const userAvatars = useAppStore((state) => state.userAvatars)
@@ -38,6 +39,9 @@ export function ProfileCard({ userId, onOpenChat, onClose }: ProfileCardProps) {
   const [noteDraft, setNoteDraft] = useState('')
   /** 举报 is its own phased sheet (see ReportDialog). */
   const [reportOpen, setReportOpen] = useState(false)
+  /** 共同群聊: opened rows are fetched once and kept for this card's lifetime. */
+  const [commonOpen, setCommonOpen] = useState(false)
+  const [commonChats, setCommonChats] = useState<ChatSummary[] | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -102,6 +106,20 @@ export function ProfileCard({ userId, onOpenChat, onClose }: ProfileCardProps) {
   const startNoteEdit = (): void => {
     setNoteDraft(profile?.note ?? '')
     setEditingNote(true)
+  }
+
+  /** 共同群聊: one page (the card shows the count it already has as the header). */
+  const toggleCommonChats = async (): Promise<void> => {
+    if (commonChats !== null) {
+      setCommonOpen((open) => !open)
+      return
+    }
+    setCommonOpen(true)
+    try {
+      setCommonChats(await invoke('users:commonChats', { userId, limit: 50 }))
+    } catch (error) {
+      fail(error)
+    }
   }
 
   const avatarUrl = profile?.avatarUrl ?? userAvatars[userId]
@@ -186,7 +204,13 @@ export function ProfileCard({ userId, onOpenChat, onClose }: ProfileCardProps) {
               {profile.commonChats > 0 ? (
                 <div className="wx-profile__row">
                   <span className="wx-profile__label">共同群聊</span>
-                  <span className="wx-profile__value">{profile.commonChats} 个</span>
+                  <button
+                    type="button"
+                    className="wx-profile__link"
+                    onClick={() => void toggleCommonChats()}
+                  >
+                    {profile.commonChats} 个
+                  </button>
                 </div>
               ) : null}
 
@@ -197,6 +221,36 @@ export function ProfileCard({ userId, onOpenChat, onClose }: ProfileCardProps) {
                 </div>
               ) : null}
             </section>
+
+            {commonOpen ? (
+              <section className="wx-profile__common" aria-label="共同群聊">
+                {commonChats === null ? (
+                  <p className="wx-profile__loading">正在读取共同群聊…</p>
+                ) : commonChats.length === 0 ? (
+                  <p className="wx-profile__loading">没有共同群聊</p>
+                ) : (
+                  commonChats.map((chat) => (
+                    <button
+                      key={chat.id}
+                      type="button"
+                      className="wx-profile__chat"
+                      onClick={() => {
+                        activateChat(chat)
+                        onClose()
+                      }}
+                    >
+                      <Avatar
+                        className="wx-avatar wx-profile__chat-avatar"
+                        url={chat.avatarUrl}
+                        name={chat.title}
+                        colorId={chat.id}
+                      />
+                      <span className="wx-profile__chat-title">{chat.title}</span>
+                    </button>
+                  ))
+                )}
+              </section>
+            ) : null}
 
             <div className="wx-profile__rule" />
 

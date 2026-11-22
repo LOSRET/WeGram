@@ -11,8 +11,8 @@ Scope: the demo account both fakes serve — the Electron mock adapter
   threads on the posts that own one, and the contact fields the address book reads.
 - `seed.ts` — the dataset's shape (`FixtureSeed`, `FixtureOptions`, `SeedMedia`).
   Split out of `data.ts` when the channel fixtures pushed it to its 550-line budget;
-  `FixtureSeed` carries `canPost` and `joined` for channels, and `contact.bio` /
-  `contact.note` for the 资料卡 (both fakes read them).
+  `FixtureSeed` carries `canPost` and `joined` for channels, `contact.bio` /
+  `contact.note` for the 资料卡, and `commonChatIds` for 共同群聊 (both fakes read them).
 - `contacts.ts` — the 通讯录 people as private chats (`addContactFixtures`), moved out of
   `data.ts` when the 表情回应 + 语音转文字 fixtures pushed it over budget.
 - `stress.ts` — the 5000-message stress chat 99 for the virtualised list. Split out

@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { chatSummarySchema } from './chat'
+
 /**
  * 资料卡 (the person card) and the writes it offers.
  *
@@ -78,6 +80,12 @@ export const userInvokeChannels = [
    * ask for). See `ChatReport`.
    */
   'users:report',
+  /**
+   * 共同群聊: the group chats this account has in common with one person
+   * (TDLib `getGroupsInCommon`). The card asks only when the reader opens the
+   * row, so a card that is merely glanced at costs no extra work.
+   */
+  'users:commonChats',
 ] as const
 
 export const userInvokeSchemas = {
@@ -116,5 +124,15 @@ export const userInvokeSchemas = {
       text: z.string().max(4000).optional(),
     }),
     response: chatReportSchema,
+  },
+  /** 共同群聊: one page of TDLib `getGroupsInCommon`, as chat-list rows. */
+  'users:commonChats': {
+    request: z.object({
+      userId: z.number().int(),
+      /** TDLib's `offset_chat_id`: continue from this chat id; omit for the first page. */
+      offset: z.number().int().optional(),
+      limit: z.number().int().positive().max(100).optional(),
+    }),
+    response: z.array(chatSummarySchema),
   },
 }

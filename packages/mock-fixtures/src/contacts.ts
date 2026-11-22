@@ -21,6 +21,8 @@ interface ContactSeedRow {
   username?: string
   phone?: string
   dcId?: number
+  /** 共同群聊: the fixture group chats this person shares with the account. */
+  commonChatIds?: number[]
 }
 
 const CONTACT_SEEDS: readonly ContactSeedRow[] = [
@@ -33,6 +35,7 @@ const CONTACT_SEEDS: readonly ContactSeedRow[] = [
     body: '明天图书馆见',
     username: 'ada_lovelace',
     dcId: 5,
+    commonChatIds: [2],
   },
   {
     id: 8,
@@ -53,6 +56,7 @@ const CONTACT_SEEDS: readonly ContactSeedRow[] = [
     body: '周末一起吃个饭？',
     username: 'chenchen',
     dcId: 1,
+    commonChatIds: [2, 4],
   },
   {
     id: 10,
@@ -110,6 +114,7 @@ export function addContactFixtures(
         ...(contact.phone ? { phone: contact.phone } : {}),
         ...(contact.dcId ? { dcId: contact.dcId } : {}),
       },
+      ...(contact.commonChatIds ? { commonChatIds: contact.commonChatIds } : {}),
     })
   }
 }

@@ -41,6 +41,12 @@ export interface FixtureSeed {
     note?: string
   }
   /**
+   * 共同群聊 (private chats only): the group chats this person shares with the
+   * account — the fixture's stand-in for TDLib's `getGroupsInCommon`. The card
+   * counts them and lists them when the reader opens the row.
+   */
+  commonChatIds?: number[]
+  /**
    * Comment threads by message id (design doc §9.8). TDLib keeps them in the
    * message thread — a channel's linked discussion group — not in the transcript.
    */

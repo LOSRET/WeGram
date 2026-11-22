@@ -58,8 +58,8 @@ components/ExpressionPicker.tsx  the picker's state + composition
 components/viewer/        the 图片和视频 window: MediaViewer shell + useViewerItem /
                          useViewerZoom + ViewerToolbar / ViewerGrid + viewerMenu / viewerActions
 components/ProfileCard.tsx  资料卡: the person sheet a private chat's title and the
-                        通讯录 card's 更多资料 open (简介 / 备注 / 共同群聊 / 添加或删除
-                        联系人 / 加入黑名单 / 举报, all through `users:*`)
+                        通讯录 card's 更多资料 open (简介 / 备注 / 共同群聊 fetched on
+                        demand / 添加或删除联系人 / 加入黑名单 / 举报, all through `users:*`)
 components/ReportDialog.tsx  举报: the phased reportChat state machine (reasons →
                         maybe a comment → filed)
 components/chat-pane/PinnedBar.tsx  置顶消息: one line above the scroller (text +

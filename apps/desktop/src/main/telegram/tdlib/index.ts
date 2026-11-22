@@ -410,13 +410,11 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     return actions.markRead(this.actionDeps, input)
   }
 
-  /**
-   * 在线 / 最后上线 and 资料卡. The methods live in `user-api.ts` so this class
-   * stays inside its line budget; the deps are read lazily.
-   */
+  /** 在线/最后上线, 资料卡 and 共同群聊; `user-api.ts`, deps read lazily. */
   private readonly userApi = createUserApi(() => this.actionDeps)
   readonly userStatus = this.userApi.userStatus
   readonly userProfile = this.userApi.userProfile
+  readonly commonChats = this.userApi.commonChats
   readonly setUserNote = this.userApi.setUserNote
   readonly setUserContact = this.userApi.setUserContact
   readonly setUserBlocked = this.userApi.setUserBlocked

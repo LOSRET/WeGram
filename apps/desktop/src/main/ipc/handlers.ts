@@ -180,6 +180,7 @@ export function createHandlers({
     'users:setContact': (payload) =>
       adapter.setUserContact(payload.userId, payload.contact, payload.sharePhone),
     'users:setBlocked': (payload) => adapter.setUserBlocked(payload.userId, payload.blocked),
+    'users:commonChats': (payload) => adapter.commonChats(payload),
     'users:report': (payload) =>
       adapter.reportUser(payload.userId, {
         ...(payload.optionId === undefined ? {} : { optionId: payload.optionId }),

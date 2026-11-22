@@ -1,4 +1,10 @@
-import type { ChatReport, PeerStatus, UserProfile } from '@wegram/protocol'
+import type {
+  ChatReport,
+  ChatSummary,
+  InvokeRequest,
+  PeerStatus,
+  UserProfile,
+} from '@wegram/protocol'
 
 import * as actions from './actions'
 import type { ActionDeps } from './actions'
@@ -21,6 +27,10 @@ export function createUserApi(getDeps: () => ActionDeps) {
     /** 资料卡: identity, 简介, 备注, 共同群聊 and the 拉黑 flag. */
     userProfile: async (userId: number): Promise<UserProfile> =>
       actions.userProfile(getDeps(), userId),
+
+    /** 共同群聊: one page of the groups this account shares with the person. */
+    commonChats: async (input: InvokeRequest<'users:commonChats'>): Promise<ChatSummary[]> =>
+      actions.userCommonChats(getDeps(), input),
 
     /** 备注: Telegram's cloud-synced note; answers the refreshed card. */
     setUserNote: async (userId: number, note: string): Promise<UserProfile> =>
