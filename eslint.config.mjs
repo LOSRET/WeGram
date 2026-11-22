@@ -57,9 +57,19 @@ export default tseslint.config(
   },
 
   // ---- agent-maintainability: keep files loadable in one context window ----
-  // The tree was split into <400-line modules on 2026-11-19; this is the
-  // backstop, so a new feature cannot recreate a 1000-line file. Generated
-  // artwork is exempt, and so is the one service-copy table: its keys are a
+  // The tree was split into <400-line modules on 2026-11-19; this is the hard
+  // backstop that stops a feature from quietly recreating a giant file. The cap
+  // is 1100 (raised from 550 on 2026-11-22 by request); it is not the working
+  // budget — the split rules in CLAUDE.md ("agent-maintainable code") still ask
+  // for ~350 lines and a split as soon as a file grows a second concern.
+  //
+  // The count is logic density, not reading volume: blank lines and comment-only
+  // lines are not counted (ESLint's skipComments drops a line only when it holds
+  // no code at all, so a trailing `// note` still counts). packages/protocol/src/
+  // dto.ts is 533 raw lines but 297 counted. Imports *are* counted — the rule has
+  // no skipImports option and they are 4% of the tree, not worth a custom rule.
+  //
+  // Generated artwork is exempt, and so is the one service-copy table: its keys are a
   // single TDLib MessageContent union that grows with every Telegram service
   // type, so splitting it by family would scatter one switch across files
   // (see docs/技术方案.md §8.3).
@@ -77,7 +87,7 @@ export default tseslint.config(
       'apps/desktop/src/main/telegram/tdlib/map/service.ts',
     ],
     rules: {
-      'max-lines': ['error', { max: 550, skipBlankLines: false, skipComments: false }],
+      'max-lines': ['error', { max: 1100, skipBlankLines: true, skipComments: true }],
     },
   },
 

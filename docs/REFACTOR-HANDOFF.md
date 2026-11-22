@@ -108,6 +108,23 @@ domain; the export surface must stay identical because preload bundles it). The 
 files that remain above the 550 cap are gone; `mock/index.ts` (540) is the adapter
 surface and `WechatIcons.tsx` (513) is generated artwork.
 
+**2026-11-22: the cap moved to 1100, and it now counts logic, not lines (explicit
+request).** `max-lines` in `eslint.config.mjs` is 1100 (was 550) with
+`skipBlankLines` + `skipComments` on; no file was moved. Measured over the 437
+ts/tsx files: 48,768 raw lines = 34,724 code + 8,184 comment-only + 3,902 blank +
+1,958 import. Imports still count (the rule has no `skipImports`); blank lines and
+comment-only lines do not — ESLint drops a comment line only when it carries no code at
+all, so a trailing note still counts. The number is therefore a logic-density backstop,
+not a reading-volume one: `protocol/dto.ts` is 533 raw / 297 counted, the largest
+counted file is 522 (`WechatIcons.tsx`, exempt) and no non-exempt file exceeds 393.
+It stays a backstop against a giant file reappearing, not a new target: the ~350-line
+budget and "one file = one reason to change" still decide a split, the
+`/* eslint-disable max-lines -- <reason> */` exemption still covers the one-concern
+files above it, and the split question reopens at ~700 counted lines on readability
+alone. The "550" in the header comments of modules
+split before this date records the budget that applied *then* — it is history, not a
+live rule.
+
 ## Commits from this session (oldest first)
 
 | Commit | Content |

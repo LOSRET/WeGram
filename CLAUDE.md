@@ -86,11 +86,15 @@ These rules keep it that way:
 - **One file = one reason to change.** A component owns its render tree; data fetching,
   scroll/geometry, IPC and pure rules live beside it in their own module. When a file
   starts acquiring a second concern, split it instead of adding another branch.
-- **Size budget: ~350 lines is normal, 550 is the cap.** ESLint enforces
-  `max-lines: 550` on `apps/desktop/src/**` and `packages/protocol/src/**` (generated
-  `WechatIcons.tsx` is exempt). Hitting the cap is a design signal, not a formatting
-  problem.
-- **Core logic may break the 550 cap — deliberately, once, and in writing.** A file whose
+- **Size budget: ~350 lines is normal, 1100 is the hard cap.** ESLint enforces
+  `max-lines: 1100` on `apps/desktop/src/**` and `packages/protocol/src/**` (generated
+  `WechatIcons.tsx` is exempt; the cap was 550 until 2026-11-22). It counts neither
+  blank nor comment-only lines (`skipBlankLines` + `skipComments`), so the number
+  measures logic density rather than reading volume — imports still count, and so does a
+  trailing comment on a line that has code. The cap is the backstop that stops a giant
+  file from reappearing — the ~350-line budget and "one file = one reason to change" are
+  still the working rules. Hitting the cap is a design signal, not a formatting problem.
+- **Core logic may break the 1100 cap — deliberately, once, and in writing.** A file whose
   single concern is one indivisible algorithm (a state machine, a reducer over one data
   shape, a protocol table whose keys cannot be partitioned without inventing a boundary)
   may run past the cap, because splitting it would trade one long file for cross-module
@@ -98,8 +102,8 @@ These rules keep it that way:
   in the same change: a top-of-file `/* eslint-disable max-lines -- <the one concern this
   file owns> */` carrying the reason, a row in the layer's `AGENTS.md` naming the file
   and its concern, and a design-doc sentence recording what is deliberately not split.
-  It is re-justified as soon as the file grows a second concern, and at ~800 lines the
-  split question reopens on readability alone. Feature growth never takes it: a
+  It is re-justified as soon as the file grows a second concern, and at ~700 counted
+  lines the split question reopens on readability alone. Feature growth never takes it: a
   component that is merely getting bigger still splits.
 - **Split by responsibility, never by line count.** Keep the public import path stable
   with a directory index (`viewer/`, `picker/`, `login/`, `history/`,
