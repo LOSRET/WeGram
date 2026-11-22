@@ -31,5 +31,7 @@ export function mockMessageProperties(
     canBeReplied: true,
     // 转文字 is a voice-note feature, like TDLib's can_recognize_speech.
     canRecognizeSpeech: message.kind === 'voice',
+    // The fake has no pin rights to model: every row can be pinned.
+    canBePinned: true,
   }
 }

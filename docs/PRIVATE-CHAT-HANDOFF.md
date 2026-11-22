@@ -61,6 +61,7 @@ below is one commit, `pnpm verify`-green, on `feat/private-chat-p1`.
 | Gap | Landed in | Notes |
 |---|---|---|
 | 相册发送 | `media:sendAlbum`; `sendMessageAlbum` in `actions/send.ts`; `lib/albumSend.ts`; `components/Composer.tsx` attach path | 2–10 photos in ONE call, answered as `Messages`; every row carries the album id, so the transcript folds them into the bubble it already draws for a received album. The rule for when that applies (photos only, 2–10) is pure and tested; a document selection still sends one message per file, because `rows.ts` only folds photo/video. Mock adapter gets an album builder that shares one `media_album_id`; the browser preview cannot send files at all (no local path), so it refuses like `media:send`. |
+| 置顶消息栏 | `chats:setPinnedMessage`; `actions/pins.ts` (`pinChatMessage` / `unpinChatMessage`); `messageProperties.canBePinned`; `chat-pane/PinnedBar.tsx` + `usePinnedMessage`; menu 置顶 / 取消置顶 | The bar sits above the transcript (never inside the scroller, so it cannot re-measure the virtualised list): text + 定位 + ×, and the menu item flips to 取消置顶 for the pinned row. An unpin resolves the current pin because `unpinChatMessage` wants its id. Pinning is notification-free. **Product decision still open**: WeChat has no such bar, so this is implemented but unreviewed by the owner. Deferred: multi-pin / `only_for_self`. |
 | 语音转文字 | `Message.transcription` (+ `messageProperties.canRecognizeSpeech`); `map/content.ts mapTranscription`; channel `messages:transcribe` → `recognizeSpeech`; 转文字 in the message menu, transcript under the bubble | TDLib streams the answer through the voice note's own `speech_recognition_result`, so the finished text arrives as a content update and reaches the row through the ordinary `replace` op — no polling, no extra event. `pending` keeps the partial text on screen. The menu item is gated on `can_recognize_speech` (no trial left / wrong kind = no item), a real refusal surfaces as the error bar. Mock streams pending → done; the fixtures carry one voice note in the 前端周会 group. |
 | 表情回应（只显示） | `Message.reactions` + `protocol/reaction.ts`; `map/message.ts mapReactions`; op `reactions` (`updateMessageReactions`); chips in `MessageRow` | TDLib's list is replaced wholesale on every update (an empty one removes the chips), the chosen ones are tinted, and a Premium custom-emoji reaction draws as its sticker art with `CustomEmoji`. **No picker** — WeChat has no reactions, so adding them is still open decision #2 (§9); the fixtures carry 👍/🎉 on one group message so the chips are visible without a server. |
 | 拉黑 / 举报 | `users:setBlocked` (`setMessageSenderBlockList`, null = unblock), `users:report` (phased `reportChat`), `map/report.ts`, `components/ReportDialog.tsx` | 加入黑名单 / 取消拉黑 flips on the refreshed card. 举报 is a small state machine over TDLib's phased answer: no `option_id` → the reason list, one of those ids → filed, and `reportChatResultTextRequired` → a comment box that sends the **new** id TDLib handed back. Ids are TDLib `bytes`, passed through verbatim as base64. `messagesRequired` (Telegram wants specific messages) says so instead of claiming success — a per-message report path is still open. |
@@ -137,7 +138,7 @@ person-days, for this repo's conventions.
 | P1 | Album send | ~~Multi-select sends N separate messages~~ — **done**, see the P1 status table | `sendMessageAlbum` (returns `Messages`) | 1–2 |
 | P1 | Caption edit | ~~Edit menu is gated to `kind === 'text'`~~ — **done**, see the P1 status table | `editMessageCaption` | 0.5–1 |
 | P1 | Speech-to-text | ~~None~~ — **done** for received voice notes, see the P1 status table | `recognizeSpeech` + `can_recognize_speech` + `speech_recognition_result` | 1 |
-| P1 | Pinned message bar | `getChatPinnedMessage` is used for 群公告 only; private chats skip it | `pinChatMessage` / `unpinChatMessage` + `can_be_pinned` | 1 |
+| P1 | Pinned message bar | ~~`getChatPinnedMessage` is used for 群公告 only; private chats skip it~~ — **bar done**, see the P1 status table (waiting on the product call) | `pinChatMessage` / `unpinChatMessage` + `can_be_pinned` | 1 |
 | P2 | Location / venue / live location / contact card / poll / dice **sending** | Received as plain text / contact card; no send path | `inputMessageLocation`, `inputMessageLiveLocation`, `inputMessageVenue`, `inputMessageContact`, `inputMessagePoll`, `inputMessageDice` | 2–4 |
 | P2 | Message effects | None | `getMessageEffect` + `messageSendOptions.effect_id` (private chats only) | 1–2 |
 | P2 | Scheduled / silent send | None | `messageSchedulingStateSendAtDate`, `messageSchedulingStateSendWhenOnline`, `disable_notification` | 1–2 |
@@ -460,6 +461,38 @@ probe writes against the real session in `spikes/tdlib/data`.
   search view is still open too.
 - MVP says media "含相册"; only received-album grouping is done. Sending is
   missing.
+
+## 10b. Voice-note codec spike (2026-11-22)
+
+The one question that gates voice notes (§3, §6.1) is whether Chromium can hand
+TDLib an **Opus in OGG** file directly. Measured with `MediaRecorder.isTypeSupported`
+on this machine:
+
+| MIME type | supported |
+|---|---|
+| `audio/webm;codecs=opus` | yes |
+| `audio/webm` | yes |
+| `audio/ogg;codecs=opus` | **no** |
+| `audio/ogg` | **no** |
+| `audio/mp4` / `audio/mp4;codecs=mp4a.40.2` | yes |
+| `video/mp4;codecs=avc1.42E01E` | yes |
+| `video/webm;codecs=vp8` / `vp9` | yes |
+
+Where it was measured: Edge 157 (Chromium 157, Windows). The probe is upstream
+`MediaRecorder` behaviour rather than an Edge feature, but the target is **Electron
+45.4.1**, so re-run the same probe inside the app when voice notes are actually
+scheduled (one `isTypeSupported` call on any page).
+
+Consequences for the §6.1 plan:
+
+- Recording works, but produces **WebM/Opus** (or MP4/AAC), never OGG/Opus.
+  TDLib accepts MP3/M4A as a regular *audio* message, not as a voice note.
+- Turning WebM/Opus into OGG/Opus needs an **Opus OGG muxer** — a new dependency,
+  which is exactly the open decision §9.5. Without it, voice notes are either
+  (a) an audio message (honest, but not WeChat's bubble), or (b) a new dependency.
+- Round video notes (`inputVideoNote`, MPEG4/H.264 ≤ 640) look feasible: MP4/H.264
+  recording is supported. That still needs a real capture spike, plus the mic/camera
+  permission handler in main.
 
 ## 11. What this audit did not verify
 

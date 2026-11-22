@@ -12,6 +12,8 @@ export interface MessageMenuHandlers {
   onResend: (message: Message) => void
   /** 转文字: asks for the voice note's transcript (the text arrives as an op). */
   onTranscribe: (message: Message) => void
+  /** 置顶消息 / 取消置顶 for this chat's one pinned message. */
+  onTogglePin: (message: Message) => void
 }
 
 export interface MessageMenuOptions {
@@ -22,6 +24,8 @@ export interface MessageMenuOptions {
    * items that need no capability are offered then.
    */
   properties: MessageProperties | null
+  /** The chat's pinned message id, so this row's item reads 置顶 or 取消置顶. */
+  pinnedMessageId?: number | null
 }
 
 /**
@@ -36,7 +40,7 @@ export interface MessageMenuOptions {
 export function buildMessageMenuItems(
   message: Message,
   handlers: MessageMenuHandlers,
-  { canReply, properties }: MessageMenuOptions,
+  { canReply, properties, pinnedMessageId }: MessageMenuOptions,
 ): MenuItem[] {
   const items: MenuItem[] = []
   // 未发送 rows get 重试 first: it is the only action that can still deliver them.
@@ -62,6 +66,14 @@ export function buildMessageMenuItems(
   const editTarget = properties?.canBeEdited ? editTargetOf(message) : null
   if (editTarget) {
     items.push({ label: editLabel(editTarget), onSelect: () => handlers.onEdit(message) })
+  }
+  // 置顶消息: Telegram keeps one per chat, and `can_be_pinned` is TDLib's answer
+  // (pin rights, protected content). WeChat has no such bar — product decision.
+  if (properties?.canBePinned) {
+    items.push({
+      label: pinnedMessageId === message.id ? '取消置顶' : '置顶',
+      onSelect: () => handlers.onTogglePin(message),
+    })
   }
   if (properties?.canBeDeletedForAllUsers && message.outgoing) {
     items.push({ label: '撤回', onSelect: () => handlers.onDelete(message, true) })

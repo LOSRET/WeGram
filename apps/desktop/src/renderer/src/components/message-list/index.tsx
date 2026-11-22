@@ -76,6 +76,9 @@ export interface MessageListProps {
   onResend: (message: Message) => void
   /** 转文字: ask for a voice note's transcript. */
   onTranscribe: (message: Message) => void
+  /** 置顶消息: the id this chat has pinned, so the menu can say 取消置顶. */
+  pinnedMessageId: number | null
+  onTogglePin: (message: Message) => void
 }
 
 interface MenuState {
@@ -132,6 +135,8 @@ export function MessageList({
   onOpenComments,
   onResend,
   onTranscribe,
+  pinnedMessageId,
+  onTogglePin,
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const hostRef = useRef<HTMLDivElement | null>(null)
@@ -373,8 +378,8 @@ export function MessageList({
           y={menu.y}
           items={buildMessageMenuItems(
             menu.message,
-            { onReply, onCopy, onForward, onEdit, onDelete, onResend, onTranscribe },
-            { canReply, properties: menu.properties },
+            { onReply, onCopy, onForward, onEdit, onDelete, onResend, onTranscribe, onTogglePin },
+            { canReply, properties: menu.properties, pinnedMessageId },
           )}
           onClose={closeMenu}
         />

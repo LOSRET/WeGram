@@ -173,6 +173,7 @@ describe('buildMessageMenuItems', () => {
     onDelete: (_message: Message, _forBoth: boolean) => undefined,
     onResend: (_message: Message) => undefined,
     onTranscribe: (_message: Message) => undefined,
+    onTogglePin: (_message: Message) => undefined,
   }
   const props = (overrides: Partial<MessageProperties> = {}): MessageProperties => ({
     canBeEdited: false,
@@ -233,6 +234,17 @@ describe('buildMessageMenuItems', () => {
     // Without the capability (no trial left, wrong kind) the item is not offered.
     expect(labels(voice, props({ canRecognizeSpeech: false }))).not.toContain('转文字')
     expect(labels(message(1), props({ canRecognizeSpeech: true }))).not.toContain('转文字')
+  })
+
+  it('offers 置顶 where TDLib allows it, and 取消置顶 on the pinned row', () => {
+    const target = message(7)
+    expect(labels(target, props({ canBePinned: true }))).toContain('置顶')
+    expect(labels(target, props({ canBePinned: true }), { pinnedMessageId: 7 })).toContain(
+      '取消置顶',
+    )
+    // Another row keeps 置顶: the chat pins one message at a time.
+    expect(labels(target, props({ canBePinned: true }), { pinnedMessageId: 8 })).toContain('置顶')
+    expect(labels(target, props({ canBePinned: false }))).not.toContain('置顶')
   })
 
   it('hides forward when TDLib says the content is protected', () => {

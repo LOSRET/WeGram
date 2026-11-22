@@ -170,6 +170,8 @@ export function createHandlers({
     'chats:setTitle': (payload) => adapter.setChatTitle(payload.chatId, payload.title),
     'chats:leave': (payload) => adapter.leaveChat(payload.chatId),
     'chats:pinned': (payload) => adapter.pinnedMessage(payload.chatId),
+    'chats:setPinnedMessage': (payload) =>
+      adapter.setPinnedMessage(payload.chatId, payload.messageId),
     'chats:inviteLink': (payload) => adapter.inviteLink(payload.chatId, payload.temporary),
     'contacts:list': () => adapter.listContacts(),
     'users:status': (payload) => adapter.userStatus(payload.userId),

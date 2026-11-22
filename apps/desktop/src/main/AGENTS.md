@@ -34,8 +34,10 @@ telegram/tdlib/     lifecycle.ts (create / crash / restart the client, reports B
                     service-copy table and is max-lines exempt, see docs/技术方案.md §8.3;
                     rich, poll, media.ts holds the one media field table)
 telegram/tdlib/actions/  TDLib requests as functions over ActionDeps, grouped into
-                    chats / history / files / send / comments / poll / users (index.ts
-                    re-exports); message-input.ts holds the one send envelope
+                    chats / pins / history / files / send / comments / poll / users
+                    (index.ts re-exports); message-input.ts holds the one send
+                    envelope. pins.ts owns 群公告 + 置顶消息 (one pinned message per
+                    chat, and an unpin has to resolve the current id)
 telegram/tdlib/chat-api.ts  createChatApi: the chat seam methods (list/open/mute/pin/
                     members/title/join) as one object the adapter class binds; split
                     out of index.ts when the 频道底栏 methods hit its line budget

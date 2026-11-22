@@ -20,7 +20,8 @@ message search schemas), `events.ts` (the `evt:*` tables + `EventChannel`/`Event
 moved out of `channels.ts` at its budget), `message-ops.ts` (the `MessageOp` patch table),
 `send.ts` (outgoing typing + resend), `presence.ts` (peer status, the active-chat
 report) and `user.ts` (the 资料卡 DTO + its 备注 / 添加联系人 channels), `reaction.ts` (the
-表情回应 chip DTO, display-only for now). The channel tables of `chats.ts`, `qr.ts`, `send.ts` and `presence.ts` are
+表情回应 chip DTO, display-only for now) and `properties.ts` (the per-message
+capability answer the context menu reads). The channel tables of `chats.ts`, `qr.ts`, `send.ts` and `presence.ts` are
 spread into the two command tables; `events.ts` owns its own.
 The package is exported straight from source (`src/index.ts`, no build step), so
 `pnpm typecheck` in the consumer is the only build. A new field that pushes `dto.ts`

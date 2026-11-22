@@ -113,6 +113,7 @@ export function previewMessageProperties(
   canBeCopied: boolean
   canBeReplied: boolean
   canRecognizeSpeech: boolean
+  canBePinned: boolean
 } {
   const target = (store.messagesByChat[chatId] ?? []).find((item) => item.id === messageId)
   if (!target) throw { code: 'internal', message: 'message not found' }
@@ -126,5 +127,7 @@ export function previewMessageProperties(
     canBeCopied: target.text.length > 0,
     canBeReplied: true,
     canRecognizeSpeech: target.kind === 'voice',
+    // The fixture has no pin rights to model: every row can be pinned.
+    canBePinned: true,
   }
 }

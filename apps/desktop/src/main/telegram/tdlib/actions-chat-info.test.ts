@@ -6,6 +6,7 @@ import {
   leaveChat,
   listMembers,
   pinnedMessage,
+  setPinnedMessage,
   setChatPinned,
   setChatTitle,
 } from './actions'
@@ -244,6 +245,61 @@ describe('pinnedMessage', () => {
     })
 
     await expect(pinnedMessage(deps, 5)).resolves.toBeNull()
+  })
+})
+
+describe('setPinnedMessage', () => {
+  it("pins quietly and answers the chat's pin afterwards", async () => {
+    const { deps, calls } = makeDeps((method) => {
+      if (method._ === 'pinChatMessage') return { _: 'ok' }
+      if (method._ === 'getChatPinnedMessage') {
+        return {
+          id: 900,
+          content: { _: 'messageText', text: { _: 'formattedText', text: '开会' } },
+        }
+      }
+      throw new Error(`unexpected ${String(method._)}`)
+    })
+
+    await expect(setPinnedMessage(deps, 5, 900)).resolves.toEqual({
+      messageId: 900,
+      text: '开会',
+    })
+    // Pinning must not ring the other members' phones: it is a quiet action.
+    expect(calls[0]).toMatchObject({
+      _: 'pinChatMessage',
+      chat_id: 5,
+      message_id: 900,
+      disable_notification: true,
+      only_for_self: false,
+    })
+  })
+
+  it("unpins the chat's current pin when no id is named", async () => {
+    const { deps, calls } = makeDeps((method) => {
+      if (method._ === 'getChatPinnedMessage') {
+        return {
+          id: 900,
+          content: { _: 'messageText', text: { _: 'formattedText', text: '开会' } },
+        }
+      }
+      if (method._ === 'unpinChatMessage') return { _: 'ok' }
+      throw new Error(`unexpected ${String(method._)}`)
+    })
+
+    await expect(setPinnedMessage(deps, 5, null)).resolves.toBeNull()
+    // `unpinChatMessage` wants the id, so the current pin is resolved first.
+    expect(calls.map((call) => call._)).toEqual(['getChatPinnedMessage', 'unpinChatMessage'])
+    expect(calls[1]).toMatchObject({ chat_id: 5, message_id: 900 })
+  })
+
+  it('does nothing when the chat has no pin to remove', async () => {
+    const { deps, calls } = makeDeps(() => {
+      throw new Error('404: Message not found')
+    })
+
+    await expect(setPinnedMessage(deps, 5, null)).resolves.toBeNull()
+    expect(calls.map((call) => call._)).toEqual(['getChatPinnedMessage'])
   })
 })
 

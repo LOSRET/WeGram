@@ -300,6 +300,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   readonly setChatTitle = this.chatApi.setChatTitle
   readonly leaveChat = this.chatApi.leaveChat
   readonly pinnedMessage = this.chatApi.pinnedMessage
+  readonly setPinnedMessage = this.chatApi.setPinnedMessage
   readonly inviteLink = this.chatApi.inviteLink
 
   /** The account's Telegram address book (通讯录); see `actions.listContacts`. */

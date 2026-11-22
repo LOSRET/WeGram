@@ -62,6 +62,8 @@ components/ProfileCard.tsx  资料卡: the person sheet a private chat's title a
                         联系人 / 加入黑名单 / 举报, all through `users:*`)
 components/ReportDialog.tsx  举报: the phased reportChat state machine (reasons →
                         maybe a comment → filed)
+components/chat-pane/PinnedBar.tsx  置顶消息: one line above the scroller (text +
+                        定位 + ×); `usePinnedMessage` owns the fetch and the calls
 components/Avatar.tsx    the ONE avatar box (photo or initials); the box class it is given
                         is the positioned element, which is the rule that once cost a session
 components/CustomEmoji.tsx  a Premium custom emoji in text: its sticker art at 20 px,
@@ -296,6 +298,10 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
 - **对方正在输入 is throttled in `lib/typingPing.ts`, and its IPC call never raises an
   error.** One ping, one refresh per 3.5 s, cancel on empty / send / blur / chat switch.
   Do not move the throttle into the composer's onChange or add a per-keystroke call.
+- **置顶消息 sits OUTSIDE the scroller.** The bar is a sibling above the virtualised
+  list, never a row inside it: anything inside re-measures rows and moves the reader.
+  Both the bar's × and the menu's 取消置顶 send `messageId: null`, so the adapter
+  resolves the current pin (`unpinChatMessage` wants an id).
 - **语音转文字 is a content update, not a request answer.** `messages:transcribe` only
   asks (`recognizeSpeech` answers `Ok` at once); the pending and final text arrive as
   the voice note's content changing, so the row repaints through a `replace` op and

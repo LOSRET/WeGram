@@ -1,12 +1,7 @@
 import { z } from 'zod'
 
-import {
-  authStateSchema,
-  messagePropertiesSchema,
-  messageSchema,
-  scrollAnchorSchema,
-  selfSchema,
-} from './dto'
+import { authStateSchema, messageSchema, scrollAnchorSchema, selfSchema } from './dto'
+import { messagePropertiesSchema } from './properties'
 import { bootStateSchema } from './boot'
 import { chatSummarySchema } from './chat'
 import type { EventChannel, EventEnvelope } from './events'

@@ -16,6 +16,7 @@ describe('messageProperties', () => {
         can_be_copied: true,
         can_be_replied: true,
         can_recognize_speech: false,
+        can_be_pinned: true,
       }
     })
 
@@ -27,6 +28,7 @@ describe('messageProperties', () => {
       canBeCopied: true,
       canBeReplied: true,
       canRecognizeSpeech: false,
+      canBePinned: true,
     })
   })
 

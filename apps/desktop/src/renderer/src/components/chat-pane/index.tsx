@@ -14,6 +14,8 @@ import { ProfileCard } from '../ProfileCard'
 import { ChannelBar } from './ChannelBar'
 import { ChatHeader } from './ChatHeader'
 import { ChatInfoPanel } from './ChatInfoPanel'
+import { usePinnedMessage } from './usePinnedMessage'
+import { PinnedBar } from './PinnedBar'
 import { COMMENT_PANEL_ANIM_MS } from '../../lib/comments'
 import { CommentPanel } from './CommentPanel'
 import {
@@ -74,11 +76,7 @@ export function ChatPane() {
   const [postRights, setPostRights] = useState<Record<number, boolean>>({})
   /** The channel whose composer was opened from the bar's keyboard switch. */
   const [channelInputChatId, setChannelInputChatId] = useState<number | null>(null)
-  /**
-   * 频道底栏: whether this account belongs to the channel. A channel opened from
-   * 搜索 or an `@username` can be read without being subscribed, so the bar asks
-   * once per chat and keeps the answer for the session, like `postRights`.
-   */
+  /** 频道底栏: membership, asked once per channel like `postRights`. */
   const [joinStates, setJoinStates] = useState<Record<number, ChatJoinState>>({})
   /** A 加入 / 申请加入 call is in flight, so the item cannot be pressed twice. */
   const [joinBusy, setJoinBusy] = useState(false)
@@ -90,6 +88,8 @@ export function ChatPane() {
   const [pinBusy, setPinBusy] = useState(false)
   /** 资料卡: the person this private chat is with, or null while it is closed. */
   const [profileUserId, setProfileUserId] = useState<number | null>(null)
+  /** 置顶消息: what this chat has pinned, and the pin / unpin calls. */
+  const { pinned, setPinnedMessage } = usePinnedMessage(activeChatId)
 
   /**
    * The full-pane discussion view (design doc §9.8). It stays mounted while it
@@ -358,6 +358,16 @@ export function ChatPane() {
           : {})}
       />
 
+      {pinned ? (
+        <PinnedBar
+          pinned={pinned}
+          onLocate={() => useAppStore.getState().requestLocate(chat.id, pinned.messageId)}
+          onUnpin={() => {
+            void setPinnedMessage(null)
+          }}
+        />
+      ) : null}
+
       {loadingHistory && messages.length === 0 ? (
         <LoadingPlaceholder restoring={restoring} />
       ) : !anchorKnown ? (
@@ -410,6 +420,10 @@ export function ChatPane() {
           }}
           onTranscribe={(message) => {
             void actions.transcribe(message)
+          }}
+          pinnedMessageId={pinned?.messageId ?? null}
+          onTogglePin={(message) => {
+            void setPinnedMessage(pinned?.messageId === message.id ? null : message.id)
           }}
         />
       )}

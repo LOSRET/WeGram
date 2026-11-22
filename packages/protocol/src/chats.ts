@@ -72,6 +72,11 @@ export const chatInvokeChannels = [
   'chats:leave',
   /** 群公告: the newest pinned message, or `null` when nothing is pinned. */
   'chats:pinned',
+  /**
+   * 置顶消息 / 取消置顶. `messageId: null` unpins whatever is pinned, so the bar's
+   * × does not have to remember the id. Answers the chat's pin afterwards.
+   */
+  'chats:setPinnedMessage',
   /** 群二维码: a public t.me link or a link this account may create. */
   'chats:inviteLink',
 ] as const
@@ -140,6 +145,10 @@ export const chatInvokeSchemas = {
   'chats:leave': { request: z.object({ chatId: z.number().int() }), response: noPayload },
   'chats:pinned': {
     request: z.object({ chatId: z.number().int() }),
+    response: chatPinnedMessageSchema.nullable(),
+  },
+  'chats:setPinnedMessage': {
+    request: z.object({ chatId: z.number().int(), messageId: z.number().int().nullable() }),
     response: chatPinnedMessageSchema.nullable(),
   },
   'chats:inviteLink': {

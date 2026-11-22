@@ -1,5 +1,6 @@
 import type {
   AppSettings,
+  ChatPinnedMessage,
   AuthState,
   BootState,
   EventChannel,
@@ -40,7 +41,7 @@ import {
   previewInviteLink,
   previewJoinState,
   previewOpenUsername,
-  previewPinnedMessage,
+  handlePreviewPins,
   searchPreviewAllMessages,
   searchPreviewChats,
   searchPreviewMessages,
@@ -119,6 +120,8 @@ const previewMessagesStore: PreviewMessagesStore = { chats, messagesByChat, emit
 let nextId = 9000
 /** 资料卡's in-session 备注 / 联系人 overrides (the preview has no store to write). */
 const previewProfile = createPreviewProfileState()
+/** chatId → the one message this session pinned (the fixture ships none). */
+const previewPins = new Map<number, ChatPinnedMessage>()
 /** The chat the UI last opened; the dev injector below delivers arrivals into it. */
 let openChatId: number | null = null
 let proxy: ProxyConfig | null = null
@@ -241,7 +244,8 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'chats:leave':
       return leavePreviewChat(previewChats, Number(store.chatId))
     case 'chats:pinned':
-      return previewPinnedMessage()
+    case 'chats:setPinnedMessage':
+      return handlePreviewPins(channel, previewChats, previewPins, store)
     case 'chats:inviteLink':
       return previewInviteLink(Number(store.chatId), Boolean(store.temporary))
     /** 群二维码: the preview boots the same renderer on `#qr` (see ./qr.ts). */

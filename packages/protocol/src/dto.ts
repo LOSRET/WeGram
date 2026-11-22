@@ -495,23 +495,7 @@ export const messageSchema = z.object({
 })
 export type Message = z.infer<typeof messageSchema>
 
-/**
- * The per-message capabilities TDLib answers through `getMessageProperties`
- * (offline). The context menu asks when it opens instead of deriving 编辑/转发/删除
- * from `outgoing` and `kind`: TDLib owns the 48-hour edit window, protected
- * content, per-chat rights and the "delete for me vs for everyone" split.
- */
-export const messagePropertiesSchema = z.object({
-  canBeEdited: z.boolean(),
-  /** 转文字: TDLib `can_recognize_speech` (voice notes only, and not always). */
-  canRecognizeSpeech: z.boolean().optional(),
-  canBeForwarded: z.boolean(),
-  canBeDeletedOnlyForSelf: z.boolean(),
-  canBeDeletedForAllUsers: z.boolean(),
-  canBeCopied: z.boolean(),
-  canBeReplied: z.boolean(),
-})
-export type MessageProperties = z.infer<typeof messagePropertiesSchema>
+/* MessageProperties moved to `properties.ts` when this file reached its budget. */
 
 /**
  * A profile photo that finished downloading *after* the rows carrying it were

@@ -4,14 +4,12 @@ import type {
   ChatJoinResult,
   ChatJoinState,
   ChatMember,
-  ChatPinnedMessage,
   ChatSummary,
 } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
 import { asArray } from '../json'
 import { mapChat } from '../map/chat'
-import { previewContent } from '../map/content'
 import type { ActionDeps, PostPermissionDeps } from './deps'
 
 export async function fetchChatSummary(deps: ActionDeps, chatId: number): Promise<ChatSummary> {
@@ -428,24 +426,7 @@ export async function leaveChat(deps: ActionDeps, chatId: number): Promise<void>
   deps.emit({ type: 'chats', ops: [{ op: 'remove', chatId }] })
 }
 
-/**
- * 群公告: Telegram keeps one newest pinned message per chat, and a group uses it
- * as the announcement. TDLib answers a 404 error when nothing is pinned — that is
- * "no announcement", not a failure.
- */
-export async function pinnedMessage(
-  deps: ActionDeps,
-  chatId: number,
-): Promise<ChatPinnedMessage | null> {
-  let message: TdObject | undefined
-  try {
-    message = await deps.invoke({ _: 'getChatPinnedMessage', chat_id: chatId })
-  } catch {
-    return null
-  }
-  if (!message?.id) return null
-  return { messageId: Number(message.id), text: previewContent(message.content) }
-}
+/* 群公告 and 置顶 live in ./pins.ts. */
 
 /**
  * 群二维码: a link a phone can open (design doc §9.9).

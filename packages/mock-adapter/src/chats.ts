@@ -251,7 +251,8 @@ export interface MockChatApi {
   members(chatId: number, limit: number, query?: string): Promise<ChatMember[]>
   setTitle(chatId: number, title: string): Promise<ChatSummary>
   leave(chatId: number): Promise<void>
-  pinnedMessage(): Promise<ChatPinnedMessage | null>
+  pinnedMessage(chatId: number): Promise<ChatPinnedMessage | null>
+  setPinnedMessage(chatId: number, messageId: number | null): Promise<ChatPinnedMessage | null>
   inviteLink(chatId: number, temporary?: boolean): Promise<ChatInviteLink | null>
   userStatus(userId: number): Promise<PeerStatus | null>
 }
@@ -261,6 +262,8 @@ export function createMockChats(
   emit: (event: AdapterEvent) => void,
 ): MockChatApi {
   const store: MockChatStore = { fixtures, emit }
+  /** chatId → the one message this chat has pinned (the fixture pins nothing). */
+  const pins = new Map<number, ChatPinnedMessage>()
   return {
     listChats: async (input) => listMockChats(store, input),
     getChat: async (chatId) => getMockChat(store, chatId),
@@ -279,7 +282,22 @@ export function createMockChats(
     members: async (chatId, limit, query) => mockChatMembers(store, chatId, limit, query),
     setTitle: async (chatId, title) => setMockTitle(store, chatId, title),
     leave: async (chatId) => leaveMockChat(store, chatId),
-    pinnedMessage: async () => mockPinnedMessage(),
+    pinnedMessage: async (chatId) => pins.get(chatId) ?? mockPinnedMessage(),
+    setPinnedMessage: async (chatId, messageId) => {
+      const fixture = requireFixture(store, chatId)
+      if (messageId === null) {
+        pins.delete(chatId)
+        return null
+      }
+      const message = fixture.messages.find((item) => item.id === messageId)
+      if (!message) throw new AppError('internal', `Unknown mock message ${messageId}`)
+      const pinned: ChatPinnedMessage = {
+        messageId,
+        text: message.text || `[${message.kind}]`,
+      }
+      pins.set(chatId, pinned)
+      return pinned
+    },
     inviteLink: async (chatId, temporary) => mockInviteLink(chatId, temporary),
     userStatus: async (userId) => mockUserStatus(store, userId),
   }

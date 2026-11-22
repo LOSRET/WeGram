@@ -202,6 +202,11 @@ export interface TelegramAdapter {
   /** 群公告: the newest pinned message, or `null` when the group has none. */
   pinnedMessage(chatId: number): Promise<ChatPinnedMessage | null>
   /**
+   * 置顶消息 / 取消置顶: pins one message, or (`null`) removes the chat's pinned
+   * one. Answers the chat's pin afterwards.
+   */
+  setPinnedMessage(chatId: number, messageId: number | null): Promise<ChatPinnedMessage | null>
+  /**
    * 群二维码: a link a phone can open. `temporary` asks for the client's
    * short-lived code (a fresh 7-day link, where the account may create one);
    * otherwise a public username — or an existing permanent link — is reused.

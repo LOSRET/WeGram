@@ -165,9 +165,32 @@ export function leavePreviewChat(store: PreviewChatStore, chatId: number): void 
   store.emit('evt:chats', { ops: [{ op: 'remove', chatId }] })
 }
 
-/** The fixture pins nothing, so 群公告 reads 群主未设置. */
-export function previewPinnedMessage(): ChatPinnedMessage | null {
-  return null
+/** The fixture pins nothing until this session pins one (see previewPinMessage). */
+export function previewPinnedMessage(
+  pins: Map<number, ChatPinnedMessage>,
+  chatId: number,
+): ChatPinnedMessage | null {
+  return pins.get(chatId) ?? null
+}
+
+/** 置顶消息 / 取消置顶: `null` removes the chat's pin, like the real channel. */
+export function previewPinMessage(
+  store: PreviewChatStore,
+  pins: Map<number, ChatPinnedMessage>,
+  chatId: number,
+  messageId: number | null,
+): ChatPinnedMessage | null {
+  if (messageId === null) {
+    pins.delete(chatId)
+    return null
+  }
+  const message = (store.messagesByChat[chatId] ?? []).find((item) => item.id === messageId)
+  const pinned: ChatPinnedMessage = {
+    messageId,
+    text: message?.text || `[${message?.kind ?? '消息'}]`,
+  }
+  pins.set(chatId, pinned)
+  return pinned
 }
 
 /** 群二维码: a link that scans; the preview's is not a real group. */
@@ -243,5 +266,26 @@ export function searchPreviewMessages(
   if (needle === '') return []
   return (store.messagesByChat[chatId] ?? []).filter((message) =>
     message.text.toLowerCase().includes(needle),
+  )
+}
+
+/**
+ * The pins of this preview session: `chats:pinned` and `chats:setPinnedMessage`
+ * share one map, so the bar and the menu see the same answer the mock adapter's.
+ */
+export function handlePreviewPins(
+  channel: 'chats:pinned' | 'chats:setPinnedMessage',
+  store: PreviewChatStore,
+  pins: Map<number, ChatPinnedMessage>,
+  payload: Record<string, unknown>,
+): ChatPinnedMessage | null {
+  const chatId = Number(payload['chatId'])
+  if (channel === 'chats:pinned') return previewPinnedMessage(pins, chatId)
+  const messageId = payload['messageId']
+  return previewPinMessage(
+    store,
+    pins,
+    chatId,
+    messageId === null || messageId === undefined ? null : Number(messageId),
   )
 }

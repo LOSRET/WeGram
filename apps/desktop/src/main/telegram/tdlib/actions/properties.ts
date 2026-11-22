@@ -28,5 +28,6 @@ export async function messageProperties(
     canBeCopied: Boolean(raw?.can_be_copied),
     canBeReplied: Boolean(raw?.can_be_replied),
     canRecognizeSpeech: Boolean(raw?.can_recognize_speech),
+    canBePinned: Boolean(raw?.can_be_pinned),
   }
 }
