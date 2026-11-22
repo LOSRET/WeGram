@@ -9,6 +9,8 @@ import type {
   InvokeRequest,
   InvokeResponse,
   ProxyConfig,
+  ProxyMode,
+  ProxyState,
   ProxyTestResult,
   StickerSetSummary,
   TgBridge,
@@ -129,7 +131,21 @@ const previewPins = new Map<number, ChatPinnedMessage>()
 /** The chat the UI last opened; the dev injector below delivers arrivals into it. */
 let openChatId: number | null = null
 let proxy: ProxyConfig | null = null
+/** The preview has no operating system to read, so 跟随系统代理 resolves to direct. */
+let proxyMode: ProxyMode = 'system'
 let preferIpv6 = false
+
+function previewProxyState(): ProxyState {
+  const active = proxyMode === 'manual' && proxy ? proxy : null
+  return {
+    mode: proxyMode,
+    config: proxy,
+    system: null,
+    active,
+    source: active ? 'manual' : 'direct',
+    detail: active ? undefined : '浏览器预览没有系统代理，直连',
+  }
+}
 let settings: AppSettings = {
   theme: 'light',
   themePreference: 'light',
@@ -410,10 +426,18 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'settings:close':
       return undefined
     case 'proxy:get':
-      return proxy
-    case 'proxy:set':
-      proxy = (store.config as ProxyConfig | null) ?? null
-      return undefined
+      return previewProxyState()
+    case 'proxy:set': {
+      if (store.config !== undefined) {
+        proxy = (store.config as ProxyConfig | null) ?? null
+        proxyMode = proxy ? 'manual' : 'off'
+      }
+      const mode = store.mode as ProxyMode | undefined
+      if (mode) proxyMode = mode
+      return previewProxyState()
+    }
+    case 'proxy:refresh':
+      return previewProxyState()
     case 'proxy:test':
       return { ok: true, latencyMs: 3 } satisfies ProxyTestResult
     case 'network:get':

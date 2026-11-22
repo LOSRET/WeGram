@@ -53,6 +53,40 @@ export const proxyTestResultSchema = z.object({
 export type ProxyTestResult = z.infer<typeof proxyTestResultSchema>
 
 /**
+ * Where the client's proxy comes from (design doc §6.4).
+ *
+ * `system` is the default and behaves the way the other messengers do: use the
+ * operating system's proxy when there is one, connect directly when there is not.
+ * `manual` uses the configuration in 设置 → 网络与代理, `off` always goes direct.
+ */
+export const proxyModeSchema = z.enum(['system', 'manual', 'off'])
+export type ProxyMode = z.infer<typeof proxyModeSchema>
+
+/**
+ * Why the proxy in force is the one in force. `env` is the development-only
+ * `WEGRAM_PROXY` override, which wins while the mode is `system`.
+ */
+export const proxySourceSchema = z.enum(['manual', 'env', 'system', 'direct'])
+export type ProxySource = z.infer<typeof proxySourceSchema>
+
+/**
+ * What 网络与代理 paints: the chosen mode, the manual configuration (behind its own
+ * masking), what the operating system reports, and what TDLib is really using.
+ * `active` is the only field that describes the live connection.
+ */
+export const proxyStateSchema = z.object({
+  mode: proxyModeSchema,
+  config: proxyConfigSchema.nullable(),
+  /** The operating system's answer, read while the mode is `system`. */
+  system: proxyConfigSchema.nullable(),
+  active: proxyConfigSchema.nullable(),
+  source: proxySourceSchema,
+  /** One sentence for the panel, e.g. 「系统代理无响应，本次直连」. */
+  detail: z.string().optional(),
+})
+export type ProxyState = z.infer<typeof proxyStateSchema>
+
+/**
  * TDLib network preferences the settings surface owns (design doc §6.4).
  *
  * `preferIpv6` is TDLib's writable `prefer_ipv6` option: with it on, the DC

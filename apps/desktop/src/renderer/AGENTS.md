@@ -72,7 +72,10 @@ components/settings/      the 设置 panels: SettingsNav / SettingsGroup / Setti
                          SettingsSelect + AccountPanel / GeneralPanel / NetworkPanel /
                          AboutPanel (styles/settings.css holds the measured tokens)
 components/proxy/         ProxyForm: the one proxy form, shown by the login window's
-                         modal (`ProxyPanel`) and inline by 网络与代理
+                         modal (`ProxyPanel`) and inline by 网络与代理 — 跟随系统代理
+                         (default) / 手动配置 / 不使用代理 at the top, the manual fields
+                         only in 手动配置, and the panel paints `ProxyState` instead of
+                         deciding which proxy is in force (that is main's job)
 components/viewer/        the 图片和视频 window: MediaViewer shell + useViewerItem /
                          useViewerZoom + ViewerToolbar / ViewerGrid + viewerMenu / viewerActions
 components/ProfileCard.tsx  资料卡: the person sheet a private chat's title and the

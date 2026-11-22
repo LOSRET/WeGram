@@ -141,7 +141,7 @@ scripts\start-test.cmd          # 连测试 DC（WEGRAM_TDLIB_TEST_DC=1，复用
 | `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` | 真实 TDLib 凭据；缺省时自动落到 mock 适配器 |
 | `WEGRAM_ADAPTER=mock` | 即使有凭据也强制 mock。做 UI 时用它，避免碰真实账号 |
 | `WEGRAM_TDLIB_DIR` | session 目录覆盖；应用与 `tdlib:smoke` 共用 |
-| `WEGRAM_PROXY` | 启动时的初始代理：`socks5://host:port`、`socks5://user:pass@host:port`、`http://host:port`、`mtproto://host:port?secret=…` |
+| `WEGRAM_PROXY` | 开发用覆盖：显式指定时压过「跟随系统代理」，格式 `socks5://host:port`、`socks5://user:pass@host:port`、`http://host:port`、`mtproto://host:port?secret=…`。默认不设，客户端读 Windows 代理设置（含 PAC），没有就直连 |
 
 ## 命令
 

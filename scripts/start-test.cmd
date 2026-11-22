@@ -10,9 +10,8 @@ rem   "pnpm tdlib:test-dc" writes). If that folder has no session you sign in
 rem   once inside the app, and the login needs an account created by an
 rem   official app first (see CLAUDE.md, test-DC section).
 rem - Never point this at spikes\tdlib\data: that is the real account.
-rem - Proxy: the test DCs answer without one, but the launcher keeps the same
-rem   default as start-real.cmd because this machine's route needs it; override
-rem   by setting WEGRAM_PROXY first (set WEGRAM_PROXY= to go direct).
+rem - Proxy: the app follows the Windows proxy by default, like start-real.cmd.
+rem   Set WEGRAM_PROXY first to override it for this launch.
 rem - Kills any running electron.exe first: the single-instance lock would
 rem   otherwise silently keep the OLD bundle on screen.
 rem - Builds once when out\ is missing; pass "build" to force a rebuild:
@@ -24,7 +23,6 @@ rem ---------------------------------------------------------------------------
 set "ROOT=%~dp0.."
 set "APP=%ROOT%\apps\desktop"
 set "WEGRAM_TDLIB_TEST_DC=1"
-if not defined WEGRAM_PROXY set "WEGRAM_PROXY=socks5://127.0.0.1:7890"
 set "SESSION_DIR=%ROOT%\spikes\tdlib\test-data"
 
 if not exist "%APP%\out\main\index.js" set "NEED_BUILD=1"
@@ -59,7 +57,7 @@ ping -n 2 127.0.0.1 >nul
 set "PS=pwsh"
 where pwsh >nul 2>&1 || set "PS=powershell"
 
-echo [start-test] launching detached against the TEST DCs ^(proxy %WEGRAM_PROXY%^) ...
+if defined WEGRAM_PROXY (echo [start-test] launching detached against the TEST DCs ^(proxy %WEGRAM_PROXY%^) ...) else (echo [start-test] launching detached against the TEST DCs ^(proxy: following the Windows setting^) ...)
 "%PS%" -NoProfile -ExecutionPolicy Bypass -File "%APP%\scripts\launch-detached.ps1" -NoSandbox -TestDc -Proxy "%WEGRAM_PROXY%" -SessionDir "%SESSION_DIR%"
 if errorlevel 1 (
   echo [start-test] launch failed - WMI process creation refused. Run this from a normal terminal, not a sandboxed shell.

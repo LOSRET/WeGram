@@ -1,6 +1,8 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 
+import type { ProxyMode } from '@wegram/protocol'
+
 export interface StoredProxySocks5 {
   type: 'socks5'
   host: string
@@ -27,12 +29,23 @@ export interface StoredProxyMtproto {
 export type StoredProxy = StoredProxySocks5 | StoredProxyHttp | StoredProxyMtproto
 
 export interface StoredState {
+  /** The manual configuration; only used while `proxyMode` is `manual`. */
   proxy: StoredProxy | null
+  /**
+   * Design doc §6.4: `system` (the default) follows the operating system proxy and
+   * falls back to a direct connection when there is none, `manual` uses `proxy`,
+   * `off` always connects directly.
+   */
+  proxyMode: ProxyMode
   /** TDLib's `prefer_ipv6`; applied by the adapter at startup and on change. */
   preferIpv6: boolean
 }
 
-const DEFAULT_STATE: StoredState = { proxy: null, preferIpv6: false }
+const DEFAULT_STATE: StoredState = { proxy: null, proxyMode: 'system', preferIpv6: false }
+
+function isProxyMode(value: unknown): value is ProxyMode {
+  return value === 'system' || value === 'manual' || value === 'off'
+}
 
 /**
  * Small JSON store that holds what must be known before any window exists (the
@@ -47,7 +60,14 @@ export class SettingsStore {
   load(): void {
     try {
       const parsed = JSON.parse(readFileSync(this.file, 'utf8')) as Partial<StoredState>
-      this.state = { proxy: parsed.proxy ?? null, preferIpv6: parsed.preferIpv6 === true }
+      const proxy = parsed.proxy ?? null
+      this.state = {
+        proxy,
+        // A file written before the modes existed keeps the proxy it already had
+        // in force; a brand-new profile starts on 跟随系统代理.
+        proxyMode: isProxyMode(parsed.proxyMode) ? parsed.proxyMode : proxy ? 'manual' : 'system',
+        preferIpv6: parsed.preferIpv6 === true,
+      }
     } catch {
       this.state = { ...DEFAULT_STATE }
     }
@@ -59,6 +79,11 @@ export class SettingsStore {
 
   setProxy(proxy: StoredProxy | null): void {
     this.state.proxy = proxy
+    this.save()
+  }
+
+  setProxyMode(proxyMode: ProxyMode): void {
+    this.state.proxyMode = proxyMode
     this.save()
   }
 

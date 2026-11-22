@@ -105,6 +105,29 @@ form, and closing the shell with 设置 open quits the whole app. `pnpm verify` 
 - 清理缓存 must invalidate `media/registry.ts` tokens, or bubbles keep retrying files that
   were just deleted (see the media rules above).
 
+## Proxy: 跟随系统代理 is the default (2026-11-22)
+
+The client now behaves like the other messengers: it reads the Windows proxy and
+connects directly when there is none.
+
+- `settings.json` carries `proxyMode`: `system` (default) / `manual` / `off`. An
+  older file without the field keeps its proxy as `manual`; a profile with no proxy
+  becomes `system` — which is how the machine that had "connected but offline" healed.
+- Precedence: manual → `WEGRAM_PROXY` (development override) → the OS proxy → direct.
+  `scripts/start-*.cmd` no longer hard-code `127.0.0.1:7890`; that default is exactly
+  what made a closed FlClash look like a broken client (TDLib dialled a port nothing
+  listened on while the OS pointed at a working one).
+- `main/system-proxy.ts` asks Chromium (`resolveProxy` on a private, memory-only
+  partition: static settings, PAC, WPAD) and falls back to `reg query` on
+  `…\Internet Settings`. `main/system-proxy-rules.ts` holds the parsers and their tests.
+- A proxy the user did not choose is probed before it is used (`pingProxy` once the
+  client exists, a TCP connect before), and a failure falls back to direct with a 30 s
+  retry, so closing or reopening the proxy client heals without a restart. A manual
+  configuration is applied as written.
+- `proxy:refresh` (重新检测) and `evt:proxy` (the state changed by itself) are the two
+  new channels; `proxy:get` / `proxy:set` now carry `ProxyState` (mode, manual config,
+  the OS reading, what TDLib really uses, and one sentence explaining it).
+
 ## Where things stand
 
 Greenfield → working skeleton in three milestones:

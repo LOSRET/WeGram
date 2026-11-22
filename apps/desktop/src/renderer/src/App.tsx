@@ -215,15 +215,22 @@ export function App() {
     void (async () => {
       const store = useAppStore.getState()
       try {
-        const [info, authState, settings] = await Promise.all([
+        const [info, authState, settings, connection] = await Promise.all([
           invoke('app:info'),
           invoke('auth:state'),
           invoke('settings:get'),
+          /**
+           * The shell is created after the login window, so TDLib may already be
+           * online and `evt:connection` (a change-only stream) would never say so:
+           * the rail would read 离线 on a perfectly connected client.
+           */
+          invoke('network:connection'),
         ])
         store.setInfo(info)
         store.setAuth(authState)
         store.setTheme(settings.theme)
         store.setSendKey(settings.sendKey)
+        store.setConnection(connection)
       } catch (error) {
         store.setError(errorMessage(error))
       }

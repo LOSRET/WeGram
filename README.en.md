@@ -141,7 +141,7 @@ Logs land in `.cache\app.log`.
 | `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` | Real TDLib credentials; absent means the mock adapter |
 | `WEGRAM_ADAPTER=mock` | Forces the mock even with credentials — use it for UI work that must not touch the real account |
 | `WEGRAM_TDLIB_DIR` | Session directory override; shared by the app and `tdlib:smoke` |
-| `WEGRAM_PROXY` | Initial proxy: `socks5://host:port`, `socks5://user:pass@host:port`, `http://host:port`, `mtproto://host:port?secret=…` |
+| `WEGRAM_PROXY` | Development override: when set it wins over 跟随系统代理. Forms: `socks5://host:port`, `socks5://user:pass@host:port`, `http://host:port`, `mtproto://host:port?secret=…`. Unset by default — the client reads the Windows proxy settings (PAC included) and connects directly when there are none |
 
 ## Commands
 

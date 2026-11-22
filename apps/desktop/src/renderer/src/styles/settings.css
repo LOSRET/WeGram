@@ -285,6 +285,78 @@
   color: var(--wx-text-secondary);
 }
 
+/* ---- 网络与代理: the proxy list (design doc §6.4) ------------------------ */
+
+/* A row whose left half selects it and whose right half opens the editor, because
+   the row itself cannot be a <button>: the editor button would be nested. */
+.wx-set-choice {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 62px;
+  border-bottom: 1px solid var(--wx-set-divider);
+}
+
+.wx-set-choice__pick {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wx-set-choice__pick:hover {
+  background: var(--wx-row-hover);
+}
+
+/* The disc SettingsSelect puts on its pill: the mark for "this is the one in force". */
+.wx-set-check {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--wx-brand);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.wx-set-check--empty {
+  background: transparent;
+  border: 1px solid var(--wx-line-strong);
+}
+
+/* The 添加代理 row has no entry yet, so its disc must not look like a choice. */
+.wx-set-check--ghost {
+  border-style: dashed;
+  opacity: 0.7;
+}
+
+/* The proxy editor inside a group: fields stacked, then its actions. */
+.wx-set-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--wx-set-divider);
+}
+
+.wx-set-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 /* ---- misc ---------------------------------------------------------------- */
 
 .wx-set-error {

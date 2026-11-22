@@ -56,6 +56,13 @@ media/              registry.ts (token → path | fileId) / protocol.ts (wx-medi
                     written by the handler, pruned at startup once stale)
 store/              ui-db.ts (all SQL) / settings.ts (proxy + TDLib network options)
 proxy*.ts           proxy DTO ↔ stored config
+proxy-controller.ts the ONE place that decides the proxy in force (§6.4): manual →
+                    WEGRAM_PROXY (dev) → system → direct, plus the 30 s retry that
+                    keeps a dead OS proxy from leaving the client offline
+system-proxy.ts     reads the OS proxy (Chromium `resolveProxy` on a private,
+                    memory-only partition; `reg query` fallback) and the TCP
+                    liveness check the pre-TDLib decision needs
+system-proxy-rules.ts  the pure parsers above, pinned by `pnpm test`
 security/secrets.ts safeStorage (DPAPI) seal/unseal
 ```
 
@@ -66,6 +73,13 @@ change belongs in the adapter.
 
 ## Rules that have already cost a debugging session
 
+- **A dead OS proxy must not leave the client offline.** 跟随系统代理 is the
+  default mode, and a proxy the user did *not* choose (the OS's, or `WEGRAM_PROXY`)
+  is probed before it is applied — `pingProxy` once the client exists, a TCP connect
+  before it does — falling back to a direct connection with a 30 s retry. Only a
+  manual configuration is applied as written. `proxy-controller.ts` owns that
+  decision; the renderer only paints `ProxyState`, and `proxy:get`/`proxy:set` never
+  talk to TDLib themselves.
 - **All `node:sqlite` calls live in `store/ui-db.ts`** (also lint-enforced).
   `settings.json` keeps only what must be known before any window exists: the
   proxy config (sealed secret) and the TDLib network options (`prefer_ipv6`).

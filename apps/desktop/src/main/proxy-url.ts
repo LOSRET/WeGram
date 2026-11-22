@@ -19,6 +19,22 @@ import type { ProxyConfig } from '@wegram/protocol'
  * handed to getaddrinfo as-is and a bracketed literal never resolves, so the
  * brackets are stripped here.
  */
+export function sameProxy(a: ProxyConfig | null, b: ProxyConfig | null): boolean {
+  if (a === null || b === null) return a === b
+  if (a.type !== b.type || a.host !== b.host || a.port !== b.port) return false
+  const credentials = (config: ProxyConfig): string =>
+    config.type === 'mtproto'
+      ? (config.secret ?? '')
+      : `${config.username ?? ''}\u0000${config.password ?? ''}`
+  return credentials(a) === credentials(b)
+}
+
+/** 「SOCKS5 127.0.0.1:7890」 — the one spelling used in logs and in the panel. */
+export function describeProxy(config: ProxyConfig): string {
+  const label = config.type === 'socks5' ? 'SOCKS5' : config.type === 'http' ? 'HTTP' : 'MTProxy'
+  return `${label} ${config.host}:${config.port}`
+}
+
 export function parseProxyUrl(raw: string | undefined | null): ProxyConfig | null {
   const value = raw?.trim()
   if (!value) return null

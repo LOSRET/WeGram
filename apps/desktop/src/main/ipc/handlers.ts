@@ -2,14 +2,15 @@ import { copyFile, rm, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 
 import { AppError, RECENT_EMOJI_LIMIT } from '@wegram/protocol'
-import type { AppInfo } from '@wegram/protocol'
+import type { AppInfo, ConnectionState } from '@wegram/protocol'
 import { app, BrowserWindow, clipboard, ClipboardItem, dialog, nativeImage, shell } from 'electron'
 
 import { closeLoginWindow } from '../login-window'
 import { drop, hold } from '../media/leases'
 import { registerStreamFile } from '../media/registry'
 import { writeVoiceNote } from '../media/voice-file'
-import { resolveProxySecrets, toProxyView, toStoredProxy } from '../proxy'
+import { resolveProxySecrets, toStoredProxy } from '../proxy'
+import type { ProxyController } from '../proxy-controller'
 import { closeQrWindow, getQrWindow, openQrWindow, qrTarget } from '../qr-window'
 import type { SettingsStore } from '../store/settings'
 import type { UiDatabase } from '../store/ui-db'
@@ -34,6 +35,10 @@ export interface HandlerDeps {
   store: SettingsStore
   uiDb: UiDatabase
   info: AppInfo
+  /** §6.4: the one place that decides which proxy is in force. */
+  proxyController: ProxyController
+  /** TDLib's state right now; the shell seeds its header from it (`network:connection`). */
+  connection: () => ConnectionState
   /** Lets the shell repaint the native window-controls overlay on theme change. */
   onThemeChange?: (theme: 'light' | 'dark') => void
   /**
@@ -75,6 +80,8 @@ export function createHandlers({
   store,
   uiDb,
   info,
+  proxyController,
+  connection,
   onThemeChange,
   onSendKeyChange,
   onLoginEnter,
@@ -381,22 +388,39 @@ export function createHandlers({
     'settings:open': () => openSettingsWindow(storedTheme(uiDb), BrowserWindow.getFocusedWindow()),
     'settings:close': () => closeSettingsWindow(),
 
-    'proxy:get': () => toProxyView(store.get().proxy),
+    'proxy:get': async () => proxyController.state() ?? proxyController.resolve({ apply: false }),
+    /**
+     * 设置 → 网络与代理. A manual configuration is applied before it is persisted
+     * (§6.4: only a proxy the protocol layer accepted is stored), the mode change
+     * is left to the controller, and the returned state is what the panel paints.
+     */
     'proxy:set': async (payload) => {
       const previous = store.get().proxy
-      if (!payload.config) {
-        await adapter.setProxy(null)
-        store.setProxy(null)
-        return
+      if (payload.config !== undefined) {
+        if (!payload.config) {
+          // 关闭代理: forget the manual endpoint and use no proxy at all.
+          await adapter.setProxy(null)
+          proxyController.markApplied(null)
+          store.setProxy(null)
+          store.setProxyMode('off')
+        } else {
+          const resolved = resolveProxySecrets(payload.config, previous)
+          await adapter.setProxy(resolved)
+          proxyController.markApplied(resolved)
+          store.setProxy(toStoredProxy(payload.config, previous))
+          store.setProxyMode('manual')
+        }
       }
-      // Apply first: only persist a proxy that the protocol layer accepted.
-      await adapter.setProxy(resolveProxySecrets(payload.config, previous))
-      store.setProxy(toStoredProxy(payload.config, previous))
+      if (payload.mode) store.setProxyMode(payload.mode)
+      return proxyController.resolve()
     },
     'proxy:test': (payload) =>
       adapter.testProxy(resolveProxySecrets(payload.config, store.get().proxy)),
+    /** 重新检测: re-read the OS proxy, probe it again, apply whatever answered. */
+    'proxy:refresh': () => proxyController.refresh(),
 
     'network:get': () => ({ preferIpv6: store.get().preferIpv6 }),
+    'network:connection': () => connection(),
     'network:set': async (payload) => {
       // Same rule as the proxy: only persist what the protocol layer accepted.
       await adapter.setPreferIpv6(payload.preferIpv6)

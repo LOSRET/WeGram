@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import type { AppInfo, AuthState } from '@wegram/protocol'
-import { app, BrowserWindow, dialog, nativeTheme, session } from 'electron'
+import type { AppInfo, AuthState, ConnectionState, ProxyConfig } from '@wegram/protocol'
+import { app, BrowserWindow, dialog, nativeTheme, powerMonitor, session } from 'electron'
 
 import { parseApiCredentials } from './credentials'
 import { createHandlers } from './ipc/handlers'
@@ -11,8 +11,10 @@ import { closeLoginWindow, createLoginWindow, getLoginWindow } from './login-win
 import { installMediaProtocol, registerMediaScheme } from './media/protocol'
 import { pruneVoiceNotes } from './media/voice-file'
 import { NotificationCenter } from './notifications'
-import { storedProxyToConfig } from './proxy'
-import { parseProxyUrl } from './proxy-url'
+import { storedProxyToConfig, toProxyView } from './proxy'
+import { ProxyController } from './proxy-controller'
+import { describeProxy, parseProxyUrl } from './proxy-url'
+import { reachableOverTcp, readSystemProxy } from './system-proxy'
 import { SettingsStore } from './store/settings'
 import { getCloseBehavior } from './store/prefs'
 import { UiDatabase } from './store/ui-db'
@@ -51,6 +53,8 @@ registerMediaScheme()
 
 let mainWindow: BrowserWindow | null = null
 let adapter: TelegramAdapter | null = null
+/** Owns the proxy in force (§6.4): the mode, the OS proxy and the reachability retry. */
+let proxyController: ProxyController | null = null
 let bus: EventBus | null = null
 let uiDb: UiDatabase | null = null
 let notifications: NotificationCenter | null = null
@@ -153,25 +157,39 @@ async function bootstrap(): Promise<void> {
     return
   }
 
-  // Stored settings win; the env var is a dev convenience so a fresh profile can
-  // reach Telegram without clicking through the proxy dialog first.
-  let initialProxy = storedProxyToConfig(store.get().proxy)
-  if (!initialProxy) {
-    try {
-      initialProxy = parseProxyUrl(process.env['WEGRAM_PROXY'])
-      if (initialProxy)
-        logger.info(
-          `using WEGRAM_PROXY (${initialProxy.type} ${initialProxy.host}:${initialProxy.port})`,
-        )
-    } catch (error) {
-      logger.warn(
-        'ignoring invalid WEGRAM_PROXY:',
-        error instanceof Error ? error.message : String(error),
-      )
-    }
+  // The proxy in force is decided in one place (main/proxy-controller.ts, §6.4):
+  // an explicit manual configuration, then WEGRAM_PROXY, then the operating
+  // system's proxy, then a direct connection. TDLib has to be created *with* its
+  // proxy, so the first resolution happens before the adapter exists.
+  let envProxy: ProxyConfig | null = null
+  try {
+    envProxy = parseProxyUrl(process.env['WEGRAM_PROXY'])
+    if (envProxy) logger.info(`WEGRAM_PROXY overrides the system proxy: ${describeProxy(envProxy)}`)
+  } catch (error) {
+    logger.warn(
+      'ignoring invalid WEGRAM_PROXY:',
+      error instanceof Error ? error.message : String(error),
+    )
   }
 
-  adapter = createAdapter({
+  const controller = new ProxyController({
+    mode: () => store.get().proxyMode,
+    manualConfig: () => storedProxyToConfig(store.get().proxy),
+    manualView: () => toProxyView(store.get().proxy),
+    envProxy,
+    readSystemProxy: () => readSystemProxy(logger),
+    reachable: reachableOverTcp,
+    logger,
+    // The system proxy can change while the app runs (the reader's proxy client is
+    // closed or reopened); every open 网络与代理 panel repaints from here.
+    onChange: (state) => bus?.publish('evt:proxy', state),
+  })
+  proxyController = controller
+
+  // No apply: the adapter below is created with this answer.
+  const initialProxy = (await controller.resolve({ apply: false })).active
+
+  const createdAdapter = createAdapter({
     ...(apiId > 0 ? { apiId } : {}),
     ...(apiHash ? { apiHash } : {}),
     userDataDir,
@@ -179,6 +197,17 @@ async function bootstrap(): Promise<void> {
     initialPreferIpv6: store.get().preferIpv6,
     allowMock: isDev,
     applicationVersion: app.getVersion(),
+  })
+  adapter = createdAdapter
+  controller.attach({
+    applyProxy: (config) => createdAdapter.setProxy(config),
+    testProxy: (config) => createdAdapter.testProxy(config),
+  })
+  controller.markApplied(initialProxy)
+  controller.start()
+  // Waking up is the one moment the OS proxy commonly changed while we slept.
+  powerMonitor.on('resume', () => {
+    void controller.refresh()
   })
 
   bus = new EventBus({
@@ -204,10 +233,14 @@ async function bootstrap(): Promise<void> {
     onOpen: openChatAt,
   })
 
+  /** The shell seeds its header from this once (`network:connection`, §7.1). */
+  let lastConnection: ConnectionState = 'connecting'
+
   adapter.onEvent((event) => {
     // Windows follow authorization, not the renderer: the shell may only exist
     // while an account is signed in (see syncWindowsToAuth).
     if (event.type === 'auth') syncWindowsToAuth(event.state)
+    if (event.type === 'connection') lastConnection = event.state
     // A desktop notification is an OS concern: it never crosses IPC.
     if (event.type === 'notification') {
       notifications?.notify(event)
@@ -229,6 +262,8 @@ async function bootstrap(): Promise<void> {
       store,
       uiDb: db,
       info,
+      proxyController: controller,
+      connection: () => lastConnection,
       // Every window repaints from here: the shell's native strip, the viewer, the
       // settings window and the shell renderer (via evt:theme). Missing one is how
       // "I switched to dark and this window stayed light" happens (design doc §9.11.4).
@@ -419,6 +454,8 @@ app.on('before-quit', () => {
   notifications?.dispose()
   notifications = null
   destroyTray()
+  proxyController?.stop()
+  proxyController = null
   void adapter?.stop()
   adapter = null
   uiDb?.close()

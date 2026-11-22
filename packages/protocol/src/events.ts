@@ -5,7 +5,7 @@ import { chatOpSchema } from './chat'
 import { authStateSchema, connectionStateSchema, userAvatarSchema } from './dto'
 import { messageOpSchema } from './message-ops'
 import { peerStatusSchema } from './presence'
-import { sendKeySchema } from './settings'
+import { proxyStateSchema, sendKeySchema } from './settings'
 import { appErrorSchema } from './errors'
 
 /**
@@ -52,6 +52,12 @@ export const eventChannels = [
    */
   'evt:locate',
   'evt:error',
+  /**
+   * The proxy in force changed by itself — the operating system's proxy appeared,
+   * disappeared or started answering again. 网络与代理 and the login modal repaint
+   * from it; a manual change answers its own IPC call instead.
+   */
+  'evt:proxy',
 ] as const
 
 export type EventChannel = (typeof eventChannels)[number]
@@ -89,6 +95,7 @@ export const eventSchemas = {
   'evt:stickerSets': envelope(z.object({})),
   'evt:locate': envelope(z.object({ chatId: z.number().int(), messageId: z.number().int() })),
   'evt:error': envelope(appErrorSchema),
+  'evt:proxy': envelope(proxyStateSchema),
 } satisfies Record<EventChannel, z.ZodType>
 
 export type EventEnvelope<C extends EventChannel> = z.output<(typeof eventSchemas)[C]>

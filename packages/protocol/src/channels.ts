@@ -19,6 +19,8 @@ import {
   appInfoSchema,
   appSettingsSchema,
   proxyConfigSchema,
+  proxyModeSchema,
+  proxyStateSchema,
   proxyTestResultSchema,
   RECENT_EMOJI_LIMIT,
 } from './settings'
@@ -177,6 +179,7 @@ export const invokeChannels = [
   'proxy:get',
   'proxy:set',
   'proxy:test',
+  'proxy:refresh',
   ...networkInvokeChannels,
   'app:info',
   /** The login window's 进入 button: main swaps it for the shell window. */
@@ -489,12 +492,25 @@ export const invokeSchemas = {
   },
   'settings:open': { request: noPayload, response: noPayload },
   'settings:close': { request: noPayload, response: noPayload },
-  'proxy:get': { request: noPayload, response: proxyConfigSchema.nullable() },
-  'proxy:set': { request: z.object({ config: proxyConfigSchema.nullable() }), response: noPayload },
+  'proxy:get': { request: noPayload, response: proxyStateSchema },
+  /**
+   * Changes the mode and/or the manual configuration. A config that is not `null`
+   * also selects `manual`; an explicit `null` config means 「不使用代理」 (`off`),
+   * which is what the panel's 关闭代理 button sends.
+   */
+  'proxy:set': {
+    request: z.object({
+      mode: proxyModeSchema.optional(),
+      config: proxyConfigSchema.nullable().optional(),
+    }),
+    response: proxyStateSchema,
+  },
   'proxy:test': {
     request: z.object({ config: proxyConfigSchema }),
     response: proxyTestResultSchema,
   },
+  /** Re-reads the operating system proxy and applies it (design doc §6.4, 重新检测). */
+  'proxy:refresh': { request: noPayload, response: proxyStateSchema },
   ...networkInvokeSchemas,
   'app:info': { request: noPayload, response: appInfoSchema },
   'login:enter': { request: noPayload, response: noPayload },
