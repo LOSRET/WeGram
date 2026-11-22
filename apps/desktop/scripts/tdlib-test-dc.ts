@@ -4,8 +4,8 @@
  *
  * The test DCs are a separate account space: every `99966XYYYY` number is its
  * own account, no SMS is involved (the code is the data-center id repeated) and
- * nothing there can reach a real chat. Send / edit / delete / upload therefore
- * get proven here, which the mock adapter cannot do for TDLib-specific
+ * nothing there can reach a real chat. Send / edit / delete / upload / 语音消息
+ * therefore get proven here, which the mock adapter cannot do for TDLib-specific
  * behaviour and a real session must never do (CLAUDE.md: 真实账号只读).
  *
  *   cd apps\desktop
@@ -157,14 +157,34 @@ async function main(): Promise<void> {
     )
     console.log(`  photo      : message ${photo.id}`)
 
+    /**
+     * 语音消息: TDLib only accepts an OGG/Opus voice note (anything else would be
+     * stored as an audio message), so the probe is a real clip recorded through
+     * the app's own recorder — see `fixtures/voice-probe.ogg`. The waveform is
+     * empty on purpose (the scheme does not define its packing).
+     */
+    await adapter.sendVoiceNote({
+      chatId: saved.id,
+      filePath: resolve('scripts/fixtures/voice-probe.ogg'),
+      duration: 2,
+    })
+    const voice = await settledMessage(
+      saved.id,
+      (message) => message.kind === 'voice',
+      'the voice note',
+      60_000,
+    )
+    console.log(`  voice      : message ${voice.id} (${voice.media?.duration ?? '?'}s)`)
+
     if (cleanup) {
-      await deleteSettled(saved.id, [edited.id, photo.id])
-      await waitForGone(saved.id, [edited.id, photo.id])
+      const ids = [edited.id, photo.id, voice.id]
+      await deleteSettled(saved.id, ids)
+      await waitForGone(saved.id, ids)
       console.log('  delete     : ok')
     }
 
     console.log(
-      `\n[PASS] send / edit / upload${cleanup ? ' / delete' : ''} worked on the test DC`,
+      `\n[PASS] send / edit / upload / voice${cleanup ? ' / delete' : ''} worked on the test DC`,
     )
   } catch (error) {
     console.error(`\n[FAIL] ${error instanceof Error ? error.message : String(error)}`)
