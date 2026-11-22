@@ -250,3 +250,21 @@
 .wx-reaction--chosen .wx-reaction__count {
   color: var(--wx-brand-text);
 }
+
+/* 语音转文字: the transcript under a voice bubble. Secondary ink, because it is an
+   aside to what was actually said, and the same omission for the pending line. */
+.wx-transcript {
+  margin-top: 4px;
+  padding: 6px 8px;
+  border-radius: var(--wx-bubble-radius);
+  background: var(--wx-row-hover);
+  color: var(--wx-text);
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.wx-transcript--error {
+  color: var(--wx-danger);
+}

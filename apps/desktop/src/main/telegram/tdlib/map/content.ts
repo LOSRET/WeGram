@@ -9,6 +9,36 @@ import { mapRichMessage, richPreview } from './rich'
 import { servicePreview } from './service'
 import { mapStickerFormat } from './sticker'
 
+/**
+ * 语音转文字 (TDLib `SpeechRecognitionResult`). The result hangs off the voice note
+ * itself, so a finished transcript arrives as a content update and reaches the
+ * row through the ordinary `replace` op — no extra event or request.
+ *
+ * `pending` keeps the partial text the server has produced so far: showing words
+ * as they land is what makes the button feel alive while the rest is transcribed.
+ */
+function mapTranscription(result: TdObject | undefined): Message['transcription'] {
+  switch (result?._) {
+    case 'speechRecognitionResultPending': {
+      const partial = typeof result.partial_text === 'string' ? result.partial_text : ''
+      return { status: 'pending', ...(partial ? { text: partial } : {}) }
+    }
+    case 'speechRecognitionResultText': {
+      const text = typeof result.text === 'string' ? result.text : ''
+      return text ? { status: 'done', text } : undefined
+    }
+    case 'speechRecognitionResultError': {
+      const reason = result.error?.message
+      return {
+        status: 'error',
+        ...(typeof reason === 'string' && reason ? { error: reason } : {}),
+      }
+    }
+    default:
+      return undefined
+  }
+}
+
 // Re-exported on purpose: this is where message media has always been read from,
 // and the shared readers now live in ./media so the rich mapper can use them too.
 export { mediaUrls, pickLargest, pickSmallestAtLeast } from './media'
@@ -17,6 +47,7 @@ export function mapContent(content: TdObject): {
   kind: Message['kind']
   text: string
   entities: MessageEntity[]
+  transcription?: Message['transcription']
   media?: Message['media']
   rich?: RichBlock[]
   contact?: Message['contact']
@@ -95,11 +126,13 @@ export function mapContent(content: TdObject): {
       }
     }
     case 'messageVoiceNote': {
+      const transcription = mapTranscription(content.voice_note?.speech_recognition_result)
       return {
         kind: 'voice',
         text: content.caption?.text ?? '',
         entities: [],
         media: voiceMedia(content.voice_note),
+        ...(transcription ? { transcription } : {}),
       }
     }
     case 'messagePoll': {

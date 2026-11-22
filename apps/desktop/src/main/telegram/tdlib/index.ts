@@ -400,6 +400,11 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     return actions.messageProperties(this.actionDeps, input)
   }
 
+  /** 转文字; the transcript arrives as a content update. */
+  async transcribeMessage(input: { chatId: number; messageId: number }): Promise<void> {
+    return actions.transcribeMessage(this.actionDeps, input)
+  }
+
   async markRead(input: { chatId: number; upToMessageId: number }): Promise<void> {
     return actions.markRead(this.actionDeps, input)
   }

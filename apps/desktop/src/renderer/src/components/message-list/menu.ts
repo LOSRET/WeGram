@@ -10,6 +10,8 @@ export interface MessageMenuHandlers {
   onEdit: (message: Message) => void
   onDelete: (message: Message, forBoth: boolean) => void
   onResend: (message: Message) => void
+  /** 转文字: asks for the voice note's transcript (the text arrives as an op). */
+  onTranscribe: (message: Message) => void
 }
 
 export interface MessageMenuOptions {
@@ -46,6 +48,11 @@ export function buildMessageMenuItems(
   }
   if (message.text.length > 0 && (properties === null || properties.canBeCopied)) {
     items.push({ label: '复制', onSelect: () => handlers.onCopy(message) })
+  }
+  // 转文字: voice notes only, and only where TDLib says speech is recognised
+  // (an unpublished/limited trial answers a refusal instead of a transcript).
+  if (message.kind === 'voice' && properties?.canRecognizeSpeech) {
+    items.push({ label: '转文字', onSelect: () => handlers.onTranscribe(message) })
   }
   if (properties?.canBeForwarded) {
     items.push({ label: '转发', onSelect: () => handlers.onForward(message) })

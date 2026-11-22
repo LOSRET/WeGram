@@ -74,6 +74,8 @@ export interface MessageListProps {
   onOpenComments: (message: Message) => void
   /** 重试 a message TDLib marked `failed` with `can_retry`. */
   onResend: (message: Message) => void
+  /** 转文字: ask for a voice note's transcript. */
+  onTranscribe: (message: Message) => void
 }
 
 interface MenuState {
@@ -129,6 +131,7 @@ export function MessageList({
   onCopy,
   onOpenComments,
   onResend,
+  onTranscribe,
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const hostRef = useRef<HTMLDivElement | null>(null)
@@ -370,7 +373,7 @@ export function MessageList({
           y={menu.y}
           items={buildMessageMenuItems(
             menu.message,
-            { onReply, onCopy, onForward, onEdit, onDelete, onResend },
+            { onReply, onCopy, onForward, onEdit, onDelete, onResend, onTranscribe },
             { canReply, properties: menu.properties },
           )}
           onClose={closeMenu}

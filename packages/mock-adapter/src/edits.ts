@@ -97,5 +97,27 @@ export function createMockEdits(
     }
   }
 
-  return { editText, editCaption, deleteMessages, resendMessages }
+  /**
+   * 转文字: TDLib answers ‘Ok’ at once and streams the text through the message's
+   * content, so the fixture does the same — a partial line, then the transcript.
+   */
+  const transcribe = async (input: { chatId: number; messageId: number }): Promise<void> => {
+    const target = requireMessage(input.chatId, input.messageId)
+    const script = '这是一段演示语音的转写结果，用来检查转文字的状态流转。'
+    const announce = (text: string, status: 'pending' | 'done'): void => {
+      target.transcription = { status, ...(text ? { text } : {}) }
+      emit({
+        type: 'messages',
+        chatId: input.chatId,
+        ops: [{ op: 'replace', message: { ...target } }],
+      })
+    }
+    announce('', 'pending')
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    announce(script.slice(0, 8), 'pending')
+    await new Promise((resolve) => setTimeout(resolve, 700))
+    announce(script, 'done')
+  }
+
+  return { editText, editCaption, deleteMessages, resendMessages, transcribe }
 }

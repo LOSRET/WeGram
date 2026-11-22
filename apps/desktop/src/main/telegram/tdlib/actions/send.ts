@@ -135,6 +135,26 @@ export async function sendTyping(
 }
 
 /**
+ * 转文字: ask TDLib to recognise a voice note's speech (`recognizeSpeech`).
+ *
+ * `recognizeSpeech` answers `Ok` at once; the transcript (partial text, then the
+ * final one) arrives as a change to the message content, which the update handler
+ * already remaps into a `replace` op. A refusal (no Premium/trial left, wrong
+ * message kind) is a real error the reader should see, so it is not swallowed —
+ * the button is only offered when `messageProperties.can_recognize_speech` is set.
+ */
+export async function transcribeMessage(
+  deps: Pick<ActionDeps, 'invoke'>,
+  input: { chatId: number; messageId: number },
+): Promise<void> {
+  await deps.invoke({
+    _: 'recognizeSpeech',
+    chat_id: input.chatId,
+    message_id: input.messageId,
+  })
+}
+
+/**
  * 重试 a failed message (`resendMessages`).
  *
  * TDLib answers with the messages it retried, each still `pending`; the final

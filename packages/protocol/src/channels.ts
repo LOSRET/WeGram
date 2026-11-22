@@ -111,6 +111,11 @@ export const invokeChannels = [
   'messages:delete',
   /** Per-message capabilities for the context menu (`getMessageProperties`). */
   'messages:properties',
+  /**
+   * 转文字: asks TDLib to recognise a voice note's speech (`recognizeSpeech`). The
+   * transcript itself arrives as a content update, so the answer carries nothing.
+   */
+  'messages:transcribe',
   'messages:forward',
   'messages:read',
   'messages:sendSticker',
@@ -289,6 +294,10 @@ export const invokeSchemas = {
   'messages:properties': {
     request: z.object({ chatId: z.number().int(), messageId: z.number().int() }),
     response: messagePropertiesSchema,
+  },
+  'messages:transcribe': {
+    request: z.object({ chatId: z.number().int(), messageId: z.number().int() }),
+    response: noPayload,
   },
   'messages:forward': {
     request: z.object({

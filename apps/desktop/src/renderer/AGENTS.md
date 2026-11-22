@@ -296,6 +296,10 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
 - **对方正在输入 is throttled in `lib/typingPing.ts`, and its IPC call never raises an
   error.** One ping, one refresh per 3.5 s, cancel on empty / send / blur / chat switch.
   Do not move the throttle into the composer's onChange or add a per-keystroke call.
+- **语音转文字 is a content update, not a request answer.** `messages:transcribe` only
+  asks (`recognizeSpeech` answers `Ok` at once); the pending and final text arrive as
+  the voice note's content changing, so the row repaints through a `replace` op and
+  the transcript block draws what `Message.transcription` says. Never poll.
 - **表情回应 are displayed, never offered.** `MessageRow` draws the chips from
   `Message.reactions` (`updateMessageReactions` replaces the whole list, so the
   `reactions` op replaces rather than merges); a custom-emoji reaction is its

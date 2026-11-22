@@ -357,6 +357,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   readonly editCaption = this.edits.editCaption
   readonly deleteMessages = this.edits.deleteMessages
   readonly resendMessages = this.edits.resendMessages
+  readonly transcribeMessage = this.edits.transcribe
 
   async messageProperties(input: {
     chatId: number

@@ -291,6 +291,11 @@ export interface TelegramAdapter {
    * the delete-for-me / delete-for-everyone split are TDLib's rules, not ours.
    */
   messageProperties(input: InvokeRequest<'messages:properties'>): Promise<MessageProperties>
+  /**
+   * 转文字: asks for a voice note's transcript. The answer carries nothing — the
+   * text arrives as the message's content changing (`transcription` on the DTO).
+   */
+  transcribeMessage(input: InvokeRequest<'messages:transcribe'>): Promise<void>
 
   /** Sends a local file as a photo or a document (design doc §1: media upload). */
   sendMedia(input: InvokeRequest<'media:send'>): Promise<{ localId: string; message: Message }>

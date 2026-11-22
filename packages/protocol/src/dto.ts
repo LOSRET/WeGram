@@ -476,6 +476,18 @@ export const messageSchema = z.object({
   /** Views / forwards / comments under the message; absent when there are none. */
   interaction: messageInteractionSchema.optional(),
   /**
+   * 语音转文字 (TDLib `voiceNote.speech_recognition_result`). Absent until somebody
+   * asked for a transcript; `pending` carries the partial text TDLib streams while
+   * the server still works, `done` the final text, `error` the reason it failed.
+   */
+  transcription: z
+    .object({
+      status: z.enum(['pending', 'done', 'error']),
+      text: z.string().optional(),
+      error: z.string().optional(),
+    })
+    .optional(),
+  /**
    * 表情回应 (TDLib `interaction_info.reactions`), newest first as TDLib sends
    * them; absent when the message carries none. Display only — see `reaction.ts`.
    */
@@ -491,6 +503,8 @@ export type Message = z.infer<typeof messageSchema>
  */
 export const messagePropertiesSchema = z.object({
   canBeEdited: z.boolean(),
+  /** 转文字: TDLib `can_recognize_speech` (voice notes only, and not always). */
+  canRecognizeSpeech: z.boolean().optional(),
   canBeForwarded: z.boolean(),
   canBeDeletedOnlyForSelf: z.boolean(),
   canBeDeletedForAllUsers: z.boolean(),

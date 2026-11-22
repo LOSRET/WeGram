@@ -22,7 +22,9 @@ import {
   previewAround,
   previewHistory,
   previewMarkRead,
+  previewMessageProperties,
   previewNewer,
+  previewTranscribe,
   type PreviewMessagesStore,
 } from './messages'
 import { handlePreviewPoll } from './polls'
@@ -48,7 +50,6 @@ import {
   setPreviewTitle,
   type PreviewChatStore,
 } from './chats'
-import { editTargetOf } from '../editTarget'
 import { stickerMedia } from '../stickerMedia'
 import {
   ME,
@@ -368,21 +369,16 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       target.edited = true
       return { ...target }
     }
-    case 'messages:properties': {
-      const list = messagesByChat[store.chatId] ?? []
-      const target = list.find((item) => item.id === store.messageId)
-      if (!target) throw { code: 'internal', message: 'message not found' }
-      return {
-        // Text edits and 编辑说明 are different calls but share TDLib's flag; the
-        // row's own kind decides which one the menu offers (`lib/editTarget.ts`).
-        canBeEdited: target.outgoing && editTargetOf(target) !== null,
-        canBeForwarded: true,
-        canBeDeletedOnlyForSelf: true,
-        canBeDeletedForAllUsers: target.outgoing,
-        canBeCopied: target.text.length > 0,
-        canBeReplied: true,
-      }
-    }
+    /** 转文字: the fake transcript lives in ./messages.ts. */
+    case 'messages:transcribe':
+      return previewTranscribe(previewMessagesStore, Number(store.chatId), Number(store.messageId))
+    /** The capability question; its rule lives in ./messages.ts. */
+    case 'messages:properties':
+      return previewMessageProperties(
+        previewMessagesStore,
+        Number(store.chatId),
+        Number(store.messageId),
+      )
     case 'messages:delete': {
       const ids = store.messageIds as number[]
       messagesByChat[store.chatId] = (messagesByChat[store.chatId] ?? []).filter(

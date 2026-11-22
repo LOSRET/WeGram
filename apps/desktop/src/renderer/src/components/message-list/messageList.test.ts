@@ -172,6 +172,7 @@ describe('buildMessageMenuItems', () => {
     onEdit: () => undefined,
     onDelete: (_message: Message, _forBoth: boolean) => undefined,
     onResend: (_message: Message) => undefined,
+    onTranscribe: (_message: Message) => undefined,
   }
   const props = (overrides: Partial<MessageProperties> = {}): MessageProperties => ({
     canBeEdited: false,
@@ -224,6 +225,14 @@ describe('buildMessageMenuItems', () => {
     expect(labels(message(1, { outgoing: true }), props({ canBeEdited: false }))).not.toContain(
       '编辑',
     )
+  })
+
+  it('offers 转文字 only on a voice note TDLib can recognise', () => {
+    const voice = message(1, { kind: 'voice', text: '', media: { fileId: 9 } })
+    expect(labels(voice, props({ canRecognizeSpeech: true }))).toContain('转文字')
+    // Without the capability (no trial left, wrong kind) the item is not offered.
+    expect(labels(voice, props({ canRecognizeSpeech: false }))).not.toContain('转文字')
+    expect(labels(message(1), props({ canRecognizeSpeech: true }))).not.toContain('转文字')
   })
 
   it('hides forward when TDLib says the content is protected', () => {

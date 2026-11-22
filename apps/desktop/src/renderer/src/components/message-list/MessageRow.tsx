@@ -151,6 +151,12 @@ export const MessageRow = memo(
      * WeChat has no reactions, so there is no picker yet (see protocol/reaction.ts).
      */
     const reactions = last.reactions?.length ? last.reactions : undefined
+    /**
+     * 语音转文字: the transcript of a voice note, once somebody asked for one. WeChat
+     * shows it under the bubble and the 转文字 action is in the context menu; a
+     * pending answer keeps its partial text so the words appear while they land.
+     */
+    const transcription = mediaKind === 'voice' && !album ? first.transcription : undefined
     const showSender = !first.outgoing && chat.kind !== 'private'
     const channelBubble = channel ? ' wx-bubble--channel' : ''
     /**
@@ -337,6 +343,15 @@ export const MessageRow = memo(
               {channel ? commentBar : null}
             </div>
           )}
+          {transcription ? (
+            <div
+              className={`wx-transcript${transcription.status === 'error' ? ' wx-transcript--error' : ''}`}
+            >
+              {transcription.status === 'error'
+                ? (transcription.error ?? '转写失败')
+                : (transcription.text ?? '正在转写…')}
+            </div>
+          ) : null}
           {reactions ? (
             <div className="wx-reactions">
               {reactions.map((reaction, index) => (

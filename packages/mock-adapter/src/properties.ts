@@ -29,5 +29,7 @@ export function mockMessageProperties(
     canBeDeletedForAllUsers: message.outgoing,
     canBeCopied: message.text.length > 0,
     canBeReplied: true,
+    // 转文字 is a voice-note feature, like TDLib's can_recognize_speech.
+    canRecognizeSpeech: message.kind === 'voice',
   }
 }

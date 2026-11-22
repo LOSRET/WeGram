@@ -20,6 +20,8 @@ export interface MessageActions {
    * arrives as `replace` / `replaceId` / another `failed`.
    */
   resend: (message: Message) => Promise<void>
+  /** 转文字: no optimistic state — the transcript arrives as a content update. */
+  transcribe: (message: Message) => Promise<void>
 }
 
 /** The confirm dialog's payload: which message, and whether 撤回 or 删除. */
@@ -118,6 +120,14 @@ export function createMessageActions(activeChatId: number): MessageActions {
             sendingState: 'pending',
           },
         ])
+      } catch (error) {
+        useAppStore.getState().setError(errorMessage(error))
+      }
+    },
+
+    transcribe: async (message) => {
+      try {
+        await invoke('messages:transcribe', { chatId: message.chatId, messageId: message.id })
       } catch (error) {
         useAppStore.getState().setError(errorMessage(error))
       }

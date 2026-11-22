@@ -197,6 +197,7 @@ export function createHandlers({
     'messages:editCaption': (payload) => adapter.editCaption(payload),
     'messages:delete': (payload) => adapter.deleteMessages(payload),
     'messages:properties': (payload) => adapter.messageProperties(payload),
+    'messages:transcribe': (payload) => adapter.transcribeMessage(payload),
     'messages:forward': (payload) => adapter.forwardMessages(payload),
     'messages:read': (payload) => adapter.markRead(payload),
     'messages:typing': (payload) => adapter.sendTyping(payload.chatId, payload.typing),

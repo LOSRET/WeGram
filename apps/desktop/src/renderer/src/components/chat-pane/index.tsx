@@ -408,6 +408,9 @@ export function ChatPane() {
           onResend={(message) => {
             void actions.resend(message)
           }}
+          onTranscribe={(message) => {
+            void actions.transcribe(message)
+          }}
         />
       )}
 

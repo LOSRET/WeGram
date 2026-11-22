@@ -15,6 +15,7 @@ describe('messageProperties', () => {
         can_be_deleted_for_all_users: false,
         can_be_copied: true,
         can_be_replied: true,
+        can_recognize_speech: false,
       }
     })
 
@@ -25,6 +26,7 @@ describe('messageProperties', () => {
       canBeDeletedForAllUsers: false,
       canBeCopied: true,
       canBeReplied: true,
+      canRecognizeSpeech: false,
     })
   })
 
