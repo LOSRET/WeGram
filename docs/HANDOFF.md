@@ -28,20 +28,24 @@ notifications with a tray icon. Measured notes and the still-unverified parts ar
 "Private-chat P0 batch — measured notes" below; the audit document keeps the P1/P2
 backlog.
 
-**Private-chat P1 batch (same day):** the audit's P1 list is closed except for three
+**Private-chat P1 batch (same day):** the audit's P1 list is closed except for two
 items that need the owner. Landed: 相册发送 (one `sendMessageAlbum` call), 置顶消息栏,
 语音转文字, 表情回应 (display only), 拉黑 + 举报 (a person **and** one message, one
 phased `reportChat` sheet), the 资料卡 with 备注 / 共同群聊 (count + a page of chat rows
-fetched on demand) / 添加删除联系人, 编辑说明 for a media caption, and the 聊天信息
-panel's face opening that card. Still open: **voice notes** (the codec spike in
-`docs/PRIVATE-CHAT-HANDOFF.md` §10b says Chromium records WebM/Opus, not the OGG/Opus
-TDLib wants — a muxer dependency needs approval), the **reactions picker** (WeChat has
+fetched on demand) / 添加删除联系人, 编辑说明 for a media caption, the 聊天信息
+panel's face opening that card, and **语音消息** (recorded in the renderer with
+WebCodecs Opus and muxed into OGG in-repo — no new dependency; see
+`docs/PRIVATE-CHAT-HANDOFF.md` §6.1). Still open: the **reactions picker** (WeChat has
 no reactions; display-only until the owner signs one off) and the 置顶消息 bar's
-product call. **No test DC was available in this session either**, so the P1 TDLib
+product call. **No test DC was available in this session either**, so the P1/P2 TDLib
 writes (`sendMessageAlbum`, `pinChatMessage`, `setUserNote`, `setMessageSenderBlockList`,
 `reportChat`, `editMessageCaption`, `recognizeSpeech`, `addContact`, `removeContacts`,
-`getGroupsInCommon`) are compile- and mock-verified only — run `pnpm tdlib:test-dc`
-before calling them proven.
+`getGroupsInCommon`, `inputMessageVoiceNote`) are compile- and mock-verified only —
+run `pnpm tdlib:test-dc` before calling them proven. The voice **gesture** was then
+clicked through in a mock Electron window (isolated profile, fake media device): a
+2 s hold produced a decodable voice bubble (`<audio>` duration 1.9, `readyState 4`)
+and a valid OGG/Opus file; the slide-up cancel sent nothing. `inputMessageVoiceNote`
+against real TDLib stays unmeasured — see `docs/PRIVATE-CHAT-HANDOFF.md` §11.
 
 ## Where things stand
 
@@ -1041,7 +1045,13 @@ Shipped from `docs/PRIVATE-CHAT-HANDOFF.md` §3 (P0): outgoing typing, 标为未
      *sending* (received albums are grouped into one bubble now, design doc §8.6),
      no drag & drop / paste. Captions are supported end-to-end in the adapter
      (`media:send` takes `caption`), just not surfaced in the UI yet.
-   - Voice notes play, but there is no recording and the waveform is decorative.
+   - ~~Voice notes play, but there is no recording~~ — **done 2026-11-22**: the
+     renderer records 按住 说话 with WebCodecs Opus and muxes OGG itself
+     (`renderer/lib/voice/`), main materialises the bytes under `userData/voice`
+     and TDLib sends `inputMessageVoiceNote`. The waveform is still decorative
+     (and sent empty, see `docs/PRIVATE-CHAT-HANDOFF.md` §6.1). The mock/Electron
+     pass is done (fake media device) — see "Private-chat P1 batch" above; the
+     test-DC write is still pending.
    - Download cache is TDLib's own file cache; the `media_cache` LRU table from §5.2 is
      still unused, so nothing bounds the disk usage yet.
    - Sticker panel only lists regular installed sets; no search/trending, no "recent".

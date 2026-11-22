@@ -18,7 +18,8 @@ window's channels), `poll.ts` (the poll DTO + the vote/add-option channels),
 comment carries: text, a sticker or a local file), `search.ts` (the cross-chat
 message search schemas), `events.ts` (the `evt:*` tables + `EventChannel`/`EventEnvelope`,
 moved out of `channels.ts` at its budget), `message-ops.ts` (the `MessageOp` patch table),
-`send.ts` (outgoing typing + resend), `presence.ts` (peer status, the active-chat
+`send.ts` (outgoing typing + resend), `voice.ts` (the 语音消息 payload: base64 OGG +
+duration + reply, and its send channel), `presence.ts` (peer status, the active-chat
 report) and `user.ts` (the 资料卡 DTO + its 备注 / 共同群聊 / 添加联系人 channels),
 `report.ts` (the phased 举报 contract for a person and for one message),
 `reaction.ts` (the 表情回应 chip DTO, display-only for now) and `properties.ts` (the

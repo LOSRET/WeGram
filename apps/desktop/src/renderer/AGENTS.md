@@ -33,6 +33,13 @@ components/composer/       ComposerCard: the ONE bordered input card (§8.4 + §
                          the 表情/收藏/文件/截图/语音 tool row, 发送, the attach menu and the
                          ExpressionPicker. Both composers render it; a caller only says where
                          a send goes, so the comment box is not a cut-down copy of a chat's.
+                         VoiceRecorder: 语音消息's hold gesture, the portalled recording panel,
+                         the 60 s cap and the slide-up cancel (the mic tool flips the card
+                         into WeChat's 按住 说话 mode).
+lib/voice/            语音消息's audio path: oggOpus.ts (pure, unit-tested — OGG pages,
+                      lacing, OpusHead/OpusTags, the OGG CRC-32) and recorder.ts
+                      (getUserMedia → AudioContext 48 kHz → ScriptProcessor → WebCodecs
+                      AudioEncoder → muxed OGG bytes).
 components/chat-pane/     render tree + useChatHistory (history/ modules) + messageActions +
                          useMarkRead (已读上报 effect) + usePeerStatus (在线/最后上线 for a
                          private chat's header) +
@@ -317,6 +324,15 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   `reactions` op replaces rather than merges); a custom-emoji reaction is its
   sticker art by int64-id string. WeChat has no reactions, so there is no picker
   until the owner signs one off — do not add a tap-to-react gesture before that.
+- **The voice gesture is settled from a ref, never from state.** `getUserMedia`
+  and the encoder start asynchronously, so the pointer can be released before the
+  recorder exists: `VoiceRecorder` keeps the session in a ref and, when the
+  recorder promise lands, decides from `released` whether to send or drop it. The
+  recording panel is portalled to `body` on purpose — as a row it would re-measure
+  the virtualised transcript while the reader is holding the button — and the clip
+  crosses IPC as base64 OGG, never as a path (the renderer has no filesystem).
+  `lib/voice/oggOpus.ts` is the only part that must stay pure and tested: Chromium
+  cannot record OGG, so the container is written here, not by a library.
 - **标为未读 is a dot, not a count.** `ChatSummary.markedUnread` draws a bare
   `.wx-badge--dot` when `unread` is 0; opening the chat clears the flag (the adapter
   does it). Do not render it through the count badge.

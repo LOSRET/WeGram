@@ -41,13 +41,17 @@ telegram/tdlib/actions/  TDLib requests as functions over ActionDeps, grouped in
 telegram/tdlib/chat-api.ts  createChatApi: the chat seam methods (list/open/mute/pin/
                     members/title/join) as one object the adapter class binds; split
                     out of index.ts when the 频道底栏 methods hit its line budget
+telegram/tdlib/send-api.ts  createSendApi: the message seam methods (send/edit/delete/
+                    forward/read/typing/retry/media/album/sticker/voice), split out of
+                    index.ts at the same budget when 语音消息's send landed
 telegram/tdlib/user-api.ts  createUserApi: the person seam methods (userStatus, 资料卡,
                     共同群聊, 举报 and the note / contact writes) as one bound object,
                     split out of index.ts at the same budget
 media/              registry.ts (token → path | fileId) / protocol.ts (wx-media://: disk
                     Range streams, plus the branch that tails a download) / stream.ts
                     (the byte pump, pure) / leases.ts (per-file download holders, pure) /
-                    image-size.ts
+                    image-size.ts / voice-file.ts (a recorded 语音消息's temporary OGG:
+                    written by the handler, pruned at startup once stale)
 store/              ui-db.ts (all SQL) / settings.ts (proxy only)
 proxy*.ts           proxy DTO ↔ stored config
 security/secrets.ts safeStorage (DPAPI) seal/unseal
@@ -71,6 +75,14 @@ change belongs in the adapter.
   *before* the transfer was queued** — empty `local.path` for a cold clip, sometimes a zero
   `expected_size` — so `beginStream` waits for `getFile` to report the path; the first answer
   is never "this file cannot be streamed".
+- **A recorded voice note outlives its send call.** `messages:sendVoice` writes the
+  renderer's base64 to `userData/voice/…ogg` and TDLib uploads from that path
+  *after* `sendMessage` answers the pending row, so deleting the file in the handler
+  would race the upload; the handler deletes only on failure, and
+  `media/voice-file.ts` prunes recordings older than 6 h at startup. The microphone
+  is granted to the shell window only (`index.ts`, both the request and the check
+  handler): Electron's default with no handler is "allow everything", which would
+  let the login / 群二维码 / viewer windows open a device.
 - **The renderer never sees a filesystem path.** Only the adapters may call
   `media/registry.ts` to mint a `wx-media://f/<token>` URL; `media/protocol.ts`
   resolves tokens and never request paths, and it must keep Range support.

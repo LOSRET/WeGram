@@ -21,7 +21,7 @@ anything visual.
 - The five gaps that make a messenger feel unfinished are all small:
   **send-failure state + retry**, **outgoing typing**, **online/last-seen**,
   **delete chat / mark unread**, **desktop notifications**.
-- Next tier: **voice notes**, **reactions**, **peer profile card**
+- Next tier: **voice notes** (done, see the P1 status table), **reactions**, **peer profile card**
   (bio / note / common groups / block / report), **album send**, **caption edit**,
   **translate**, **shared-media tabs**, **pinned-message bar**.
 - Calls and secret chats stay out of v1. However, the design doc's reason for
@@ -69,6 +69,17 @@ below is one commit, `pnpm verify`-green, on `feat/private-chat-p1`.
 | 图片说明编辑 | `messages:editCaption`; `editMessageCaption` in `actions/send.ts`; `lib/editTarget.ts`; menu 编辑 / 编辑说明 | The row's kind picks the call (`can_be_edited` covers both): text edits go through `editMessageText`, media captions through `editMessageCaption`. `show_caption_above_media` is read back with `getMessage` first, so an edit never moves a caption from above the picture to below it. An empty caption clears it (the composer allows an empty save only on that path). Mock + browser preview both implement it. |
 | 共同群聊列表 | `users:commonChats` (`protocol/user.ts`); `actions/users.ts userCommonChats` (`getGroupsInCommon`); `tdlib/user-api.ts`; `ProfileCard` 共同群聊行 → the row opens | The card shows the count (`userFullInfo.group_in_common_count`) and fetches one page of chat rows only when the reader opens the row (`limit: 50`, `offset` = TDLib's `offset_chat_id`); tapping a row opens that conversation. Photos come through `evt:avatars` like a chat-list page. Fixtures: `commonChatIds` on the person's seed (妈 shares 2 and 4; Ada shares 2), read by both fakes. |
 | 资料卡入口补全 | `ChatInfoPanel` (聊天信息) renders the private chat's face as a button → `ProfileCard` in a portal; Esc closes the card before the panel | The card no longer needs the header: WeChat's own group panel opens the person from the avatar tile, and the panel + card are one sheet stack (the card is portalled out of the panel's transform). |
+| 语音消息 | `messages:sendVoice` (`packages/protocol/src/voice.ts`); main writes the bytes to `userData/voice`
+(`main/media/voice-file.ts`), the TDLib action is `inputMessageVoiceNote` (`actions/send.ts voiceContent`),
+and mock + browser preview answer the same channel. The renderer records with WebCodecs (`lib/voice/recorder.ts`)
+and muxes OGG/Opus itself (`lib/voice/oggOpus.ts`, unit-tested); the UI is WeChat's 按住 说话 mode
+(`components/composer/VoiceRecorder.tsx`) with a 60 s cap, slide-up cancel and a `chatActionRecordingVoiceNote`
+while the mic is live | No new dependency: Chromium hands over raw Opus packets through `AudioEncoder`, so the
+WebM→OGG muxer decision (§9.5) is moot. The waveform is sent **empty** on purpose (§6.1). **Mock Electron pass
+done** (fake media device): 2 s hold → a voice bubble whose `<audio>` decodes the clip (`duration 1.9`,
+`readyState 4`), chat preview `[语音]`, no error bar, and the recorded file is a valid 4-page OGG (OpusHead,
+OpusTags, 2 audio pages, 91 200 samples, EOS). Slide-up past 48 px sends nothing. The real TDLib write is
+test-DC unverified (§11). |
 | 单条消息举报 | `messages:report` (`protocol/report.ts`); `actions/users.ts reportMessage` (`reportChat` with `message_ids`); `messageProperties.canReportChat`; menu 举报 → the shared `ReportDialog` | The context menu offers 举报 only where TDLib's `can_report_chat` allows it, and the sheet files the report against that chat with the message attached. `messagesRequired` on a chat-level report now points the reader at the message menu instead of claiming failure. Mock + browser preview answer the same phases. |
 
 ## 1. What already works (do not rebuild it)
@@ -132,7 +143,7 @@ person-days, for this repo's conventions.
 | P0 | Online / last seen | No field, no update handler, no UI slot | `user.status`, `updateUserStatus`, `userStatusOnline/Offline/Recently/LastWeek/LastMonth` | 0.5–1 |
 | P0 | 删除聊天 / 标为未读 | Only 清空, and it passes `remove_from_chat_list: false`; no mark-unread | `deleteChatHistory(remove_from_chat_list, revoke)`; `toggleChatIsMarkedAsUnread` + `updateChatIsMarkedAsUnread` | 1 |
 | P0 | Desktop notifications / tray | No `updateNotification*`, no `Notification`, no tray | `updateNotificationGroup`, `updateNotification` | 2–3 |
-| P1 | Voice message recording/send | Toolbar entry only toasts 还没有接入 | `inputMessageVoiceNote` + `inputVoiceNote` + `chatActionRecordingVoiceNote` | 3–5 |
+| P1 | Voice message recording/send | ~~Toolbar entry only toasts 还没有接入~~ — **done**, see the P1 status table | `inputMessageVoiceNote` + `inputVoiceNote` + `chatActionRecordingVoiceNote` | 3–5 |
 | P1 | Reactions | ~~Not in DTO, no renderer, no updates~~ — **display done**, picker still needs the owner's sign-off | `addMessageReaction` / `removeMessageReaction` / `setMessageReactions`, `getMessageAvailableReactions`, `updateMessageReactions`, `interaction_info.reactions` | 2–3 |
 | P1 | Peer profile card | ~~Chat title/avatar not clickable; `ContactDetail` 更多资料/备注 are placeholders~~ — **done** (card, 共同群聊 list, and the 聊天信息 face), see the P1 status table | `getUserFullInfo` (bio, note, `group_in_common_count`, `block_list`, `can_be_called`), `getGroupsInCommon` | 2–3 |
 | P1 | Block / unblock | ~~No entry point~~ — **done** (资料卡's 加入黑名单 / 取消拉黑) | `setMessageSenderBlockList` (pass `null` to unblock), `getBlockedMessageSenders` | 1 |
@@ -309,22 +320,51 @@ Incoming typing already works; the other side never sees ours.
 
 ## 6. P1 deep dives
 
-### 6.1 Voice notes
+### 6.1 Voice notes — done 2026-11-22
 
-- Content: `inputMessageVoiceNote { voice_note: inputVoiceNote, caption,
-  self_destruct_type }`; `inputVoiceNote { voice_note: InputFile, duration,
-  waveform }`.
-- Format: Opus in OGG, one channel (MP3/M4A is accepted but arrives as audio,
-  not a voice note). Solve the Chromium encoding question first (§3 notes).
-- Waveform is 5-bit packed samples; TDLib may accept an empty `waveform` — check
-  before building a waveform renderer (the current bubble's waveform is
-  decorative).
-- While recording, send `chatActionRecordingVoiceNote`; stop on send/cancel.
-- Playback already exists (`kind: 'voice'`, `MediaBubble`); do not add a second
-  player.
-- Mic permission: Electron main must allow `media` for the renderer
-  (`session.setPermissionRequestHandler`), and the permission must not leak to
-  other windows.
+How it was built (the audit's assumptions above held except where noted):
+
+- **No OGG encoder in Chromium, so the container is ours.** `MediaRecorder`
+  still cannot emit OGG (§10b), but it is not needed: WebCodecs
+  `AudioEncoder({codec: 'opus'})` returns the raw Opus packets, and
+  `renderer/lib/voice/oggOpus.ts` writes OGG around them — OpusHead, OpusTags,
+  lacing, page sequencing and the CRC-32 in one pure module with unit tests. No
+  dependency was added, so open decision §9.5 is moot.
+- **Capture graph:** `getUserMedia` (mono, echo cancellation / noise suppression /
+  auto-gain) → `AudioContext({sampleRate: 48000})` → `ScriptProcessor` → 20 ms
+  `AudioData` frames → `AudioEncoder`. The processor is deprecated; an
+  AudioWorklet would need a second bundle entry point for one callback. The
+  whole graph lives in `renderer/lib/voice/recorder.ts`; the muxer stays pure and
+  tested.
+- **Bytes cross IPC, not a path.** `messages:sendVoice` carries base64 OGG +
+  `duration` (1–60 s) + optional `replyTo` (`packages/protocol/src/voice.ts`).
+  Main writes `userData/voice/voice-<stamp>-<rand>.ogg`
+  (`main/media/voice-file.ts`) and hands the path to TDLib: the upload starts
+  *after* `sendMessage` answers, so the file must outlive the call — it is pruned
+  at the next start once older than 6 h. A failed send deletes it at once.
+- **Action:** `inputMessageVoiceNote { voice_note: inputFileLocal, duration,
+  waveform: '' }`; `sendMessage` with `options: null`, mapped like any send
+  (`actions/send.ts voiceContent` / `sendVoice`).
+- **Waveform is empty on purpose.** The scheme says "5-bit format" without
+  defining the packing, and the audit said to start with an empty waveform; the
+  bubble's wave is decorative. Revisit only with a real client's bytes to compare.
+- **Chat action:** `messages:typing` gained `action: 'typing' | 'recording'`;
+  the recorder sends `chatActionRecordingVoiceNote` on pointer-down and
+  `typing: false` (a cancel) on release/cancel, fire-and-forget like the typing
+  ping.
+- **UI:** WeChat's 按住 说话 mode. The mic tool toggles the card into voice mode
+  (keyboard glyph back), the textarea is replaced by a hold button, and a
+  portalled dark panel shows elapsed time + a level wave. Release sends, sliding
+  up > 48 px or Esc cancels, 60 s auto-sends. A gesture released before the
+  microphone opens is remembered in a ref and settled when the recorder starts.
+- **Mic permission:** main narrows `media` to the shell window
+  (`session.setPermissionRequestHandler` + `setPermissionCheckHandler`); every
+  other permission keeps Electron's default. The login, 群二维码 and viewer
+  windows cannot open a device.
+- **Scope:** the chat composer only. The comment composer shares the card but
+  passes no `onSendVoice`, so its mic still reports 还没有接入.
+- Playback was left alone: the existing `kind: 'voice'` bubble plays the clip
+  through `wx-media://` (mock and preview mint their own local URL).
 
 ### 6.2 Reactions
 
@@ -480,8 +520,10 @@ probe writes against the real session in `spikes/tdlib/data`.
    never "delete for everyone".
 4. **Notifications** — all messages or unmuted only? Show sender + preview text
    (privacy) or just "新消息"?
-5. **Voice notes** — if a WebM→OGG muxer needs a new dependency, is that
-   approved? Otherwise the fallback is audio-message semantics.
+5. ~~**Voice notes** — if a WebM→OGG muxer needs a new dependency, is that
+   approved? Otherwise the fallback is audio-message semantics.~~ **Resolved
+   2026-11-22 without a dependency**: WebCodecs gives raw Opus and the OGG muxer
+   is in-repo (§6.1).
 6. **Calls / secret chats** — keep out of v1; only the wording of the reason
    changes (§10).
 
@@ -524,13 +566,14 @@ Where it was measured: Edge 157 (Chromium 157, Windows). The probe is upstream
 45.4.1**, so re-run the same probe inside the app when voice notes are actually
 scheduled (one `isTypeSupported` call on any page).
 
-Consequences for the §6.1 plan:
+Consequences for the §6.1 plan (and what was actually done):
 
 - Recording works, but produces **WebM/Opus** (or MP4/AAC), never OGG/Opus.
   TDLib accepts MP3/M4A as a regular *audio* message, not as a voice note.
-- Turning WebM/Opus into OGG/Opus needs an **Opus OGG muxer** — a new dependency,
-  which is exactly the open decision §9.5. Without it, voice notes are either
-  (a) an audio message (honest, but not WeChat's bubble), or (b) a new dependency.
+- Turning WebM/Opus into OGG/Opus **would** need a muxer dependency — but the
+  route taken skips `MediaRecorder` entirely: WebCodecs `AudioEncoder` emits
+  raw Opus packets, so only the container had to be written, and that is
+  `renderer/lib/voice/oggOpus.ts` (in-repo, tested). Decision §9.5 is closed.
 - Round video notes (`inputVideoNote`, MPEG4/H.264 ≤ 640) look feasible: MP4/H.264
   recording is supported. That still needs a real capture spike, plus the mic/camera
   permission handler in main.
@@ -538,9 +581,28 @@ Consequences for the §6.1 plan:
 ## 11. What this audit did not verify
 
 - No runtime behavior, no real account, no test-DC writes.
+- **Voice-note runtime pass (2026-11-22, mock adapter only):** done, and it is the
+  strongest evidence this batch has. The mock app ran in an isolated profile next
+  to the real-account instance (`%APPDATA%\WeGram` pins `userData`, and the
+  single-instance lock is per profile, so the run temporarily honoured a
+  `WEGRAM_USER_DATA` override that was *not* kept), with
+  `--use-fake-device-for-media-stream` so a real microphone was unnecessary.
+  Measured: a 2 s hold produced a voice bubble whose `<audio>` decoded the clip
+  (`duration 1.9`, `readyState 4`), the chat preview became `[语音]`, no error
+  bar appeared, and the file under `userData/voice` parsed as a valid OGG/Opus
+  container (4 pages, 91 200 samples = 1.9 s, last page EOS, 5 805 bytes).
+  Sliding up past the 48 px cancel distance showed 松开 取消 and sent nothing.
+  The only console warning was Chromium's expected `ScriptProcessorNode`
+  deprecation.
+- **Still open:** `inputMessageVoiceNote` against real TDLib has never been sent —
+  run the same clip on the test DC (`WEGRAM_TDLIB_TEST_DC=1`) before calling the
+  write path proven, and confirm the server accepts an empty `waveform`. A real
+  microphone (as opposed to the fake device) is also unmeasured.
 - TDLib field semantics beyond the scheme comments (e.g. whether an empty
   waveform is accepted, whether the message id actually changes).
-- Electron 45 codec support for OGG/Opus and MP4/H.264 recording.
+- Electron 45 codec support for OGG/Opus and MP4/H.264 recording. (Voice
+  notes sidestep OGG *recording*; only `AudioEncoder`'s opus support matters
+  now, and that is still unmeasured in Electron 45.)
 - Windows notification/badge specifics on this machine.
 - Secret-chat E2E support in TDLib 1.8.70.
 

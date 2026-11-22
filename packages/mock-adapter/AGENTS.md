@@ -23,7 +23,8 @@ credentials (development only), plus the real PNG/WebP/TGS/WebM media it generat
 - `users.ts` — 资料卡 for the fixture people: the card's data, 共同群聊 (from the
   seed's `commonChatIds`), its 备注 / 添加删除联系人 writes and the phased 举报 answer
   (person and one message), kept in an in-session override map (nothing persists).
-- `sends.ts` — the outgoing path (text / one media file / 相册 / sticker) as one
+- `sends.ts` — the outgoing path (text / one media file / 相册 / sticker / 语音消息 ->
+  the voice row `buildVoiceMessage` in `media.ts`) as one
   `createMockSends` factory: build the row, append it, start the fake upload. It is
   constructed in `MockAdapter`'s constructor rather than as a field initializer,
   because it reads `assets`.
