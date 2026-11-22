@@ -2,13 +2,14 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import type { AppInfo, AuthState } from '@wegram/protocol'
-import { app, BrowserWindow, dialog } from 'electron'
+import { app, BrowserWindow, dialog, session } from 'electron'
 
 import { parseApiCredentials } from './credentials'
 import { createHandlers } from './ipc/handlers'
 import { registerIpc, unregisterIpc } from './ipc/router'
 import { closeLoginWindow, createLoginWindow, getLoginWindow } from './login-window'
 import { installMediaProtocol, registerMediaScheme } from './media/protocol'
+import { pruneVoiceNotes } from './media/voice-file'
 import { NotificationCenter } from './notifications'
 import { storedProxyToConfig } from './proxy'
 import { parseProxyUrl } from './proxy-url'
@@ -89,6 +90,34 @@ async function bootstrap(): Promise<void> {
   // A viewer opened before the first theme change must still get a dark strip,
   // so seed the module with the stored theme instead of defaulting to light.
   setViewerTheme(storedTheme(db))
+
+  // Recordings nobody can still be uploading are dead weight (see voice-file.ts).
+  void pruneVoiceNotes(join(userDataDir, 'voice')).then((removed) => {
+    if (removed > 0) logger.info(`pruned ${removed} old voice recording(s)`)
+  })
+
+  /**
+   * The microphone is granted to the shell only.
+   *
+   * 语音消息 needs `getUserMedia` in the renderer, and Electron's default with no
+   * handler is "allow everything" — which would also let the login, 群二维码 and
+   * viewer windows open a device. Every other permission keeps that default (the
+   * contact card's clipboard write is one); only `media` is narrowed, and only to
+   * the window that actually owns the composer.
+   */
+  const isShell = (contents: Electron.WebContents | null): boolean =>
+    mainWindow !== null && !mainWindow.isDestroyed() && contents === mainWindow.webContents
+  session.defaultSession.setPermissionRequestHandler((contents, permission, callback) => {
+    if (permission !== 'media') {
+      callback(true)
+      return
+    }
+    if (!isShell(contents)) logger.warn('refused microphone access outside the shell window')
+    callback(isShell(contents))
+  })
+  session.defaultSession.setPermissionCheckHandler((contents, permission) =>
+    permission === 'media' ? isShell(contents) : true,
+  )
 
   // Credentials come from the environment (.env in development) and, for a release
   // artifact, from the value the build inlined (electron.vite.config.ts).

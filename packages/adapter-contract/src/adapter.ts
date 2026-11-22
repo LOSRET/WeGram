@@ -293,9 +293,10 @@ export interface TelegramAdapter {
   markRead(input: InvokeRequest<'messages:read'>): Promise<void>
   /**
    * 对方正在输入: one `sendChatAction` for the chat. A failure is swallowed on
-   * purpose — a typing ping must never raise the error bar.
+   * purpose — a typing ping must never raise the error bar. `action` picks the
+   * indicator the peer sees (`recording` = a voice note is being held down).
    */
-  sendTyping(chatId: number, typing: boolean): Promise<void>
+  sendTyping(chatId: number, typing: boolean, action?: 'typing' | 'recording'): Promise<void>
   /**
    * 重试 a failed message (`messages:resend` → TDLib `resendMessages`). The new
    * states arrive as message ops; the answer carries nothing else.
@@ -327,6 +328,18 @@ export interface TelegramAdapter {
     localId: string
     message: Message
   }>
+  /**
+   * 语音消息. Takes a *file path*, not the renderer's bytes: main has already
+   * written the recording to a temporary OGG (see `messages:sendVoice`), because
+   * TDLib uploads from disk and the renderer never touches the filesystem.
+   * `duration` is whole seconds; the voice note arrives as an ordinary message.
+   */
+  sendVoiceNote(input: {
+    chatId: number
+    filePath: string
+    duration: number
+    replyTo?: number
+  }): Promise<{ localId: string; message: Message }>
 
   listStickerSets(): Promise<StickerSetSummary[]>
   getStickerSet(setId: string): Promise<StickerSet>

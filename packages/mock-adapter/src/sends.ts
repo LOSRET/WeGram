@@ -9,6 +9,7 @@ import {
   buildAlbumMessages,
   buildMediaMessage,
   buildStickerMessage,
+  buildVoiceMessage,
   type MockSendDeps,
 } from './media'
 import { appendMessage, outgoingMessage } from './transcript'
@@ -124,6 +125,27 @@ export function createMockSends(store: MockSendStore) {
     }
   }
 
+  /**
+   * 语音消息: the OGG main wrote from the renderer's recording. The row is a voice
+   * bubble with its duration and a real local file, so playback goes through the
+   * same registry as every other outgoing media.
+   */
+  const sendVoice = async (input: {
+    chatId: number
+    filePath: string
+    duration: number
+    replyTo?: number
+  }): Promise<{ localId: string; message: Message }> => {
+    const fixture = requireFixture(input.chatId)
+    const built = await buildVoiceMessage(store.sendDeps(), {
+      ...input,
+      id: store.takeMessageId(),
+    })
+    append(fixture, built.message, built.preview)
+    upload(built.fileId, built.size)
+    return { localId: `mock-${built.message.id}`, message: built.message }
+  }
+
   const sendSticker = async (input: {
     chatId: number
     fileId: number
@@ -138,5 +160,5 @@ export function createMockSends(store: MockSendStore) {
     return { localId: `mock-${built.message.id}`, message: built.message }
   }
 
-  return { sendText, sendMedia, sendAlbum, sendSticker }
+  return { sendText, sendMedia, sendAlbum, sendSticker, sendVoice }
 }

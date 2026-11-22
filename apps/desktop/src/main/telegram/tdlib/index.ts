@@ -19,7 +19,7 @@ import type {
 
 import { createLogger, toAdapterError } from '../../util'
 import { AdapterEmitter } from '../adapter'
-import type { MediaKind, TelegramAdapter } from '../adapter'
+import type { TelegramAdapter } from '../adapter'
 import * as actions from './actions'
 import type { ActionDeps } from './actions'
 import * as auth from './auth'
@@ -34,6 +34,7 @@ import { setProxy as applyProxyConfig, testProxy as testProxyConfig } from './pr
 import type { ProxyDeps } from './proxy'
 import * as stickers from './stickers'
 import { createChatApi } from './chat-api'
+import { createSendApi } from './send-api'
 import { createUserApi } from './user-api'
 import { createUpdateHandler } from './updates'
 
@@ -360,42 +361,20 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     return actions.addPollOption(this.actionDeps, input)
   }
 
-  async sendText(input: {
-    chatId: number
-    text: string
-    replyTo?: number
-  }): Promise<{ localId: string; message: Message }> {
-    return actions.sendText(this.actionDeps, input)
-  }
-
-  async editText(input: { chatId: number; messageId: number; text: string }): Promise<Message> {
-    return actions.editText(this.actionDeps, input)
-  }
-
-  /** 编辑说明: a media message's caption; see `actions/editCaption`. */
-  async editCaption(input: {
-    chatId: number
-    messageId: number
-    caption: string
-  }): Promise<Message> {
-    return actions.editCaption(this.actionDeps, input)
-  }
-
-  async deleteMessages(input: {
-    chatId: number
-    messageIds: number[]
-    forBoth: boolean
-  }): Promise<void> {
-    return actions.deleteMessages(this.actionDeps, input)
-  }
-
-  async forwardMessages(input: {
-    fromChatId: number
-    messageIds: number[]
-    toChatId: number
-  }): Promise<void> {
-    return actions.forwardMessages(this.actionDeps, input)
-  }
+  /** Sends, edits and deletes; `send-api.ts`, deps read lazily. */
+  private readonly sendApi = createSendApi(() => this.actionDeps)
+  readonly sendText = this.sendApi.sendText
+  readonly editText = this.sendApi.editText
+  readonly editCaption = this.sendApi.editCaption
+  readonly deleteMessages = this.sendApi.deleteMessages
+  readonly forwardMessages = this.sendApi.forwardMessages
+  readonly markRead = this.sendApi.markRead
+  readonly sendTyping = this.sendApi.sendTyping
+  readonly resendMessages = this.sendApi.resendMessages
+  readonly sendMedia = this.sendApi.sendMedia
+  readonly sendAlbum = this.sendApi.sendAlbum
+  readonly sendSticker = this.sendApi.sendSticker
+  readonly sendVoiceNote = this.sendApi.sendVoiceNote
 
   async messageProperties(input: InvokeRequest<'messages:properties'>): Promise<MessageProperties> {
     return actions.messageProperties(this.actionDeps, input)
@@ -404,10 +383,6 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   /** 转文字; the transcript arrives as a content update. */
   async transcribeMessage(input: { chatId: number; messageId: number }): Promise<void> {
     return actions.transcribeMessage(this.actionDeps, input)
-  }
-
-  async markRead(input: { chatId: number; upToMessageId: number }): Promise<void> {
-    return actions.markRead(this.actionDeps, input)
   }
 
   /** 在线/最后上线, 资料卡 and 共同群聊; `user-api.ts`, deps read lazily. */
@@ -420,14 +395,6 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   readonly setUserBlocked = this.userApi.setUserBlocked
   readonly reportUser = this.userApi.reportUser
   readonly reportMessage = this.userApi.reportMessage
-
-  async sendTyping(chatId: number, typing: boolean): Promise<void> {
-    return actions.sendTyping(this.actionDeps, chatId, typing)
-  }
-
-  async resendMessages(chatId: number, messageIds: number[]): Promise<void> {
-    return actions.resendMessages(this.actionDeps, chatId, messageIds)
-  }
 
   async searchGlobal(input: { q: string; limit: number }): Promise<ChatSummary[]> {
     return actions.searchGlobal(this.actionDeps, input)
@@ -464,33 +431,6 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
 
   cancelDownload(fileId: number): Promise<void> {
     return actions.cancelDownload(this.actionDeps, fileId)
-  }
-
-  async sendMedia(input: {
-    chatId: number
-    filePath: string
-    kind: MediaKind
-    caption?: string
-    replyTo?: number
-  }): Promise<{ localId: string; message: Message }> {
-    return actions.sendMedia(this.actionDeps, input)
-  }
-
-  /** 相册: several photos in one album; see `actions/send.ts sendAlbum`. */
-  async sendAlbum(input: {
-    chatId: number
-    items: Array<{ filePath: string; kind: MediaKind; caption?: string }>
-    replyTo?: number
-  }): Promise<{ localIds: string[]; messages: Message[] }> {
-    return actions.sendAlbum(this.actionDeps, input)
-  }
-
-  async sendSticker(input: {
-    chatId: number
-    fileId: number
-    replyTo?: number
-  }): Promise<{ localId: string; message: Message }> {
-    return actions.sendSticker(this.actionDeps, input)
   }
 
   async listStickerSets(): Promise<StickerSetSummary[]> {

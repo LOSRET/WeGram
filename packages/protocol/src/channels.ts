@@ -6,6 +6,7 @@ import { bootStateSchema } from './boot'
 import { chatSummarySchema } from './chat'
 import type { EventChannel, EventEnvelope } from './events'
 import { sendInvokeChannels, sendInvokeSchemas } from './send'
+import { voiceInvokeChannels, voiceInvokeSchemas } from './voice'
 import { presenceInvokeChannels, presenceInvokeSchemas } from './presence'
 import { userInvokeChannels, userInvokeSchemas } from './user'
 import { reportInvokeChannels, reportInvokeSchemas } from './report'
@@ -117,6 +118,8 @@ export const invokeChannels = [
   'messages:sendSticker',
   /** Outgoing typing and failed-message retry; see ./send.ts. */
   ...sendInvokeChannels,
+  /** 语音消息: a recorded OGG/Opus clip; see ./voice.ts. */
+  ...voiceInvokeChannels,
   ...presenceInvokeChannels,
   /** 资料卡: the person card and its 备注 / 联系人 writes; see ./user.ts. */
   ...userInvokeChannels,
@@ -318,6 +321,7 @@ export const invokeSchemas = {
     response: z.object({ localId: z.string(), message: messageSchema }),
   },
   ...sendInvokeSchemas,
+  ...voiceInvokeSchemas,
   ...presenceInvokeSchemas,
   ...userInvokeSchemas,
   ...reportInvokeSchemas,

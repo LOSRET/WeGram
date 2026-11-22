@@ -25,7 +25,16 @@ export const sendInvokeChannels = [
 
 export const sendInvokeSchemas = {
   'messages:typing': {
-    request: z.object({ chatId: z.number().int(), typing: z.boolean() }),
+    request: z.object({
+      chatId: z.number().int(),
+      typing: z.boolean(),
+      /**
+       * What the peer sees while the box is busy. `recording` is a voice note
+       * being held down (TDLib `chatActionRecordingVoiceNote`); a cancel
+       * (`typing: false`) ends either one.
+       */
+      action: z.enum(['typing', 'recording']).optional(),
+    }),
     response: z.void(),
   },
   'messages:resend': {

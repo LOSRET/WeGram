@@ -128,6 +128,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     this.sendMedia = this.sends.sendMedia
     this.sendAlbum = this.sends.sendAlbum
     this.sendSticker = this.sends.sendSticker
+    this.sendVoiceNote = this.sends.sendVoice
     this.avatars = new MockAvatars({
       mediaDir: options.mediaDir,
       registerMedia: options.registerMedia,
@@ -336,6 +337,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   readonly sendMedia: TelegramAdapter['sendMedia']
   readonly sendAlbum: TelegramAdapter['sendAlbum']
   readonly sendSticker: TelegramAdapter['sendSticker']
+  readonly sendVoiceNote: TelegramAdapter['sendVoiceNote']
 
   /** What the outgoing-message builders need; also handed to the comment threads. */
   private sendDeps(): MockSendDeps {

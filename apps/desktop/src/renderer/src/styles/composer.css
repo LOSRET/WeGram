@@ -217,3 +217,90 @@
 .wx-composer-bar__close:hover {
   color: var(--wx-text);
 }
+
+/* ---------- 语音消息 ----------
+   A voice note is held down, not typed. While the mic tool is active the card's
+   textarea gives way to WeChat's 按住 说话 bar, and the recording panel floats
+   over the pane (portalled to body) so the virtualised list never re-measures a
+   row while the reader is holding the button. */
+
+.wx-composer__hold {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 84px;
+  margin: 8px 10px 0;
+  border: 1px solid var(--wx-line);
+  border-radius: 6px;
+  background: var(--wx-divider);
+  font-size: 15px;
+  color: var(--wx-text);
+  user-select: none;
+  touch-action: none;
+}
+
+.wx-composer__hold:hover:not(:disabled) {
+  background: var(--wx-row-hover);
+}
+
+.wx-composer__hold--live,
+.wx-composer__hold--live:hover {
+  background: var(--wx-row-selected);
+}
+
+.wx-composer__hold:disabled {
+  color: var(--wx-text-tertiary);
+  cursor: default;
+}
+
+.wx-voice-rec {
+  position: fixed;
+  inset: 0;
+  z-index: 85;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.wx-voice-rec__panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 208px;
+  padding: 18px 16px 14px;
+  border-radius: 12px;
+  background: var(--wx-rec-surface);
+  color: var(--wx-rec-text);
+}
+
+.wx-voice-rec__panel--cancel {
+  background: var(--wx-rec-cancel-surface);
+}
+
+.wx-voice-rec__wave {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 46px;
+}
+
+.wx-voice-rec__wave span {
+  width: 3px;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.85;
+  /* The bar heights come from the recorder's level, one step per 100 ms. */
+  transition: height 90ms linear;
+}
+
+.wx-voice-rec__time {
+  font-size: 13px;
+  letter-spacing: 0.5px;
+}
+
+.wx-voice-rec__hint {
+  font-size: 12px;
+  color: var(--wx-rec-hint);
+}

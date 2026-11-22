@@ -8,7 +8,6 @@ import type {
   InvokeChannel,
   InvokeRequest,
   InvokeResponse,
-  Message,
   ProxyConfig,
   ProxyTestResult,
   StickerSetSummary,
@@ -23,11 +22,10 @@ import {
   previewAround,
   previewHistory,
   previewMarkRead,
-  previewMessageProperties,
   previewNewer,
-  previewTranscribe,
   type PreviewMessagesStore,
 } from './messages'
+import { handlePreviewSend, type PreviewSendContext } from './sends'
 import { handlePreviewPoll } from './polls'
 import { createPreviewProfileState, handlePreviewProfile, isProfileChannel } from './profile'
 import { handlePreviewUi } from './ui'
@@ -51,20 +49,17 @@ import {
   setPreviewTitle,
   type PreviewChatStore,
 } from './chats'
-import { stickerMedia } from '../stickerMedia'
 import {
   ME,
   chats,
   contacts,
   info,
-  media,
   messagesByChat,
   msg,
   now,
   previewCommonChatsFor,
   previewCustomEmoji,
   previewStickerSet,
-  PREVIEW_STICKERS,
   channelNotJoined,
   channelPostRights,
 } from './fixtures'
@@ -119,6 +114,14 @@ function clearQrTimer(): void {
 const previewMessagesStore: PreviewMessagesStore = { chats, messagesByChat, emit }
 
 let nextId = 9000
+/** The sends' view of this session; their rules live in ./sends.ts. */
+const previewSendContext: PreviewSendContext = {
+  chats,
+  messagesByChat,
+  messages: previewMessagesStore,
+  emit,
+  takeId: () => nextId++,
+}
 /** 资料卡's in-session 备注 / 联系人 overrides (the preview has no store to write). */
 const previewProfile = createPreviewProfileState()
 /** chatId → the one message this session pinned (the fixture ships none). */
@@ -344,83 +347,17 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'messages:joinCommentGroup':
     case 'messages:sendComment':
       return handlePreviewComments(channel, store, messagesByChat, emit)
-    case 'messages:send': {
-      const list = messagesByChat[store.chatId] ?? []
-      const message = msg(store.chatId, nextId++, String(store.text), true, 0)
-      if (typeof store.replyTo === 'number') message.replyToId = store.replyTo
-      list.push(message)
-      messagesByChat[store.chatId] = list
-      const chat = chats.find((item) => item.id === store.chatId)
-      if (chat) {
-        chat.lastMessageText = message.text
-        chat.lastMessageAt = message.date
-        emit('evt:chats', { ops: [{ op: 'upsert', chat: { ...chat } }] })
-      }
-      return { localId: `web-${message.id}`, message }
-    }
-    case 'messages:edit': {
-      const list = messagesByChat[store.chatId] ?? []
-      const target = list.find((item) => item.id === store.messageId)
-      if (!target) throw { code: 'internal', message: 'message not found' }
-      target.text = String(store.text)
-      target.edited = true
-      return target
-    }
-    case 'messages:editCaption': {
-      const list = messagesByChat[store.chatId] ?? []
-      const target = list.find((item) => item.id === store.messageId)
-      if (!target) throw { code: 'internal', message: 'message not found' }
-      target.text = String(store.caption ?? '')
-      target.edited = true
-      return { ...target }
-    }
-    /** 转文字: the fake transcript lives in ./messages.ts. */
+    /** Sending, editing and row mutations; their rules live in ./sends.ts. */
+    case 'messages:send':
+    case 'messages:edit':
+    case 'messages:editCaption':
     case 'messages:transcribe':
-      return previewTranscribe(previewMessagesStore, Number(store.chatId), Number(store.messageId))
-    /** The capability question; its rule lives in ./messages.ts. */
     case 'messages:properties':
-      return previewMessageProperties(
-        previewMessagesStore,
-        Number(store.chatId),
-        Number(store.messageId),
-      )
-    case 'messages:delete': {
-      const ids = store.messageIds as number[]
-      messagesByChat[store.chatId] = (messagesByChat[store.chatId] ?? []).filter(
-        (item) => !ids.includes(item.id),
-      )
-      return undefined
-    }
-    case 'messages:forward': {
-      const ids = store.messageIds as number[]
-      const source = messagesByChat[store.fromChatId] ?? []
-      const target = messagesByChat[store.toChatId] ?? []
-      for (const id of ids) {
-        const original = source.find((item) => item.id === id)
-        if (original) target.push({ ...original, id: nextId++, chatId: store.toChatId })
-      }
-      messagesByChat[store.toChatId] = target
-      return undefined
-    }
-    case 'messages:sendSticker': {
-      const sticker = PREVIEW_STICKERS.find((item) => item.fileId === store.fileId)
-      if (!sticker) throw { code: 'internal', message: 'unknown sticker' }
-      const list = messagesByChat[store.chatId] ?? []
-      const message: Message = {
-        id: nextId++,
-        chatId: store.chatId,
-        senderId: ME.id,
-        senderName: '我',
-        outgoing: true,
-        date: now(),
-        kind: 'sticker',
-        text: '',
-        media: media(sticker.fileId, stickerMedia(sticker)),
-      }
-      list.push(message)
-      messagesByChat[store.chatId] = list
-      return { localId: `web-${message.id}`, message }
-    }
+    case 'messages:delete':
+    case 'messages:forward':
+    case 'messages:sendSticker':
+    case 'messages:sendVoice':
+      return handlePreviewSend(channel, store, previewSendContext)
     case 'media:pick':
     case 'media:download':
     case 'media:cancel':

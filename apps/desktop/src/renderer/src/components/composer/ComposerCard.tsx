@@ -8,6 +8,7 @@ import {
   type RefObject,
 } from 'react'
 
+import type { RecordedVoice } from '../../lib/voice/recorder'
 import type { useComposerInput } from '../../lib/useComposerInput'
 import { anchorOf, type PopupAnchor } from '../../lib/popupPlacement'
 import { AnchoredPopup } from '../ContextMenu'
@@ -20,6 +21,8 @@ import {
   MicIcon,
   ScissorsIcon,
 } from '../Icon'
+import { KeyboardIcon } from '../WechatIcons'
+import { VoiceRecorder } from './VoiceRecorder'
 
 export interface ComposerCardProps {
   value: string
@@ -38,6 +41,13 @@ export interface ComposerCardProps {
   onSend: () => void
   onSendSticker: (sticker: Sticker) => void
   onAttach: (kind: 'photo' | 'file') => void
+  /**
+   * 语音消息's send path. Absent where a recording has nowhere to go (the comment
+   * composer), which leaves the mic tool reporting "还没有接入" like before.
+   */
+  onSendVoice?: (voice: RecordedVoice) => Promise<void> | void
+  /** True while the microphone is live; the caller forwards it as a chat action. */
+  onRecordingChange?: (recording: boolean) => void
   /** A toolbar entry with no protocol behind it yet (收藏 / 截图 / 语音). */
   onNotice: (label: string) => void
   /** A channel's way back to the 服务号 bar; absent everywhere else. */
@@ -69,11 +79,15 @@ export function ComposerCard({
   onSend,
   onSendSticker,
   onAttach,
+  onSendVoice,
+  onRecordingChange,
   onNotice,
   onCollapse,
   onBlur,
 }: ComposerCardProps) {
   const [pickerOpen, setPickerOpen] = useState(false)
+  /** 语音消息 mode: the textarea gives way to WeChat's 按住 说话 bar. */
+  const [voiceMode, setVoiceMode] = useState(false)
   const [attachAnchor, setAttachAnchor] = useState<PopupAnchor | null>(null)
   /** Where the next render should put the caret after an emoji pick. */
   const pendingCaret = useRef<number | null>(null)
@@ -111,21 +125,35 @@ export function ComposerCard({
   const closeAttach = useCallback(() => setAttachAnchor(null), [])
 
   const toolsDisabled = busy || editing
-  const sendReady = !busy && !sendBlocked && value.trim().length > 0
+  /**
+   * 语音消息 mode is only reachable where a recording can be sent, and an edit
+   * (which owns the textarea) always wins over it.
+   */
+  const voiceActive = voiceMode && Boolean(onSendVoice) && !editing
+  // In voice mode the card sends by gesture, so 发送 must not invite an empty send.
+  const sendReady = !busy && !sendBlocked && !voiceActive && value.trim().length > 0
 
   return (
     <>
       <div className="wx-composer__card">
-        <textarea
-          ref={textareaRef}
-          className="wx-composer__input"
-          placeholder={placeholder}
-          title="Enter 发送 · Shift+Enter 换行"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          onBlur={onBlur}
-          {...inputHandlers}
-        />
+        {voiceActive ? (
+          <VoiceRecorder
+            disabled={busy}
+            onSend={(voice) => onSendVoice?.(voice)}
+            {...(onRecordingChange ? { onRecordingChange } : {})}
+          />
+        ) : (
+          <textarea
+            ref={textareaRef}
+            className="wx-composer__input"
+            placeholder={placeholder}
+            title="Enter 发送 · Shift+Enter 换行"
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            onBlur={onBlur}
+            {...inputHandlers}
+          />
+        )}
 
         <div className="wx-composer__actions">
           <div className="wx-composer__tools">
@@ -174,13 +202,21 @@ export function ComposerCard({
               <ChevronDownIcon size={9} className="wx-tool-button__chevron" />
             </button>
             <button
-              className="wx-tool-button"
-              onClick={() => onNotice('语音消息')}
+              className={`wx-tool-button${voiceActive ? ' wx-tool-button--active' : ''}`}
+              onClick={() => {
+                if (!onSendVoice) {
+                  onNotice('语音消息')
+                  return
+                }
+                setPickerOpen(false)
+                setAttachAnchor(null)
+                setVoiceMode((current) => !current)
+              }}
               disabled={toolsDisabled}
-              title="语音消息"
-              aria-label="语音消息"
+              title={voiceActive ? '切换到键盘' : '语音消息'}
+              aria-label={voiceActive ? '切换到键盘' : '语音消息'}
             >
-              <MicIcon size={20} />
+              {voiceActive ? <KeyboardIcon size={20} /> : <MicIcon size={20} />}
             </button>
           </div>
 

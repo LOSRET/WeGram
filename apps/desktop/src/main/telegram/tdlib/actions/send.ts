@@ -118,6 +118,9 @@ export async function sendTyping(
   deps: Pick<ActionDeps, 'invoke' | 'logger'>,
   chatId: number,
   typing: boolean,
+  // A voice note is a different chat action ("recording a voice message"); the
+  // renderer asks for it while the hold-to-record gesture is live.
+  action: 'typing' | 'recording' = 'typing',
 ): Promise<void> {
   try {
     await deps.invoke({
@@ -125,7 +128,13 @@ export async function sendTyping(
       chat_id: chatId,
       topic_id: null,
       business_connection_id: '',
-      action: { _: typing ? 'chatActionTyping' : 'chatActionCancel' },
+      action: {
+        _: !typing
+          ? 'chatActionCancel'
+          : action === 'recording'
+            ? 'chatActionRecordingVoiceNote'
+            : 'chatActionTyping',
+      },
     })
   } catch (error) {
     deps.logger.warn(
@@ -224,6 +233,45 @@ export async function mediaContent(input: {
         },
         caption: formattedText(input.caption),
       }
+}
+
+/**
+ * The `inputMessageVoiceNote` body for a recorded clip (语音消息).
+ *
+ * TDLib accepts a voice note only as Opus inside an OGG container; an MP3 or an
+ * M4A is stored as an ordinary *audio* message and would draw the file bubble.
+ * The renderer produces exactly that container (WebCodecs Opus packets muxed by
+ * `renderer/lib/voice/oggOpus.ts`), main writes it to a temporary file, and
+ * TDLib uploads it from there.
+ *
+ * `waveform` is deliberately empty: the scheme says "5-bit format" without
+ * defining the packing, so the audit's advice (start with an empty waveform) is
+ * what we do until a real client confirms the bytes. The bubble's wave is
+ * decorative anyway.
+ */
+export function voiceContent(input: { filePath: string; duration: number }): TdObject {
+  return {
+    _: 'inputMessageVoiceNote',
+    voice_note: {
+      _: 'inputVoiceNote',
+      voice_note: { _: 'inputFileLocal', path: input.filePath },
+      duration: input.duration,
+      waveform: '',
+    },
+    caption: formattedText(''),
+    self_destruct_type: null,
+  }
+}
+
+/** Sends one recorded voice note; the row comes back mapped like any other send. */
+export async function sendVoice(
+  deps: ActionDeps,
+  input: { chatId: number; filePath: string; duration: number; replyTo?: number },
+): Promise<{ localId: string; message: Message }> {
+  return sendAndMap(deps, input.chatId, voiceContent(input), {
+    replyTo: input.replyTo,
+    options: null,
+  })
 }
 
 /** Sends a local file into a chat (design doc §1: media upload). */

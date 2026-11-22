@@ -8,6 +8,7 @@ import { app, BrowserWindow, clipboard, ClipboardItem, dialog, nativeImage, shel
 import { closeLoginWindow } from '../login-window'
 import { drop, hold } from '../media/leases'
 import { registerStreamFile } from '../media/registry'
+import { writeVoiceNote } from '../media/voice-file'
 import { resolveProxySecrets, toProxyView, toStoredProxy } from '../proxy'
 import { closeQrWindow, getQrWindow, openQrWindow, qrTarget } from '../qr-window'
 import type { SettingsStore } from '../store/settings'
@@ -280,6 +281,28 @@ export function createHandlers({
       return adapter.sendMedia(payload)
     },
     'messages:sendSticker': (payload) => adapter.sendSticker(payload),
+    /**
+     * 语音消息. The bytes come from the renderer's recorder (no native dialog is
+     * involved), so main writes them to `userData/voice` first: TDLib uploads
+     * from disk and the renderer never touches the filesystem. The file outlives
+     * this handler on purpose — the upload starts after `sendMessage` answers —
+     * and `pruneVoiceNotes` cleans it up hours later.
+     */
+    'messages:sendVoice': async (payload) => {
+      const filePath = await writeVoiceNote(join(app.getPath('userData'), 'voice'), payload.audio)
+      try {
+        return await adapter.sendVoiceNote({
+          chatId: payload.chatId,
+          filePath,
+          duration: payload.duration,
+          ...(payload.replyTo === undefined ? {} : { replyTo: payload.replyTo }),
+        })
+      } catch (error) {
+        // Nothing will ever read this recording; a failed send must not leave it.
+        await rm(filePath, { force: true })
+        throw error
+      }
+    },
     'stickers:sets': () => adapter.listStickerSets(),
     'stickers:set': (payload) => adapter.getStickerSet(payload.setId),
     'stickers:customEmoji': (payload) => adapter.customEmojiStickers(payload.ids),

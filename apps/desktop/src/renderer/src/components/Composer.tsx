@@ -5,6 +5,7 @@ import { albumSendOf } from '../lib/albumSend'
 import { loadLatestWindow } from '../lib/anchoredWindow'
 import { TypingPing } from '../lib/typingPing'
 import { useComposerInput } from '../lib/useComposerInput'
+import type { RecordedVoice } from '../lib/voice/recorder'
 import { errorMessage, invoke } from '../lib/ipc'
 import { messagePreview } from '../lib/format'
 import { useAppStore } from '../store/useAppStore'
@@ -205,6 +206,45 @@ export function Composer({
   }
 
   /**
+   * 语音消息. The clip arrives from the composer's recorder already encoded as
+   * OGG/Opus; main writes it to a temporary file and TDLib uploads it. The
+   * anchored-window dance is the same as any other send.
+   */
+  const sendVoice = async (voice: RecordedVoice): Promise<void> => {
+    if (busy) return
+    setBusy(true)
+    try {
+      const wasAnchored = await loadLatestWindow(chatId)
+      const replyToId = replyTo?.id
+      const result = await invoke('messages:sendVoice', {
+        chatId,
+        audio: voice.audio,
+        duration: voice.duration,
+        ...(replyToId === undefined ? {} : { replyTo: replyToId }),
+      })
+      useAppStore.getState().applyMessageOps(chatId, [{ op: 'new', message: result.message }])
+      if (replyToId !== undefined) onCancelReply()
+      if (wasAnchored) useAppStore.getState().requestJumpToLatest(chatId)
+      useAppStore.getState().setToast('已发送语音')
+    } catch (error) {
+      useAppStore.getState().setError(errorMessage(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * 对方正在说. The chat action is fire-and-forget like the typing ping: a failed
+   * presence update must never raise the error bar over the composer, and the
+   * release sends `typing: false` to end either indicator.
+   */
+  const recordingAction = (recording: boolean): void => {
+    void invoke('messages:typing', { chatId, typing: recording, action: 'recording' }).catch(
+      () => undefined,
+    )
+  }
+
+  /**
    * A sticker posted from the 表情 panel, through the chat's own send path.
    * An anchored window cannot take the new row in place, so it returns to the
    * newest page first and the list jumps once the row is in.
@@ -266,6 +306,8 @@ export function Composer({
         onSend={() => void submit()}
         onSendSticker={(sticker) => void sendSticker(sticker)}
         onAttach={(kind) => void attach(kind)}
+        onSendVoice={(voice) => void sendVoice(voice)}
+        onRecordingChange={recordingAction}
         onNotice={notWired}
         {...(onCollapse ? { onCollapse } : {})}
       />
