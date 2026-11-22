@@ -333,17 +333,19 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   Measured on the client: clicking the toolbar mic starts dictation and drops
   recognised text into the box (we have no ASR, so it stays a placeholder),
   while clicking the circled mic starts a clip at once — no push-to-talk, no
-  separate voice mode. `useVoiceRecording` then swaps 发送 for the cancel ×, the
-  dot meter and the green send ↑, and keeps the session in a ref because
+  separate voice mode. `useVoiceRecording` then turns the right cluster into the
+  recording bar (cancel ×, dotted pill, green send circle), and keeps the session
+  in a ref because
   `getUserMedia` and the encoder start asynchronously: a send or cancel pressed
   in that first moment is stored as `want` and applied when the recorder lands.
   Keep the clip on the base64 OGG IPC path (the renderer has no filesystem) and
   keep `lib/voice/oggOpus.ts` pure and tested — Chromium cannot record OGG, so
   the container is written here, not by a library. The recording bar is one
   button with two layers: a grey pill with the dots and a green send circle at
-  its right end, and a `clip-path: circle()` reveal on hover that turns it into
-  the green 发送 bar (both inside the same button, or the expansion would swallow
-  the click). The bubble is `components/VoiceBubble.tsx`: 13", width from
+  its right end, and a 120 ms `clip-path: circle()` reveal that **only the circle**
+  starts (hovering the empty part of the pill does nothing) and that turns it into
+  the green 发送 bar — both layers inside the same button, or the expansion would
+  swallow the click. The bubble is `components/VoiceBubble.tsx`: 13", width from
   `lib/voiceBubble.ts`, waves on the side the client puts them — never a play
   triangle plus a drawn waveform.
 - **标为未读 is a dot, not a count.** `ChatSummary.markedUnread` draws a bare

@@ -76,8 +76,8 @@ and muxes OGG/Opus itself (`lib/voice/oggOpus.ts`, unit-tested); the UI is WeCha
 (`components/composer/useVoiceRecording.ts` + `VoiceControls.tsx`): 发语音 is the circled microphone
 **beside 发送** (the tool-row mic is 语音转文字, i.e. dictation, and stays a placeholder); a click starts the
 clip, the right cluster becomes the recording bar — cancel ×, a grey pill with the dots travelling across
-it and a green send circle at its right end; hovering that circle expands it over the pill (a circular
-reveal) into the green 发送 bar. The bubble is the client's own — width from the clip (`lib/voiceBubble.ts`), seconds as 13", waves on the other
+it and a green send circle at its right end; reaching that circle expands it over the pill (a 120 ms
+circular reveal) into the green 发送 bar, which stays open while the pointer is on the bar. The bubble is the client's own — width from the clip (`lib/voiceBubble.ts`), seconds as 13", waves on the other
 side (`components/VoiceBubble.tsx`). Esc/× cancel and 60 s auto-sends, plus a `chatActionRecordingVoiceNote`
 while the mic is live | No new dependency: Chromium hands over raw Opus packets through `AudioEncoder`, so the
 WebM→OGG muxer decision (§9.5) is moot. The waveform is sent **empty** on purpose (§6.1). **Mock Electron pass
@@ -363,10 +363,11 @@ How it was built (the audit's assumptions above held except where noted):
   the client and has no engine here, so it stays a 还没有接入 placeholder. A click
   on 发语音 starts a clip and the right cluster becomes the pressed bar: a grey
   cancel ×, a grey pill with the green dots travelling across it, and a green
-  circle holding the send arrow at its right end. Hovering that circle expands it
-  over the whole pill — a `clip-path: circle()` reveal — where 发送 and its dots
-  live; clicking sends (no push-to-talk on the desktop), Esc and × cancel, 60 s
-  sends itself. A send/cancel pressed while the microphone is still opening is
+  circle holding the send arrow at its right end. *Only that circle* starts the
+  animation: reaching it expands the green over the whole pill (a 120 ms
+  `clip-path: circle()` reveal), where 发送 and its dots live; the bar stays open
+  while the pointer is anywhere on it and collapses when it leaves. Clicking
+  sends (no push-to-talk on the desktop), Esc and × cancel, 60 s sends itself. A send/cancel pressed while the microphone is still opening is
   remembered in the session ref and applied when the recorder lands
   (`useVoiceRecording.ts`).
 - **Bubble:** the client's, not Telegram's. `MessageMedia.kind = 'voice'` draws

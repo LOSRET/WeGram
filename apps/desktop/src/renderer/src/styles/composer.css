@@ -335,8 +335,8 @@
   clip-path: circle(16px at calc(100% - 16px) 50%);
   opacity: 0;
   transition:
-    clip-path 220ms ease-out,
-    opacity 120ms ease-out;
+    clip-path 120ms ease-out,
+    opacity 70ms ease-out;
 }
 
 .wx-voice-ctl__expand .wx-voice-ctl__dots span {
@@ -347,13 +347,15 @@
   letter-spacing: 0.5px;
 }
 
-.wx-voice-ctl__send:hover .wx-voice-ctl__expand,
+/* Revealed only once the pointer is on the send circle (or the button is
+   focused); it then stays open across the whole bar so 发送 is easy to hit. */
+.wx-voice-ctl__send--revealed .wx-voice-ctl__expand,
 .wx-voice-ctl__send:focus-visible .wx-voice-ctl__expand {
   clip-path: circle(130% at calc(100% - 16px) 50%);
   opacity: 1;
 }
 
-.wx-voice-ctl__send:hover .wx-voice-ctl__circle,
+.wx-voice-ctl__send--revealed .wx-voice-ctl__circle,
 .wx-voice-ctl__send:focus-visible .wx-voice-ctl__circle {
   opacity: 0;
 }
