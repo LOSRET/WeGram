@@ -9,6 +9,7 @@ import {
   pollFooter,
   pollOptionCorrect,
   pollOptionWrong,
+  pollRestrictionText,
   pollResultsVisible,
   pollSelectionChanged,
   pollToggleSelection,
@@ -47,6 +48,7 @@ export function PollBubble({
   const votable = pollVotable(poll) && !busy
   const solution = pollCorrectAnswer(poll)
   const canAddOption = pollCanAddOption(poll)
+  const restriction = pollRestrictionText(poll)
 
   const fail = (cause: unknown): void => {
     useAppStore.getState().setError(errorMessage(cause))
@@ -134,6 +136,7 @@ export function PollBubble({
           )
         })}
       </div>
+      {restriction ? <div className="wx-poll__hint">{restriction}</div> : null}
       {staged ? (
         <div className="wx-poll__actions">
           <button type="button" className="wx-poll__submit" onClick={() => vote(selection)}>
