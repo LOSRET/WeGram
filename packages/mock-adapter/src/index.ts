@@ -288,6 +288,12 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   async setUserContact(userId: number, contact: boolean) {
     return this.users.setContact({ userId, contact })
   }
+  async setUserBlocked(userId: number, blocked: boolean) {
+    return this.users.setBlocked({ userId, blocked })
+  }
+  async reportUser(userId: number, input: { optionId?: string; text?: string }) {
+    return this.users.report({ userId, ...input })
+  }
 
   /** The mock address book; see `listMockContacts`. */
   async listContacts(): Promise<Contact[]> {

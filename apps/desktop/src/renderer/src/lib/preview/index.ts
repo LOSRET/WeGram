@@ -274,6 +274,8 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'users:profile':
     case 'users:setNote':
     case 'users:setContact':
+    case 'users:setBlocked':
+    case 'users:report':
       return handlePreviewProfile(channel, store, previewProfile, contacts)
     case 'users:status': {
       const chat = chats.find((item) => item.userId === Number(store.userId))

@@ -187,3 +187,45 @@
   font-size: 13px;
   color: var(--wx-text-secondary);
 }
+
+/* 举报 sheet: the reason rows (one per option Telegram offered) and the comment
+   box the last phase may ask for. Same sheet geometry as the confirm dialog. */
+.wx-report__options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wx-report__option {
+  height: 32px;
+  border: 1px solid var(--wx-line-strong);
+  border-radius: 4px;
+  background: var(--wx-elevated);
+  color: var(--wx-text);
+  font-size: 13px;
+  text-align: left;
+  padding: 0 10px;
+  cursor: pointer;
+}
+
+.wx-report__option:hover {
+  background: var(--wx-row-hover);
+}
+
+.wx-report__option:disabled {
+  color: var(--wx-text-disabled);
+  cursor: default;
+}
+
+.wx-report__comment {
+  width: 100%;
+  min-height: 72px;
+  padding: 6px 8px;
+  border: 1px solid var(--wx-field-line);
+  border-radius: 4px;
+  background: var(--wx-elevated);
+  font: inherit;
+  font-size: 13px;
+  color: var(--wx-text);
+  resize: vertical;
+}

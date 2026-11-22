@@ -59,7 +59,9 @@ components/viewer/        the 图片和视频 window: MediaViewer shell + useVie
                          useViewerZoom + ViewerToolbar / ViewerGrid + viewerMenu / viewerActions
 components/ProfileCard.tsx  资料卡: the person sheet a private chat's title and the
                         通讯录 card's 更多资料 open (简介 / 备注 / 共同群聊 / 添加或删除
-                        联系人, all through `users:*`)
+                        联系人 / 加入黑名单 / 举报, all through `users:*`)
+components/ReportDialog.tsx  举报: the phased reportChat state machine (reasons →
+                        maybe a comment → filed)
 components/Avatar.tsx    the ONE avatar box (photo or initials); the box class it is given
                         is the positioned element, which is the rule that once cost a session
 components/CustomEmoji.tsx  a Premium custom emoji in text: its sticker art at 20 px,

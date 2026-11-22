@@ -413,6 +413,8 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   readonly userProfile = this.userApi.userProfile
   readonly setUserNote = this.userApi.setUserNote
   readonly setUserContact = this.userApi.setUserContact
+  readonly setUserBlocked = this.userApi.setUserBlocked
+  readonly reportUser = this.userApi.reportUser
 
   async sendTyping(chatId: number, typing: boolean): Promise<void> {
     return actions.sendTyping(this.actionDeps, chatId, typing)

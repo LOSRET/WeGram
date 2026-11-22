@@ -1,4 +1,4 @@
-import type { Contact, UserProfile } from '@wegram/protocol'
+import type { ChatReport, Contact, UserProfile } from '@wegram/protocol'
 
 /**
  * 资料卡 in the browser preview: the same card the mock adapter serves, derived
@@ -10,7 +10,7 @@ import type { Contact, UserProfile } from '@wegram/protocol'
  */
 export interface PreviewProfileState {
   /** userId → what this session changed on the card. */
-  overrides: Map<number, { note?: string; contact?: boolean }>
+  overrides: Map<number, { note?: string; contact?: boolean; blocked?: boolean }>
 }
 
 export function createPreviewProfileState(): PreviewProfileState {
@@ -36,16 +36,19 @@ function read(state: PreviewProfileState, contacts: Contact[], userId: number): 
     ...(note ? { note } : {}),
     commonChats: 0,
     isContact: override.contact ?? true,
-    blocked: false,
+    blocked: override.blocked ?? false,
   }
 }
 
+type PreviewProfileChannel =
+  'users:profile' | 'users:setNote' | 'users:setContact' | 'users:setBlocked' | 'users:report'
+
 export function handlePreviewProfile(
-  channel: 'users:profile' | 'users:setNote' | 'users:setContact',
+  channel: PreviewProfileChannel,
   payload: Record<string, unknown>,
   state: PreviewProfileState,
   contacts: Contact[],
-): UserProfile {
+): UserProfile | ChatReport {
   const userId = Number(payload['userId'])
   switch (channel) {
     case 'users:profile':
@@ -59,6 +62,28 @@ export function handlePreviewProfile(
       const current = state.overrides.get(userId) ?? {}
       state.overrides.set(userId, { ...current, contact: Boolean(payload['contact']) })
       return read(state, contacts, userId)
+    }
+    case 'users:setBlocked': {
+      const current = state.overrides.get(userId) ?? {}
+      state.overrides.set(userId, { ...current, blocked: Boolean(payload['blocked']) })
+      return read(state, contacts, userId)
+    }
+    case 'users:report': {
+      // The preview mirrors the mock: reasons first, then the report lands.
+      const optionId = typeof payload['optionId'] === 'string' ? payload['optionId'] : ''
+      find(contacts, userId)
+      if (!optionId) {
+        return {
+          reported: false,
+          title: '举报这个用户',
+          options: [
+            { id: 'spam', text: '垃圾信息' },
+            { id: 'violence', text: '涉及暴力或危险行为' },
+            { id: 'other', text: '其他' },
+          ],
+        }
+      }
+      return { reported: true }
     }
   }
 }

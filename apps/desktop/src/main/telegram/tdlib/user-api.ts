@@ -1,4 +1,4 @@
-import type { PeerStatus, UserProfile } from '@wegram/protocol'
+import type { ChatReport, PeerStatus, UserProfile } from '@wegram/protocol'
 
 import * as actions from './actions'
 import type { ActionDeps } from './actions'
@@ -25,6 +25,16 @@ export function createUserApi(getDeps: () => ActionDeps) {
     /** 备注: Telegram's cloud-synced note; answers the refreshed card. */
     setUserNote: async (userId: number, note: string): Promise<UserProfile> =>
       actions.setUserNote(getDeps(), { userId, note }),
+
+    /** 拉黑 / 取消拉黑; answers the refreshed card. */
+    setUserBlocked: async (userId: number, blocked: boolean): Promise<UserProfile> =>
+      actions.setUserBlocked(getDeps(), { userId, blocked }),
+
+    /** 举报: one phase of TDLib's phased reportChat; see actions/users.ts. */
+    reportUser: async (
+      userId: number,
+      input: { optionId?: string; text?: string },
+    ): Promise<ChatReport> => actions.reportUser(getDeps(), { userId, ...input }),
 
     /** 添加为联系人 / 删除联系人; answers the refreshed card. */
     setUserContact: async (

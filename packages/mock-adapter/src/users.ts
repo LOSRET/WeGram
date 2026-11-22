@@ -1,4 +1,4 @@
-import type { UserProfile } from '@wegram/protocol'
+import type { ChatReport, UserProfile } from '@wegram/protocol'
 import { AppError } from '@wegram/protocol'
 
 import type { Fixture } from './constants'
@@ -60,6 +60,38 @@ export function createMockUsers(fixtures: Map<number, Fixture>) {
     return read(input.userId)
   }
 
+  const setBlocked = async (input: { userId: number; blocked: boolean }): Promise<UserProfile> => {
+    findFixture(input.userId)
+    const current = overrides.get(input.userId) ?? {}
+    overrides.set(input.userId, { ...current, blocked: input.blocked })
+    return read(input.userId)
+  }
+
+  /**
+   * 举报: the fake files it at once, but the answer keeps TDLib's two-phase shape
+   * so the sheet's state machine is the same against the mock as against the
+   * server — the first call names the reasons, the second one reports.
+   */
+  const report = async (input: {
+    userId: number
+    optionId?: string
+    text?: string
+  }): Promise<ChatReport> => {
+    findFixture(input.userId)
+    if (!input.optionId) {
+      return {
+        reported: false,
+        title: '举报这个用户',
+        options: [
+          { id: 'spam', text: '垃圾信息' },
+          { id: 'violence', text: '涉及暴力或危险行为' },
+          { id: 'other', text: '其他' },
+        ],
+      }
+    }
+    return { reported: true }
+  }
+
   const setContact = async (input: { userId: number; contact: boolean }): Promise<UserProfile> => {
     findFixture(input.userId)
     const current = overrides.get(input.userId) ?? {}
@@ -67,5 +99,5 @@ export function createMockUsers(fixtures: Map<number, Fixture>) {
     return read(input.userId)
   }
 
-  return { profile, setNote, setContact }
+  return { profile, setNote, setContact, setBlocked, report }
 }

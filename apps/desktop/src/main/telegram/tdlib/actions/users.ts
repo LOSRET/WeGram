@@ -1,6 +1,7 @@
-import type { PeerStatus, UserProfile } from '@wegram/protocol'
+import type { ChatReport, PeerStatus, UserProfile } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
+import { mapReportResult } from '../map/report'
 import { mapPeerStatus } from '../map/status'
 import { mapUserProfile } from '../map/user'
 import type { ActionDeps } from './deps'
@@ -86,4 +87,51 @@ export async function setUserContact(
     await deps.invoke({ _: 'removeContacts', user_ids: [input.userId] })
   }
   return userProfile(deps, input.userId)
+}
+
+/**
+ * 拉黑 / 取消拉黑.
+ *
+ * `setMessageSenderBlockList` takes a *sender*, not a user id, and a null list
+ * means "unblock" — the same call both ways. The card is answered refreshed so
+ * the button flips without a second request.
+ */
+export async function setUserBlocked(
+  deps: ActionDeps,
+  input: { userId: number; blocked: boolean },
+): Promise<UserProfile> {
+  await deps.invoke({
+    _: 'setMessageSenderBlockList',
+    sender_id: { _: 'messageSenderUser', user_id: input.userId },
+    block_list: input.blocked ? { _: 'blockListMain' } : null,
+  })
+  return userProfile(deps, input.userId)
+}
+
+/**
+ * 举报 a person (`reportChat`).
+ *
+ * The report is filed against the *chat*, so the private chat is resolved first
+ * (`createPrivateChat` is a local call — nothing is sent and no message appears).
+ * `optionId` is a TDLib `bytes` id that came back from a previous answer and is
+ * passed back verbatim; an empty one is the "which reason?" first phase. The
+ * comment Telegram asks for travels with it in `text`.
+ */
+export async function reportUser(
+  deps: ActionDeps,
+  input: { userId: number; optionId?: string; text?: string },
+): Promise<ChatReport> {
+  const chat = (await deps.invoke({
+    _: 'createPrivateChat',
+    user_id: input.userId,
+    force: false,
+  })) as TdObject
+  const result = await deps.invoke({
+    _: 'reportChat',
+    chat_id: Number(chat.id),
+    option_id: input.optionId ?? '',
+    message_ids: [],
+    text: input.text ?? '',
+  })
+  return mapReportResult(result as TdObject | undefined)
 }

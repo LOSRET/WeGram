@@ -76,3 +76,26 @@ describe('createMockUsers', () => {
     await expect(users.profile({ userId: 999 })).rejects.toMatchObject({ code: 'invalid_payload' })
   })
 })
+
+describe('block and report', () => {
+  it('marks the person blocked and answers the refreshed card', async () => {
+    const users = createMockUsers(fixture())
+    await expect(users.setBlocked({ userId: 37, blocked: true })).resolves.toMatchObject({
+      blocked: true,
+    })
+    await expect(users.setBlocked({ userId: 37, blocked: false })).resolves.toMatchObject({
+      blocked: false,
+    })
+  })
+
+  it('answers the reasons first and files the report on the second call', async () => {
+    const users = createMockUsers(fixture())
+
+    const first = await users.report({ userId: 37 })
+    expect(first.reported).toBe(false)
+    expect(first.options?.length).toBeGreaterThan(1)
+
+    const second = await users.report({ userId: 37, optionId: first.options?.[0]?.id })
+    expect(second.reported).toBe(true)
+  })
+})

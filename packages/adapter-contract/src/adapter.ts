@@ -1,5 +1,6 @@
 import type {
   AuthState,
+  ChatReport,
   BootState,
   ChatInviteLink,
   ChatJoinResult,
@@ -222,6 +223,13 @@ export interface TelegramAdapter {
   setUserNote(userId: number, note: string): Promise<UserProfile>
   /** 添加为联系人 / 删除联系人; answers the refreshed card. */
   setUserContact(userId: number, contact: boolean, sharePhone?: boolean): Promise<UserProfile>
+  /** 拉黑 / 取消拉黑 (TDLib `setMessageSenderBlockList`); refreshed card. */
+  setUserBlocked(userId: number, blocked: boolean): Promise<UserProfile>
+  /**
+   * 举报, one phase per call: no `optionId` asks for the reasons, one of those ids
+   * files the report (a reason may then ask for a comment, which the answer says).
+   */
+  reportUser(userId: number, input: { optionId?: string; text?: string }): Promise<ChatReport>
 
   history(
     input: InvokeRequest<'messages:history'>,

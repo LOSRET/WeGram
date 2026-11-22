@@ -177,6 +177,12 @@ export function createHandlers({
     'users:setNote': (payload) => adapter.setUserNote(payload.userId, payload.note),
     'users:setContact': (payload) =>
       adapter.setUserContact(payload.userId, payload.contact, payload.sharePhone),
+    'users:setBlocked': (payload) => adapter.setUserBlocked(payload.userId, payload.blocked),
+    'users:report': (payload) =>
+      adapter.reportUser(payload.userId, {
+        ...(payload.optionId === undefined ? {} : { optionId: payload.optionId }),
+        ...(payload.text === undefined ? {} : { text: payload.text }),
+      }),
     'ui:setActiveChat': (payload) => setActiveChat(payload.chatId),
 
     'messages:history': (payload) => adapter.history(payload),

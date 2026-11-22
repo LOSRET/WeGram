@@ -5,6 +5,7 @@ import { formatPhone } from '../lib/format'
 import { errorMessage, invoke } from '../lib/ipc'
 import { useAppStore } from '../store/useAppStore'
 import { Avatar } from './Avatar'
+import { ReportDialog } from './ReportDialog'
 
 interface ProfileCardProps {
   userId: number
@@ -35,6 +36,8 @@ export function ProfileCard({ userId, onOpenChat, onClose }: ProfileCardProps) {
   const [busy, setBusy] = useState(false)
   const [editingNote, setEditingNote] = useState(false)
   const [noteDraft, setNoteDraft] = useState('')
+  /** 举报 is its own phased sheet (see ReportDialog). */
+  const [reportOpen, setReportOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -80,6 +83,17 @@ export function ProfileCard({ userId, onOpenChat, onClose }: ProfileCardProps) {
     try {
       apply(await invoke('users:setContact', { userId, contact: !profile.isContact }))
       useAppStore.getState().setToast(profile.isContact ? '已删除联系人' : '已添加为联系人')
+    } catch (error) {
+      fail(error)
+    }
+  }
+
+  const toggleBlocked = async (): Promise<void> => {
+    if (!profile || busy) return
+    setBusy(true)
+    try {
+      apply(await invoke('users:setBlocked', { userId, blocked: !profile.blocked }))
+      useAppStore.getState().setToast(profile.blocked ? '已取消拉黑' : '已拉黑')
     } catch (error) {
       fail(error)
     }
@@ -207,12 +221,29 @@ export function ProfileCard({ userId, onOpenChat, onClose }: ProfileCardProps) {
               >
                 {profile.isContact ? '删除联系人' : '添加为联系人'}
               </button>
+              <button
+                type="button"
+                className={`wx-profile__action${profile.blocked ? '' : ' wx-profile__action--danger'}`}
+                disabled={busy}
+                onClick={() => void toggleBlocked()}
+              >
+                {profile.blocked ? '取消拉黑' : '加入黑名单'}
+              </button>
+              <button
+                type="button"
+                className="wx-profile__action wx-profile__action--danger"
+                onClick={() => setReportOpen(true)}
+              >
+                举报
+              </button>
             </div>
           </>
         ) : (
           <div className="wx-profile__loading">正在读取资料…</div>
         )}
       </div>
+
+      {reportOpen ? <ReportDialog userId={userId} onClose={() => setReportOpen(false)} /> : null}
     </div>
   )
 }
