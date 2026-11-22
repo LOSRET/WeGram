@@ -15,14 +15,14 @@ WeGram 是一个自用的 Telegram 桌面客户端：协议层用 Telegram 官�
 登录的是你自己的账号，会话、群、频道都按 Telegram 的真实数据展示；它不是演示界面。
 
 - **单账号**：手机号 + 验证码 + 两步验证，登录态由 TDLib 持久化，重启直接复用 session。
-- **内置代理**：SOCKS5 / MTProxy。国内网络下代理是刚需——没有代理 `getChats` 会直接挂住。
+- **内置代理**：SOCKS5 / HTTP / MTProxy。国内网络下代理是刚需——没有代理 `getChats` 会直接挂住。
 - **消息存储交给 TDLib** 自带的本地库，本项目不再造一套消息表；只有纯 UI 状态（草稿、主题、滚动位置）写进 `ui.db`（`node:sqlite`）。
 
 ## 进度
 
 | 阶段 | 内容 | 状态 |
 | --- | --- | --- |
-| W1 | Electron 外壳、`packages/protocol` IPC 契约、mock 适配器、真实 TDLib 适配器（手动登录状态机）、SOCKS5/MTProxy、微信风登录页与三栏布局 | ✅ |
+| W1 | Electron 外壳、`packages/protocol` IPC 契约、mock 适配器、真实 TDLib 适配器（手动登录状态机）、SOCKS5/HTTP/MTProxy、微信风登录页与三栏布局 | ✅ |
 | W2 | 虚拟化消息列表、锚定历史分页、发送/回复/编辑/删除/转发、按会话草稿、`ui.db` | ✅ |
 | W3 | 图片与文件收发（含进度）、`wx-media://` 媒体协议、三种贴纸格式（WebP / TGS / WebM）、贴纸面板、TL 实体渲染、日期与未读分隔、已读回执、typing | ✅ |
 | W3+ | 独立媒体查看器窗口：图片缩放/旋转/保存，视频播放（倍速、静音、时间轴） | ✅ |
@@ -141,7 +141,7 @@ scripts\start-test.cmd          # 连测试 DC（WEGRAM_TDLIB_TEST_DC=1，复用
 | `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` | 真实 TDLib 凭据；缺省时自动落到 mock 适配器 |
 | `WEGRAM_ADAPTER=mock` | 即使有凭据也强制 mock。做 UI 时用它，避免碰真实账号 |
 | `WEGRAM_TDLIB_DIR` | session 目录覆盖；应用与 `tdlib:smoke` 共用 |
-| `WEGRAM_PROXY` | 启动时的初始代理：`socks5://host:port`、`socks5://user:pass@host:port`、`mtproto://host:port?secret=…` |
+| `WEGRAM_PROXY` | 启动时的初始代理：`socks5://host:port`、`socks5://user:pass@host:port`、`http://host:port`、`mtproto://host:port?secret=…` |
 
 ## 命令
 

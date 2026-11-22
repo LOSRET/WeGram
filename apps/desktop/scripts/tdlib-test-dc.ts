@@ -11,7 +11,7 @@
  *   cd apps\desktop
  *   pnpm tdlib:test-dc
  *
- * Env: TDLIB_PROXY (`socks5://host:port`), TDLIB_SESSION_DIR (defaults to
+ * Env: TDLIB_PROXY (`socks5://host:port` or `http://host:port`), TDLIB_SESSION_DIR (defaults to
  * `spikes/tdlib/test-data`), WEGRAM_TEST_PHONE (default `+9996620001`),
  * WEGRAM_TEST_CODE (default: the DC id repeated five times, which is what the
  * test servers answer with).

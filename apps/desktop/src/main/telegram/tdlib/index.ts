@@ -73,7 +73,6 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   private readonly logger = createLogger('tdlib')
   private auth: AuthState = { kind: 'idle' }
   private connection: ConnectionState = 'offline'
-  private proxy: ProxyConfig | null = null
   /** TDLib's prefer_ipv6; re-applied to every client the lifecycle creates. */
   private preferIpv6 = false
   private readonly userNames = new Map<number, string>()
@@ -166,11 +165,6 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     this.proxyDeps = {
       invoke: (method) => this.invoke(method),
       logger: this.logger,
-      getProxy: () => this.proxy,
-      setProxyState: (config) => {
-        this.proxy = config
-      },
-      isOnline: () => this.isOnline(),
     }
 
     this.handleUpdate = createUpdateHandler({
@@ -500,9 +494,5 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     if (this.connection === state) return
     this.connection = state
     this.emit({ type: 'connection', state })
-  }
-
-  private isOnline(): boolean {
-    return this.connection === 'online'
   }
 }

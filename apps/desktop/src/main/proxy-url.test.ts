@@ -62,6 +62,24 @@ describe('parseProxyUrl', () => {
     expect(config && 'password' in config).toBe(false)
   })
 
+  it('parses a plain HTTP proxy URL', () => {
+    expect(parseProxyUrl('http://127.0.0.1:8080')).toEqual({
+      type: 'http',
+      host: '127.0.0.1',
+      port: 8080,
+    })
+  })
+
+  it('keeps HTTP credentials and decodes them', () => {
+    expect(parseProxyUrl('http://user:p%40ss@proxy.example.com:3128')).toEqual({
+      type: 'http',
+      host: 'proxy.example.com',
+      port: 3128,
+      username: 'user',
+      password: 'p@ss',
+    })
+  })
+
   it('parses an MTProto URL with its secret', () => {
     expect(parseProxyUrl('mtproto://proxy.example.com:443?secret=dd0123456789abcdef')).toEqual({
       type: 'mtproto',
@@ -83,8 +101,8 @@ describe('parseProxyUrl', () => {
     expect(() => parseProxyUrl('socks5://127.0.0.1')).toThrow(/host and port/)
   })
 
-  it('rejects an unsupported protocol', () => {
-    expect(() => parseProxyUrl('http://127.0.0.1:8080')).toThrow(/unsupported proxy protocol/)
+  it('rejects HTTPS, because TDLib cannot speak TLS to the proxy itself', () => {
+    expect(() => parseProxyUrl('https://127.0.0.1:8080')).toThrow(/unsupported proxy protocol/)
   })
 
   it('rejects a malformed URL', () => {

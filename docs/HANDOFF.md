@@ -55,7 +55,7 @@ run — see `docs/PRIVATE-CHAT-HANDOFF.md` §11.
 Greenfield → working skeleton in three milestones:
 
 - **W1** Electron shell, `packages/protocol` IPC contract, mock adapter, real TDLib
-  adapter with manual auth state machine, SOCKS5/MTProxy proxy support, WeChat-style
+  adapter with manual auth state machine, SOCKS5/HTTP/MTProxy proxy support, WeChat-style
   standalone login window + three-column shell.
 - **W2** virtualised message list, anchored history paging, send / reply / edit /
   delete / forward, per-chat drafts, `ui.db` (drafts, theme, scroll-anchor columns).
@@ -411,7 +411,7 @@ Anything that opens a chat also marks it read on the server — use it deliberat
   is how the prepend/FPS numbers above were measured without opening DevTools. rAF and
   `PerfPanel` only run while the window is actually visible, so focus it first.
 
-- `tdlib:smoke` env: `TDLIB_PROXY=socks5://host:port`, `WEGRAM_TDLIB_DIR`,
+- `tdlib:smoke` env: `TDLIB_PROXY=socks5://host:port` (or `http://host:port`), `WEGRAM_TDLIB_DIR`,
   `SMOKE_DEBUG=1`. It defaults to the spike session, so no second login is needed.
 - The browser preview installs `lib/preview-bridge.ts` when `window.tg` is missing.
   It mirrors the mock adapter for the UI only — never let app logic depend on it.
@@ -914,7 +914,7 @@ router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
 
 Single account in v1 (multi-account is v2; session dir already shaped
 `tdlib/<accountId>/`), animated stickers in v1 (WebP + TGS + WebM), Electron (Tauri only
-if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivity test,
+if bundle size becomes a real pain), built-in SOCKS5 / HTTP / MTProxy with a connectivity test,
 5-week schedule instead of 4.
 
 ## Private-chat P0 batch — measured notes (2026-11-22)

@@ -1,4 +1,3 @@
-import { AppError } from '@wegram/protocol'
 import type { ProxyConfig, ProxyTestResult } from '@wegram/protocol'
 
 import { toAdapterError } from '../../util'
@@ -9,11 +8,6 @@ import type { TdObject } from './client'
 export interface ProxyDeps {
   invoke(method: TdObject): Promise<any>
   logger: Logger
-  /** The proxy currently enabled, if any. */
-  getProxy(): ProxyConfig | null
-  /** Records the proxy that is now in force (`null` after `disableProxy`). */
-  setProxyState(config: ProxyConfig | null): void
-  isOnline(): boolean
 }
 
 function normalizeMtprotoSecret(secret: string): string {
@@ -24,14 +18,14 @@ function normalizeMtprotoSecret(secret: string): string {
   return cleaned
 }
 
-/** Applies a proxy; may be called before authorization (TDLib allows that). */
-export async function applyProxy(deps: ProxyDeps, config: ProxyConfig | null): Promise<void> {
-  if (!config) {
-    await deps.invoke({ _: 'disableProxy' }).catch(() => undefined)
-    deps.setProxyState(null)
-    return
-  }
-
+/**
+ * The TDLib `Proxy` object for a config.
+ *
+ * `http_only: false` asks for CONNECT tunnelling, so Telegram's TCP traffic can
+ * go through an ordinary HTTP proxy; `true` would limit the proxy to HTTP
+ * requests, which the protocol never makes.
+ */
+export function toTdlibProxy(config: ProxyConfig): TdObject {
   const type =
     config.type === 'socks5'
       ? {
@@ -39,15 +33,31 @@ export async function applyProxy(deps: ProxyDeps, config: ProxyConfig | null): P
           username: config.username ?? '',
           password: config.password ?? '',
         }
-      : { _: 'proxyTypeMtproto', secret: normalizeMtprotoSecret(config.secret ?? '') }
+      : config.type === 'http'
+        ? {
+            _: 'proxyTypeHttp',
+            username: config.username ?? '',
+            password: config.password ?? '',
+            http_only: false,
+          }
+        : { _: 'proxyTypeMtproto', secret: normalizeMtprotoSecret(config.secret ?? '') }
+
+  return { _: 'proxy', server: config.host, port: config.port, type }
+}
+
+/** Applies a proxy; may be called before authorization (TDLib allows that). */
+export async function applyProxy(deps: ProxyDeps, config: ProxyConfig | null): Promise<void> {
+  if (!config) {
+    await deps.invoke({ _: 'disableProxy' }).catch(() => undefined)
+    return
+  }
 
   await deps.invoke({
     _: 'addProxy',
-    proxy: { _: 'proxy', server: config.host, port: config.port, type },
+    proxy: toTdlibProxy(config),
     enable: true,
     comment: 'WeGram',
   })
-  deps.setProxyState(config)
   deps.logger.info(`proxy enabled: ${config.type} ${config.host}:${config.port}`)
 }
 
@@ -60,32 +70,19 @@ export async function setProxy(deps: ProxyDeps, config: ProxyConfig | null): Pro
 }
 
 /**
- * Enables the candidate proxy, waits for a real connection to come up, then
- * restores the previous configuration. Never silently reports success.
+ * One-shot connectivity check through TDLib's `pingProxy`: it opens a throwaway
+ * connection using the candidate proxy and answers the round trip, so the proxy
+ * currently in force is never touched (the previous implementation applied the
+ * candidate, waited for `online` and restored it). Like `addProxy`, it may be
+ * called before authorization.
  */
 export async function testProxy(deps: ProxyDeps, config: ProxyConfig): Promise<ProxyTestResult> {
-  const previous = deps.getProxy()
-  const startedAt = Date.now()
   try {
-    await applyProxy(deps, config)
-    await waitForOnline(deps, 8_000)
-    return { ok: true, latencyMs: Date.now() - startedAt }
+    const answer = await deps.invoke({ _: 'pingProxy', proxy: toTdlibProxy(config) })
+    const seconds = typeof answer?.seconds === 'number' ? answer.seconds : null
+    if (seconds === null) return { ok: false, error: 'No latency in the TDLib ping answer' }
+    return { ok: true, latencyMs: Math.round(seconds * 1000) }
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) }
-  } finally {
-    await applyProxy(deps, previous).catch(() => undefined)
   }
-}
-
-export async function waitForOnline(deps: ProxyDeps, timeoutMs: number): Promise<void> {
-  if (deps.isOnline()) return
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, 250))
-    if (deps.isOnline()) return
-  }
-  throw new AppError(
-    'proxy_failed',
-    'Proxy did not reach an online connection within 8 seconds — check host, port and secret',
-  )
 }

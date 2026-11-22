@@ -152,7 +152,7 @@ test DCs now, see the three tiers under Environment quirks.
 `tdlib:smoke` reads `apps/desktop/.env` (`TELEGRAM_API_ID` / `TELEGRAM_API_HASH`) and these optional variables:
 
 - `WEGRAM_TDLIB_DIR` — session dir override, used by both the app and the smoke script (the script defaults to `spikes/tdlib/data`, i.e. the session created by `login.mjs`, so no second login is needed).
-- `TDLIB_PROXY` — `socks5://host:port`, `socks5://user:pass@host:port` or `mtproto://host:port?secret=...`. Without a proxy `getChats` hangs even though `getMe` succeeds.
+- `TDLIB_PROXY` — `socks5://host:port`, `socks5://user:pass@host:port`, `http://host:port` or `mtproto://host:port?secret=...`. Without a proxy `getChats` hangs even though `getMe` succeeds.
 - `SMOKE_DEBUG=1` — extra per-chat/history diagnostics.
 - `WEGRAM_TDLIB_TEST_DC=1` — points the smoke script (and the app) at Telegram's test
   data centers: a separate account space where send / edit / delete cannot reach a real

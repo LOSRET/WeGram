@@ -8,7 +8,12 @@ import type { ProxyConfig } from '@wegram/protocol'
  *   socks5://127.0.0.1:7890
  *   socks5://user:pass@127.0.0.1:1080
  *   socks5://[::1]:1080
+ *   http://127.0.0.1:8080
+ *   http://user:pass@proxy.example.com:3128
  *   mtproto://proxy.example.com:443?secret=dd0123...
+ *
+ * `http` is a CONNECT tunnel (TDLib `proxyTypeHttp` with `http_only: false`);
+ * TDLib cannot speak TLS to the proxy itself, so `https://` stays unsupported.
  *
  * A WHATWG URL keeps an IPv6 literal bracketed, but TDLib's proxy `server` is
  * handed to getaddrinfo as-is and a bracketed literal never resolves, so the
@@ -26,14 +31,17 @@ export function parseProxyUrl(raw: string | undefined | null): ProxyConfig | nul
       ? url.hostname.slice(1, -1)
       : url.hostname
 
+  const credentials = {
+    ...(url.username ? { username: decodeURIComponent(url.username) } : {}),
+    ...(url.password ? { password: decodeURIComponent(url.password) } : {}),
+  }
+
   if (url.protocol === 'socks5:') {
-    return {
-      type: 'socks5',
-      host,
-      port,
-      ...(url.username ? { username: decodeURIComponent(url.username) } : {}),
-      ...(url.password ? { password: decodeURIComponent(url.password) } : {}),
-    }
+    return { type: 'socks5', host, port, ...credentials }
+  }
+
+  if (url.protocol === 'http:') {
+    return { type: 'http', host, port, ...credentials }
   }
 
   if (url.protocol === 'mtproto:') {

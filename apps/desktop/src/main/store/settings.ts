@@ -9,6 +9,14 @@ export interface StoredProxySocks5 {
   passwordSealed?: string
 }
 
+export interface StoredProxyHttp {
+  type: 'http'
+  host: string
+  port: number
+  username?: string
+  passwordSealed?: string
+}
+
 export interface StoredProxyMtproto {
   type: 'mtproto'
   host: string
@@ -16,7 +24,7 @@ export interface StoredProxyMtproto {
   secretSealed?: string
 }
 
-export type StoredProxy = StoredProxySocks5 | StoredProxyMtproto
+export type StoredProxy = StoredProxySocks5 | StoredProxyHttp | StoredProxyMtproto
 
 export interface StoredState {
   proxy: StoredProxy | null

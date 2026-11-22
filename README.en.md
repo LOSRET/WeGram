@@ -15,14 +15,14 @@ WeGram is a personal Telegram desktop client: Telegram's official TDLib (`tdl` +
 You sign in with your own account and see your real chats, groups and channels. It is not a demo shell.
 
 - **Single account**: phone number + code + 2FA, session persisted by TDLib and reused on restart.
-- **Built-in proxy**: SOCKS5 and MTProxy. On mainland networks a proxy is mandatory — without one `getChats` hangs.
+- **Built-in proxy**: SOCKS5, HTTP and MTProxy. On mainland networks a proxy is mandatory — without one `getChats` hangs.
 - **Message storage belongs to TDLib**. This project does not re-implement a message table; only protocol-independent UI state (drafts, theme, scroll position) lives in `ui.db` (`node:sqlite`).
 
 ## Status
 
 | Milestone | Scope | State |
 | --- | --- | --- |
-| W1 | Electron shell, `packages/protocol` IPC contract, mock adapter, real TDLib adapter with a manual auth state machine, SOCKS5/MTProxy, WeChat-style login screen and three-column shell | ✅ |
+| W1 | Electron shell, `packages/protocol` IPC contract, mock adapter, real TDLib adapter with a manual auth state machine, SOCKS5/HTTP/MTProxy, WeChat-style login screen and three-column shell | ✅ |
 | W2 | Virtualised message list, anchored history paging, send / reply / edit / delete / forward, per-chat drafts, `ui.db` | ✅ |
 | W3 | Photo and document send/receive with progress, the `wx-media://` media protocol, all three sticker formats (WebP / TGS / WebM), sticker picker, TL entity rendering, day and unread dividers, read receipts, typing indicator | ✅ |
 | W3+ | Standalone media viewer window: zoom / rotate / save for photos, playback (speed, mute, timeline) for videos | ✅ |
@@ -141,7 +141,7 @@ Logs land in `.cache\app.log`.
 | `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` | Real TDLib credentials; absent means the mock adapter |
 | `WEGRAM_ADAPTER=mock` | Forces the mock even with credentials — use it for UI work that must not touch the real account |
 | `WEGRAM_TDLIB_DIR` | Session directory override; shared by the app and `tdlib:smoke` |
-| `WEGRAM_PROXY` | Initial proxy: `socks5://host:port`, `socks5://user:pass@host:port`, `mtproto://host:port?secret=…` |
+| `WEGRAM_PROXY` | Initial proxy: `socks5://host:port`, `socks5://user:pass@host:port`, `http://host:port`, `mtproto://host:port?secret=…` |
 
 ## Commands
 
