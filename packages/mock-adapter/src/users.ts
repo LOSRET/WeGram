@@ -12,12 +12,44 @@ import type { Fixture } from './constants'
  * both parts and remembers the two things the card can change. Nothing is
  * persisted: restarting the app resets the fake account, like every other fixture.
  */
-/** The fake's reasons: the same list for a person and for one message. */
+/**
+ * The reasons the sheet shows.
+ *
+ * A real answer is server-driven: TDLib's `reportChatResultOptionRequired` carries
+ * `reportOption id/text` rows, and behind them sit the `ReportReason` constructors
+ * of the pinned scheme (`reportReasonSpam` … `reportReasonCustom`; the server picks
+ * the subset a chat kind allows). The fake carries the whole taxonomy so the sheet is
+ * exercised at its real height and copy, and `other` mirrors the comment phase
+ * (`reportChatResultTextRequired`) instead of filing straight away.
+ */
 const REPORT_OPTIONS = [
   { id: 'spam', text: '垃圾信息' },
+  { id: 'fake', text: '假冒账号' },
   { id: 'violence', text: '涉及暴力或危险行为' },
+  { id: 'child-abuse', text: '儿童虐待' },
+  { id: 'pornography', text: '色情内容' },
+  { id: 'illegal-drugs', text: '非法毒品' },
+  { id: 'personal-details', text: '泄露个人信息' },
+  { id: 'copyright', text: '侵犯版权' },
   { id: 'other', text: '其他' },
 ]
+
+/** The reason that asks for details, and the *new* id TDLib hands back for that step. */
+const CUSTOM_REASON_ID = 'other'
+const CUSTOM_DETAILS_ID = 'other-details'
+
+/**
+ * One phase of the fake's `reportChat`: no reason yet → the list; `其他` → a
+ * comment step, exactly like `reportChatResultTextRequired`; anything after that
+ * is filed. Shared by the person and the one-message path.
+ */
+function reportAnswer(input: { title: string; optionId?: string }): ChatReport {
+  if (!input.optionId) return { reported: false, title: input.title, options: REPORT_OPTIONS }
+  if (input.optionId === CUSTOM_REASON_ID) {
+    return { reported: false, textRequired: true, optionId: CUSTOM_DETAILS_ID }
+  }
+  return { reported: true }
+}
 
 interface Overrides {
   note?: string
@@ -114,10 +146,7 @@ export function createMockUsers(fixtures: Map<number, Fixture>) {
     text?: string
   }): Promise<ChatReport> => {
     findFixture(input.userId)
-    if (!input.optionId) {
-      return { reported: false, title: '举报这个用户', options: REPORT_OPTIONS }
-    }
-    return { reported: true }
+    return reportAnswer({ title: '举报这个用户', ...input })
   }
 
   /**
@@ -129,12 +158,7 @@ export function createMockUsers(fixtures: Map<number, Fixture>) {
     messageId: number
     optionId?: string
     text?: string
-  }): Promise<ChatReport> => {
-    if (!input.optionId) {
-      return { reported: false, title: '举报这条消息', options: REPORT_OPTIONS }
-    }
-    return { reported: true }
-  }
+  }): Promise<ChatReport> => reportAnswer({ title: '举报这条消息', ...input })
 
   const setContact = async (input: { userId: number; contact: boolean }): Promise<UserProfile> => {
     findFixture(input.userId)

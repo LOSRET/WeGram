@@ -96,8 +96,14 @@ export function ReportDialog({ target, onClose }: ReportDialogProps) {
         setBusy(false)
         return
       }
-      // Either the comment step or the reason list again.
-      setReport(answer)
+      // Either the comment step or the reason list again. The comment step carries
+      // no title (`reportChatResultTextRequired` has none), so keep the one the
+      // reasons came with.
+      setReport((current) =>
+        answer.title === undefined && current?.title !== undefined
+          ? { ...answer, title: current.title }
+          : answer,
+      )
       setBusy(false)
     } catch (error) {
       useAppStore.getState().setError(errorMessage(error))
@@ -119,19 +125,24 @@ export function ReportDialog({ target, onClose }: ReportDialogProps) {
 
         {needsComment ? (
           <>
-            <div className="wx-dialog__body">这个举报需要补充说明。</div>
+            <div className="wx-dialog__body">
+              {report?.textOptional ? '这个举报可以补充说明。' : '这个举报需要补充说明。'}
+            </div>
             <textarea
               className="wx-report__comment"
               value={comment}
               autoFocus
               maxLength={4000}
-              placeholder="补充说明"
+              placeholder={report?.textOptional ? '补充说明（可选）' : '补充说明'}
               onChange={(event) => setComment(event.target.value)}
             />
             <button
               type="button"
               className="wx-profile__action"
-              disabled={busy || comment.trim().length === 0}
+              disabled={
+                // TDLib's `is_optional`: this step may be submitted without a comment.
+                busy || (report?.textOptional !== true && comment.trim().length === 0)
+              }
               onClick={() => void submit(report?.optionId ?? '', comment)}
             >
               提交举报

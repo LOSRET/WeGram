@@ -31,6 +31,11 @@ export const chatReportSchema = z.object({
    * comment. TDLib hands back a different one for that step, so it travels.
    */
   optionId: z.string().optional(),
+  /**
+   * With `textRequired`: TDLib's `is_optional` — the comment may be skipped, so the
+   * sheet must not refuse to submit an empty one.
+   */
+  textOptional: z.boolean().optional(),
   /** Telegram wants messages picked, which the chat-level report cannot offer. */
   messagesRequired: z.boolean().optional(),
 })

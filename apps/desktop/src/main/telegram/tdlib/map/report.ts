@@ -34,6 +34,7 @@ export function mapReportResult(result: TdObject | undefined): ChatReport {
         reported: false,
         textRequired: true,
         ...(typeof result.option_id === 'string' ? { optionId: result.option_id } : {}),
+        ...(result.is_optional === true ? { textOptional: true } : {}),
       }
     case 'reportChatResultMessagesRequired':
       return { reported: false, messagesRequired: true }

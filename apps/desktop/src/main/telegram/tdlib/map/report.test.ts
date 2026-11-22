@@ -37,6 +37,21 @@ describe('mapReportResult', () => {
     expect(answer).toEqual({ reported: false, textRequired: true, optionId: 'dGV4dA==' })
   })
 
+  it('marks the comment step optional when TDLib allows skipping it', () => {
+    const answer = mapReportResult({
+      _: 'reportChatResultTextRequired',
+      option_id: 'dGV4dA==',
+      is_optional: true,
+    } as TdObject)
+
+    expect(answer).toEqual({
+      reported: false,
+      textRequired: true,
+      optionId: 'dGV4dA==',
+      textOptional: true,
+    })
+  })
+
   it('reports the per-message requirement instead of claiming success', () => {
     expect(mapReportResult({ _: 'reportChatResultMessagesRequired' })).toEqual({
       reported: false,

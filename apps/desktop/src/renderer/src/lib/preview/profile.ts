@@ -27,12 +27,35 @@ export const PROFILE_CHANNELS = [
   'messages:report',
 ] as const
 
-/** The preview's reasons: the same list for a person and for one message. */
+/**
+ * The preview's reasons: the whole `ReportReason` taxonomy of the pinned scheme,
+ * because a real answer is server-driven (`reportOption id/text` rows) and the
+ * sheet must be exercised at its real height. `其他` asks for details, like
+ * `reportChatResultTextRequired`; the mock adapter answers the same list.
+ */
 const REPORT_OPTIONS = [
   { id: 'spam', text: '垃圾信息' },
+  { id: 'fake', text: '假冒账号' },
   { id: 'violence', text: '涉及暴力或危险行为' },
+  { id: 'child-abuse', text: '儿童虐待' },
+  { id: 'pornography', text: '色情内容' },
+  { id: 'illegal-drugs', text: '非法毒品' },
+  { id: 'personal-details', text: '泄露个人信息' },
+  { id: 'copyright', text: '侵犯版权' },
   { id: 'other', text: '其他' },
 ]
+
+const CUSTOM_REASON_ID = 'other'
+const CUSTOM_DETAILS_ID = 'other-details'
+
+/** One phase of the preview's phased answer, shared by both report targets. */
+function reportAnswer(title: string, optionId: string): ChatReport {
+  if (!optionId) return { reported: false, title, options: REPORT_OPTIONS }
+  if (optionId === CUSTOM_REASON_ID) {
+    return { reported: false, textRequired: true, optionId: CUSTOM_DETAILS_ID }
+  }
+  return { reported: true }
+}
 
 export type PreviewProfileChannel = (typeof PROFILE_CHANNELS)[number]
 
@@ -114,15 +137,16 @@ export function handlePreviewProfile(
     }
     case 'users:report': {
       // The preview mirrors the mock: reasons first, then the report lands.
-      const optionId = typeof payload['optionId'] === 'string' ? payload['optionId'] : ''
       find(contacts, userId)
-      if (!optionId) return { reported: false, title: '举报这个用户', options: REPORT_OPTIONS }
-      return { reported: true }
+      return reportAnswer(
+        '举报这个用户',
+        typeof payload['optionId'] === 'string' ? payload['optionId'] : '',
+      )
     }
-    case 'messages:report': {
-      const optionId = typeof payload['optionId'] === 'string' ? payload['optionId'] : ''
-      if (!optionId) return { reported: false, title: '举报这条消息', options: REPORT_OPTIONS }
-      return { reported: true }
-    }
+    case 'messages:report':
+      return reportAnswer(
+        '举报这条消息',
+        typeof payload['optionId'] === 'string' ? payload['optionId'] : '',
+      )
   }
 }

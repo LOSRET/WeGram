@@ -142,6 +142,39 @@ describe('block and report', () => {
     expect(second.reported).toBe(true)
   })
 
+  it('offers the whole ReportReason taxonomy, not a shortlist', async () => {
+    const users = createMockUsers(fixture())
+
+    const first = await users.report({ userId: 37 })
+
+    expect(first.options?.map((option) => option.text)).toEqual([
+      '垃圾信息',
+      '假冒账号',
+      '涉及暴力或危险行为',
+      '儿童虐待',
+      '色情内容',
+      '非法毒品',
+      '泄露个人信息',
+      '侵犯版权',
+      '其他',
+    ])
+  })
+
+  it('asks for details on 其他 before filing, like reportChatResultTextRequired', async () => {
+    const users = createMockUsers(fixture())
+
+    const step = await users.report({ userId: 37, optionId: 'other' })
+    expect(step).toMatchObject({
+      reported: false,
+      textRequired: true,
+      optionId: 'other-details',
+    })
+
+    await expect(
+      users.report({ userId: 37, optionId: 'other-details', text: '说明' }),
+    ).resolves.toEqual({ reported: true })
+  })
+
   it('files a one-message report through the same two phases', async () => {
     const users = createMockUsers(fixture())
 
