@@ -78,8 +78,9 @@ while the mic is live | No new dependency: Chromium hands over raw Opus packets 
 WebM→OGG muxer decision (§9.5) is moot. The waveform is sent **empty** on purpose (§6.1). **Mock Electron pass
 done** (fake media device): 2 s hold → a voice bubble whose `<audio>` decodes the clip (`duration 1.9`,
 `readyState 4`), chat preview `[语音]`, no error bar, and the recorded file is a valid 4-page OGG (OpusHead,
-OpusTags, 2 audio pages, 91 200 samples, EOS). Slide-up past 48 px sends nothing. The real TDLib write is
-test-DC unverified (§11). |
+OpusTags, 2 audio pages, 91 200 samples, EOS). Slide-up past 48 px sends nothing. **Test DC: confirmed** — a
+voice note sent from the live test-DC app came back as an outgoing `kind: 'voice'` row (0:02), i.e. TDLib
+accepted the OGG and the server stored it (§11). |
 | 单条消息举报 | `messages:report` (`protocol/report.ts`); `actions/users.ts reportMessage` (`reportChat` with `message_ids`); `messageProperties.canReportChat`; menu 举报 → the shared `ReportDialog` | The context menu offers 举报 only where TDLib's `can_report_chat` allows it, and the sheet files the report against that chat with the message attached. `messagesRequired` on a chat-level report now points the reader at the message menu instead of claiming failure. Mock + browser preview answer the same phases. |
 
 ## 1. What already works (do not rebuild it)
@@ -594,10 +595,22 @@ Consequences for the §6.1 plan (and what was actually done):
   Sliding up past the 48 px cancel distance showed 松开 取消 and sent nothing.
   The only console warning was Chromium's expected `ScriptProcessorNode`
   deprecation.
-- **Still open:** `inputMessageVoiceNote` against real TDLib has never been sent —
-  run the same clip on the test DC (`WEGRAM_TDLIB_TEST_DC=1`) before calling the
-  write path proven, and confirm the server accepts an empty `waveform`. A real
-  microphone (as opposed to the fake device) is also unmeasured.
+- **Test DC (2026-11-22): confirmed, by the owner's own run.** The test-DC app
+  (launched 13:49 with `WEGRAM_TDLIB_TEST_DC=1` and this branch's build) sent a
+  voice note; the transcript drew it as an **outgoing `kind: 'voice'` bubble with
+  0:02**, which means TDLib's `sendMessage` with `inputMessageVoiceNote` succeeded
+  and the server round-tripped the message as `messageVoiceNote`. That answers the
+  audit's open question: an **empty `waveform` is accepted**, and the server keeps
+  the OGG/Opus clip as a voice note rather than as an audio document.
+- **The CLI probe could not run in the same window:** `pnpm tdlib:test-dc` needs
+  the test session exclusively and the live app holds `db/td_test.binlog`; a
+  VSS/torn copy of the database loses TDLib's authorization state (it came back
+  as `waitPhoneNumber`, and the `99966XYYYY` numbers are dead, so re-authorizing
+  needs the owner's phone). `scripts/tdlib-test-dc.ts` now includes the voice
+  step anyway — run it with the app closed, on a session that is still authorized:
+  `TDLIB_PROXY=socks5://127.0.0.1:7890 pnpm tdlib:test-dc` (it sends
+  `scripts/fixtures/voice-probe.ogg`, a 2.4 s clip recorded through the app).
+- **A real microphone** (as opposed to the fake device) is still unmeasured.
 - TDLib field semantics beyond the scheme comments (e.g. whether an empty
   waveform is accepted, whether the message id actually changes).
 - Electron 45 codec support for OGG/Opus and MP4/H.264 recording. (Voice

@@ -45,7 +45,10 @@ run `pnpm tdlib:test-dc` before calling them proven. The voice **gesture** was t
 clicked through in a mock Electron window (isolated profile, fake media device): a
 2 s hold produced a decodable voice bubble (`<audio>` duration 1.9, `readyState 4`)
 and a valid OGG/Opus file; the slide-up cancel sent nothing. `inputMessageVoiceNote`
-against real TDLib stays unmeasured — see `docs/PRIVATE-CHAT-HANDOFF.md` §11.
+was then confirmed on the **test DC** by the owner's own send: the transcript drew
+it as an outgoing voice bubble (0:02), so the server accepts our OGG and an empty
+waveform. The CLI probe step is in `scripts/tdlib-test-dc.ts` for the next clean
+run — see `docs/PRIVATE-CHAT-HANDOFF.md` §11.
 
 ## Where things stand
 
