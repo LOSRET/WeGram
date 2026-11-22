@@ -36,10 +36,11 @@ export interface VoiceRecordingController {
 /**
  * 语音消息's recording state machine.
  *
- * A voice note is clicked, not held: WeChat 4.x starts recording when the mic is
- * clicked and then shows a cancel cross, a live dot meter and the green send
- * arrow inside the composer card — there is no push-to-talk gesture on the
- * desktop. This hook owns that state; the card owns the drawing.
+ * A voice note is clicked, not held: WeChat 4.x starts recording when the circled
+ * 发语音 button beside 发送 is clicked and then shows a cancel cross, a live dot
+ * meter and the green send arrow inside the composer card — there is no
+ * push-to-talk gesture on the desktop. This hook owns that state; the card owns
+ * the drawing.
  *
  * The recorder opens asynchronously, so a send/cancel pressed in that first
  * moment is remembered in the session ref and applied when the recorder lands;

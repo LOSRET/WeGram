@@ -47,6 +47,26 @@ import { CallBubbleIcon } from './WechatIcons'
  * Trailing chevron of a navigational row (the chat-info panel's 查找聊天内容).
  * Hand-drawn at the client's weight: a 7 × 11 stroke, 1.3 px, no fill.
  */
+/**
+ * 发语音: the client's circled microphone with sound arcs, which sits next to
+ * 发送. Hand-drawn from the reference screenshots at the same weight as the
+ * other toolbar glyphs — the payload had no circled variant.
+ */
+export function VoiceMessageIcon({ size = 20, ...rest }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden {...rest}>
+      <circle cx="12" cy="12" r="9.1" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="8.9" cy="12" r="1.15" fill="currentColor" />
+      <path
+        d="M11.3 8.9a4.5 4.5 0 0 1 0 6.2M14.2 6.7a7.6 7.6 0 0 1 0 10.6M17.1 4.8a10.4 10.4 0 0 1 0 14.4"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
 export function ChevronRightIcon({ size = 12, ...rest }: IconProps) {
   return (
     <svg

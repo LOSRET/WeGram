@@ -73,9 +73,10 @@ below is one commit, `pnpm verify`-green, on `feat/private-chat-p1`.
 (`main/media/voice-file.ts`), the TDLib action is `inputMessageVoiceNote` (`actions/send.ts voiceContent`),
 and mock + browser preview answer the same channel. The renderer records with WebCodecs (`lib/voice/recorder.ts`)
 and muxes OGG/Opus itself (`lib/voice/oggOpus.ts`, unit-tested); the UI is WeChat 4.x's in-card recorder
-(`components/composer/useVoiceRecording.ts` + `VoiceControls.tsx`): the mic opens 语音消息 mode with the
-placeholder 开始说话, a click records, and the send button gives way to a cancel ×, a live dot meter and the
-green send ↑ (Esc cancels, 60 s auto-sends) — plus a `chatActionRecordingVoiceNote` while the mic is live | No new dependency: Chromium hands over raw Opus packets through `AudioEncoder`, so the
+(`components/composer/useVoiceRecording.ts` + `VoiceControls.tsx`): 发语音 is the circled microphone
+**beside 发送** (the tool-row mic is 语音转文字, i.e. dictation, and stays a placeholder), a click starts the
+clip, and the send button gives way to a cancel ×, a live dot meter and the green send ↑ (Esc cancels, 60 s
+auto-sends) — plus a `chatActionRecordingVoiceNote` while the mic is live | No new dependency: Chromium hands over raw Opus packets through `AudioEncoder`, so the
 WebM→OGG muxer decision (§9.5) is moot. The waveform is sent **empty** on purpose (§6.1). **Mock Electron pass
 done** (fake media device): 2 s hold → a voice bubble whose `<audio>` decodes the clip (`duration 1.9`,
 `readyState 4`), chat preview `[语音]`, no error bar, and the recorded file is a valid 4-page OGG (OpusHead,
@@ -354,13 +355,14 @@ How it was built (the audit's assumptions above held except where noted):
   the recorder sends `chatActionRecordingVoiceNote` on pointer-down and
   `typing: false` (a cancel) on release/cancel, fire-and-forget like the typing
   ping.
-- **UI:** WeChat 4.x's in-card recorder, not a floating panel. The mic tool
-  opens 语音消息 mode (it stays green, the surface reads 开始说话); clicking the
-  surface starts a clip, and the 发送 button gives way to the client's three
-  controls: a grey cancel ×, a 9-dot live meter and the green send ↑. Sending is
-  a click (no push-to-talk on the desktop), Esc and × cancel, 60 s sends itself.
-  A send/cancel pressed while the microphone is still opening is remembered in
-  the session ref and applied when the recorder lands (`useVoiceRecording.ts`).
+- **UI:** WeChat 4.x's in-card recorder, not a floating panel. The entry is the
+  circled microphone **beside 发送**; the tool-row mic is 语音转文字 (dictation) in
+  the client and has no engine here, so it stays a 还没有接入 placeholder. A click
+  on 发语音 starts a clip, and 发送 gives way to the client's three controls: a grey
+  cancel ×, a 9-dot live meter and the green send ↑. Sending is a click (no
+  push-to-talk on the desktop), Esc and × cancel, 60 s sends itself. A
+  send/cancel pressed while the microphone is still opening is remembered in the
+  session ref and applied when the recorder lands (`useVoiceRecording.ts`).
 - **Mic permission:** main narrows `media` to the shell window
   (`session.setPermissionRequestHandler` + `setPermissionCheckHandler`); every
   other permission keeps Electron's default. The login, 群二维码 and viewer

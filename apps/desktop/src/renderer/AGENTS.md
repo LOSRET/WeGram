@@ -34,8 +34,8 @@ components/composer/       ComposerCard: the ONE bordered input card (§8.4 + §
                          ExpressionPicker. Both composers render it; a caller only says where
                          a send goes, so the comment box is not a cut-down copy of a chat's.
                          useVoiceRecording / VoiceControls: 语音消息's click-to-record state
-                         machine and the in-card cancel × / dot meter / send ↑ (the mic tool
-                         opens WeChat 4.x's 开始说话 mode).
+                         machine and the in-card cancel × / dot meter / send ↑; 发语音 is
+                         the circled mic beside 发送, the tool-row mic is 语音转文字.
 lib/voice/            语音消息's audio path: oggOpus.ts (pure, unit-tested — OGG pages,
                       lacing, OpusHead/OpusTags, the OGG CRC-32) and recorder.ts
                       (getUserMedia → AudioContext 48 kHz → ScriptProcessor → WebCodecs
@@ -324,16 +324,17 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   `reactions` op replaces rather than merges); a custom-emoji reaction is its
   sticker art by int64-id string. WeChat has no reactions, so there is no picker
   until the owner signs one off — do not add a tap-to-react gesture before that.
-- **A voice note is clicked, not held, and its intent is settled from a ref.**
-  WeChat 4.x desktop starts a clip when the mic is clicked and then offers the
-  cancel ×, a live dot meter and the green send ↑ in the composer card — there is
-  no push-to-talk gesture (the hold-to-talk control next to 发送 is 语音输入, i.e.
-  dictation, which this client does not have). `useVoiceRecording` keeps the
-  session in a ref because `getUserMedia` and the encoder start asynchronously: a
-  send or cancel pressed in that first moment is stored as `want` and applied
-  when the recorder lands. Keep the clip on the base64 OGG IPC path (the renderer
-  has no filesystem) and keep `lib/voice/oggOpus.ts` pure and tested — Chromium
-  cannot record OGG, so the container is written here, not by a library.
+- **发语音 is the circled mic beside 发送; the tool-row mic is 语音转文字.**
+  Measured on the client: clicking the toolbar mic starts dictation and drops
+  recognised text into the box (we have no ASR, so it stays a placeholder),
+  while clicking the circled mic starts a clip at once — no push-to-talk, no
+  separate voice mode. `useVoiceRecording` then swaps 发送 for the cancel ×, the
+  dot meter and the green send ↑, and keeps the session in a ref because
+  `getUserMedia` and the encoder start asynchronously: a send or cancel pressed
+  in that first moment is stored as `want` and applied when the recorder lands.
+  Keep the clip on the base64 OGG IPC path (the renderer has no filesystem) and
+  keep `lib/voice/oggOpus.ts` pure and tested — Chromium cannot record OGG, so
+  the container is written here, not by a library.
 - **标为未读 is a dot, not a count.** `ChatSummary.markedUnread` draws a bare
   `.wx-badge--dot` when `unread` is 0; opening the chat clears the flag (the adapter
   does it). Do not render it through the count badge.

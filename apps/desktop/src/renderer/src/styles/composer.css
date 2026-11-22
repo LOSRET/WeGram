@@ -219,39 +219,31 @@
 }
 
 /* ---------- 语音消息 ----------
-   WeChat 4.x records inside the card, not in a floating panel: the input shows
-   开始说话, the mic stays active, and while a clip runs the send button gives way
-   to a cancel cross, a live dot meter and the green send arrow. */
+   In the client, 发语音 is the circled microphone beside 发送 (the tool-row mic is
+   语音转文字), and a click starts recording: 发送 is replaced by the cancel cross,
+   the live dot meter and the green send arrow, all inside the card. */
 
-.wx-composer__voice {
-  display: flex;
-  align-items: flex-start;
-  min-height: 84px;
-  padding: 10px 12px 0;
+.wx-voice-message {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
   border: none;
-  border-radius: 0;
+  border-radius: 50%;
   background: transparent;
-  text-align: left;
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--wx-text-tertiary);
-  cursor: pointer;
-  user-select: none;
+  color: var(--wx-icon);
 }
 
-.wx-composer__voice:hover:not(:disabled) {
-  color: var(--wx-text-secondary);
+.wx-voice-message:hover:not(:disabled) {
+  background: var(--wx-row-hover);
+  color: var(--wx-text);
 }
 
-/* A live clip keeps the words but drops the pointer: the controls are the way out. */
-.wx-composer__voice--live,
-.wx-composer__voice--live:hover {
-  color: var(--wx-text-secondary);
+.wx-voice-message:disabled {
+  opacity: 0.35;
   cursor: default;
-}
-
-.wx-composer__voice:disabled {
-  opacity: 1;
 }
 
 .wx-voice-ctl {
@@ -317,11 +309,4 @@
 
 .wx-voice-ctl__send:hover {
   background: var(--wx-brand-active);
-}
-
-/* The mic tool stays green while 语音消息 mode is open, like the client's. */
-.wx-tool-button--voice,
-.wx-tool-button--voice:hover {
-  background: var(--wx-row-hover);
-  color: var(--wx-brand-text);
 }

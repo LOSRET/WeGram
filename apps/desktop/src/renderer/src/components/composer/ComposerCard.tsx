@@ -20,6 +20,7 @@ import {
   FolderIcon,
   MicIcon,
   ScissorsIcon,
+  VoiceMessageIcon,
 } from '../Icon'
 import { VoiceControls } from './VoiceControls'
 import { useVoiceRecording } from './useVoiceRecording'
@@ -86,8 +87,6 @@ export function ComposerCard({
   onBlur,
 }: ComposerCardProps) {
   const [pickerOpen, setPickerOpen] = useState(false)
-  /** 语音消息 mode: the input shows 开始说话 and the mic stays active. */
-  const [voiceMode, setVoiceMode] = useState(false)
   const voice = useVoiceRecording({
     onSend: (clip) => {
       void onSendVoice?.(clip)
@@ -135,45 +134,29 @@ export function ComposerCard({
    * 语音消息 mode is only reachable where a recording can be sent, and an edit
    * (which owns the textarea) always wins over it.
    */
-  const voiceActive = voiceMode && Boolean(onSendVoice) && !editing
-  // In voice mode the card sends through the mic's own controls, so 发送 must not
-  // invite an empty send there.
-  const sendReady = !busy && !sendBlocked && !voiceActive && value.trim().length > 0
+  // A running clip takes the right cluster, so 发送 must not invite an empty send.
+  const sendReady = !busy && !sendBlocked && !voice.recording && value.trim().length > 0
 
-  // Losing the voice surface (an edit opens, the tool is switched off) must drop
-  // the clip instead of leaving the microphone open behind the textarea.
+  // An edit takes the textarea and the send button: drop the clip rather than
+  // leave the microphone open behind the edit banner.
   const { recording: voiceRecording, cancel: cancelVoice } = voice
   useEffect(() => {
-    if (!voiceActive && voiceRecording) cancelVoice()
-  }, [voiceActive, voiceRecording, cancelVoice])
+    if (editing && voiceRecording) cancelVoice()
+  }, [editing, voiceRecording, cancelVoice])
 
   return (
     <>
       <div className="wx-composer__card">
-        {voiceActive ? (
-          <button
-            type="button"
-            className={`wx-composer__voice${voice.recording ? ' wx-composer__voice--live' : ''}`}
-            onClick={() => {
-              if (!voice.recording) voice.start()
-            }}
-            disabled={busy || !voice.supported || voice.recording}
-            title={voice.recording ? '正在录音，点右下角发送或取消' : '点击麦克风开始说话'}
-          >
-            {voice.recording ? '正在说话…' : voice.supported ? '开始说话' : '无法录音'}
-          </button>
-        ) : (
-          <textarea
-            ref={textareaRef}
-            className="wx-composer__input"
-            placeholder={placeholder}
-            title="Enter 发送 · Shift+Enter 换行"
-            value={value}
-            onChange={(event) => onChange(event.target.value)}
-            onBlur={onBlur}
-            {...inputHandlers}
-          />
-        )}
+        <textarea
+          ref={textareaRef}
+          className="wx-composer__input"
+          placeholder={placeholder}
+          title="Enter 发送 · Shift+Enter 换行"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          onBlur={onBlur}
+          {...inputHandlers}
+        />
 
         <div className="wx-composer__actions">
           <div className="wx-composer__tools">
@@ -221,21 +204,19 @@ export function ComposerCard({
               <ScissorsIcon size={20} />
               <ChevronDownIcon size={9} className="wx-tool-button__chevron" />
             </button>
+            {/*
+              In the client this tool is 语音转文字 (dictation, hold the mouse and
+              speak): the transcript lands in the box. There is no ASR behind it
+              here — TDLib only transcribes a voice note that was *received* — so
+              it stays the honest placeholder. 发语音 is the circled glyph beside
+              发送, like the client's.
+            */}
             <button
-              className={`wx-tool-button${voiceActive ? ' wx-tool-button--voice' : ''}`}
-              onClick={() => {
-                if (!onSendVoice) {
-                  onNotice('语音消息')
-                  return
-                }
-                if (voice.recording) voice.cancel()
-                setPickerOpen(false)
-                setAttachAnchor(null)
-                setVoiceMode((current) => !current)
-              }}
+              className="wx-tool-button"
+              onClick={() => onNotice('语音转文字')}
               disabled={toolsDisabled}
-              title={voiceActive ? '退出语音输入' : '语音消息'}
-              aria-label={voiceActive ? '退出语音输入' : '语音消息'}
+              title="语音转文字"
+              aria-label="语音转文字"
             >
               <MicIcon size={20} />
             </button>
@@ -263,13 +244,28 @@ export function ComposerCard({
               onSend={voice.send}
             />
           ) : (
-            <button
-              className={`wx-send-button${sendReady ? ' wx-send-button--ready' : ''}`}
-              onClick={onSend}
-              disabled={!sendReady}
-            >
-              {sendLabel}
-            </button>
+            <>
+              {/* 发语音: only where a clip has somewhere to go (not the comment box). */}
+              {onSendVoice ? (
+                <button
+                  type="button"
+                  className="wx-voice-message"
+                  onClick={voice.start}
+                  disabled={toolsDisabled || !voice.supported}
+                  title={voice.supported ? '发语音' : '这台设备不支持录音'}
+                  aria-label="发语音"
+                >
+                  <VoiceMessageIcon size={21} />
+                </button>
+              ) : null}
+              <button
+                className={`wx-send-button${sendReady ? ' wx-send-button--ready' : ''}`}
+                onClick={onSend}
+                disabled={!sendReady}
+              >
+                {sendLabel}
+              </button>
+            </>
           )}
         </div>
       </div>
