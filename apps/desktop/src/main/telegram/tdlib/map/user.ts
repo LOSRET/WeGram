@@ -34,6 +34,8 @@ export function mapUserProfile(
   ctx: MapperContext,
   user: TdObject,
   full: TdObject | undefined,
+  /** TDLib's `chat.can_be_reported` for the private chat (bots only). */
+  canBeReported: boolean,
 ): UserProfile {
   const username: string | undefined = user.usernames?.active_usernames?.[0]
   const bio = textOf(full?.bio)
@@ -52,6 +54,7 @@ export function mapUserProfile(
     isContact: Boolean(user.is_contact),
     // `block_list` is null when the person is not blocked; a non-null list is one.
     blocked: Boolean(full?.block_list && typeof full.block_list === 'object'),
+    canBeReported,
   }
 }
 

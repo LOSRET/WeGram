@@ -33,12 +33,21 @@ export async function userStatus(
  * a card that has to wait for a download would open blank.
  */
 export async function userProfile(deps: ActionDeps, userId: number): Promise<UserProfile> {
-  const [user, full] = await Promise.all([
+  const [user, full, chat] = await Promise.all([
     deps.invoke({ _: 'getUser', user_id: userId }) as Promise<TdObject>,
     deps.invoke({ _: 'getUserFullInfo', user_id: userId }) as Promise<TdObject | undefined>,
+    // 举报 is only possible where TDLib says so. For a person that is "a bot":
+    // `DialogManager::can_report_dialog` asks `UserManager::can_report_user`,
+    // which requires `is_bot` — a human is reported through the chat action bar
+    // instead. A local call; `force: false` never sends anything.
+    deps.invoke({
+      _: 'createPrivateChat',
+      user_id: userId,
+      force: false,
+    }) as Promise<TdObject | undefined>,
   ])
   deps.mapper.prefetchUserAvatars([userId])
-  return mapUserProfile(deps.mapper, user, full)
+  return mapUserProfile(deps.mapper, user, full, Boolean(chat?.can_be_reported))
 }
 
 /**

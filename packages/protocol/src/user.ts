@@ -33,6 +33,14 @@ export const userProfileSchema = z.object({
   isContact: z.boolean(),
   /** 已拉黑 (`userFullInfo.block_list` is not null). */
   blocked: z.boolean(),
+  /**
+   * 举报 is possible for this person: TDLib's `chat.can_be_reported` for the
+   * private chat. It is **bots only** for users (`UserManager::can_report_user`
+   * requires `is_bot`), so the card must not offer 举报 to a human — reporting a
+   * person goes through the chat action bar's spam banner instead, which this
+   * client does not consume yet.
+   */
+  canBeReported: z.boolean(),
 })
 export type UserProfile = z.infer<typeof userProfileSchema>
 

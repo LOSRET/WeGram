@@ -94,6 +94,9 @@ export function createMockUsers(fixtures: Map<number, Fixture>) {
       // Everyone in the fake address book is a contact unless this session
       // removed them; the card's button then offers 添加为联系人.
       isContact: override.contact ?? true,
+      // 举报 a human is not a TDLib path: `can_report_user` wants a bot, and the
+      // fake account has none, so the card matches the real client and hides it.
+      canBeReported: false,
       blocked: override.blocked ?? false,
     }
   }

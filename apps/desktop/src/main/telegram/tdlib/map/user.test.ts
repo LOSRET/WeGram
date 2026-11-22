@@ -31,12 +31,17 @@ function user(overrides: Partial<TdObject> = {}): TdObject {
 
 describe('mapUserProfile', () => {
   it('reads the card out of user + userFullInfo', () => {
-    const profile = mapUserProfile(ctx(), user(), {
-      bio: { _: 'formattedText', text: '每天散步一小时。' },
-      note: { _: 'formattedText', text: '妈妈' },
-      group_in_common_count: 3,
-      block_list: null,
-    })
+    const profile = mapUserProfile(
+      ctx(),
+      user(),
+      {
+        bio: { _: 'formattedText', text: '每天散步一小时。' },
+        note: { _: 'formattedText', text: '妈妈' },
+        group_in_common_count: 3,
+        block_list: null,
+      },
+      false,
+    )
 
     expect(profile).toMatchObject({
       userId: 37,
@@ -52,12 +57,17 @@ describe('mapUserProfile', () => {
   })
 
   it('drops empty text so the card draws no empty rows', () => {
-    const profile = mapUserProfile(ctx(), user(), {
-      bio: { _: 'formattedText', text: '  ' },
-      note: { _: 'formattedText', text: '' },
-      group_in_common_count: 0,
-      block_list: null,
-    })
+    const profile = mapUserProfile(
+      ctx(),
+      user(),
+      {
+        bio: { _: 'formattedText', text: '  ' },
+        note: { _: 'formattedText', text: '' },
+        group_in_common_count: 0,
+        block_list: null,
+      },
+      false,
+    )
 
     // TDLib hands back an empty formattedText where there is nothing to say.
     expect(profile.bio).toBeUndefined()
@@ -65,11 +75,22 @@ describe('mapUserProfile', () => {
     expect(profile.commonChats).toBe(0)
   })
 
+  it("carries TDLib's reportability for the private chat", () => {
+    const bot = mapUserProfile(ctx(), user({ is_bot: true }), undefined, true)
+    expect(bot.canBeReported).toBe(true)
+
+    // A human's chat answers `can_be_reported: false`: TDLib only reports bots
+    // from a profile (`UserManager::can_report_user` requires `is_bot`).
+    const human = mapUserProfile(ctx(), user(), undefined, false)
+    expect(human.canBeReported).toBe(false)
+  })
+
   it('reads 已拉黑 from a non-null block list, and a person outside the book', () => {
     const profile = mapUserProfile(
       ctx(),
       user({ is_contact: false, first_name: '', last_name: '' }),
       { block_list: { _: 'blockListMain' }, group_in_common_count: 0 },
+      false,
     )
 
     expect(profile.blocked).toBe(true)
@@ -80,7 +101,7 @@ describe('mapUserProfile', () => {
 
   it('takes the photo from the avatar cache when it is already on disk', () => {
     const avatars = new Map<number, string>([[37, 'wx-media://f/abc']])
-    const profile = mapUserProfile(ctx({ userAvatarUrls: avatars }), user(), undefined)
+    const profile = mapUserProfile(ctx({ userAvatarUrls: avatars }), user(), undefined, false)
 
     expect(profile.avatarUrl).toBe('wx-media://f/abc')
   })

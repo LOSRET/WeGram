@@ -285,13 +285,22 @@ export function ProfileCard({ userId, onOpenChat, onClose }: ProfileCardProps) {
               >
                 {profile.blocked ? '取消拉黑' : '加入黑名单'}
               </button>
-              <button
-                type="button"
-                className="wx-profile__action wx-profile__action--danger"
-                onClick={() => setReportOpen(true)}
-              >
-                举报
-              </button>
+              {/*
+                举报 only where TDLib allows it: `chat.can_be_reported` is true for
+                a bot and false for a human (`UserManager::can_report_user` wants
+                `is_bot`). A human is reported through the chat action bar's spam
+                banner, which this client does not consume yet — a button here
+                would only produce a server refusal.
+              */}
+              {profile.canBeReported ? (
+                <button
+                  type="button"
+                  className="wx-profile__action wx-profile__action--danger"
+                  onClick={() => setReportOpen(true)}
+                >
+                  举报
+                </button>
+              ) : null}
             </div>
           </>
         ) : (

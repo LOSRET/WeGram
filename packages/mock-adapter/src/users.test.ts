@@ -45,6 +45,8 @@ describe('createMockUsers', () => {
       bio: '散步',
       isContact: true,
       blocked: false,
+      // A human is not reportable from a profile; TDLib's flag wants a bot.
+      canBeReported: false,
     })
   })
 

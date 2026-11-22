@@ -136,7 +136,7 @@ person-days, for this repo's conventions.
 | P1 | Reactions | ~~Not in DTO, no renderer, no updates~~ — **display done**, picker still needs the owner's sign-off | `addMessageReaction` / `removeMessageReaction` / `setMessageReactions`, `getMessageAvailableReactions`, `updateMessageReactions`, `interaction_info.reactions` | 2–3 |
 | P1 | Peer profile card | ~~Chat title/avatar not clickable; `ContactDetail` 更多资料/备注 are placeholders~~ — **done** (card, 共同群聊 list, and the 聊天信息 face), see the P1 status table | `getUserFullInfo` (bio, note, `group_in_common_count`, `block_list`, `can_be_called`), `getGroupsInCommon` | 2–3 |
 | P1 | Block / unblock | ~~No entry point~~ — **done** (资料卡's 加入黑名单 / 取消拉黑) | `setMessageSenderBlockList` (pass `null` to unblock), `getBlockedMessageSenders` | 1 |
-| P1 | Report chat / message | ~~No entry point~~ — **done**: 资料卡's 举报 (chat-level) and the message menu's (`message_ids`) share one phased sheet | `reportChat` (two-phase: empty `option_id` first), `chat.can_be_reported`, `messageProperties.can_report_chat` | 1 |
+| P1 | Report chat / message | ~~No entry point~~ — **done for the API-allowed paths**: the message menu (channels/supergroups, and bots) and 资料卡's 举报 for a bot; a human's only path is the chat action bar, still unwired | `reportChat` (two-phase: empty `option_id` first), `chat.can_be_reported`, `messageProperties.can_report_chat` | 1 |
 | P1 | Add / remove contact, 备注 | ~~通讯录 is read-only; 添加备注名 placeholder~~ — **done**, see the P1 status table | `addContact` + `importedContact`, `removeContacts`, `setUserNote`, `userFullInfo.note` | 2 |
 | P1 | Album send | ~~Multi-select sends N separate messages~~ — **done**, see the P1 status table | `sendMessageAlbum` (returns `Messages`) | 1–2 |
 | P1 | Caption edit | ~~Edit menu is gated to `kind === 'text'`~~ — **done**, see the P1 status table | `editMessageCaption` | 0.5–1 |
@@ -361,6 +361,16 @@ Incoming typing already works; the other side never sees ours.
   answers `reportChatResultOptionRequired { title, options }`; call again with
   the chosen `option_id` (and optionally `message_ids` / `text`). Gate the
   entry on `chat.can_be_reported` / `messageProperties.can_report_chat`.
+  **Which chats are reportable is TDLib's rule, not ours**: 1.8.70 computes
+  `messageProperties.can_report_chat = DialogManager::can_report_dialog(dialog) &&
+  MessagesManager::can_report_message(id)`, and `can_report_dialog` is
+  `UserManager::can_report_user` for a user (**`is_bot` only** — a human answers
+  false), **false** for a basic group, true for a channel/supergroup unless the
+  account is its **creator**, false for a secret chat. So the message menu's 举报
+  appears on channel / supergroup posts and in a bot's chat, nowhere else — that is
+  the API, not a product choice. `chat.can_be_reported` (same gate) is now on
+  `UserProfile` as `canBeReported`, and the 资料卡 hides its 举报 for a human for the
+  same reason.
   **The reasons are the server's**, text included: each `reportOption` is an
   opaque `id` plus a `text` Telegram has already localized to the session's language
   (`reportOption id:bytes text:string`; 1.8.70 has no `type` field), and the client

@@ -33,7 +33,9 @@ export function mockMessageProperties(
     canRecognizeSpeech: message.kind === 'voice',
     // The fake has no pin rights to model: every row can be pinned.
     canBePinned: true,
-    // 举报 is about a peer's row; TDLib answers false for your own messages.
-    canReportChat: !message.outgoing,
+    // 举报 follows TDLib's `can_report_chat`: for users it needs a bot; basic
+    // groups answer false; channels and supergroups answer true (the fake has no
+    // creators to exclude, and its groups are supergroups).
+    canReportChat: fixture !== undefined && fixture.chat.kind !== 'private',
   }
 }

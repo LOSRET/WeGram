@@ -93,6 +93,9 @@ function read(
     commonChats: commonChatsFor(userId).length,
     isContact: override.contact ?? true,
     blocked: override.blocked ?? false,
+    // Same rule as the mock: a human is not reportable from a profile (TDLib
+    // reports bots only), so the card's 举报 stays hidden.
+    canBeReported: false,
   }
 }
 
