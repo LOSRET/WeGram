@@ -9,7 +9,8 @@ const logger = createLogger('window')
 /**
  * The one place a renderer window is built.
  *
- * All three windows (shell, login, viewer) are the same sandboxed page family:
+ * Every renderer window (shell, login, viewer, 群二维码, 设置) is the same sandboxed page
+ * family:
  * a preload script, context isolation, no node integration, sandbox on, no
  * spellcheck. That is a security contract, not styling — a copy per window is
  * how one of them eventually ships without `sandbox` or without the external

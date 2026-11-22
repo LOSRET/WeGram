@@ -50,6 +50,61 @@ it as an outgoing voice bubble (0:02), so the server accepts our OGG and an empt
 waveform. The CLI probe step is in `scripts/tdlib-test-dc.ts` for the next clean
 run — see `docs/PRIVATE-CHAT-HANDOFF.md` §11.
 
+## 设置 window batch A (2026-11-22)
+
+**Shipped in two commits:** `3367958` (HTTP proxy) and `2685642` (设置 batch A), both
+GPG-signed; `pnpm verify` was green before them and the working tree is clean.
+
+- 设置 is its own window (`main/settings-window.ts`, `#settings`,
+  `renderer/src/screens/SettingsWindow.tsx`): frameless **640×558**, **no parent**,
+  centred on the display the shell sits on, single instance (a second 打开 focuses the
+  open one). Design, measured metrics and the light/dark palette:
+  `docs/技术方案.md` §9.11 and `docs/UI-HANDOFF.md` §2.10.
+- Batch A ships four groups: **账号与安全** (own identity, read-only, plus 退出登录),
+  **通用** (外观 with a 跟随系统 state, 关闭主窗口 tray/quit, 发送消息 Enter/Ctrl+Enter),
+  **网络与代理** (the proxy form extracted into `components/proxy/ProxyForm.tsx` and shared
+  with the login window's modal) and **关于**. The other four groups are specified in
+  §9.11.3 and are deliberately **not** drawn as dead rows.
+- Protocol: `settings:open` / `settings:close`, `evt:theme`, `evt:settings`, and
+  `appSettings` = `theme` (resolved) + `themePreference` + `closeBehavior` + `sendKey`.
+
+**Rules that are easy to break**
+
+- The window has **no parent on purpose** (the shell must be able to cover it, and it must
+  be draggable on its own). Nothing closes it for us: the shell's `closed`,
+  `auth:logout` and `before-quit` each call `closeSettingsWindow()`. Drop one and
+  `window-all-closed` never fires — the app lives on with a single settings window.
+- A theme change must repaint **four** things: the shell's native title strip, the viewer,
+  the settings window itself, and both renderers through `evt:theme`. `applyTheme()` in
+  `main/index.ts` is the one place; a fifth window means a fifth line there.
+- `theme` in `appSettings` is always the **resolved** value (`light`/`dark`);
+  `themePreference` is what is stored. `storedTheme(uiDb)` resolves `system` through
+  `nativeTheme`, and `nativeTheme.on('updated')` only acts while the preference is
+  `system`.
+- 关闭主窗口 defaults to **quit**, not tray: an installed copy must not start surviving
+  its own × after an update.
+- 发送消息 is read **at keydown time** (`useComposerInput` reads the store), never captured
+  in a render — otherwise the new rule only applies after a restart.
+
+**Verified** — mock Electron pass (`launch-detached.ps1 -Mock -NoSandbox`): ≡ → 设置
+opens the window, the four groups render, 外观 light↔dark repaints the settings window
+**and** the shell, Esc closes only the settings window, 网络与代理 renders the shared proxy
+form, and closing the shell with 设置 open quits the whole app. `pnpm verify` green
+(lint → typecheck → 95 files / 726 tests → build).
+
+**Next (B/C — design doc §9.11.3, §9.11.7)**
+
+- **B**: 消息通知 (私聊/群/频道 scope via `setScopeNotificationSettings`), the six 隐私
+  rules + 黑名单 (`setUserPrivacySettingRules`, `setMessageSenderBlockList`), 登录设备
+  (`getActiveSessions` / `terminateSession`), 存储统计/清理 (`getStorageStatistics` /
+  `optimizeStorage`), 自动下载 (`getAutoDownloadSettingsPresets`), 消息字号, 开机自启.
+- **C**: 两步验证, 本地锁, 全局快捷键, 检查更新, 保存目录, 贴纸管理, 恢复默认.
+- Each batch adds panels to the same nav table in `screens/SettingsWindow.tsx`; prefer
+  per-domain channels (`notifications:*`, `privacy:*`, `sessions:*`, …) over growing the
+  one `settings:set` patch.
+- 清理缓存 must invalidate `media/registry.ts` tokens, or bubbles keep retrying files that
+  were just deleted (see the media rules above).
+
 ## Where things stand
 
 Greenfield → working skeleton in three milestones:
@@ -1163,3 +1218,15 @@ The refactor sessions added nine more commits on top of `395ac19` (`f1d0a9e` the
 real-account fixes, then batches 0–3, the doc updates, and batch 4 as two commits).
 `pnpm verify` — not just typecheck + build — was green before each; batch 4 also passed
 `pnpm tdlib:smoke` and a mock Electron pass, and the working tree is clean.
+
+**2026-11-22, settings session:** designed and shipped 设置 batch A (above), plus HTTP
+CONNECT proxy support. Two things in that batch were **not** exercised for real:
+
+- the settings window only ran against the **mock adapter** — a real-account pass is still
+  open for the profile photo, @username and 退出登录 against TDLib;
+- 跟随系统 was clicked in the mock window (light → system → light) but the OS theme was
+  never switched to watch `nativeTheme.on('updated')` fire, and `pingProxy`/`proxy:test`
+  was clicked with the mock's fixed 3 ms answer, not against a real proxy.
+
+The mock Electron window used for the pass was closed at the end of the session.
+
