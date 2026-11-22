@@ -5,6 +5,7 @@ import { hasCommentBar, isCommentablePost } from '../../lib/comments'
 import { formatMessageTime, messagePreview } from '../../lib/format'
 import { stickerBox } from '../../lib/stickerBox'
 import { Avatar } from '../Avatar'
+import { CustomEmoji } from '../CustomEmoji'
 import {
   CHANNEL_MEDIA_INSET,
   CHANNEL_MEDIA_LIMITS,
@@ -56,6 +57,12 @@ export interface MessageRowProps {
   onOpenMenu: (message: Message, x: number, y: number) => void
   /** Opens Telegram's full-pane discussion view for that message's thread. */
   onOpenComments: (message: Message) => void
+  /**
+   * 重试 a 未发送 row (`messages:resend`). Optional: the comment panel draws rows
+   * from its own thread (no store, no resend path), and a retry button that
+   * cannot work must not be drawn.
+   */
+  onResend?: (message: Message) => void
 }
 
 /**
@@ -95,6 +102,7 @@ export const MessageRow = memo(
     readOutboxMaxId,
     onOpenMenu,
     onOpenComments,
+    onResend,
   }: MessageRowProps) {
     /**
      * A premium sticker's effect plays once; a tap on the sticker replays it, so
@@ -137,6 +145,18 @@ export const MessageRow = memo(
     const buttons = first.buttons?.length ? first.buttons : undefined
     // Telegram puts an album's caption on one of its items (normally the first).
     const caption = messages.find((message) => message.text) ?? null
+    /**
+     * 表情回应: an album shares one row, so the chips of its last item stand for the
+     * group — Telegram draws them on the album's tail the same way. Display only:
+     * WeChat has no reactions, so there is no picker yet (see protocol/reaction.ts).
+     */
+    const reactions = last.reactions?.length ? last.reactions : undefined
+    /**
+     * 语音转文字: the transcript of a voice note, once somebody asked for one. WeChat
+     * shows it under the bubble and the 转文字 action is in the context menu; a
+     * pending answer keeps its partial text so the words appear while they land.
+     */
+    const transcription = mediaKind === 'voice' && !album ? first.transcription : undefined
     const showSender = !first.outgoing && chat.kind !== 'private'
     const channelBubble = channel ? ' wx-bubble--channel' : ''
     /**
@@ -304,6 +324,8 @@ export const MessageRow = memo(
                   kind={mediaKind}
                   chatId={chat.id}
                   messageId={first.id}
+                  // 语音消息 mirrors its seconds/waves by side, like the client's.
+                  outgoing={first.outgoing}
                   // Telegram's GIF badge steps aside when the animation has a caption.
                   showAnimationBadge={!caption}
                   // A channel post is Telegram's card, so its photo may grow past
@@ -323,10 +345,49 @@ export const MessageRow = memo(
               {channel ? commentBar : null}
             </div>
           )}
+          {transcription ? (
+            <div
+              className={`wx-transcript${transcription.status === 'error' ? ' wx-transcript--error' : ''}`}
+            >
+              {transcription.status === 'error'
+                ? (transcription.error ?? '转写失败')
+                : (transcription.text ?? '正在转写…')}
+            </div>
+          ) : null}
+          {reactions ? (
+            <div className="wx-reactions">
+              {reactions.map((reaction, index) => (
+                <span
+                  key={reaction.emoji ?? reaction.customEmojiId ?? `reaction-${index}`}
+                  className={`wx-reaction${reaction.chosen ? ' wx-reaction--chosen' : ''}`}
+                  title={`${reaction.count} 人回应`}
+                >
+                  {reaction.customEmojiId ? (
+                    <CustomEmoji id={reaction.customEmojiId} glyph="🙂" />
+                  ) : (
+                    <span className="wx-reaction__emoji">{reaction.emoji}</span>
+                  )}
+                  <span className="wx-reaction__count">{reaction.count}</span>
+                </span>
+              ))}
+            </div>
+          ) : null}
           {/* Telegram's inline keyboard is attached to the message, not to its
               bubble: under it, on the transcript's own background, so the buttons
               read as their own control strip instead of part of the body. */}
           {buttons ? <InlineButtons rows={buttons} /> : null}
+          {/* 未发送: always visible, unlike the hover meta — a failed message that
+              looks delivered is the one bug this row exists to prevent. */}
+          {last.sendingState === 'failed' && onResend ? (
+            <button
+              className="wx-message__retry"
+              title={last.sendError ?? '发送失败'}
+              onClick={() => onResend(last)}
+              disabled={last.canRetry === false}
+            >
+              未发送{last.canRetry === false ? '' : '，点击重试'}
+            </button>
+          ) : null}
           {/* 评论 N 条 (design doc §9.8): just the handle — the thread opens in the
               full-pane CommentPanel, like Telegram's discussion view. A thread that
               nobody has commented in yet keeps the handle too (写评论), or the reader
@@ -363,5 +424,6 @@ export const MessageRow = memo(
     previous.repliedTo === next.repliedTo &&
     previous.onOpenMenu === next.onOpenMenu &&
     previous.onOpenComments === next.onOpenComments &&
+    previous.onResend === next.onResend &&
     sameRow(previous.messages, next.messages),
 )

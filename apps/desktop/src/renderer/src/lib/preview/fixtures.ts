@@ -173,6 +173,22 @@ for (const seed of seeds.values()) {
   }
 }
 
+/**
+ * 共同群聊 for one person: the group chats the seed says they share with the
+ * account. The mock adapter reads the same `commonChatIds`, so the two fakes
+ * cannot disagree about a card.
+ */
+export function previewCommonChatsFor(userId: number): ChatSummary[] {
+  for (const seed of seeds.values()) {
+    if (seed.chat.userId !== userId) continue
+    return (seed.commonChatIds ?? []).flatMap((id) => {
+      const chat = chats.find((item) => item.id === id)
+      return chat?.kind === 'group' ? [{ ...chat }] : []
+    })
+  }
+  return []
+}
+
 /** The address book: every private seed that is a person, not Saved Messages. */
 export const contacts: Contact[] = [...seeds.values()]
   .flatMap((seed) => {

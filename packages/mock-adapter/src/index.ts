@@ -18,15 +18,18 @@ import type {
   StickerSetSummary,
 } from '@wegram/protocol'
 
-import { AdapterEmitter, type MediaKind, type TelegramAdapter } from '@wegram/adapter-contract'
+import { AdapterEmitter, type TelegramAdapter } from '@wegram/adapter-contract'
 import { MockAssets } from './assets'
 import { MockAvatars } from './avatars'
 import { createMockChats } from './chats'
 import { createMockComments } from './comments'
 import { listMockContacts } from './contacts'
 import { ME, MOCK_CODE, MOCK_PASSWORD, type Fixture } from './constants'
-import { applyRead, simulateTransfer } from './effects'
-import { buildMediaMessage, buildStickerMessage, type MockSendDeps } from './media'
+import { createMockEdits } from './edits'
+import { createMockSends } from './sends'
+import { createMockUsers } from './users'
+import { applyRead } from './effects'
+import type { MockSendDeps } from './media'
 import { beginMockStream, downloadMockFile, mockDownloadedPrefix } from './files'
 import { buildFixtures } from './fixtures'
 import {
@@ -42,7 +45,6 @@ import { mockMessageProperties } from './properties'
 import { searchChats, searchMessages, searchMessagesInScope } from './search'
 import { getMockStickerSet, listMockCustomEmoji, listMockStickerSets } from './stickers'
 import { emitTraffic } from './traffic'
-import { appendMessage, outgoingMessage } from './transcript'
 
 export interface MockAdapterOptions {
   /** Where generated fixture media is written (under userData). */
@@ -95,12 +97,38 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   private nextMessageId = 5000
   private nextFileId = 9000
   private timer: NodeJS.Timeout | null = null
+  /**
+   * `WEGRAM_MOCK_FAIL_SEND=1` fails the next text send once, so the 未发送 row and
+   * 重试 can be exercised without a network: the retry then succeeds normally.
+   */
+  private failNextSend = /^(1|true|yes|on)$/i.test(
+    process.env['WEGRAM_MOCK_FAIL_SEND']?.trim() ?? '',
+  )
   /** Pending fake QR confirmation; the scan is simulated on this timer. */
   private qrTimer: NodeJS.Timeout | null = null
 
   constructor(private readonly options: MockAdapterOptions) {
     super()
     this.assets = new MockAssets(options.registerMedia)
+    // Built here, not as a field initializer: it reads `assets`, which only exists
+    // once this constructor has made it.
+    this.sends = createMockSends({
+      fixtures: this.fixtures,
+      assets: this.assets,
+      emit: (event) => this.emit(event),
+      sendDeps: () => this.sendDeps(),
+      takeMessageId: () => this.nextMessageId++,
+      failNextSend: () => {
+        if (!this.failNextSend) return false
+        this.failNextSend = false
+        return true
+      },
+    })
+    this.sendText = this.sends.sendText
+    this.sendMedia = this.sends.sendMedia
+    this.sendAlbum = this.sends.sendAlbum
+    this.sendSticker = this.sends.sendSticker
+    this.sendVoiceNote = this.sends.sendVoice
     this.avatars = new MockAvatars({
       mediaDir: options.mediaDir,
       registerMedia: options.registerMedia,
@@ -241,11 +269,44 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   readonly setChatMuted = this.chatApi.setMuted
   readonly setChatPinned = this.chatApi.setPinned
   readonly clearHistory = this.chatApi.clearHistory
+  readonly deleteChat = this.chatApi.deleteChat
+  readonly setChatUnread = this.chatApi.setChatUnread
   readonly chatMembers = this.chatApi.members
   readonly setChatTitle = this.chatApi.setTitle
   readonly leaveChat = this.chatApi.leave
   readonly pinnedMessage = this.chatApi.pinnedMessage
+  readonly setPinnedMessage = this.chatApi.setPinnedMessage
   readonly inviteLink = this.chatApi.inviteLink
+  readonly userStatus = this.chatApi.userStatus
+
+  /** 资料卡's data and its two writes; the rules live in ./users.ts. */
+  private readonly users = createMockUsers(this.fixtures)
+  async userProfile(userId: number) {
+    return this.users.profile({ userId })
+  }
+  async commonChats(input: { userId: number; offset?: number; limit?: number }) {
+    return this.users.commonChats(input)
+  }
+  async setUserNote(userId: number, note: string) {
+    return this.users.setNote({ userId, note })
+  }
+  async setUserContact(userId: number, contact: boolean) {
+    return this.users.setContact({ userId, contact })
+  }
+  async setUserBlocked(userId: number, blocked: boolean) {
+    return this.users.setBlocked({ userId, blocked })
+  }
+  async reportUser(userId: number, input: { optionId?: string; text?: string }) {
+    return this.users.report({ userId, ...input })
+  }
+  async reportMessage(input: {
+    chatId: number
+    messageId: number
+    optionId?: string
+    text?: string
+  }) {
+    return this.users.reportMessage(input)
+  }
 
   /** The mock address book; see `listMockContacts`. */
   async listContacts(): Promise<Contact[]> {
@@ -266,56 +327,17 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     return mockHistoryNewer({ fixtures: this.fixtures }, input)
   }
 
-  async sendText(input: {
-    chatId: number
-    text: string
-    replyTo?: number
-  }): Promise<{ localId: string; message: Message }> {
-    const fixture = this.requireFixture(input.chatId)
-    const message = outgoingMessage({
-      id: this.nextMessageId++,
-      chatId: input.chatId,
-      kind: 'text',
-      text: input.text,
-      replyTo: input.replyTo,
-    })
-    appendMessage({ emit: (event) => this.emit(event) }, fixture, message, input.text)
-    return { localId: `mock-${message.id}`, message }
-  }
-
-  async sendMedia(input: {
-    chatId: number
-    filePath: string
-    kind: MediaKind
-    caption?: string
-    replyTo?: number
-  }): Promise<{ localId: string; message: Message }> {
-    const fixture = this.requireFixture(input.chatId)
-    const built = await buildMediaMessage(this.sendDeps(), {
-      ...input,
-      id: this.nextMessageId++,
-    })
-    appendMessage({ emit: (event) => this.emit(event) }, fixture, built.message, built.preview)
-    // Upload progress is reported asynchronously, like TDLib does.
-    void simulateTransfer(
-      { files: this.assets.files, emit: (event) => this.emit(event) },
-      built.fileId,
-      built.size,
-      true,
-    )
-    return { localId: `mock-${built.message.id}`, message: built.message }
-  }
-
-  async sendSticker(input: {
-    chatId: number
-    fileId: number
-    replyTo?: number
-  }): Promise<{ localId: string; message: Message }> {
-    const fixture = this.requireFixture(input.chatId)
-    const built = buildStickerMessage(this.sendDeps(), { ...input, id: this.nextMessageId++ })
-    appendMessage({ emit: (event) => this.emit(event) }, fixture, built.message, built.preview)
-    return { localId: `mock-${built.message.id}`, message: built.message }
-  }
+  /**
+   * Outgoing messages — text, one media file, 相册 and stickers. Every send builds a
+   * row, appends it to the fixture and starts the fake upload, so their rules live
+   * in ./sends.ts and this class only binds them.
+   */
+  private readonly sends: ReturnType<typeof createMockSends>
+  readonly sendText: TelegramAdapter['sendText']
+  readonly sendMedia: TelegramAdapter['sendMedia']
+  readonly sendAlbum: TelegramAdapter['sendAlbum']
+  readonly sendSticker: TelegramAdapter['sendSticker']
+  readonly sendVoiceNote: TelegramAdapter['sendVoiceNote']
 
   /** What the outgoing-message builders need; also handed to the comment threads. */
   private sendDeps(): MockSendDeps {
@@ -339,31 +361,17 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     return listMockCustomEmoji(this.assets, ids)
   }
 
-  async editText(input: { chatId: number; messageId: number; text: string }): Promise<Message> {
-    const target = this.requireMessage(input.chatId, input.messageId)
-    target.text = input.text
-    target.edited = true
-    this.emit({
-      type: 'messages',
-      chatId: input.chatId,
-      ops: [{ op: 'edit', chatId: input.chatId, messageId: input.messageId, text: input.text }],
-    })
-    return { ...target }
-  }
-
-  async deleteMessages(input: {
-    chatId: number
-    messageIds: number[]
-    forBoth: boolean
-  }): Promise<void> {
-    const fixture = this.requireFixture(input.chatId)
-    fixture.messages = fixture.messages.filter((m) => !input.messageIds.includes(m.id))
-    this.emit({
-      type: 'messages',
-      chatId: input.chatId,
-      ops: [{ op: 'delete', chatId: input.chatId, messageIds: input.messageIds }],
-    })
-  }
+  /**
+   * Message edits — 编辑, 编辑说明, delete and 重试. They all rewrite one fixture row
+   * and announce the op that describes it, so their rules live in ./edits.ts and
+   * this class only binds them.
+   */
+  private readonly edits = createMockEdits(this.fixtures, (event) => this.emit(event))
+  readonly editText = this.edits.editText
+  readonly editCaption = this.edits.editCaption
+  readonly deleteMessages = this.edits.deleteMessages
+  readonly resendMessages = this.edits.resendMessages
+  readonly transcribeMessage = this.edits.transcribe
 
   async messageProperties(input: {
     chatId: number
@@ -385,6 +393,11 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
       target.messages.push({ ...original, id: this.nextMessageId++, chatId: input.toChatId })
     }
     this.emit({ type: 'chats', ops: [{ op: 'upsert', chat: { ...target.chat } }] })
+  }
+
+  /** 对方正在输入: a fixture peer never reads it, so the mock only acknowledges. */
+  async sendTyping(_chatId: number, _typing: boolean): Promise<void> {
+    // Nothing to tell a fake peer.
   }
 
   async markRead(input: { chatId: number; upToMessageId: number }): Promise<void> {

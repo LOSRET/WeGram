@@ -55,6 +55,47 @@ export function reduceOps(
           item.id === op.messageId ? { ...item, text: op.text, edited: true } : item,
         )
         break
+      /**
+       * A failed/pending badge moved. The row keeps its id, so this is a patch;
+       * a state update for a row that is not loaded changes nothing (it will be
+       * in the history page when the reader gets there).
+       */
+      case 'sendState':
+        next = next.map((item) =>
+          item.id === op.messageId
+            ? {
+                ...item,
+                sendingState: op.sendingState,
+                ...(op.sendError === undefined ? {} : { sendError: op.sendError }),
+                ...(op.canRetry === undefined ? {} : { canRetry: op.canRetry }),
+              }
+            : item,
+        )
+        break
+      /**
+       * TDLib swaps a pending message's id for the server one. The row stays where
+       * it is, but its id must change or every later edit / delete / read receipt
+       * would name a message the server does not know.
+       */
+      case 'replaceId': {
+        const index = next.findIndex((item) => item.id === op.oldId)
+        if (index === -1) break
+        const updated = [...next]
+        updated[index] = op.message
+        next = updated
+        break
+      }
+      /**
+       * 表情回应: TDLib sends the complete list, so this replaces the chips; an
+       * empty answer removes them (the last person took their reaction back).
+       */
+      case 'reactions':
+        next = next.map((item) => {
+          if (item.id !== op.messageId) return item
+          const { reactions: _previous, ...rest } = item
+          return op.reactions.length > 0 ? { ...rest, reactions: op.reactions } : rest
+        })
+        break
       case 'interaction':
         // A counter patch, never a replacement: an update carries only the
         // fields that changed (a view count, a fresh reply count), so merging

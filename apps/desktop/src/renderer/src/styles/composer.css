@@ -217,3 +217,164 @@
 .wx-composer-bar__close:hover {
   color: var(--wx-text);
 }
+
+/* ---------- 语音消息 ----------
+   In the client, 发语音 is the circled microphone beside 发送 (the tool-row mic is
+   语音转文字). A click starts a clip and the right cluster becomes the recording
+   bar: a cancel cross, a grey pill with the green dots travelling across it and a
+   green send circle at its right end. Hovering that circle expands it over the
+   whole pill — a circular reveal — where 发送 and its dots live; clicking sends. */
+
+.wx-voice-message {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--wx-icon);
+}
+
+.wx-voice-message:hover:not(:disabled) {
+  background: var(--wx-row-hover);
+  color: var(--wx-text);
+}
+
+.wx-voice-message:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.wx-voice-ctl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wx-voice-ctl__cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--wx-line);
+  color: var(--wx-text-secondary);
+  font-size: 16px;
+  line-height: 1;
+  animation: wx-voice-fade 140ms ease-out;
+}
+
+.wx-voice-ctl__cancel:hover {
+  background: var(--wx-line-strong);
+  color: var(--wx-text);
+}
+
+/* The bar is one button: the arrow circle and the expanded 发送 sheet are layers
+   inside it, so a click anywhere on the green sends. */
+.wx-voice-ctl__send {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 180px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 16px;
+  background: var(--wx-divider);
+  color: var(--wx-text-on-brand);
+  font-size: 13px;
+}
+
+.wx-voice-ctl__dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wx-voice-ctl__dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--wx-brand);
+  opacity: 0.35;
+  animation: wx-voice-dot 1s ease-in-out infinite;
+}
+
+.wx-voice-ctl__circle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--wx-brand);
+  transition: opacity 140ms ease-out;
+}
+
+/* The reveal: a circle anchored on the send button grows across the bar. */
+.wx-voice-ctl__expand {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 16px;
+  background: var(--wx-brand);
+  color: var(--wx-text-on-brand);
+  clip-path: circle(16px at calc(100% - 16px) 50%);
+  opacity: 0;
+  transition:
+    clip-path 120ms ease-out,
+    opacity 70ms ease-out;
+}
+
+.wx-voice-ctl__expand .wx-voice-ctl__dots span {
+  background: currentColor;
+}
+
+.wx-voice-ctl__label {
+  letter-spacing: 0.5px;
+}
+
+/* Revealed only once the pointer is on the send circle (or the button is
+   focused); it then stays open across the whole bar so 发送 is easy to hit. */
+.wx-voice-ctl__send--revealed .wx-voice-ctl__expand,
+.wx-voice-ctl__send:focus-visible .wx-voice-ctl__expand {
+  clip-path: circle(130% at calc(100% - 16px) 50%);
+  opacity: 1;
+}
+
+.wx-voice-ctl__send--revealed .wx-voice-ctl__circle,
+.wx-voice-ctl__send:focus-visible .wx-voice-ctl__circle {
+  opacity: 0;
+}
+
+@keyframes wx-voice-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes wx-voice-dot {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}

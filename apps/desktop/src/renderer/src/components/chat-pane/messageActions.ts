@@ -6,10 +6,22 @@ import { useAppStore } from '../../store/useAppStore'
 
 export interface MessageActions {
   send: (text: string, replyToMessageId: number | undefined) => Promise<void>
-  saveEdit: (messageId: number, text: string) => Promise<void>
+  /**
+   * Saves the composer's edit banner. `caption` routes a media row's 说明 to
+   * `messages:editCaption`; the answer replaces the row (TDLib re-maps its
+   * content), so the transcript keeps the server's own copy.
+   */
+  saveEdit: (messageId: number, text: string, caption: boolean) => Promise<void>
   removeMessage: (message: Message, forBoth: boolean) => Promise<void>
   forward: (message: Message, toChatId: number) => Promise<void>
   copy: (message: Message) => void
+  /**
+   * 重试 a 未发送 message. The row turns 'pending' at once; TDLib's final state
+   * arrives as `replace` / `replaceId` / another `failed`.
+   */
+  resend: (message: Message) => Promise<void>
+  /** 转文字: no optimistic state — the transcript arrives as a content update. */
+  transcribe: (message: Message) => Promise<void>
 }
 
 /** The confirm dialog's payload: which message, and whether 撤回 or 删除. */
@@ -47,9 +59,19 @@ export function createMessageActions(activeChatId: number): MessageActions {
       if (wasAnchored) store.requestJumpToLatest(activeChatId)
     },
 
-    saveEdit: async (messageId, text) => {
-      const updated = await invoke('messages:edit', { chatId: activeChatId, messageId, text })
+    saveEdit: async (messageId, text, caption) => {
       const store = useAppStore.getState()
+      if (caption) {
+        const updated = await invoke('messages:editCaption', {
+          chatId: activeChatId,
+          messageId,
+          caption: text,
+        })
+        store.applyMessageOps(activeChatId, [{ op: 'replace', message: updated }])
+        store.setEditing(null)
+        return
+      }
+      const updated = await invoke('messages:edit', { chatId: activeChatId, messageId, text })
       store.applyMessageOps(activeChatId, [
         { op: 'edit', chatId: activeChatId, messageId, text: updated.text },
       ])
@@ -82,6 +104,30 @@ export function createMessageActions(activeChatId: number): MessageActions {
           toChatId,
         })
         useAppStore.getState().setToast('已转发')
+      } catch (error) {
+        useAppStore.getState().setError(errorMessage(error))
+      }
+    },
+
+    resend: async (message) => {
+      try {
+        await invoke('messages:resend', { chatId: message.chatId, messageIds: [message.id] })
+        useAppStore.getState().applyMessageOps(message.chatId, [
+          {
+            op: 'sendState',
+            chatId: message.chatId,
+            messageId: message.id,
+            sendingState: 'pending',
+          },
+        ])
+      } catch (error) {
+        useAppStore.getState().setError(errorMessage(error))
+      }
+    },
+
+    transcribe: async (message) => {
+      try {
+        await invoke('messages:transcribe', { chatId: message.chatId, messageId: message.id })
       } catch (error) {
         useAppStore.getState().setError(errorMessage(error))
       }

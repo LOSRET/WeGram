@@ -2,13 +2,15 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 import type { AppInfo, AuthState } from '@wegram/protocol'
-import { app, BrowserWindow, dialog } from 'electron'
+import { app, BrowserWindow, dialog, session } from 'electron'
 
 import { parseApiCredentials } from './credentials'
 import { createHandlers } from './ipc/handlers'
 import { registerIpc, unregisterIpc } from './ipc/router'
 import { closeLoginWindow, createLoginWindow, getLoginWindow } from './login-window'
 import { installMediaProtocol, registerMediaScheme } from './media/protocol'
+import { pruneVoiceNotes } from './media/voice-file'
+import { NotificationCenter } from './notifications'
 import { storedProxyToConfig } from './proxy'
 import { parseProxyUrl } from './proxy-url'
 import { SettingsStore } from './store/settings'
@@ -17,6 +19,7 @@ import { createAdapter } from './telegram'
 import type { TelegramAdapter } from './telegram/adapter'
 import { publishAdapterEvent } from './telegram/events'
 import { EventBus } from './telegram/updates'
+import { createTray, destroyTray } from './tray'
 import { createLogger } from './util'
 import { closeViewer, setViewerTheme } from './viewer'
 import { applyTitleBarTheme, createMainWindow, raiseShellAboveViewer, storedTheme } from './windows'
@@ -29,6 +32,10 @@ const isDev = !app.isPackaged
 app.setName('WeGram')
 app.setPath('userData', join(app.getPath('appData'), 'WeGram'))
 
+// Windows groups this process's toasts under one app identity. Without it the
+// Notification API has no AppUserModelID to show and silently drops the toast.
+app.setAppUserModelId('dev.wegram.desktop')
+
 // A custom scheme must be declared privileged before the app is ready, otherwise
 // <img>/<video>/fetch() in the renderer cannot load downloaded media.
 registerMediaScheme()
@@ -37,6 +44,7 @@ let mainWindow: BrowserWindow | null = null
 let adapter: TelegramAdapter | null = null
 let bus: EventBus | null = null
 let uiDb: UiDatabase | null = null
+let notifications: NotificationCenter | null = null
 /**
  * Set before `before-quit` stops the adapter: the stop closes the client, which
  * emits `auth: closed`, and that must not resurrect the login window mid-quit.
@@ -82,6 +90,34 @@ async function bootstrap(): Promise<void> {
   // A viewer opened before the first theme change must still get a dark strip,
   // so seed the module with the stored theme instead of defaulting to light.
   setViewerTheme(storedTheme(db))
+
+  // Recordings nobody can still be uploading are dead weight (see voice-file.ts).
+  void pruneVoiceNotes(join(userDataDir, 'voice')).then((removed) => {
+    if (removed > 0) logger.info(`pruned ${removed} old voice recording(s)`)
+  })
+
+  /**
+   * The microphone is granted to the shell only.
+   *
+   * 语音消息 needs `getUserMedia` in the renderer, and Electron's default with no
+   * handler is "allow everything" — which would also let the login, 群二维码 and
+   * viewer windows open a device. Every other permission keeps that default (the
+   * contact card's clipboard write is one); only `media` is narrowed, and only to
+   * the window that actually owns the composer.
+   */
+  const isShell = (contents: Electron.WebContents | null): boolean =>
+    mainWindow !== null && !mainWindow.isDestroyed() && contents === mainWindow.webContents
+  session.defaultSession.setPermissionRequestHandler((contents, permission, callback) => {
+    if (permission !== 'media') {
+      callback(true)
+      return
+    }
+    if (!isShell(contents)) logger.warn('refused microphone access outside the shell window')
+    callback(isShell(contents))
+  })
+  session.defaultSession.setPermissionCheckHandler((contents, permission) =>
+    permission === 'media' ? isShell(contents) : true,
+  )
 
   // Credentials come from the environment (.env in development) and, for a release
   // artifact, from the value the build inlined (electron.vite.config.ts).
@@ -135,10 +171,31 @@ async function bootstrap(): Promise<void> {
       }
     },
   })
+  /**
+   * Raise the shell and hand it a chat + message. Used by the viewer's 定位 and by
+   * a notification click: both mean "show me this conversation, now".
+   */
+  const openChatAt = ({ chatId, messageId }: { chatId: number; messageId: number }): void => {
+    const win = mainWindow
+    if (!win || win.isDestroyed()) return
+    raiseShellAboveViewer(win)
+    bus?.publish('evt:locate', { chatId, messageId })
+  }
+
+  notifications = new NotificationCenter({
+    getShellWindow: () => mainWindow,
+    onOpen: openChatAt,
+  })
+
   adapter.onEvent((event) => {
     // Windows follow authorization, not the renderer: the shell may only exist
     // while an account is signed in (see syncWindowsToAuth).
     if (event.type === 'auth') syncWindowsToAuth(event.state)
+    // A desktop notification is an OS concern: it never crosses IPC.
+    if (event.type === 'notification') {
+      notifications?.notify(event)
+      return
+    }
     if (bus) publishAdapterEvent(bus, event)
   })
 
@@ -168,12 +225,12 @@ async function bootstrap(): Promise<void> {
        * 定位到聊天位置: the viewer stays open, the shell comes forward above it and
        * the renderer opens the conversation on that message.
        */
-      onLocate: ({ chatId, messageId }) => {
-        const win = mainWindow
-        if (!win || win.isDestroyed()) return
-        raiseShellAboveViewer(win)
-        bus?.publish('evt:locate', { chatId, messageId })
-      },
+      onLocate: openChatAt,
+      /**
+       * Which conversation the shell is showing, so a toast for that chat can be
+       * suppressed while the window is focused (see NotificationCenter).
+       */
+      setActiveChat: (chatId) => notifications?.setActiveChat(chatId),
     }),
   )
 
@@ -181,6 +238,19 @@ async function bootstrap(): Promise<void> {
   // lands on the profile step, a fresh one on the phone form. The shell window is
   // only created once the reader clicks 进入 WeGram.
   openLoginWindow()
+
+  // The notification-area icon: a shortcut back to a minimized window, and a way
+  // out without hunting for the shell.
+  createTray({
+    onOpen: () => {
+      const win = mainWindow ?? getLoginWindow()
+      if (!win || win.isDestroyed()) {
+        openLoginWindow()
+        return
+      }
+      raiseShellAboveViewer(win)
+    },
+  })
 
   try {
     await adapter.start()
@@ -223,6 +293,11 @@ function showMainWindow(theme: 'light' | 'dark', closeLogin: 'immediate' | 'afte
 
   const win = createMainWindow(theme)
   mainWindow = win
+  // A notification flashed the task bar; the flash stops as soon as the reader
+  // comes back, however they did it.
+  win.on('focus', () => {
+    if (!win.isDestroyed()) win.flashFrame(false)
+  })
   win.on('closed', () => {
     if (mainWindow === win) mainWindow = null
     // The viewer is a separate top-level window, so it does not die with this one:
@@ -292,6 +367,9 @@ app.on('before-quit', () => {
   bus?.dispose()
   bus = null
   unregisterIpc()
+  notifications?.dispose()
+  notifications = null
+  destroyTray()
   void adapter?.stop()
   adapter = null
   uiDb?.close()

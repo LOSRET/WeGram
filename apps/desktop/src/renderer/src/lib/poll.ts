@@ -59,6 +59,35 @@ export function pollSelectionChanged(poll: Poll, selected: number[]): boolean {
   return chosen.length !== next.length || chosen.some((id, index) => id !== next[index])
 }
 
+/**
+ * Why this account may not vote, in the card's own words.
+ *
+ * TDLib already disables the options when it sets a vote restriction, but a card
+ * whose options are simply dead is indistinguishable from a broken one — the
+ * reader clicks and nothing happens, with no request and no error. The reason is
+ * therefore drawn under the options. `closed` is skipped on purpose: the footer
+ * already carries 已结束 for it.
+ */
+export function pollRestrictionText(poll: Poll): string | null {
+  switch (poll.restriction) {
+    case undefined:
+    case 'closed':
+      return null
+    case 'yetUnsent':
+      return '消息还在发送，暂时不能投票'
+    case 'scheduled':
+      return '定时消息不能提前投票'
+    case 'countryRestricted':
+      return '所在地区不支持参与这个投票'
+    case 'membershipRequired':
+      return '需要加入后才能投票'
+    case 'other':
+      return '当前账号不能参与这个投票'
+    default:
+      return null
+  }
+}
+
 /** 无人投票 / N 人参与, the card's footer line. */
 export function pollFooter(poll: Poll): string {
   return poll.totalVoterCount === 0 ? '无人投票' : `${poll.totalVoterCount} 人参与`

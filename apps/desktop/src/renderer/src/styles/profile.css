@@ -1,0 +1,376 @@
+/* ==========================================================================
+   资料卡 (the person card, P1): the sheet a private chat's title and the
+   通讯录 card's 更多资料 open. It reuses the shell's .wx-modal geometry and adds
+   only the rows; every colour comes from tokens.css.
+   ========================================================================== */
+
+.wx-profile {
+  width: 340px;
+  padding: 16px 18px 18px;
+  gap: 12px;
+}
+
+.wx-profile__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wx-profile__heading {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--wx-text);
+}
+
+.wx-profile__close {
+  border: none;
+  background: none;
+  padding: 0 2px;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--wx-text-tertiary);
+  cursor: pointer;
+}
+
+.wx-profile__identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* The avatar box owns its own geometry (Avatar's rule); only its size is here. */
+.wx-profile__avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 6px;
+}
+
+.wx-profile__names {
+  min-width: 0;
+}
+
+.wx-profile__name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--wx-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wx-profile__handle {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--wx-text-tertiary);
+}
+
+.wx-profile__rule {
+  height: 1px;
+  background: var(--wx-divider);
+}
+
+.wx-profile__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wx-profile__row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.wx-profile__label {
+  flex: none;
+  width: 56px;
+  color: var(--wx-text-secondary);
+}
+
+.wx-profile__value {
+  flex: 1;
+  min-width: 0;
+  color: var(--wx-text);
+  word-break: break-word;
+}
+
+.wx-profile__link {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 13px;
+  text-align: left;
+  color: var(--wx-link);
+  cursor: pointer;
+}
+
+.wx-profile__link:disabled {
+  color: var(--wx-text-disabled);
+  cursor: default;
+}
+
+.wx-profile__note-editor {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.wx-profile__note-input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 6px;
+  border: 1px solid var(--wx-field-line);
+  border-radius: 4px;
+  background: var(--wx-elevated);
+  font: inherit;
+  font-size: 13px;
+  color: var(--wx-text);
+}
+
+.wx-profile__note-input:focus {
+  outline: none;
+  border-color: var(--wx-brand);
+}
+
+.wx-profile__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wx-profile__primary {
+  height: 32px;
+  border: none;
+  border-radius: 4px;
+  background: var(--wx-brand);
+  color: var(--wx-text-on-brand);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.wx-profile__primary:hover {
+  background: var(--wx-brand-active);
+}
+
+.wx-profile__action {
+  height: 30px;
+  border: 1px solid var(--wx-line-strong);
+  border-radius: 4px;
+  background: var(--wx-elevated);
+  color: var(--wx-text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.wx-profile__action:hover {
+  background: var(--wx-row-hover);
+}
+
+.wx-profile__action--danger {
+  color: var(--wx-danger);
+}
+
+.wx-profile__action:disabled {
+  color: var(--wx-text-disabled);
+  cursor: default;
+}
+
+.wx-profile__loading {
+  padding: 12px 0;
+  font-size: 13px;
+  color: var(--wx-text-secondary);
+}
+
+/* 共同群聊: the rows the count opens. On demand and scrollable, so a person who
+   shares twenty groups does not push the card past the window. */
+.wx-profile__common {
+  display: flex;
+  flex-direction: column;
+  max-height: 168px;
+  overflow-y: auto;
+  /* A popover-style thin bar; the card is not a virtualised pane. */
+  scrollbar-width: thin;
+}
+
+.wx-profile__chat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 2px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wx-profile__chat:hover {
+  background: var(--wx-row-hover);
+}
+
+.wx-profile__chat-avatar {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border-radius: 4px;
+}
+
+.wx-profile__chat-title {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--wx-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 举报: Telegram's report sheet — a left-aligned title, the server's reasons as
+   plain rows with a trailing chevron (not bordered buttons), and one 关闭 link at
+   the bottom. The comment step replaces the list with its box and a 举报 button. */
+.wx-report {
+  width: 380px;
+  /* Taller than .wx-modal's 80vh on purpose: Telegram's sheet shows the whole
+     reason list, and only a very long one scrolls. */
+  max-height: 92vh;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.wx-report__title {
+  margin: 0;
+  padding: 18px 20px 10px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--wx-text);
+}
+
+.wx-report__options {
+  display: flex;
+  flex-direction: column;
+  padding: 0 8px 8px;
+  /* Telegram's own report list is eleven rows; the sheet should hold that without
+     scrolling. Only a longer server list gets an inner scroll — and when the card
+     itself is clamped by .wx-modal's max-height, min-height: 0 lets this list be
+     the part that shrinks instead of clipping the footer. */
+  max-height: 480px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.wx-report__option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--wx-text);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wx-report__option:hover {
+  background: var(--wx-row-hover);
+}
+
+.wx-report__option:disabled {
+  color: var(--wx-text-disabled);
+  cursor: default;
+}
+
+/* A reason Telegram words long ("It's not illegal, but must be taken down"):
+   one line with an ellipsis, the row itself stays one height. */
+.wx-report__option-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.wx-report__chevron {
+  flex: none;
+  color: var(--wx-text-tertiary);
+}
+
+.wx-report__step {
+  padding: 0 20px 4px;
+}
+
+.wx-report__hint {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--wx-text-secondary);
+}
+
+.wx-report__comment {
+  width: 100%;
+  min-height: 84px;
+  padding: 8px 10px;
+  border: 1px solid var(--wx-field-line);
+  border-radius: 6px;
+  background: var(--wx-elevated);
+  font: inherit;
+  font-size: 13px;
+  color: var(--wx-text);
+  resize: vertical;
+}
+
+.wx-report__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 14px 12px;
+}
+
+.wx-report__submit {
+  height: 30px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 5px;
+  background: var(--wx-brand);
+  color: var(--wx-text-on-brand);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.wx-report__submit:hover {
+  background: var(--wx-brand-active);
+}
+
+.wx-report__submit:disabled {
+  color: var(--wx-text-disabled);
+  cursor: default;
+}
+
+.wx-report__close {
+  height: 30px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  color: var(--wx-link);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.wx-report__close:hover {
+  background: var(--wx-row-hover);
+}

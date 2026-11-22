@@ -1,8 +1,11 @@
 import type { Message, Sticker } from '@wegram/protocol'
 import { useEffect, useRef, useState } from 'react'
 
+import { albumSendOf } from '../lib/albumSend'
 import { loadLatestWindow } from '../lib/anchoredWindow'
+import { TypingPing } from '../lib/typingPing'
 import { useComposerInput } from '../lib/useComposerInput'
+import type { RecordedVoice } from '../lib/voice/recorder'
 import { errorMessage, invoke } from '../lib/ipc'
 import { messagePreview } from '../lib/format'
 import { useAppStore } from '../store/useAppStore'
@@ -11,6 +14,8 @@ import { ComposerCard } from './composer/ComposerCard'
 export interface ComposerEditing {
   messageId: number
   text: string
+  /** A media row's 说明 (saved through `messages:editCaption`); an empty box clears it. */
+  caption?: boolean
 }
 
 interface ComposerProps {
@@ -50,8 +55,25 @@ export function Composer({
   const [busy, setBusy] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const draftTimer = useRef<number | null>(null)
+  /**
+   * 对方正在输入. One throttle per open chat: the cleanup cancels the indicator
+   * when the reader switches conversations, and the ping itself is fire-and-forget
+   * (a failed typing action must never raise the error bar).
+   */
+  const pingerRef = useRef<TypingPing | null>(null)
 
   // Drafts are stored by the main process (§5.1) and restored per chat.
+  useEffect(() => {
+    const pinger = new TypingPing((typing) => {
+      void invoke('messages:typing', { chatId, typing }).catch(() => undefined)
+    })
+    pingerRef.current = pinger
+    return () => {
+      pingerRef.current = null
+      pinger.stop()
+    }
+  }, [chatId])
+
   useEffect(() => {
     let cancelled = false
     setText('')
@@ -91,15 +113,28 @@ export function Composer({
     }
   }, [text, chatId, editing])
 
+  /** Every keystroke also pings (throttled); emptying the box cancels at once. */
+  const changeText = (next: string): void => {
+    setText(next)
+    if (editing) return
+    if (next.trim().length === 0) pingerRef.current?.stop()
+    else pingerRef.current?.typing()
+  }
+
   const submit = async (): Promise<void> => {
     const value = text.trim()
-    if (!value || busy) return
+    // An empty caption is a real edit — it removes the 说明 — while an empty
+    // message body is not a send and an empty text edit is not an edit.
+    if (busy || (!value && !editing?.caption)) return
     setBusy(true)
     try {
       if (editing) {
         await onSaveEdit(editing.messageId, value)
         setText('')
       } else {
+        // Sending ends the peer's "typing" state immediately; waiting for the
+        // throttle to expire would leave the indicator over a delivered message.
+        pingerRef.current?.stop()
         await onSend(value, replyTo?.id)
         setText('')
       }
@@ -120,6 +155,11 @@ export function Composer({
    * Picks local files and sends them straight away, like WeChat's + panel. The
    * picker lives in the main process (native dialog), so the renderer never
    * touches the filesystem.
+   *
+   * Several photos become ONE Telegram album (`sendMessageAlbum`), which arrives
+   * as the folded bubble the transcript already draws for a received album; the
+   * rule for when that applies is `lib/albumSend.ts`. Everything else is one
+   * message per file.
    */
   const attach = async (kind: 'photo' | 'file'): Promise<void> => {
     if (busy) return
@@ -129,23 +169,79 @@ export function Composer({
       setBusy(true)
       const wasAnchored = await loadLatestWindow(chatId)
       const replyToId = replyTo?.id
-      for (const filePath of picked.paths) {
-        const result = await invoke('media:send', {
+      const album = albumSendOf(picked.paths, kind)
+      if (album) {
+        const result = await invoke('media:sendAlbum', {
           chatId,
-          filePath,
-          kind,
+          items: album,
           ...(replyToId === undefined ? {} : { replyTo: replyToId }),
         })
-        useAppStore.getState().applyMessageOps(chatId, [{ op: 'new', message: result.message }])
+        useAppStore.getState().applyMessageOps(
+          chatId,
+          result.messages.map((message) => ({ op: 'new' as const, message })),
+        )
+      } else {
+        for (const filePath of picked.paths) {
+          const result = await invoke('media:send', {
+            chatId,
+            filePath,
+            kind,
+            ...(replyToId === undefined ? {} : { replyTo: replyToId }),
+          })
+          useAppStore.getState().applyMessageOps(chatId, [{ op: 'new', message: result.message }])
+        }
       }
       if (replyToId !== undefined) onCancelReply()
       if (wasAnchored) useAppStore.getState().requestJumpToLatest(chatId)
-      useAppStore.getState().setToast(kind === 'photo' ? '已发送图片' : '已发送文件')
+      useAppStore
+        .getState()
+        .setToast(
+          album ? `已发送 ${album.length} 张图片` : kind === 'photo' ? '已发送图片' : '已发送文件',
+        )
     } catch (error) {
       useAppStore.getState().setError(errorMessage(error))
     } finally {
       setBusy(false)
     }
+  }
+
+  /**
+   * 语音消息. The clip arrives from the composer's recorder already encoded as
+   * OGG/Opus; main writes it to a temporary file and TDLib uploads it. The
+   * anchored-window dance is the same as any other send.
+   */
+  const sendVoice = async (voice: RecordedVoice): Promise<void> => {
+    if (busy) return
+    setBusy(true)
+    try {
+      const wasAnchored = await loadLatestWindow(chatId)
+      const replyToId = replyTo?.id
+      const result = await invoke('messages:sendVoice', {
+        chatId,
+        audio: voice.audio,
+        duration: voice.duration,
+        ...(replyToId === undefined ? {} : { replyTo: replyToId }),
+      })
+      useAppStore.getState().applyMessageOps(chatId, [{ op: 'new', message: result.message }])
+      if (replyToId !== undefined) onCancelReply()
+      if (wasAnchored) useAppStore.getState().requestJumpToLatest(chatId)
+      useAppStore.getState().setToast('已发送语音')
+    } catch (error) {
+      useAppStore.getState().setError(errorMessage(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * 对方正在说. The chat action is fire-and-forget like the typing ping: a failed
+   * presence update must never raise the error bar over the composer, and the
+   * release sends `typing: false` to end either indicator.
+   */
+  const recordingAction = (recording: boolean): void => {
+    void invoke('messages:typing', { chatId, typing: recording, action: 'recording' }).catch(
+      () => undefined,
+    )
   }
 
   /**
@@ -173,7 +269,7 @@ export function Composer({
     <div className="wx-composer">
       {editing ? (
         <div className="wx-composer-bar">
-          <span>正在编辑消息</span>
+          <span>{editing.caption ? '正在编辑说明' : '正在编辑消息'}</span>
           <button className="wx-composer-bar__close" onClick={onCancelEdit} title="取消编辑">
             ×
           </button>
@@ -193,9 +289,16 @@ export function Composer({
 
       <ComposerCard
         value={text}
-        onChange={setText}
+        onChange={changeText}
+        onBlur={() => pingerRef.current?.stop()}
         textareaRef={textareaRef}
-        placeholder={editing ? '编辑后回车保存，Esc 取消' : '输入消息'}
+        placeholder={
+          editing
+            ? editing.caption
+              ? '编辑说明，清空后回车可删除'
+              : '编辑后回车保存，Esc 取消'
+            : '输入消息'
+        }
         inputHandlers={inputHandlers}
         busy={busy}
         editing={Boolean(editing)}
@@ -203,6 +306,8 @@ export function Composer({
         onSend={() => void submit()}
         onSendSticker={(sticker) => void sendSticker(sticker)}
         onAttach={(kind) => void attach(kind)}
+        onSendVoice={(voice) => void sendVoice(voice)}
+        onRecordingChange={recordingAction}
         onNotice={notWired}
         {...(onCollapse ? { onCollapse } : {})}
       />

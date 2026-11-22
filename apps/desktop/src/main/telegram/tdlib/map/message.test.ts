@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import type { MapperContext } from './context'
-import { mapMessage } from './message'
+import { mapMessage, mapReactions } from './message'
 
 /**
  * `mapMessage` is where a TDLib update becomes a transcript row. The sender
@@ -380,5 +380,65 @@ describe('mapMessage', () => {
       },
     })
     expect(noThread).not.toHaveProperty('interaction')
+  })
+})
+describe('mapReactions', () => {
+  function raw(interactionInfo: unknown): Record<string, unknown> {
+    return { interaction_info: interactionInfo }
+  }
+
+  it('reads emoji and custom reactions, newest first as TDLib sends them', () => {
+    const reactions = mapReactions(
+      raw({
+        reactions: {
+          reactions: [
+            {
+              _: 'messageReaction',
+              reaction_type: { _: 'reactionTypeEmoji', emoji: '👍' },
+              total_count: 3,
+              is_chosen: true,
+            },
+            {
+              _: 'messageReaction',
+              reaction_type: {
+                _: 'reactionTypeCustomEmoji',
+                custom_emoji_id: '5909018290759408123',
+              },
+              total_count: 2,
+            },
+          ],
+        },
+      }),
+    )
+
+    // The custom id is an int64: carried as a string so the sticker lookup can use it.
+    expect(reactions).toEqual([
+      { emoji: '👍', count: 3, chosen: true },
+      { customEmojiId: '5909018290759408123', count: 2 },
+    ])
+  })
+
+  it('has nothing to draw without reactions, or with a zero count', () => {
+    expect(mapReactions({})).toBeUndefined()
+    expect(mapReactions(raw({ reactions: { reactions: [] } }))).toBeUndefined()
+    expect(
+      mapReactions(
+        raw({
+          reactions: {
+            reactions: [{ reaction_type: { _: 'reactionTypeEmoji', emoji: '👍' }, total_count: 0 }],
+          },
+        }),
+      ),
+    ).toBeUndefined()
+  })
+
+  it('drops a reaction kind this client cannot draw', () => {
+    expect(
+      mapReactions(
+        raw({
+          reactions: { reactions: [{ reaction_type: { _: 'reactionTypePaid' }, total_count: 4 }] },
+        }),
+      ),
+    ).toBeUndefined()
   })
 })

@@ -1,6 +1,7 @@
 import { threadInteraction } from '@wegram/mock-session'
 import type { Message } from '@wegram/protocol'
 
+import { addContactFixtures } from './contacts'
 import type { FixtureOptions, FixtureSeed } from './seed'
 import { buildStressSeed } from './stress'
 import { groupPollMessages, pollMessage } from './polls'
@@ -291,7 +292,15 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
       ...serviceMessages(at),
     ],
     // Digits only: TDLib hands phone numbers over without the leading +.
-    contact: { username: 'mama_wegram', phone: '8613800000000', dcId: 4 },
+    contact: {
+      username: 'mama_wegram',
+      phone: '8613800000000',
+      dcId: 4,
+      bio: '每天散步一小时。',
+      note: '妈妈',
+    },
+    // 共同群聊: the two groups in this account she is also in.
+    commonChatIds: [2, 4],
   })
 
   fixtures.set(4, {
@@ -308,7 +317,28 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
       lastReadOutboxMessageId: 0,
     },
     messages: [
-      text(4, 401, 180, '会议纪要已经放到共享盘', false),
+      // 表情回应 on a received row: the chips and the chosen tint must draw
+      // without a server (WeChat has no reactions; the group does).
+      {
+        ...text(4, 401, 180, '会议纪要已经放到共享盘', false),
+        reactions: [
+          { emoji: '👍', count: 3 },
+          { emoji: '🎉', count: 1, chosen: true },
+        ],
+      },
+      // 语音转文字: a voice note the reader can ask for a transcript of. The clip is
+      // the mock's own tone WAV (voice playback does not care about the codec).
+      {
+        id: 405,
+        chatId: 4,
+        senderId: 23,
+        senderName: '陈晨',
+        outgoing: false,
+        date: at(179),
+        kind: 'voice',
+        text: '',
+        media: mediaOf(7004, { duration: 3, mimeType: 'audio/wav' }),
+      },
       // A closed poll with real numbers and one answer this account already gave:
       // the card must show the bars, the percentages and the 已结束 state.
       pollMessage({
@@ -435,95 +465,8 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
     ],
   })
 
-  // Private chats whose purpose is the 通讯录: they give the contact list several
-  // initials and a 微信号, and are ordinary chats too, so 发消息 opens a transcript.
-  const contacts: Array<{
-    id: number
-    userId: number
-    title: string
-    messageId: number
-    minutesAgo: number
-    body: string
-    username?: string
-    phone?: string
-    dcId?: number
-  }> = [
-    {
-      id: 7,
-      userId: 21,
-      title: 'Ada Lovelace',
-      messageId: 701,
-      minutesAgo: 15,
-      body: '明天图书馆见',
-      username: 'ada_lovelace',
-      dcId: 5,
-    },
-    {
-      id: 8,
-      userId: 22,
-      title: 'Ben Carter',
-      messageId: 801,
-      minutesAgo: 45,
-      body: 'Thanks, that works!',
-      username: 'ben_carter',
-      dcId: 5,
-    },
-    {
-      id: 9,
-      userId: 23,
-      title: '陈晨',
-      messageId: 901,
-      minutesAgo: 120,
-      body: '周末一起吃个饭？',
-      username: 'chenchen',
-      dcId: 1,
-    },
-    {
-      id: 10,
-      userId: 24,
-      title: 'Dmitri Volkov',
-      messageId: 1001,
-      minutesAgo: 240,
-      body: 'Ок, договорились',
-      username: 'dvolkov',
-      dcId: 4,
-    },
-    {
-      id: 11,
-      userId: 25,
-      title: 'Eva Müller',
-      messageId: 1101,
-      minutesAgo: 360,
-      body: '🎉',
-      username: 'eva_m',
-      phone: '4915100000000',
-      dcId: 5,
-    },
-  ]
-
-  for (const contact of contacts) {
-    fixtures.set(contact.id, {
-      chat: {
-        id: contact.id,
-        title: contact.title,
-        kind: 'private',
-        userId: contact.userId,
-        unread: 0,
-        pinned: false,
-        muted: false,
-        lastMessageText: contact.body,
-        lastMessageAt: at(contact.minutesAgo),
-        lastReadInboxMessageId: contact.messageId,
-        lastReadOutboxMessageId: 0,
-      },
-      messages: [text(contact.id, contact.messageId, contact.minutesAgo, contact.body, false)],
-      contact: {
-        ...(contact.username ? { username: contact.username } : {}),
-        ...(contact.phone ? { phone: contact.phone } : {}),
-        ...(contact.dcId ? { dcId: contact.dcId } : {}),
-      },
-    })
-  }
+  // The 通讯录 people (the address book's private chats) live in ./contacts.ts.
+  addContactFixtures(fixtures, { at, text })
 
   // The virtualised list's 5000-message stress chat lives in `stress.ts`.
   fixtures.set(99, buildStressSeed({ selfId, at }))

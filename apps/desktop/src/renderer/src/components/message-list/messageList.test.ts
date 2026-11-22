@@ -171,6 +171,10 @@ describe('buildMessageMenuItems', () => {
     onForward: () => undefined,
     onEdit: () => undefined,
     onDelete: (_message: Message, _forBoth: boolean) => undefined,
+    onResend: (_message: Message) => undefined,
+    onTranscribe: (_message: Message) => undefined,
+    onTogglePin: (_message: Message) => undefined,
+    onReport: (_message: Message) => undefined,
   }
   const props = (overrides: Partial<MessageProperties> = {}): MessageProperties => ({
     canBeEdited: false,
@@ -203,19 +207,52 @@ describe('buildMessageMenuItems', () => {
     expect(labels(message(1), props({ canBeCopied: false }))).not.toContain('复制')
   })
 
-  it('offers edit only where the text edit path can actually run', () => {
+  it('offers the edit path the row can actually run', () => {
     expect(labels(message(1, { outgoing: true }), props({ canBeEdited: true }))).toContain('编辑')
-    // TDLib may allow editing a caption, but this client only implements editMessageText.
+    // A caption is its own call (editMessageCaption), so it has its own word.
     expect(
       labels(
         message(1, { outgoing: true, kind: 'photo', media: { fileId: 1 } }),
         props({ canBeEdited: true }),
       ),
-    ).not.toContain('编辑')
-    // The 48-hour window / permissions are TDLib's answer, not "it is ours".
+    ).toContain('编辑说明')
+    // A sticker's emoji is not a caption: no edit path exists for it here.
     expect(
-      labels(message(1, { outgoing: true }), props({ canBeEdited: false })),
-    ).not.toContain('编辑')
+      labels(
+        message(1, { outgoing: true, kind: 'sticker', text: '', media: { fileId: 1 } }),
+        props({ canBeEdited: true }),
+      ),
+    ).not.toContain('编辑说明')
+    // The 48-hour window / permissions are TDLib's answer, not "it is ours".
+    expect(labels(message(1, { outgoing: true }), props({ canBeEdited: false }))).not.toContain(
+      '编辑',
+    )
+  })
+
+  it('offers 转文字 only on a voice note TDLib can recognise', () => {
+    const voice = message(1, { kind: 'voice', text: '', media: { fileId: 9 } })
+    expect(labels(voice, props({ canRecognizeSpeech: true }))).toContain('转文字')
+    // Without the capability (no trial left, wrong kind) the item is not offered.
+    expect(labels(voice, props({ canRecognizeSpeech: false }))).not.toContain('转文字')
+    expect(labels(message(1), props({ canRecognizeSpeech: true }))).not.toContain('转文字')
+  })
+
+  it('offers 举报 only where TDLib says the message may be reported', () => {
+    expect(labels(message(1), props({ canReportChat: true }))).toContain('举报')
+    // An omitted flag is "not allowed": the menu never guesses a moderator right.
+    expect(labels(message(1))).not.toContain('举报')
+    expect(labels(message(1), props({ canReportChat: false }))).not.toContain('举报')
+  })
+
+  it('offers 置顶 where TDLib allows it, and 取消置顶 on the pinned row', () => {
+    const target = message(7)
+    expect(labels(target, props({ canBePinned: true }))).toContain('置顶')
+    expect(labels(target, props({ canBePinned: true }), { pinnedMessageId: 7 })).toContain(
+      '取消置顶',
+    )
+    // Another row keeps 置顶: the chat pins one message at a time.
+    expect(labels(target, props({ canBePinned: true }), { pinnedMessageId: 8 })).toContain('置顶')
+    expect(labels(target, props({ canBePinned: false }))).not.toContain('置顶')
   })
 
   it('hides forward when TDLib says the content is protected', () => {
@@ -227,6 +264,21 @@ describe('buildMessageMenuItems', () => {
       labels(message(1, { outgoing: true }), props({ canBeDeletedForAllUsers: true })),
     ).toContain('撤回')
     expect(labels(message(1), props({ canBeDeletedForAllUsers: true }))).not.toContain('撤回')
+  })
+
+  it('offers 重试 first on a failed row TDLib allows retrying', () => {
+    const failed = message(1, {
+      outgoing: true,
+      sendingState: 'failed',
+      canRetry: true,
+    })
+    expect(labels(failed)).toEqual(['重试', '回复', '复制', '转发', '删除'])
+    const unrecoverable = message(2, {
+      outgoing: true,
+      sendingState: 'failed',
+      canRetry: false,
+    })
+    expect(labels(unrecoverable)).not.toContain('重试')
   })
 
   it('deletes locally by default and revokes only through 撤回', () => {
@@ -247,10 +299,7 @@ describe('buildMessageMenuItems', () => {
 
   it('hides delete when neither local delete nor revoke is allowed', () => {
     expect(
-      labels(
-        message(1),
-        props({ canBeDeletedOnlyForSelf: false, canBeDeletedForAllUsers: false }),
-      ),
+      labels(message(1), props({ canBeDeletedOnlyForSelf: false, canBeDeletedForAllUsers: false })),
     ).not.toContain('删除')
   })
 
@@ -375,9 +424,9 @@ describe('pickSeenUpTo', () => {
   })
 
   it('has nothing seen without rows', () => {
-    expect(
-      pickSeenUpTo({ items: [], sizerOffset: 0, viewportHeight: 400, idAt: () => 1 }),
-    ).toEqual({ newestIndex: -1, newestId: null })
+    expect(pickSeenUpTo({ items: [], sizerOffset: 0, viewportHeight: 400, idAt: () => 1 })).toEqual(
+      { newestIndex: -1, newestId: null },
+    )
   })
 
   it('skips a row whose message is gone (a shrunk transcript)', () => {

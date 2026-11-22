@@ -20,6 +20,12 @@ export const chatSummarySchema = z.object({
   unread: z.number().int().nonnegative(),
   pinned: z.boolean(),
   muted: z.boolean(),
+  /**
+   * 标为未读 (TDLib `chat.is_marked_as_unread`): a flag the reader sets by hand,
+   * independent of the unread counter. The row draws a dot, not a count, and the
+   * flag is cleared when the chat is opened.
+   */
+  markedUnread: z.boolean().optional(),
   lastMessageText: z.string().optional(),
   lastMessageAt: z.number().optional(),
   /** [start, end) spoiler runs of `lastMessageText`, so the row can mask them too. */

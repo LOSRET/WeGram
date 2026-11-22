@@ -56,6 +56,14 @@ export const chatInvokeChannels = [
   'chats:setPinned',
   /** 清空聊天记录: removes this account's copy of the history, not the peers'. */
   'chats:clearHistory',
+  /**
+   * 删除聊天: WeChat's local removal. TDLib `deleteChatHistory` with
+   * `remove_from_chat_list: true` and `revoke: false` — never `deleteChat`,
+   * which would delete the history for every member.
+   */
+  'chats:delete',
+  /** 标为未读 / 标为已读, TDLib `toggleChatIsMarkedAsUnread`; answers the row. */
+  'chats:setUnread',
   /** The 聊天信息 panel's member grid; private chats answer with an empty list. */
   'chats:members',
   /** 群聊名称: renames the group (TDLib `setChatTitle`). */
@@ -64,6 +72,11 @@ export const chatInvokeChannels = [
   'chats:leave',
   /** 群公告: the newest pinned message, or `null` when nothing is pinned. */
   'chats:pinned',
+  /**
+   * 置顶消息 / 取消置顶. `messageId: null` unpins whatever is pinned, so the bar's
+   * × does not have to remember the id. Answers the chat's pin afterwards.
+   */
+  'chats:setPinnedMessage',
   /** 群二维码: a public t.me link or a link this account may create. */
   'chats:inviteLink',
 ] as const
@@ -110,6 +123,12 @@ export const chatInvokeSchemas = {
   },
   /** `revoke: false` on purpose — WeChat's 清空聊天记录 clears this account's copy. */
   'chats:clearHistory': { request: z.object({ chatId: z.number().int() }), response: noPayload },
+  /** 删除聊天 is local to this account: the peers keep their history (§5.4). */
+  'chats:delete': { request: z.object({ chatId: z.number().int() }), response: noPayload },
+  'chats:setUnread': {
+    request: z.object({ chatId: z.number().int(), unread: z.boolean() }),
+    response: chatSummarySchema,
+  },
   'chats:members': {
     request: z.object({
       chatId: z.number().int(),
@@ -126,6 +145,10 @@ export const chatInvokeSchemas = {
   'chats:leave': { request: z.object({ chatId: z.number().int() }), response: noPayload },
   'chats:pinned': {
     request: z.object({ chatId: z.number().int() }),
+    response: chatPinnedMessageSchema.nullable(),
+  },
+  'chats:setPinnedMessage': {
+    request: z.object({ chatId: z.number().int(), messageId: z.number().int().nullable() }),
     response: chatPinnedMessageSchema.nullable(),
   },
   'chats:inviteLink': {

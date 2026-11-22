@@ -1,4 +1,4 @@
-import type { Message, MessageInteraction } from '@wegram/protocol'
+import type { Message, MessageInteraction, MessageReaction } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
 import { mapReplyMarkup } from './buttons'
@@ -48,9 +48,11 @@ export async function mapMessage(
   if (senderUserId) ctx.prefetchUserAvatars([senderUserId])
   const content = await resolveContent(ctx, chatId, raw)
   const mapped = mapContent(content)
+  const sending = mapSendingState(raw.sending_state)
   const buttons = mapReplyMarkup(raw.reply_markup)
   const albumId = albumIdOf(raw)
   const interaction = mapInteraction(raw)
+  const reactions = mapReactions(raw)
   let text = mapped.text
   if (mapped.kind === 'service' && text === '') {
     text = SERVICE_CONTENT_TYPES.has(content._)
@@ -77,6 +79,7 @@ export async function mapMessage(
     text,
     ...(mapped.entities.length ? { entities: mapped.entities } : {}),
     ...(mapped.media ? { media: mapped.media } : {}),
+    ...(mapped.transcription ? { transcription: mapped.transcription } : {}),
     ...(mapped.rich?.length ? { rich: mapped.rich } : {}),
     ...(mapped.contact ? { contact: mapped.contact } : {}),
     ...(mapped.poll ? { poll: mapped.poll } : {}),
@@ -84,7 +87,60 @@ export async function mapMessage(
     ...(albumId ? { albumId } : {}),
     ...(raw.reply_to?.message_id ? { replyToId: raw.reply_to.message_id } : {}),
     ...(raw.edit_date ? { edited: true } : {}),
+    ...sending,
     ...(interaction ? { interaction } : {}),
+    ...(reactions ? { reactions } : {}),
+  }
+}
+
+/**
+ * 表情回应 under a message (TDLib `interaction_info.reactions`).
+ *
+ * The list is TDLib's own order (most reacted first); a reaction is either a
+ * standard emoji or a Premium custom emoji whose id is an int64 — carried as a
+ * string so it can be looked up as sticker art without rounding. A reaction
+ * whose type is neither is dropped instead of drawn as an empty chip.
+ */
+export function mapReactions(raw: TdObject): MessageReaction[] | undefined {
+  const list = raw.interaction_info?.reactions?.reactions
+  if (!Array.isArray(list) || list.length === 0) return undefined
+  const reactions: MessageReaction[] = []
+  for (const entry of list as TdObject[]) {
+    const type = entry.reaction_type
+    const count = Number(entry.total_count ?? 0)
+    if (!Number.isFinite(count) || count <= 0) continue
+    const chosen = entry.is_chosen === true ? { chosen: true } : {}
+    if (type?._ === 'reactionTypeEmoji' && typeof type.emoji === 'string' && type.emoji) {
+      reactions.push({ emoji: type.emoji, count, ...chosen })
+    } else if (type?._ === 'reactionTypeCustomEmoji' && type.custom_emoji_id !== undefined) {
+      reactions.push({ customEmojiId: String(type.custom_emoji_id), count, ...chosen })
+    }
+  }
+  return reactions.length > 0 ? reactions : undefined
+}
+
+/**
+ * TDLib `message.sending_state`: absent for a delivered message, 'pending' while
+ * the send is in flight, 'failed' when TDLib gave up. The failed branch carries
+ * the reason and whether 重试 is allowed (`can_retry`); a failed message with
+ * `can_retry: false` is shown as 未发送 with no retry gesture.
+ */
+function mapSendingState(
+  state: TdObject | undefined,
+): Pick<Message, 'sendingState' | 'sendError' | 'canRetry'> | Record<string, never> {
+  switch (state?._) {
+    case 'messageSendingStatePending':
+      return { sendingState: 'pending' }
+    case 'messageSendingStateFailed': {
+      const reason = state.error?.message
+      return {
+        sendingState: 'failed',
+        ...(typeof reason === 'string' && reason ? { sendError: reason } : {}),
+        canRetry: Boolean(state.can_retry),
+      }
+    }
+    default:
+      return {}
   }
 }
 

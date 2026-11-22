@@ -1,15 +1,17 @@
 import type { Contact } from '@wegram/protocol'
+import { useState } from 'react'
 
 import { formatPhone } from '../../lib/format'
 import { useAppStore } from '../../store/useAppStore'
 import { Avatar } from '../Avatar'
+import { ProfileCard } from '../ProfileCard'
 import { CallOutlineIcon, MessageOutlineIcon, MoreIcon, VideoCallOutlineIcon } from '../Icon'
 
 interface ContactDetailProps {
   contact: Contact
   /** 发消息: open (creating if needed) the private chat and switch to 聊天. */
   onOpenChat: (contact: Contact) => void
-  /** 备注 / 语音聊天 / 视频聊天 / 更多资料 — no protocol behind them yet. */
+  /** 语音聊天 / 视频聊天 — no call stack yet; the card's other rows are wired. */
   onUnavailable: (label: string) => void
 }
 
@@ -24,6 +26,8 @@ interface ContactDetailProps {
  */
 export function ContactDetail({ contact, onOpenChat, onUnavailable }: ContactDetailProps) {
   const userAvatars = useAppStore((state) => state.userAvatars)
+  /** 更多资料 opens the same 资料卡 a private chat's title does. */
+  const [profileOpen, setProfileOpen] = useState(false)
   const avatarUrl = contact.avatarUrl ?? userAvatars[contact.userId]
   const handle = contact.username ? contact.username : '未设置'
   /** The photo's DC is the only DC signal a client gets; without it, say so. */
@@ -47,7 +51,7 @@ export function ContactDetail({ contact, onOpenChat, onUnavailable }: ContactDet
             type="button"
             className="wx-contact-detail__more"
             title="更多资料"
-            onClick={() => onUnavailable('更多资料')}
+            onClick={() => setProfileOpen(true)}
           >
             <MoreIcon size={20} />
           </button>
@@ -62,7 +66,7 @@ export function ContactDetail({ contact, onOpenChat, onUnavailable }: ContactDet
             <button
               type="button"
               className="wx-contact-detail__remark"
-              onClick={() => onUnavailable('备注')}
+              onClick={() => setProfileOpen(true)}
             >
               添加备注名
             </button>
@@ -114,6 +118,14 @@ export function ContactDetail({ contact, onOpenChat, onUnavailable }: ContactDet
           </button>
         </div>
       </div>
+
+      {profileOpen ? (
+        <ProfileCard
+          userId={contact.userId}
+          onOpenChat={(userId) => onOpenChat({ ...contact, userId })}
+          onClose={() => setProfileOpen(false)}
+        />
+      ) : null}
     </main>
   )
 }

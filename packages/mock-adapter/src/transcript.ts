@@ -22,6 +22,8 @@ export function outgoingMessage(input: {
   text: string
   media?: MessageMedia
   replyTo?: number
+  /** Set on every item of one album; the transcript folds items that share it. */
+  albumId?: string
 }): Message {
   return {
     id: input.id,
@@ -34,6 +36,7 @@ export function outgoingMessage(input: {
     text: input.text,
     ...(input.media ? { media: input.media } : {}),
     ...(input.replyTo === undefined ? {} : { replyToId: input.replyTo }),
+    ...(input.albumId ? { albumId: input.albumId } : {}),
   }
 }
 

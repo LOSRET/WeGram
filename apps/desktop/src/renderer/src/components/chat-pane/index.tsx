@@ -3,16 +3,19 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { loadLatestWindow } from '../../lib/anchoredWindow'
 import { INFO_PANEL_ANIM_MS } from '../../lib/chatInfo'
+import { editTargetOf } from '../../lib/editTarget'
 import { errorMessage, invoke } from '../../lib/ipc'
-import { mayMarkRead } from '../../lib/readGate'
 import { useAppStore } from '../../store/useAppStore'
 import { Composer } from '../Composer'
 import { ConfirmDialog } from '../ConfirmDialog'
 import { ForwardDialog } from '../ForwardDialog'
 import { MessageList } from '../message-list'
+import { ProfileCard } from '../ProfileCard'
 import { ChannelBar } from './ChannelBar'
 import { ChatHeader } from './ChatHeader'
 import { ChatInfoPanel } from './ChatInfoPanel'
+import { usePinnedMessage } from './usePinnedMessage'
+import { PinnedBar } from './PinnedBar'
 import { COMMENT_PANEL_ANIM_MS } from '../../lib/comments'
 import { CommentPanel } from './CommentPanel'
 import {
@@ -23,13 +26,8 @@ import {
 } from './Placeholders'
 import { createMessageActions, type PendingDelete } from './messageActions'
 import { useChatHistory } from './useChatHistory'
-
-/**
- * How long the newest message may sit in an open, focused window before it is
- * reported as read. Long enough to coalesce a burst of arriving messages into
- * one call, short enough that the badge clears while the reader is still there.
- */
-const MARK_READ_DELAY_MS = 350
+import { useMarkRead } from './useMarkRead'
+import { usePeerStatus } from './usePeerStatus'
 
 /**
  * The conversation pane: header, transcript, composer and the modals they open.
@@ -78,11 +76,7 @@ export function ChatPane() {
   const [postRights, setPostRights] = useState<Record<number, boolean>>({})
   /** The channel whose composer was opened from the bar's keyboard switch. */
   const [channelInputChatId, setChannelInputChatId] = useState<number | null>(null)
-  /**
-   * 频道底栏: whether this account belongs to the channel. A channel opened from
-   * 搜索 or an `@username` can be read without being subscribed, so the bar asks
-   * once per chat and keeps the answer for the session, like `postRights`.
-   */
+  /** 频道底栏: membership, asked once per channel like `postRights`. */
   const [joinStates, setJoinStates] = useState<Record<number, ChatJoinState>>({})
   /** A 加入 / 申请加入 call is in flight, so the item cannot be pressed twice. */
   const [joinBusy, setJoinBusy] = useState(false)
@@ -92,6 +86,10 @@ export function ChatPane() {
   const [muteBusy, setMuteBusy] = useState(false)
   /** The same guard for 置顶聊天. */
   const [pinBusy, setPinBusy] = useState(false)
+  /** 资料卡: the person this private chat is with, or null while it is closed. */
+  const [profileUserId, setProfileUserId] = useState<number | null>(null)
+  /** 置顶消息: what this chat has pinned, and the pin / unpin calls. */
+  const { pinned, setPinnedMessage } = usePinnedMessage(activeChatId)
 
   /**
    * The full-pane discussion view (design doc §9.8). It stays mounted while it
@@ -186,46 +184,16 @@ export function ChatPane() {
 
   const chat = chats.find((item) => item.id === activeChatId) ?? null
   const messages = activeChatId ? (messagesByChat[activeChatId] ?? []) : []
-  const seenUpToMessageId = seen && seen.chatId === activeChatId ? seen.messageId : null
 
   /**
-   * Reading happens while the chat is open, and it happens *message by message*:
-   * the report moves to whatever the reader has actually had on screen, so the
-   * server's unread count — and with it the chat row and the rail badge — falls as
-   * they scroll through the new messages instead of only when they hit the bottom.
-   *
-   * `messages:read` is idempotent and TDLib's marker is monotonic, so the unread
-   * snapshot taken when the chat opened, a burst of scroll positions and this
-   * effect may all overlap. The delay coalesces a burst of arrivals into one call.
-   *
-   * The gate is `mayMarkRead` (`lib/readGate.ts`): a message that never appeared
-   * on screen must not be reported as read, however far the marker could move.
+   * 在线 / 最后上线 belongs to a private chat's peer; a group or channel has nobody
+   * to describe. The hook owns the fetch and the `evt:status` updates.
    */
-  useEffect(() => {
-    if (activeChatId === null || seenUpToMessageId === null) return
-    const markRead = (): void => {
-      const allowed = mayMarkRead({
-        seenUpToMessageId,
-        visible: document.visibilityState === 'visible',
-        focused: document.hasFocus(),
-      })
-      if (!allowed) return
-      void invoke('messages:read', {
-        chatId: activeChatId,
-        upToMessageId: seenUpToMessageId,
-      }).catch(() => undefined)
-    }
-    const timer = window.setTimeout(markRead, MARK_READ_DELAY_MS)
-    // Reopening the window (or the pane) re-checks: the reader may have been
-    // looking at these messages all along while the app was behind another window.
-    window.addEventListener('focus', markRead)
-    document.addEventListener('visibilitychange', markRead)
-    return () => {
-      window.clearTimeout(timer)
-      window.removeEventListener('focus', markRead)
-      document.removeEventListener('visibilitychange', markRead)
-    }
-  }, [activeChatId, seenUpToMessageId])
+  const peerStatus = usePeerStatus(chat?.kind === 'private' ? (chat.userId ?? null) : null)
+  const seenUpToMessageId = seen && seen.chatId === activeChatId ? seen.messageId : null
+
+  /** 已读上报 lives in its own hook (see `useMarkRead`). */
+  useMarkRead(activeChatId, seenUpToMessageId)
 
   /**
    * "跳转到最新消息": replace an anchored window with the newest page (a no-op
@@ -382,9 +350,23 @@ export function ChatPane() {
       <ChatHeader
         title={chat.title}
         typing={typing}
+        peerStatus={peerStatus}
         infoOpen={infoOpen}
         onToggleInfo={toggleInfo}
+        {...(chat.kind === 'private' && chat.userId !== undefined
+          ? { onOpenProfile: () => setProfileUserId(chat.userId ?? null) }
+          : {})}
       />
+
+      {pinned ? (
+        <PinnedBar
+          pinned={pinned}
+          onLocate={() => useAppStore.getState().requestLocate(chat.id, pinned.messageId)}
+          onUnpin={() => {
+            void setPinnedMessage(null)
+          }}
+        />
+      ) : null}
 
       {loadingHistory && messages.length === 0 ? (
         <LoadingPlaceholder restoring={restoring} />
@@ -422,14 +404,27 @@ export function ChatPane() {
             if (isChannel) setChannelInputChatId(activeChatId)
           }}
           onEdit={(message) =>
-            useAppStore
-              .getState()
-              .setEditing({ chatId: activeChatId, messageId: message.id, text: message.text })
+            useAppStore.getState().setEditing({
+              chatId: activeChatId,
+              messageId: message.id,
+              text: message.text,
+              ...(editTargetOf(message) === 'caption' ? { caption: true } : {}),
+            })
           }
           onDelete={(message, forBoth) => setDeleting({ message, forBoth })}
           onForward={setForwarding}
           onCopy={actions.copy}
           onOpenComments={openComments}
+          onResend={(message) => {
+            void actions.resend(message)
+          }}
+          onTranscribe={(message) => {
+            void actions.transcribe(message)
+          }}
+          pinnedMessageId={pinned?.messageId ?? null}
+          onTogglePin={(message) => {
+            void setPinnedMessage(pinned?.messageId === message.id ? null : message.id)
+          }}
         />
       )}
 
@@ -439,7 +434,9 @@ export function ChatPane() {
           replyTo={replyTo}
           editing={editingForChat}
           onSend={actions.send}
-          onSaveEdit={actions.saveEdit}
+          onSaveEdit={(messageId, text) =>
+            actions.saveEdit(messageId, text, editingForChat?.caption === true)
+          }
           onCancelReply={() => useAppStore.getState().setReplyTo(activeChatId, null)}
           onCancelEdit={() => useAppStore.getState().setEditing(null)}
           {...(isChannel ? { onCollapse: () => setChannelInputChatId(null) } : {})}
@@ -495,6 +492,10 @@ export function ChatPane() {
           open={comments.open}
           onClose={closeComments}
         />
+      ) : null}
+
+      {profileUserId !== null ? (
+        <ProfileCard userId={profileUserId} onClose={() => setProfileUserId(null)} />
       ) : null}
 
       {forwarding ? (

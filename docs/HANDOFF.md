@@ -15,6 +15,41 @@ records what moved where, the conventions the code now enforces, and the batches
 still pending (`mock.ts`, `preview-bridge.ts`, `styles/index.css`,
 `packages/protocol`). Read it before restructuring anything.
 
+**Private-chat gap audit (2026-11-22):** `docs/PRIVATE-CHAT-HANDOFF.md` inventories
+what 1:1 chats still lack — send failure/retry, outgoing typing, online status, delete
+chat / mark unread, notifications, voice notes, reactions, the peer profile card, album
+send and more — with the exact TDLib 1.8.70 API for each, the insertion points, and an
+implementation order. Read it before starting private-chat work.
+
+**Private-chat P0 batch (same day):** the audit's five P0 gaps are implemented —
+outgoing typing, 标为未读 + 删除聊天 with a chat-list context menu, send failure
+(未发送) with 重试, online / last-seen in a private chat's header, and desktop
+notifications with a tray icon. Measured notes and the still-unverified parts are in
+"Private-chat P0 batch — measured notes" below; the audit document keeps the P1/P2
+backlog.
+
+**Private-chat P1 batch (same day):** the audit's P1 list is closed except for two
+items that need the owner. Landed: 相册发送 (one `sendMessageAlbum` call), 置顶消息栏,
+语音转文字, 表情回应 (display only), 拉黑 + 举报 (a person **and** one message, one
+phased `reportChat` sheet), the 资料卡 with 备注 / 共同群聊 (count + a page of chat rows
+fetched on demand) / 添加删除联系人, 编辑说明 for a media caption, the 聊天信息
+panel's face opening that card, and **语音消息** (recorded in the renderer with
+WebCodecs Opus and muxed into OGG in-repo — no new dependency; see
+`docs/PRIVATE-CHAT-HANDOFF.md` §6.1). Still open: the **reactions picker** (WeChat has
+no reactions; display-only until the owner signs one off) and the 置顶消息 bar's
+product call. **No test DC was available in this session either**, so the P1/P2 TDLib
+writes (`sendMessageAlbum`, `pinChatMessage`, `setUserNote`, `setMessageSenderBlockList`,
+`reportChat`, `editMessageCaption`, `recognizeSpeech`, `addContact`, `removeContacts`,
+`getGroupsInCommon`, `inputMessageVoiceNote`) are compile- and mock-verified only —
+run `pnpm tdlib:test-dc` before calling them proven. The voice **gesture** was then
+clicked through in a mock Electron window (isolated profile, fake media device): a
+2 s hold produced a decodable voice bubble (`<audio>` duration 1.9, `readyState 4`)
+and a valid OGG/Opus file; the slide-up cancel sent nothing. `inputMessageVoiceNote`
+was then confirmed on the **test DC** by the owner's own send: the transcript drew
+it as an outgoing voice bubble (0:02), so the server accepts our OGG and an empty
+waveform. The CLI probe step is in `scripts/tdlib-test-dc.ts` for the next clean
+run — see `docs/PRIVATE-CHAT-HANDOFF.md` §11.
+
 ## Where things stand
 
 Greenfield → working skeleton in three milestones:
@@ -882,6 +917,65 @@ Single account in v1 (multi-account is v2; session dir already shaped
 if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivity test,
 5-week schedule instead of 4.
 
+## Private-chat P0 batch — measured notes (2026-11-22)
+
+Shipped from `docs/PRIVATE-CHAT-HANDOFF.md` §3 (P0): outgoing typing, 标为未读,
+删除聊天, send failure + 重试, online / last seen, desktop notifications, tray.
+
+- **Typing is renderer-side throttled, never thrown.** `lib/typingPing.ts` sends one
+  `messages:typing` immediately and at most one refresh per 3.5 s; emptying the box,
+  sending, switching chats or blurring sends the cancel. The adapter's `sendTyping`
+  swallows TDLib failures on purpose (ambient presence must not raise the error bar).
+  The mock adapter has no peer to show it, so the indicator is only observable against a
+  real account.
+- **The send id swap is real and handled as a re-key.** `sendMessage` answers with a
+  pending row; `updateMessageSendSucceeded.old_message_id` is patched through the new
+  `replaceId` op, so the row keeps its position and later edit/delete/read receipts
+  name the server id. `updateMessageSendFailed` patches `sendingState: 'failed'` +
+  `canRetry`; 重试 calls `messages:resend` (`resendMessages`) and the row goes back
+  to 'pending'. The message menu also offers 重试 first for a failed row.
+  - Dev path: `WEGRAM_MOCK_FAIL_SEND=1` fails the **next** text send once, so the
+    未发送 row and click-to-retry can be exercised without a network. Verified in the
+    mock Electron shell (row appeared red, retry delivered it, receipt returned).
+- **标为未读 is a flag, not a counter.** `ChatSummary.markedUnread` comes from
+  `chat.is_marked_as_unread`; the row draws a bare dot when there is no count, and
+  opening the chat clears the flag (the adapter calls `toggleChatIsMarkedAsUnread`).
+  Unread messages still move the server marker one viewport at a time.
+- **删除聊天 is local.** The adapter uses `deleteChatHistory` with
+  `remove_from_chat_list: true, revoke: false` — never `deleteChat`, which deletes
+  the history for every member. The `remove` op now drops the transcript, queued ops,
+  paging state and the active selection with the row.
+- **The chat list has a right-click menu** (置顶 / 免打扰 / 标为未读 / 删除聊天) built in
+  `components/chat-list/chatMenu.ts`; `ContextMenu` already handled placement and keys.
+- **Presence is a stream, not a chat field.** `users:status` answers once per open
+  private chat and `evt:status` keeps it live; the copy is `lib/presence.ts`
+  (在线 / 刚刚在线 / 今天 HH:mm / 昨天 HH:mm / M月D日 HH:mm / coarse sentences). Placement
+  was the audit's open decision #1: it sits **after the name inside the 48 px header**,
+  styled like the typing label, so the transcript never re-flows. Typing wins over
+  status when both exist.
+- **Notifications come from TDLib's notification objects**, not from
+  `updateNewMessage`: both `updateNotification` and
+  `updateNotificationGroup.added_notifications` are forwarded as a main-only
+  `notification` adapter event (`notificationTypeNewMessage` only). Main builds the
+  Electron `Notification`, flashes the task bar when the shell is not focused, and
+  suppresses the toast for the chat the focused shell is showing — the renderer reports
+  that through `ui:setActiveChat` (null when the pane is closed or 通讯录 is showing).
+  A notification click raises the shell and publishes `evt:locate`; a chat not yet in
+  the list is fetched with `chats:get` before the pane opens.
+  - Dev path: `WEGRAM_MOCK_NOTIFY=1` turns the mock's ambient arrivals into
+    notification events.
+  - **Unverified on this machine:** Windows toasts for an unpackaged build (no Start
+    Menu shortcut), and the tray icon — `Shell_NotifyIcon` refused it in the agent's
+    launch session (`Unable to create status tray icon`). `createTray` now logs and
+    carries on without the icon, so neither failure can stop the app from starting.
+- **Protocol split:** `channels.ts` was at its 550-line budget, so the event tables
+  moved to `packages/protocol/src/events.ts`, the message ops to
+  `message-ops.ts`, and the new channels to `send.ts` (typing, resend) and
+  `presence.ts` (status, active chat). `dto.ts` is under budget again.
+- **Renderer splits that the batch forced:** `useMarkRead` and `usePeerStatus` left
+  `chat-pane/index.tsx`; the browser preview's media, viewer and `ui:*` handlers left
+  `preview/index.ts`.
+
 ## Known gaps / suggested next steps
 
 1. ~~**Unverified:** the dark-mode window-controls overlay~~ — **verified** (Electron 38,
@@ -954,7 +1048,13 @@ if bundle size becomes a real pain), built-in SOCKS5 + MTProxy with a connectivi
      *sending* (received albums are grouped into one bubble now, design doc §8.6),
      no drag & drop / paste. Captions are supported end-to-end in the adapter
      (`media:send` takes `caption`), just not surfaced in the UI yet.
-   - Voice notes play, but there is no recording and the waveform is decorative.
+   - ~~Voice notes play, but there is no recording~~ — **done 2026-11-22**: the
+     renderer records 按住 说话 with WebCodecs Opus and muxes OGG itself
+     (`renderer/lib/voice/`), main materialises the bytes under `userData/voice`
+     and TDLib sends `inputMessageVoiceNote`. The waveform is still decorative
+     (and sent empty, see `docs/PRIVATE-CHAT-HANDOFF.md` §6.1). The mock/Electron
+     pass is done (fake media device) — see "Private-chat P1 batch" above; the
+     test-DC write is still pending.
    - Download cache is TDLib's own file cache; the `media_cache` LRU table from §5.2 is
      still unused, so nothing bounds the disk usage yet.
    - Sticker panel only lists regular installed sets; no search/trending, no "recent".

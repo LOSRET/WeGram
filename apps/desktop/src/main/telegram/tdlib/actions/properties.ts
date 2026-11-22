@@ -27,5 +27,8 @@ export async function messageProperties(
     canBeDeletedForAllUsers: Boolean(raw?.can_be_deleted_for_all_users),
     canBeCopied: Boolean(raw?.can_be_copied),
     canBeReplied: Boolean(raw?.can_be_replied),
+    canRecognizeSpeech: Boolean(raw?.can_recognize_speech),
+    canBePinned: Boolean(raw?.can_be_pinned),
+    canReportChat: Boolean(raw?.can_report_chat),
   }
 }

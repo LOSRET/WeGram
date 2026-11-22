@@ -33,7 +33,17 @@ components/composer/       ComposerCard: the ONE bordered input card (§8.4 + §
                          the 表情/收藏/文件/截图/语音 tool row, 发送, the attach menu and the
                          ExpressionPicker. Both composers render it; a caller only says where
                          a send goes, so the comment box is not a cut-down copy of a chat's.
+                         useVoiceRecording / VoiceControls: 语音消息's click-to-record state
+                         machine and the in-card bar: cancel ×, a dotted pill and the
+                         send circle whose hover reveal expands it into green 发送; 发语音
+                         is the circled mic beside 发送, the tool-row mic is 语音转文字.
+lib/voice/            语音消息's audio path: oggOpus.ts (pure, unit-tested — OGG pages,
+                      lacing, OpusHead/OpusTags, the OGG CRC-32) and recorder.ts
+                      (getUserMedia → AudioContext 48 kHz → ScriptProcessor → WebCodecs
+                      AudioEncoder → muxed OGG bytes).
 components/chat-pane/     render tree + useChatHistory (history/ modules) + messageActions +
+                         useMarkRead (已读上报 effect) + usePeerStatus (在线/最后上线 for a
+                         private chat's header) +
                          CommentPanel (full-pane discussion view, slides in from the right;
                          chat-style rows + CommentComposer, the shared composer card posting
                          text / sticker / photo-file through messages:sendComment; non-members
@@ -42,7 +52,8 @@ components/chat-pane/     render tree + useChatHistory (history/ modules) + mess
                          reading position in ui.db; the default landing is the top) +
                          ChatInfoPanel (聊天信息, §9.9: a 314 px OVERLAY sheet — transform
                          only, the transcript keeps its width — with 搜索群成员 and the
-                         member grid for groups, 群聊名称 / 群公告 / 群二维码 / 退出群聊 (频道
+                         member grid for groups, a private chat's face opening 资料卡,
+                         群聊名称 / 群公告 / 群二维码 / 退出群聊 (频道
                          名称 / 频道公告 / 频道二维码 / 退出频道 on a channel, whose member
                          grid only an administrator gets — chats:canGetMembers) and the
                          shared mute/pin/clear rows; 群二维码 opens screens/QrWindow.tsx, the
@@ -55,6 +66,18 @@ components/picker/        the expression panel's data hooks and body components
 components/ExpressionPicker.tsx  the picker's state + composition
 components/viewer/        the 图片和视频 window: MediaViewer shell + useViewerItem /
                          useViewerZoom + ViewerToolbar / ViewerGrid + viewerMenu / viewerActions
+components/ProfileCard.tsx  资料卡: the person sheet a private chat's title and the
+                        通讯录 card's 更多资料 open (简介 / 备注 / 共同群聊 fetched on
+                        demand / 添加或删除联系人 / 加入黑名单 / 举报 for a bot only —
+                        `canBeReported` is TDLib's `chat.can_be_reported`, all through
+                        `users:*`)
+components/ReportDialog.tsx  举报: the phased reportChat state machine (reasons →
+                        maybe a comment → filed), shared by the 资料卡's 举报 and the
+                        message menu's (`ReportTarget` picks the channel); the reason
+                        list is whatever TDLib sent, never a local shortlist, and
+                        `textOptional` (`is_optional`) lets the comment be skipped
+components/chat-pane/PinnedBar.tsx  置顶消息: one line above the scroller (text +
+                        定位 + ×); `usePinnedMessage` owns the fetch and the calls
 components/Avatar.tsx    the ONE avatar box (photo or initials); the box class it is given
                         is the positioned element, which is the rule that once cost a session
 components/CustomEmoji.tsx  a Premium custom emoji in text: its sticker art at 20 px,
@@ -65,6 +88,10 @@ components/ChatList.tsx  the conversation column: pill (server search panel, §2
 components/chat-search/ SearchTabs (聊天 / 频道) and SearchHitRow (one message hit:
                         chat face, chat title, message preview, time)
 components/SearchField.tsx  the ONE search pill (label + input + optional trailing control)
+components/VoiceBubble.tsx  语音消息's bubble: the client's strip — seconds as 13", the
+                        waves on the other side (mirrored by side), width from the clip
+                        (`lib/voiceBubble.ts`), waves pulsing while it plays; split out of
+                        MediaBubble.tsx when that file reached its line cap
 components/           the remaining visual concerns (Composer, MediaBubble, …)
 components/Composer.tsx  a chat's send path over ComposerCard: per-chat drafts, reply /
                         edit banners, anchored-window reload, the channel's 收起 button
@@ -72,7 +99,7 @@ lib/ipc.ts            thin `window.tg` wrapper
 lib/clipboard.ts      text copy for the contact card (navigator.clipboard + execCommand fallback)
 lib/format.ts         time / preview / avatar helpers (pure, unit-tested)
 lib/poll.ts           (pure, unit-tested) results visibility, votability, selection
-                      staging, footer/mode copy, quiz correctness
+                      staging, footer/mode copy, vote-restriction copy, quiz correctness
 lib/search.ts         normalizeQuery / containsText / matchSegments — the ONE reading of a
                       search box, and the hit emphasis a result row draws
 lib/useGlobalSearch.ts  the search panel's conversation hits: 260 ms debounce over
@@ -87,6 +114,12 @@ lib/mediaBox.ts       (pure, unit-tested) the reserved media box + percent text
 lib/unreadBoundary.ts (type only) the snapshot a chat opens with; `UnreadMarker` is an alias
 lib/listMetrics.ts    (pure, unit-tested via scripts/style-contract) the virtualised row height
 lib/composerInput.ts  (pure, unit-tested) Enter / Shift+Enter / IME rule
+lib/typingPing.ts     (pure, unit-tested) 对方正在输入 throttle: one ping, 3.5 s refresh,
+                      cancel on empty/send/blur
+lib/presence.ts       (pure, unit-tested) 在线 / 最后上线 copy for the peer-status DTO
+lib/editTarget.ts     (pure, unit-tested) which edit path a row has: 编辑 (text) or
+                      编辑说明 (a media caption), and the menu's word for each
+lib/albumSend.ts      (pure, unit-tested) when a multi-select becomes ONE Telegram album
 lib/useComposerInput.ts  composition ref + textarea props, shared by both composers
 lib/contacts.ts       通讯录 initial/grouping, pinyin via ICU (pure, unit-tested)
 lib/entities.ts       TL entity → text segments (pure, unit-tested)
@@ -115,8 +148,8 @@ lib/useInView.ts      the visibility gate a sticker and its effect share (geomet
 lib/preview-bridge.ts DEV-ONLY entry point (re-exports lib/preview)
 lib/preview/          browser-preview session + invoke switch (index.ts); fixtures.ts is a
                       thin adapter over @wegram/mock-fixtures (data: URLs + gradient faces);
-                      chats.ts / messages.ts / comments.ts / qr.ts hold the handler rules the
-                      invoke switch delegates to
+                      chats.ts / messages.ts / comments.ts / qr.ts / media.ts / ui.ts /
+                      viewer.ts hold the handler rules the invoke switch delegates to
 ```
 
 `styles/index.css` is the entry point only: it imports `styles/*.css` in source order
@@ -276,6 +309,55 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   number in a message would disappear. Never "fix" that by adding digits back — it
   breaks every number in the transcript. Rebuild with `scripts/emoji-art.py` then
   `scripts/emoji-font.py`, and treat the two as one change.
+- **A failed send must stay visible without hovering.** 未发送 is drawn as its own
+  row button (`.wx-message__retry`), not inside the opacity-0 meta line: a failed row
+  that looks delivered is the bug the marker exists to prevent. The 重试 action is also
+  the first item of the message menu, gated on `canRetry`.
+- **对方正在输入 is throttled in `lib/typingPing.ts`, and its IPC call never raises an
+  error.** One ping, one refresh per 3.5 s, cancel on empty / send / blur / chat switch.
+  Do not move the throttle into the composer's onChange or add a per-keystroke call.
+- **置顶消息 sits OUTSIDE the scroller.** The bar is a sibling above the virtualised
+  list, never a row inside it: anything inside re-measures rows and moves the reader.
+  Both the bar's × and the menu's 取消置顶 send `messageId: null`, so the adapter
+  resolves the current pin (`unpinChatMessage` wants an id).
+- **语音转文字 is a content update, not a request answer.** `messages:transcribe` only
+  asks (`recognizeSpeech` answers `Ok` at once); the pending and final text arrive as
+  the voice note's content changing, so the row repaints through a `replace` op and
+  the transcript block draws what `Message.transcription` says. Never poll.
+- **表情回应 are displayed, never offered.** `MessageRow` draws the chips from
+  `Message.reactions` (`updateMessageReactions` replaces the whole list, so the
+  `reactions` op replaces rather than merges); a custom-emoji reaction is its
+  sticker art by int64-id string. WeChat has no reactions, so there is no picker
+  until the owner signs one off — do not add a tap-to-react gesture before that.
+- **发语音 is the circled mic beside 发送; the tool-row mic is 语音转文字.**
+  Measured on the client: clicking the toolbar mic starts dictation and drops
+  recognised text into the box (we have no ASR, so it stays a placeholder),
+  while clicking the circled mic starts a clip at once — no push-to-talk, no
+  separate voice mode. `useVoiceRecording` then turns the right cluster into the
+  recording bar (cancel ×, dotted pill, green send circle), and keeps the session
+  in a ref because
+  `getUserMedia` and the encoder start asynchronously: a send or cancel pressed
+  in that first moment is stored as `want` and applied when the recorder lands.
+  Keep the clip on the base64 OGG IPC path (the renderer has no filesystem) and
+  keep `lib/voice/oggOpus.ts` pure and tested — Chromium cannot record OGG, so
+  the container is written here, not by a library. The recording bar is one
+  button with two layers: a grey pill with the dots and a green send circle at
+  its right end, and a 120 ms `clip-path: circle()` reveal that **only the circle**
+  starts (hovering the empty part of the pill does nothing) and that turns it into
+  the green 发送 bar — both layers inside the same button, or the expansion would
+  swallow the click. The bubble is `components/VoiceBubble.tsx`: 13", width from
+  `lib/voiceBubble.ts`, waves on the side the client puts them — never a play
+  triangle plus a drawn waveform.
+- **标为未读 is a dot, not a count.** `ChatSummary.markedUnread` draws a bare
+  `.wx-badge--dot` when `unread` is 0; opening the chat clears the flag (the adapter
+  does it). Do not render it through the count badge.
+- **The peer-status line is part of the title, in the same 48 px header**, and typing
+  wins over it when both exist; a second header row would move the transcript.
+- **编辑 vs 编辑说明 is `lib/editTarget.ts`'s decision, not the menu's.** TDLib's
+  `can_be_edited` covers `editMessageText`, `editMessageCaption` and the reply markup,
+  so the flag alone would offer 编辑 on a poll (where it means "stop it") or on a
+  sticker (an emoji, not a caption). A caption row also saves through its own channel
+  and may legitimately save an empty box — it removes the 说明.
 - User-facing copy is Chinese (`回复`/`复制`/`转发`…), code, identifiers and
   comments are English.
 

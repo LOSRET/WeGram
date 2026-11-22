@@ -4,14 +4,12 @@ import type {
   ChatJoinResult,
   ChatJoinState,
   ChatMember,
-  ChatPinnedMessage,
   ChatSummary,
 } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
 import { asArray } from '../json'
 import { mapChat } from '../map/chat'
-import { previewContent } from '../map/content'
 import type { ActionDeps, PostPermissionDeps } from './deps'
 
 export async function fetchChatSummary(deps: ActionDeps, chatId: number): Promise<ChatSummary> {
@@ -60,7 +58,21 @@ export async function listChats(
  * `from_message_id` as *exclusive*, measured 2026-11-17.)
  */
 export async function openChat(deps: ActionDeps, chatId: number): Promise<void> {
-  await deps.invoke({ _: 'getChat', chat_id: chatId })
+  const chat = await deps.invoke({ _: 'getChat', chat_id: chatId })
+  /**
+   * 标为未读 is a flag the reader set by hand, and opening the chat consumes it —
+   * WeChat clears its red dot the same way. Reading itself still moves the server
+   * marker one viewport at a time through `messages:read` (see above), so this
+   * call only touches the flag, never `unread_count`.
+   */
+  if (!chat?.is_marked_as_unread) return
+  await deps.invoke({
+    _: 'toggleChatIsMarkedAsUnread',
+    chat_id: chatId,
+    is_marked_as_unread: false,
+  })
+  const summary = await fetchChatSummary(deps, chatId)
+  deps.emit({ type: 'chats', ops: [{ op: 'upsert', chat: summary }] })
 }
 
 /**
@@ -298,6 +310,45 @@ export async function clearHistory(deps: ActionDeps, chatId: number): Promise<vo
 }
 
 /**
+ * 删除聊天, the way WeChat means it: the conversation disappears from this
+ * account's list, and its copy of the history goes with it.
+ *
+ * `deleteChatHistory` with `remove_from_chat_list: true, revoke: false` — the
+ * peers keep their messages. `deleteChat` would be the other thing entirely
+ * (delete for every member), which WeChat has no gesture for and this client must
+ * never send by accident.
+ */
+export async function deleteChat(deps: ActionDeps, chatId: number): Promise<void> {
+  await deps.invoke({
+    _: 'deleteChatHistory',
+    chat_id: chatId,
+    remove_from_chat_list: true,
+    revoke: false,
+  })
+  deps.emit({ type: 'chats', ops: [{ op: 'remove', chatId }] })
+}
+
+/**
+ * 标为未读 / 标为已读. TDLib keeps this as a boolean flag next to `unread_count`
+ * (a chat can be marked unread with nothing new), so the row draws a dot and the
+ * refreshed summary carries the new state.
+ */
+export async function setChatUnread(
+  deps: ActionDeps,
+  chatId: number,
+  unread: boolean,
+): Promise<ChatSummary> {
+  await deps.invoke({
+    _: 'toggleChatIsMarkedAsUnread',
+    chat_id: chatId,
+    is_marked_as_unread: unread,
+  })
+  const summary = await fetchChatSummary(deps, chatId)
+  deps.emit({ type: 'chats', ops: [{ op: 'upsert', chat: summary }] })
+  return summary
+}
+
+/**
  * The member grid of the 聊天信息 panel (design doc §9.9).
  *
  * TDLib answers `searchChatMembers` with ids only, so names come from the
@@ -375,24 +426,7 @@ export async function leaveChat(deps: ActionDeps, chatId: number): Promise<void>
   deps.emit({ type: 'chats', ops: [{ op: 'remove', chatId }] })
 }
 
-/**
- * 群公告: Telegram keeps one newest pinned message per chat, and a group uses it
- * as the announcement. TDLib answers a 404 error when nothing is pinned — that is
- * "no announcement", not a failure.
- */
-export async function pinnedMessage(
-  deps: ActionDeps,
-  chatId: number,
-): Promise<ChatPinnedMessage | null> {
-  let message: TdObject | undefined
-  try {
-    message = await deps.invoke({ _: 'getChatPinnedMessage', chat_id: chatId })
-  } catch {
-    return null
-  }
-  if (!message?.id) return null
-  return { messageId: Number(message.id), text: previewContent(message.content) }
-}
+/* 群公告 and 置顶 live in ./pins.ts. */
 
 /**
  * 群二维码: a link a phone can open (design doc §9.9).

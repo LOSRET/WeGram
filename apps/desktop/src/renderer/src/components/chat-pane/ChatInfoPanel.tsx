@@ -7,6 +7,7 @@ import { errorMessage, invoke } from '../../lib/ipc'
 import { useAppStore } from '../../store/useAppStore'
 import { Avatar } from '../Avatar'
 import { ConfirmDialog } from '../ConfirmDialog'
+import { ProfileCard } from '../ProfileCard'
 import { PlusIcon, QrGlyphIcon } from '../Icon'
 import { OverlayScrollbar } from '../OverlayScrollbar'
 import { SearchField } from '../SearchField'
@@ -78,6 +79,8 @@ export function ChatInfoPanel({
   const [renameBusy, setRenameBusy] = useState(false)
   const [invite, setInvite] = useState<{ title: string } | null>(null)
   const [leaving, setLeaving] = useState(false)
+  /** 资料卡: a private chat's own face opens the peer's card (the header does too). */
+  const [profileOpen, setProfileOpen] = useState(false)
   const userAvatars = useAppStore((state) => state.userAvatars)
   const panelRef = useRef<HTMLElement | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -191,6 +194,7 @@ export function ChatInfoPanel({
       if (event.key !== 'Escape') return
       event.stopPropagation()
       if (leaving) setLeaving(false)
+      else if (profileOpen) setProfileOpen(false)
       else if (invite !== null) setInvite(null)
       else if (renaming) setRenaming(false)
       else if (searching) setSearching(false)
@@ -198,7 +202,7 @@ export function ChatInfoPanel({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open, searching, renaming, invite, leaving, onClose])
+  }, [open, searching, renaming, invite, leaving, profileOpen, onClose])
 
   const saveTitle = async (title: string): Promise<void> => {
     setRenameBusy(true)
@@ -262,19 +266,37 @@ export function ChatInfoPanel({
               ) : null}
 
               <div className="wx-info__people">
-                {tiles.map((tile) => (
-                  <div className="wx-info__person" key={tile.id}>
-                    <Avatar
-                      url={tile.avatarUrl}
-                      name={tile.title}
-                      colorId={tile.id}
-                      className="wx-info__avatar"
-                    />
-                    <span className="wx-info__name" title={tile.title}>
-                      {tile.title}
-                    </span>
-                  </div>
-                ))}
+                {tiles.map((tile) => {
+                  const face = (
+                    <>
+                      <Avatar
+                        url={tile.avatarUrl}
+                        name={tile.title}
+                        colorId={tile.id}
+                        className="wx-info__avatar"
+                      />
+                      <span className="wx-info__name" title={tile.title}>
+                        {tile.title}
+                      </span>
+                    </>
+                  )
+                  // A private chat has exactly one face — the peer's — and WeChat
+                  // opens their 资料卡 from it, the same card the header's title does.
+                  return chat.kind === 'private' ? (
+                    <button
+                      key={tile.id}
+                      type="button"
+                      className="wx-info__person wx-info__person--face"
+                      onClick={() => setProfileOpen(true)}
+                    >
+                      {face}
+                    </button>
+                  ) : (
+                    <div className="wx-info__person" key={tile.id}>
+                      {face}
+                    </div>
+                  )
+                })}
                 {isGroup ? (
                   <button
                     type="button"
@@ -373,6 +395,18 @@ export function ChatInfoPanel({
       {invite
         ? createPortal(
             <InviteDialog chatId={chat.id} title={invite.title} onClose={() => setInvite(null)} />,
+            document.body,
+          )
+        : null}
+
+      {/*
+        资料卡 opens in a portal for the same reason the sheets below do: .wx-info
+        carries the slide transform, and a fixed overlay inside it would be sized
+        to the panel and clipped by its overflow.
+      */}
+      {profileOpen && chat.userId !== undefined
+        ? createPortal(
+            <ProfileCard userId={chat.userId} onClose={() => setProfileOpen(false)} />,
             document.body,
           )
         : null}

@@ -54,7 +54,11 @@ describe('applyMessageOps', () => {
 
   it('keeps a known comment count when an update only carries views', () => {
     const store = useAppStore.getState()
-    store.setHistory(CHAT_ID, [{ ...message(1), interaction: { comments: 78, canOpen: true } }], false)
+    store.setHistory(
+      CHAT_ID,
+      [{ ...message(1), interaction: { comments: 78, canOpen: true } }],
+      false,
+    )
     store.applyMessageOps(CHAT_ID, [
       { op: 'interaction', chatId: CHAT_ID, messageId: 1, interaction: { views: 12_400 } },
     ])

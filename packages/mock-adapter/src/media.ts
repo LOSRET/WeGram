@@ -89,6 +89,79 @@ export async function buildMediaMessage(
   }
 }
 
+/**
+ * Builds the rows of one album (相册). Telegram keys them by `media_album_id`,
+ * so every row carries the same id and the transcript folds them into one bubble;
+ * the ids come from the caller's counter, like a real send.
+ */
+export async function buildAlbumMessages(
+  deps: MockSendDeps,
+  input: {
+    chatId: number
+    albumId: string
+    items: Array<{ filePath: string; kind: MediaKind; caption?: string }>
+    takeId: () => number
+    replyTo?: number
+  },
+): Promise<BuiltMedia[]> {
+  const built: BuiltMedia[] = []
+  for (const item of input.items) {
+    const row = await buildMediaMessage(deps, {
+      ...item,
+      id: input.takeId(),
+      chatId: input.chatId,
+      ...(input.replyTo === undefined ? {} : { replyTo: input.replyTo }),
+    })
+    built.push({ ...row, message: { ...row.message, albumId: input.albumId } })
+  }
+  return built
+}
+
+/**
+ * Builds the row a 语音消息 becomes.
+ *
+ * The clip is a real OGG file main just wrote from the renderer's recording, so
+ * the bubble plays it through the same `wx-media://` registry as every other
+ * outgoing file; `duration` is what the bubble prints.
+ */
+export async function buildVoiceMessage(
+  deps: MockSendDeps,
+  input: {
+    id: number
+    chatId: number
+    filePath: string
+    duration: number
+    replyTo?: number
+  },
+): Promise<BuiltMedia> {
+  const info = await stat(input.filePath)
+  const fileId = deps.nextFileId()
+  const file: MockFile = {
+    fileId,
+    path: input.filePath,
+    url: deps.registerMedia(input.filePath),
+    name: basename(input.filePath),
+    size: info.size,
+    mimeType: 'audio/ogg',
+  }
+  deps.assets.files.set(fileId, file)
+  const message = outgoingMessage({
+    id: input.id,
+    chatId: input.chatId,
+    kind: 'voice',
+    text: '',
+    media: {
+      fileId,
+      mimeType: file.mimeType ?? 'audio/ogg',
+      duration: input.duration,
+      size: info.size,
+      localUrl: file.url,
+    },
+    replyTo: input.replyTo,
+  })
+  return { message, preview: '[语音]', fileId, size: info.size }
+}
+
 /** Builds the row a sticker from the picker becomes. */
 export function buildStickerMessage(
   deps: Pick<MockSendDeps, 'assets'>,

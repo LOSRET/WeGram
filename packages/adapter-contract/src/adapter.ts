@@ -1,5 +1,6 @@
 import type {
   AuthState,
+  ChatReport,
   BootState,
   ChatInviteLink,
   ChatJoinResult,
@@ -14,12 +15,14 @@ import type {
   Message,
   MessageOp,
   MessageProperties,
+  PeerStatus,
   ProxyConfig,
   ProxyTestResult,
   Self,
   StickerSet,
   StickerSetSummary,
   UserAvatar,
+  UserProfile,
   InvokeRequest,
   InvokeResponse,
 } from '@wegram/protocol'
@@ -65,6 +68,23 @@ export type AdapterEvent =
   | { type: 'chats'; ops: ChatOp[] }
   | { type: 'messages'; chatId: number; ops: MessageOp[] }
   | { type: 'avatars'; avatars: UserAvatar[] }
+  /** A peer's online / last-seen state (TDLib `updateUserStatus`). */
+  | { type: 'status'; userId: number; status: PeerStatus }
+  /**
+   * A notification TDLib decided the user should see (`updateNotification` /
+   * `updateNotificationGroup`). Main turns it into an OS notification; it never
+   * crosses IPC to the renderer, so it has no `evt:*` channel. TDLib has already
+   * applied the chat's mute rules, mentions and preview privacy.
+   */
+  | {
+      type: 'notification'
+      chatId: number
+      messageId: number
+      title: string
+      text: string
+      isSilent: boolean
+      date: number
+    }
   | { type: 'typing'; chatId: number; userId: number; action: string; until: number }
   /** TDLib reloaded the installed sticker sets (cache first, then server). */
   | { type: 'stickerSets' }
@@ -160,6 +180,15 @@ export interface TelegramAdapter {
    */
   clearHistory(chatId: number): Promise<void>
   /**
+   * 删除聊天: removes the chat from this account's list and its copy of the
+   * history behind it (TDLib `deleteChatHistory` with
+   * `remove_from_chat_list: true`, `revoke: false`). Never "delete for
+   * everyone": that is `deleteChat`, which deletes the history for every member.
+   */
+  deleteChat(chatId: number): Promise<void>
+  /** 标为未读 / 标为已读; answers the refreshed summary (the row reads the flag). */
+  setChatUnread(chatId: number, unread: boolean): Promise<ChatSummary>
+  /**
    * The 聊天信息 panel's member grid. Private chats answer with an empty list
    * (the panel draws the chat's own face); a channel's member list needs
    * administrator rights, so it degrades to an empty grid instead of failing.
@@ -172,6 +201,11 @@ export interface TelegramAdapter {
   leaveChat(chatId: number): Promise<void>
   /** 群公告: the newest pinned message, or `null` when the group has none. */
   pinnedMessage(chatId: number): Promise<ChatPinnedMessage | null>
+  /**
+   * 置顶消息 / 取消置顶: pins one message, or (`null`) removes the chat's pinned
+   * one. Answers the chat's pin afterwards.
+   */
+  setPinnedMessage(chatId: number, messageId: number | null): Promise<ChatPinnedMessage | null>
   /**
    * 群二维码: a link a phone can open. `temporary` asks for the client's
    * short-lived code (a fresh 7-day link, where the account may create one);
@@ -186,6 +220,32 @@ export interface TelegramAdapter {
    * card's 发消息 is pressed.
    */
   listContacts(): Promise<Contact[]>
+  /** Online / last seen for one user; `null` when TDLib has no status to show. */
+  userStatus(userId: number): Promise<PeerStatus | null>
+  /** 资料卡: identity, 简介, 备注, 共同群聊 and the 拉黑 flag for one person. */
+  userProfile(userId: number): Promise<UserProfile>
+  /**
+   * 共同群聊: one page of the group chats this account shares with one person
+   * (TDLib `getGroupsInCommon`, asked when the card's row is opened).
+   */
+  commonChats(input: InvokeRequest<'users:commonChats'>): Promise<ChatSummary[]>
+  /** 备注: writes Telegram's cloud-synced note and answers the refreshed card. */
+  setUserNote(userId: number, note: string): Promise<UserProfile>
+  /** 添加为联系人 / 删除联系人; answers the refreshed card. */
+  setUserContact(userId: number, contact: boolean, sharePhone?: boolean): Promise<UserProfile>
+  /** 拉黑 / 取消拉黑 (TDLib `setMessageSenderBlockList`); refreshed card. */
+  setUserBlocked(userId: number, blocked: boolean): Promise<UserProfile>
+  /**
+   * 举报, one phase per call: no `optionId` asks for the reasons, one of those ids
+   * files the report (a reason may then ask for a comment, which the answer says).
+   */
+  reportUser(userId: number, input: { optionId?: string; text?: string }): Promise<ChatReport>
+  /**
+   * 举报 one message: the same phased `reportChat`, filed against its chat with the
+   * message id attached. The context menu offers it only where TDLib's
+   * `messageProperties.can_report_chat` says the message may be reported.
+   */
+  reportMessage(input: InvokeRequest<'messages:report'>): Promise<ChatReport>
 
   history(
     input: InvokeRequest<'messages:history'>,
@@ -223,22 +283,63 @@ export interface TelegramAdapter {
   addPollOption(input: InvokeRequest<'messages:addPollOption'>): Promise<void>
   sendText(input: InvokeRequest<'messages:send'>): Promise<{ localId: string; message: Message }>
   editText(input: InvokeRequest<'messages:edit'>): Promise<Message>
+  /**
+   * 编辑说明: rewrites a media message's caption (TDLib `editMessageCaption`) and
+   * answers the message the server stored. An empty caption removes it.
+   */
+  editCaption(input: InvokeRequest<'messages:editCaption'>): Promise<Message>
   deleteMessages(input: InvokeRequest<'messages:delete'>): Promise<void>
   forwardMessages(input: InvokeRequest<'messages:forward'>): Promise<void>
   markRead(input: InvokeRequest<'messages:read'>): Promise<void>
+  /**
+   * 对方正在输入: one `sendChatAction` for the chat. A failure is swallowed on
+   * purpose — a typing ping must never raise the error bar. `action` picks the
+   * indicator the peer sees (`recording` = a voice note is being held down).
+   */
+  sendTyping(chatId: number, typing: boolean, action?: 'typing' | 'recording'): Promise<void>
+  /**
+   * 重试 a failed message (`messages:resend` → TDLib `resendMessages`). The new
+   * states arrive as message ops; the answer carries nothing else.
+   */
+  resendMessages(chatId: number, messageIds: number[]): Promise<void>
   /**
    * TDLib's per-message capabilities (`getMessageProperties`, an offline call).
    * The context menu asks when it opens: the edit window, protected content and
    * the delete-for-me / delete-for-everyone split are TDLib's rules, not ours.
    */
   messageProperties(input: InvokeRequest<'messages:properties'>): Promise<MessageProperties>
+  /**
+   * 转文字: asks for a voice note's transcript. The answer carries nothing — the
+   * text arrives as the message's content changing (`transcription` on the DTO).
+   */
+  transcribeMessage(input: InvokeRequest<'messages:transcribe'>): Promise<void>
 
   /** Sends a local file as a photo or a document (design doc §1: media upload). */
   sendMedia(input: InvokeRequest<'media:send'>): Promise<{ localId: string; message: Message }>
+  /**
+   * 相册: several local photos in one Telegram album (TDLib `sendMessageAlbum`).
+   * The answer carries every item, in transcript order, each mapped like any
+   * other message — the album id is what makes the transcript fold them.
+   */
+  sendAlbum(
+    input: InvokeRequest<'media:sendAlbum'>,
+  ): Promise<{ localIds: string[]; messages: Message[] }>
   sendSticker(input: InvokeRequest<'messages:sendSticker'>): Promise<{
     localId: string
     message: Message
   }>
+  /**
+   * 语音消息. Takes a *file path*, not the renderer's bytes: main has already
+   * written the recording to a temporary OGG (see `messages:sendVoice`), because
+   * TDLib uploads from disk and the renderer never touches the filesystem.
+   * `duration` is whole seconds; the voice note arrives as an ordinary message.
+   */
+  sendVoiceNote(input: {
+    chatId: number
+    filePath: string
+    duration: number
+    replyTo?: number
+  }): Promise<{ localId: string; message: Message }>
 
   listStickerSets(): Promise<StickerSetSummary[]>
   getStickerSet(setId: string): Promise<StickerSet>

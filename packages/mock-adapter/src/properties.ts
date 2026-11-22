@@ -29,5 +29,13 @@ export function mockMessageProperties(
     canBeDeletedForAllUsers: message.outgoing,
     canBeCopied: message.text.length > 0,
     canBeReplied: true,
+    // 转文字 is a voice-note feature, like TDLib's can_recognize_speech.
+    canRecognizeSpeech: message.kind === 'voice',
+    // The fake has no pin rights to model: every row can be pinned.
+    canBePinned: true,
+    // 举报 follows TDLib's `can_report_chat`: for users it needs a bot; basic
+    // groups answer false; channels and supergroups answer true (the fake has no
+    // creators to exclude, and its groups are supergroups).
+    canReportChat: fixture !== undefined && fixture.chat.kind !== 'private',
   }
 }

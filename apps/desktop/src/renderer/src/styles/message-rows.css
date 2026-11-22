@@ -84,6 +84,25 @@
   opacity: 1;
 }
 
+/* 未发送 must be visible without hovering: unlike the meta line, it reports a
+   failure, and a failed row that looks delivered is the bug it prevents. */
+.wx-message__retry {
+  align-self: flex-end;
+  margin: 2px 4px 0 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--wx-badge);
+  font-size: 11px;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.wx-message__retry:disabled {
+  color: var(--wx-text-tertiary);
+  cursor: default;
+}
+
 .wx-message-more {
   align-self: center;
   border: none;
@@ -190,4 +209,62 @@
 [data-theme='dark'] .wx-empty-chat__logo,
 [data-theme='dark'] .wx-empty-chat__glyph {
   color: #2a2a2c;
+}
+
+/* 表情回应 (Telegram reactions, display only): one pill per reaction under the
+   bubble, the chosen ones tinted with the brand's weak green. The stacking
+   container already right-aligns a self message's children. */
+.wx-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.wx-reaction {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 11px;
+  background: var(--wx-bubble-other);
+  color: var(--wx-text);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.wx-reaction--chosen {
+  background: var(--wx-brand-weak);
+}
+
+.wx-reaction__emoji {
+  font-size: 14px;
+}
+
+.wx-reaction__count {
+  color: var(--wx-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.wx-reaction--chosen .wx-reaction__count {
+  color: var(--wx-brand-text);
+}
+
+/* 语音转文字: the transcript under a voice bubble. Secondary ink, because it is an
+   aside to what was actually said, and the same omission for the pending line. */
+.wx-transcript {
+  margin-top: 4px;
+  padding: 6px 8px;
+  border-radius: var(--wx-bubble-radius);
+  background: var(--wx-row-hover);
+  color: var(--wx-text);
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.wx-transcript--error {
+  color: var(--wx-danger);
 }

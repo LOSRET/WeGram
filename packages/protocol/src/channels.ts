@@ -1,17 +1,15 @@
 import { z } from 'zod'
 
-import {
-  authStateSchema,
-  connectionStateSchema,
-  messageOpSchema,
-  messagePropertiesSchema,
-  messageSchema,
-  scrollAnchorSchema,
-  selfSchema,
-  userAvatarSchema,
-} from './dto'
+import { authStateSchema, messageSchema, scrollAnchorSchema, selfSchema } from './dto'
+import { messagePropertiesSchema } from './properties'
 import { bootStateSchema } from './boot'
-import { chatOpSchema, chatSummarySchema } from './chat'
+import { chatSummarySchema } from './chat'
+import type { EventChannel, EventEnvelope } from './events'
+import { sendInvokeChannels, sendInvokeSchemas } from './send'
+import { voiceInvokeChannels, voiceInvokeSchemas } from './voice'
+import { presenceInvokeChannels, presenceInvokeSchemas } from './presence'
+import { userInvokeChannels, userInvokeSchemas } from './user'
+import { reportInvokeChannels, reportInvokeSchemas } from './report'
 import { chatInvokeChannels, chatInvokeSchemas } from './chats'
 import { qrInvokeChannels, qrInvokeSchemas } from './qr'
 import { pollInvokeChannels, pollInvokeSchemas } from './poll'
@@ -34,7 +32,6 @@ import {
   commentTargetSchema,
 } from './comment'
 import { contactSchema } from './contact'
-import { appErrorSchema } from './errors'
 import { searchMessagesRequestSchema, searchMessagesResponseSchema } from './search'
 
 /**
@@ -106,12 +103,28 @@ export const invokeChannels = [
   'messages:sendComment',
   'messages:send',
   'messages:edit',
+  /** 编辑说明: a media message's caption (`editMessageCaption`), not its text. */
+  'messages:editCaption',
   'messages:delete',
   /** Per-message capabilities for the context menu (`getMessageProperties`). */
   'messages:properties',
+  /**
+   * 转文字: asks TDLib to recognise a voice note's speech (`recognizeSpeech`). The
+   * transcript itself arrives as a content update, so the answer carries nothing.
+   */
+  'messages:transcribe',
   'messages:forward',
   'messages:read',
   'messages:sendSticker',
+  /** Outgoing typing and failed-message retry; see ./send.ts. */
+  ...sendInvokeChannels,
+  /** 语音消息: a recorded OGG/Opus clip; see ./voice.ts. */
+  ...voiceInvokeChannels,
+  ...presenceInvokeChannels,
+  /** 资料卡: the person card and its 备注 / 联系人 writes; see ./user.ts. */
+  ...userInvokeChannels,
+  /** 举报: the phased reportChat contract, for a person or one message; ./report.ts. */
+  ...reportInvokeChannels,
   'search:global',
   'search:inChat',
   /**
@@ -121,6 +134,8 @@ export const invokeChannels = [
    */
   'search:messages',
   'media:pick',
+  /** 相册发送: several photos as one folded bubble. */
+  'media:sendAlbum',
   'media:download',
   /**
    * Drops one holder of a file's download. Main stops the transfer only when
@@ -260,6 +275,15 @@ export const invokeSchemas = {
     }),
     response: messageSchema,
   },
+  /** 编辑说明: an empty caption removes it, which is TDLib's null `caption`. */
+  'messages:editCaption': {
+    request: z.object({
+      chatId: z.number().int(),
+      messageId: z.number().int(),
+      caption: z.string().max(4096),
+    }),
+    response: messageSchema,
+  },
   'messages:delete': {
     request: z.object({
       chatId: z.number().int(),
@@ -271,6 +295,10 @@ export const invokeSchemas = {
   'messages:properties': {
     request: z.object({ chatId: z.number().int(), messageId: z.number().int() }),
     response: messagePropertiesSchema,
+  },
+  'messages:transcribe': {
+    request: z.object({ chatId: z.number().int(), messageId: z.number().int() }),
+    response: noPayload,
   },
   'messages:forward': {
     request: z.object({
@@ -292,6 +320,11 @@ export const invokeSchemas = {
     }),
     response: z.object({ localId: z.string(), message: messageSchema }),
   },
+  ...sendInvokeSchemas,
+  ...voiceInvokeSchemas,
+  ...presenceInvokeSchemas,
+  ...userInvokeSchemas,
+  ...reportInvokeSchemas,
   'search:global': {
     request: z.object({ q: z.string().min(1), limit: z.number().int().positive().max(50) }),
     response: z.array(chatSummarySchema),
@@ -339,6 +372,32 @@ export const invokeSchemas = {
   'media:open': {
     request: z.object({ fileId: z.number().int() }),
     response: noPayload,
+  },
+  /**
+   * 相册: several local files as ONE Telegram album (`sendMessageAlbum`), so they
+   * arrive as a folded bubble instead of N messages. 2–10 items, photos only —
+   * that is the set the transcript folds back into one row (design doc §8.6).
+   */
+  'media:sendAlbum': {
+    request: z.object({
+      chatId: z.number().int(),
+      items: z
+        .array(
+          z.object({
+            filePath: z.string().min(1),
+            kind: z.enum(['photo', 'file']),
+            caption: z.string().optional(),
+          }),
+        )
+        .min(2)
+        .max(10),
+      replyTo: z.number().int().optional(),
+    }),
+    /** `localIds` line up with `messages`: the composer tracks one per row. */
+    response: z.object({
+      localIds: z.array(z.string()),
+      messages: z.array(messageSchema),
+    }),
   },
   'media:send': {
     request: z.object({
@@ -476,69 +535,7 @@ export type InvokeResponse<C extends InvokeChannel> = z.output<
   (typeof invokeSchemas)[C]['response']
 >
 
-/** Every event main pushes to the renderer is sequenced, so gaps are detectable (§7.2). */
-const envelope = <S extends z.ZodType>(payload: S) => z.object({ seq: z.number().int(), payload })
-
-export const eventChannels = [
-  'evt:auth',
-  /** The startup phase changed; terminal kinds stop the login spinner. */
-  'evt:boot',
-  'evt:connection',
-  'evt:chats',
-  'evt:messages',
-  /**
-   * Profile photos of other people that finished downloading after their
-   * messages were mapped (a group's senders, the peer of a private chat).
-   */
-  'evt:avatars',
-  'evt:typing',
-  'evt:file',
-  /** TDLib reloaded the installed sticker sets; the picker refetches them. */
-  'evt:stickerSets',
-  /**
-   * The viewer asked the shell to show a message (定位到聊天位置). Main raises the
-   * shell window first, then publishes this; the viewer window stays open.
-   */
-  'evt:locate',
-  'evt:error',
-] as const
-
-export type EventChannel = (typeof eventChannels)[number]
-
-export const eventSchemas = {
-  'evt:auth': envelope(authStateSchema),
-  'evt:boot': envelope(bootStateSchema),
-  'evt:connection': envelope(connectionStateSchema),
-  'evt:chats': envelope(z.object({ ops: z.array(chatOpSchema) })),
-  'evt:messages': envelope(z.object({ chatId: z.number().int(), ops: z.array(messageOpSchema) })),
-  'evt:avatars': envelope(z.object({ avatars: z.array(userAvatarSchema) })),
-  'evt:typing': envelope(
-    z.object({
-      chatId: z.number().int(),
-      userId: z.number().int(),
-      action: z.string(),
-      until: z.number(),
-    }),
-  ),
-  'evt:file': envelope(
-    z.object({
-      fileId: z.number().int(),
-      downloaded: z.number(),
-      total: z.number(),
-      /** Set once the file is fully local; a `wx-media://` URL for the renderer. */
-      url: z.string().optional(),
-      /** Bytes are going up rather than down (media being sent). */
-      uploading: z.boolean().optional(),
-      completed: z.boolean().optional(),
-    }),
-  ),
-  'evt:stickerSets': envelope(z.object({})),
-  'evt:locate': envelope(z.object({ chatId: z.number().int(), messageId: z.number().int() })),
-  'evt:error': envelope(appErrorSchema),
-} satisfies Record<EventChannel, z.ZodType>
-
-export type EventEnvelope<C extends EventChannel> = z.output<(typeof eventSchemas)[C]>
-export type EventPayload<C extends EventChannel> = EventEnvelope<C>['payload']
+/** The event tables live in ./events.ts (that file hit its own budget line). */
 
 /** The only API the preload script exposes on `window.tg`. */
 export interface TgBridge {

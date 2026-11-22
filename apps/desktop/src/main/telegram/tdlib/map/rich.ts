@@ -110,7 +110,11 @@ function mapBlock(block: TdObject | undefined, depth: number): RichBlock | null 
   }
 }
 
-function textBlock(role: RichTextRole, node: TdObject | undefined, size?: number): RichBlock | null {
+function textBlock(
+  role: RichTextRole,
+  node: TdObject | undefined,
+  size?: number,
+): RichBlock | null {
   const text = richText(node)
   if (!text.text.trim()) return null
   return { type: 'text', role, text, ...(size ? { size } : {}) }
@@ -264,7 +268,10 @@ function asMedia(kind: RichMedia['kind'], media: MessageMedia): RichMedia | null
 export function flattenBlocks(blocks: RichBlock[]): string {
   const lines: string[] = []
   for (const block of blocks) flattenBlock(block, lines)
-  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim()
+  return lines
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
 
 function flattenBlock(block: RichBlock, lines: string[]): void {

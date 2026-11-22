@@ -40,10 +40,13 @@ export interface TdlibChatApi {
   setChatMuted(chatId: number, muted: boolean): Promise<ChatSummary>
   setChatPinned(chatId: number, pinned: boolean): Promise<ChatSummary>
   clearHistory(chatId: number): Promise<void>
+  deleteChat(chatId: number): Promise<void>
+  setChatUnread(chatId: number, unread: boolean): Promise<ChatSummary>
   chatMembers(chatId: number, limit: number, query?: string): Promise<ChatMember[]>
   setChatTitle(chatId: number, title: string): Promise<ChatSummary>
   leaveChat(chatId: number): Promise<void>
   pinnedMessage(chatId: number): Promise<ChatPinnedMessage | null>
+  setPinnedMessage(chatId: number, messageId: number | null): Promise<ChatPinnedMessage | null>
   inviteLink(chatId: number, temporary?: boolean): Promise<ChatInviteLink | null>
 }
 
@@ -66,10 +69,14 @@ export function createChatApi(getDeps: () => ChatApiDeps): TdlibChatApi {
     setChatMuted: (chatId, muted) => actions.setChatMuted(actionDeps(), chatId, muted),
     setChatPinned: (chatId, pinned) => actions.setChatPinned(actionDeps(), chatId, pinned),
     clearHistory: (chatId) => actions.clearHistory(actionDeps(), chatId),
+    deleteChat: (chatId) => actions.deleteChat(actionDeps(), chatId),
+    setChatUnread: (chatId, unread) => actions.setChatUnread(actionDeps(), chatId, unread),
     chatMembers: (chatId, limit, query) => actions.listMembers(actionDeps(), chatId, limit, query),
     setChatTitle: (chatId, title) => actions.setChatTitle(actionDeps(), chatId, title),
     leaveChat: (chatId) => actions.leaveChat(actionDeps(), chatId),
     pinnedMessage: (chatId) => actions.pinnedMessage(actionDeps(), chatId),
+    setPinnedMessage: (chatId, messageId) =>
+      actions.setPinnedMessage(actionDeps(), chatId, messageId),
     inviteLink: (chatId, temporary) =>
       actions.inviteLink(
         { ...actionDeps(), getSelfUserId: getDeps().getSelfUserId },

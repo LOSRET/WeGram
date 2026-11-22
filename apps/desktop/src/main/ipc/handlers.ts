@@ -8,6 +8,7 @@ import { app, BrowserWindow, clipboard, ClipboardItem, dialog, nativeImage, shel
 import { closeLoginWindow } from '../login-window'
 import { drop, hold } from '../media/leases'
 import { registerStreamFile } from '../media/registry'
+import { writeVoiceNote } from '../media/voice-file'
 import { resolveProxySecrets, toProxyView, toStoredProxy } from '../proxy'
 import { closeQrWindow, getQrWindow, openQrWindow, qrTarget } from '../qr-window'
 import type { SettingsStore } from '../store/settings'
@@ -49,6 +50,11 @@ export interface HandlerDeps {
    * the renderer to open that conversation on that message.
    */
   onLocate: (target: { chatId: number; messageId: number }) => void
+  /**
+   * Which conversation the shell shows (or null). Main uses it to suppress a
+   * desktop notification for the chat the reader is already looking at.
+   */
+  setActiveChat: (chatId: number | null) => void
 }
 
 /**
@@ -66,6 +72,7 @@ export function createHandlers({
   onLoginEnter,
   onAuthInteraction,
   onLocate,
+  setActiveChat,
 }: HandlerDeps): IpcHandlerMap {
   /**
    * The viewer's own downloads (open / save / copy / reveal) outrank the
@@ -157,13 +164,30 @@ export function createHandlers({
     'chats:setMuted': (payload) => adapter.setChatMuted(payload.chatId, payload.muted),
     'chats:setPinned': (payload) => adapter.setChatPinned(payload.chatId, payload.pinned),
     'chats:clearHistory': (payload) => adapter.clearHistory(payload.chatId),
+    'chats:delete': (payload) => adapter.deleteChat(payload.chatId),
+    'chats:setUnread': (payload) => adapter.setChatUnread(payload.chatId, payload.unread),
     'chats:members': (payload) =>
       adapter.chatMembers(payload.chatId, payload.limit ?? 12, payload.query),
     'chats:setTitle': (payload) => adapter.setChatTitle(payload.chatId, payload.title),
     'chats:leave': (payload) => adapter.leaveChat(payload.chatId),
     'chats:pinned': (payload) => adapter.pinnedMessage(payload.chatId),
+    'chats:setPinnedMessage': (payload) =>
+      adapter.setPinnedMessage(payload.chatId, payload.messageId),
     'chats:inviteLink': (payload) => adapter.inviteLink(payload.chatId, payload.temporary),
     'contacts:list': () => adapter.listContacts(),
+    'users:status': (payload) => adapter.userStatus(payload.userId),
+    'users:profile': (payload) => adapter.userProfile(payload.userId),
+    'users:setNote': (payload) => adapter.setUserNote(payload.userId, payload.note),
+    'users:setContact': (payload) =>
+      adapter.setUserContact(payload.userId, payload.contact, payload.sharePhone),
+    'users:setBlocked': (payload) => adapter.setUserBlocked(payload.userId, payload.blocked),
+    'users:commonChats': (payload) => adapter.commonChats(payload),
+    'users:report': (payload) =>
+      adapter.reportUser(payload.userId, {
+        ...(payload.optionId === undefined ? {} : { optionId: payload.optionId }),
+        ...(payload.text === undefined ? {} : { text: payload.text }),
+      }),
+    'ui:setActiveChat': (payload) => setActiveChat(payload.chatId),
 
     'messages:history': (payload) => adapter.history(payload),
     'messages:around': (payload) => adapter.historyAround(payload),
@@ -174,10 +198,15 @@ export function createHandlers({
     'messages:sendComment': (payload) => adapter.sendComment(payload),
     'messages:send': (payload) => adapter.sendText(payload),
     'messages:edit': (payload) => adapter.editText(payload),
+    'messages:editCaption': (payload) => adapter.editCaption(payload),
     'messages:delete': (payload) => adapter.deleteMessages(payload),
     'messages:properties': (payload) => adapter.messageProperties(payload),
+    'messages:transcribe': (payload) => adapter.transcribeMessage(payload),
+    'messages:report': (payload) => adapter.reportMessage(payload),
     'messages:forward': (payload) => adapter.forwardMessages(payload),
     'messages:read': (payload) => adapter.markRead(payload),
+    'messages:typing': (payload) => adapter.sendTyping(payload.chatId, payload.typing),
+    'messages:resend': (payload) => adapter.resendMessages(payload.chatId, payload.messageIds),
     'messages:vote': (payload) => adapter.votePoll(payload),
     'messages:addPollOption': (payload) => adapter.addPollOption(payload),
 
@@ -242,11 +271,38 @@ export function createHandlers({
       const failure = await shell.openPath(path)
       if (failure) throw new AppError('internal', `Failed to open file: ${failure}`)
     },
+    'media:sendAlbum': (payload) => {
+      const empty = payload.items.find((item) => !item.filePath.trim())
+      if (empty) throw new AppError('invalid_payload', 'Empty file path')
+      return adapter.sendAlbum(payload)
+    },
     'media:send': (payload) => {
       if (!payload.filePath.trim()) throw new AppError('invalid_payload', 'Empty file path')
       return adapter.sendMedia(payload)
     },
     'messages:sendSticker': (payload) => adapter.sendSticker(payload),
+    /**
+     * 语音消息. The bytes come from the renderer's recorder (no native dialog is
+     * involved), so main writes them to `userData/voice` first: TDLib uploads
+     * from disk and the renderer never touches the filesystem. The file outlives
+     * this handler on purpose — the upload starts after `sendMessage` answers —
+     * and `pruneVoiceNotes` cleans it up hours later.
+     */
+    'messages:sendVoice': async (payload) => {
+      const filePath = await writeVoiceNote(join(app.getPath('userData'), 'voice'), payload.audio)
+      try {
+        return await adapter.sendVoiceNote({
+          chatId: payload.chatId,
+          filePath,
+          duration: payload.duration,
+          ...(payload.replyTo === undefined ? {} : { replyTo: payload.replyTo }),
+        })
+      } catch (error) {
+        // Nothing will ever read this recording; a failed send must not leave it.
+        await rm(filePath, { force: true })
+        throw error
+      }
+    },
     'stickers:sets': () => adapter.listStickerSets(),
     'stickers:set': (payload) => adapter.getStickerSet(payload.setId),
     'stickers:customEmoji': (payload) => adapter.customEmojiStickers(payload.ids),

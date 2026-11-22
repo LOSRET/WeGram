@@ -73,12 +73,19 @@
   margin-bottom: 12px;
 }
 
-button.wx-info__person--add {
+/* A private chat's single face is a button (it opens 资料卡), like 添加 is. */
+button.wx-info__person--add,
+button.wx-info__person--face {
   padding: 0;
   border: none;
   background: none;
   color: inherit;
   font: inherit;
+  cursor: pointer;
+}
+
+button.wx-info__person--face:hover .wx-info__avatar {
+  opacity: 0.85;
 }
 
 .wx-info__person--add:hover .wx-info__add-tile {

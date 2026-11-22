@@ -86,9 +86,7 @@ export async function beginStream(
     }
   }
   if (!ready) {
-    deps.logger.warn(
-      `file ${input.fileId} never became streamable: ${JSON.stringify(file)}`,
-    )
+    deps.logger.warn(`file ${input.fileId} never became streamable: ${JSON.stringify(file)}`)
     throw new AppError('internal', `File ${input.fileId} cannot be streamed yet`)
   }
   return ready

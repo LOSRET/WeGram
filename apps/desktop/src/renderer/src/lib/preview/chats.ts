@@ -82,6 +82,26 @@ export function clearPreviewHistory(store: PreviewChatStore, chatId: number): vo
   announce(store, chat)
 }
 
+/** 删除聊天: the preview drops the row and the transcript, like the mock adapter. */
+export function deletePreviewChat(store: PreviewChatStore, chatId: number): void {
+  const chat = findChat(store, chatId)
+  store.chats.splice(store.chats.indexOf(chat), 1)
+  delete store.messagesByChat[chat.id]
+  store.emit('evt:chats', { ops: [{ op: 'remove', chatId }] })
+}
+
+/** 标为未读 / 标为已读: the preview's row draws its dot from this flag. */
+export function setPreviewUnread(
+  store: PreviewChatStore,
+  chatId: number,
+  unread: boolean,
+): ChatSummary {
+  const chat = findChat(store, chatId)
+  chat.markedUnread = unread
+  announce(store, chat)
+  return { ...chat }
+}
+
 /**
  * `@username` mentions: the fixture's address book is its only user directory,
  * so a known username answers with that person's private chat — the preview's
@@ -145,9 +165,32 @@ export function leavePreviewChat(store: PreviewChatStore, chatId: number): void 
   store.emit('evt:chats', { ops: [{ op: 'remove', chatId }] })
 }
 
-/** The fixture pins nothing, so 群公告 reads 群主未设置. */
-export function previewPinnedMessage(): ChatPinnedMessage | null {
-  return null
+/** The fixture pins nothing until this session pins one (see previewPinMessage). */
+export function previewPinnedMessage(
+  pins: Map<number, ChatPinnedMessage>,
+  chatId: number,
+): ChatPinnedMessage | null {
+  return pins.get(chatId) ?? null
+}
+
+/** 置顶消息 / 取消置顶: `null` removes the chat's pin, like the real channel. */
+export function previewPinMessage(
+  store: PreviewChatStore,
+  pins: Map<number, ChatPinnedMessage>,
+  chatId: number,
+  messageId: number | null,
+): ChatPinnedMessage | null {
+  if (messageId === null) {
+    pins.delete(chatId)
+    return null
+  }
+  const message = (store.messagesByChat[chatId] ?? []).find((item) => item.id === messageId)
+  const pinned: ChatPinnedMessage = {
+    messageId,
+    text: message?.text || `[${message?.kind ?? '消息'}]`,
+  }
+  pins.set(chatId, pinned)
+  return pinned
 }
 
 /** 群二维码: a link that scans; the preview's is not a real group. */
@@ -223,5 +266,26 @@ export function searchPreviewMessages(
   if (needle === '') return []
   return (store.messagesByChat[chatId] ?? []).filter((message) =>
     message.text.toLowerCase().includes(needle),
+  )
+}
+
+/**
+ * The pins of this preview session: `chats:pinned` and `chats:setPinnedMessage`
+ * share one map, so the bar and the menu see the same answer the mock adapter's.
+ */
+export function handlePreviewPins(
+  channel: 'chats:pinned' | 'chats:setPinnedMessage',
+  store: PreviewChatStore,
+  pins: Map<number, ChatPinnedMessage>,
+  payload: Record<string, unknown>,
+): ChatPinnedMessage | null {
+  const chatId = Number(payload['chatId'])
+  if (channel === 'chats:pinned') return previewPinnedMessage(pins, chatId)
+  const messageId = payload['messageId']
+  return previewPinMessage(
+    store,
+    pins,
+    chatId,
+    messageId === null || messageId === undefined ? null : Number(messageId),
   )
 }

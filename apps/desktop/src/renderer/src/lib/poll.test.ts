@@ -8,6 +8,7 @@ import {
   pollFooter,
   pollOptionCorrect,
   pollOptionWrong,
+  pollRestrictionText,
   pollResultsVisible,
   pollSelectionChanged,
   pollToggleSelection,
@@ -71,6 +72,22 @@ describe('poll rules', () => {
     expect(pollCanAddOption(poll())).toBe(false)
     expect(pollCanAddOption(poll({ canAddOption: true }))).toBe(true)
     expect(pollCanAddOption(poll({ canAddOption: true, closed: true }))).toBe(false)
+  })
+
+  it('explains a vote restriction and stays quiet without one', () => {
+    expect(pollRestrictionText(poll())).toBeNull()
+    expect(pollRestrictionText(poll({ closed: true, restriction: 'closed' }))).toBeNull()
+    expect(pollRestrictionText(poll({ restriction: 'yetUnsent' }))).toBe(
+      '消息还在发送，暂时不能投票',
+    )
+    expect(pollRestrictionText(poll({ restriction: 'scheduled' }))).toBe('定时消息不能提前投票')
+    expect(pollRestrictionText(poll({ restriction: 'countryRestricted' }))).toBe(
+      '所在地区不支持参与这个投票',
+    )
+    expect(pollRestrictionText(poll({ restriction: 'membershipRequired' }))).toBe(
+      '需要加入后才能投票',
+    )
+    expect(pollRestrictionText(poll({ restriction: 'other' }))).toBe('当前账号不能参与这个投票')
   })
 
   it('labels the footer', () => {

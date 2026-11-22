@@ -244,6 +244,27 @@
   background: rgba(0, 0, 0, 0.28);
 }
 
+/* 标为未读 is a flag, not a count: WeChat draws a bare dot where the badge would
+   sit, so the row never claims there is a message waiting when there is none. */
+.wx-badge--dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  min-width: 0;
+  padding: 0;
+  margin-right: 4px;
+  border-radius: 4px;
+  background: var(--wx-badge);
+}
+
+.wx-badge--dot--muted {
+  background: var(--wx-badge-muted);
+}
+
+.wx-chat-item--active .wx-badge--dot {
+  background: rgba(255, 255, 255, 0.8);
+}
+
 /* ---------- Global search results ---------- */
 
 /* The column swaps faces while the pill has text: the 聊天 / 频道 tabs, the
