@@ -28,10 +28,11 @@ export const PROFILE_CHANNELS = [
 ] as const
 
 /**
- * The preview's reasons: the whole `ReportReason` taxonomy of the pinned scheme,
- * because a real answer is server-driven (`reportOption id/text` rows) and the
- * sheet must be exercised at its real height. `其他` asks for details, like
- * `reportChatResultTextRequired`; the mock adapter answers the same list.
+ * The preview's reasons: an imitation of a server answer. The real list and its
+ * localized text come from Telegram (`reportOption id/text` rows; the ids are opaque
+ * and 1.8.70 has no `type` field), so it can differ from this fixture — the shape is
+ * what matters: a tall list, and `其他` asking for details like
+ * `reportChatResultTextRequired`. The mock adapter answers the same list.
  */
 const REPORT_OPTIONS = [
   { id: 'spam', text: '垃圾信息' },

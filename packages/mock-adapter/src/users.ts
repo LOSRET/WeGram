@@ -13,14 +13,15 @@ import type { Fixture } from './constants'
  * persisted: restarting the app resets the fake account, like every other fixture.
  */
 /**
- * The reasons the sheet shows.
+ * The reasons the sheet shows — an imitation of a server answer, not its content.
  *
- * A real answer is server-driven: TDLib's `reportChatResultOptionRequired` carries
- * `reportOption id/text` rows, and behind them sit the `ReportReason` constructors
- * of the pinned scheme (`reportReasonSpam` … `reportReasonCustom`; the server picks
- * the subset a chat kind allows). The fake carries the whole taxonomy so the sheet is
- * exercised at its real height and copy, and `other` mirrors the comment phase
- * (`reportChatResultTextRequired`) instead of filing straight away.
+ * A real `reportChatResultOptionRequired` carries `reportOption id/text` rows whose
+ * text Telegram has already localized, and whose ids are opaque bytes (1.8.70 has no
+ * `type` field on the option), so a client cannot re-label them: it renders exactly
+ * what arrived. The list is not the `ReportReason` enum either — that enum is only an
+ * *input* (`reportChatPhoto`), and real dialogs offer labels outside it. This fixture
+ * mirrors the shape so the sheet is exercised at its real height, and `其他` walks the
+ * comment phase (`reportChatResultTextRequired`) instead of filing straight away.
  */
 const REPORT_OPTIONS = [
   { id: 'spam', text: '垃圾信息' },

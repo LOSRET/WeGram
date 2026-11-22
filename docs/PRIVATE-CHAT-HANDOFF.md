@@ -64,7 +64,7 @@ below is one commit, `pnpm verify`-green, on `feat/private-chat-p1`.
 | 置顶消息栏 | `chats:setPinnedMessage`; `actions/pins.ts` (`pinChatMessage` / `unpinChatMessage`); `messageProperties.canBePinned`; `chat-pane/PinnedBar.tsx` + `usePinnedMessage`; menu 置顶 / 取消置顶 | The bar sits above the transcript (never inside the scroller, so it cannot re-measure the virtualised list): text + 定位 + ×, and the menu item flips to 取消置顶 for the pinned row. An unpin resolves the current pin because `unpinChatMessage` wants its id. Pinning is notification-free. **Product decision still open**: WeChat has no such bar, so this is implemented but unreviewed by the owner. Deferred: multi-pin / `only_for_self`. |
 | 语音转文字 | `Message.transcription` (+ `messageProperties.canRecognizeSpeech`); `map/content.ts mapTranscription`; channel `messages:transcribe` → `recognizeSpeech`; 转文字 in the message menu, transcript under the bubble | TDLib streams the answer through the voice note's own `speech_recognition_result`, so the finished text arrives as a content update and reaches the row through the ordinary `replace` op — no polling, no extra event. `pending` keeps the partial text on screen. The menu item is gated on `can_recognize_speech` (no trial left / wrong kind = no item), a real refusal surfaces as the error bar. Mock streams pending → done; the fixtures carry one voice note in the 前端周会 group. |
 | 表情回应（只显示） | `Message.reactions` + `protocol/reaction.ts`; `map/message.ts mapReactions`; op `reactions` (`updateMessageReactions`); chips in `MessageRow` | TDLib's list is replaced wholesale on every update (an empty one removes the chips), the chosen ones are tinted, and a Premium custom-emoji reaction draws as its sticker art with `CustomEmoji`. **No picker** — WeChat has no reactions, so adding them is still open decision #2 (§9); the fixtures carry 👍/🎉 on one group message so the chips are visible without a server. |
-| 拉黑 / 举报 | `users:setBlocked` (`setMessageSenderBlockList`, null = unblock), `users:report` / `messages:report` (phased `reportChat`, in `protocol/report.ts`), `map/report.ts`, `components/ReportDialog.tsx` | 加入黑名单 / 取消拉黑 flips on the refreshed card. 举报 is a small state machine over TDLib's phased answer: no `option_id` → the reason list, one of those ids → filed, and `reportChatResultTextRequired` → a comment box that sends the **new** id TDLib handed back. Ids are TDLib `bytes`, passed through verbatim as base64. One sheet serves both entry points: the 资料卡's 举报 (a person) and the message menu's (one message, `message_ids` attached). The reason list is the server's (`reportOption` rows over the ten `ReportReason` constructors); both fakes carry the whole taxonomy and make `其他` ask for details, and the sheet honours `reportChatResultTextRequired.is_optional`. |
+| 拉黑 / 举报 | `users:setBlocked` (`setMessageSenderBlockList`, null = unblock), `users:report` / `messages:report` (phased `reportChat`, in `protocol/report.ts`), `map/report.ts`, `components/ReportDialog.tsx` | 加入黑名单 / 取消拉黑 flips on the refreshed card. 举报 is a small state machine over TDLib's phased answer: no `option_id` → the reason list, one of those ids → filed, and `reportChatResultTextRequired` → a comment box that sends the **new** id TDLib handed back. Ids are TDLib `bytes`, passed through verbatim as base64. One sheet serves both entry points: the 资料卡's 举报 (a person) and the message menu's (one message, `message_ids` attached). The reason list **and its text** are the server's (`reportOption id/text`, already localized; 1.8.70 has no `type`, so ids cannot be re-labelled); both fakes imitate the list (nine rows) and make `其他` ask for details, and the sheet honours `reportChatResultTextRequired.is_optional`. |
 | 资料卡 / 备注 / 加删联系人 | `users:profile` / `users:setNote` / `users:setContact` (`protocol/user.ts`); `actions/users.ts`; `map/user.ts mapUserProfile`; `tdlib/user-api.ts`; `components/ProfileCard.tsx` + `styles/profile.css` | One card for a private chat's **title** and the 通讯录 card's 更多资料 (and 添加备注名): avatar, name, Telegram号, 备注 (Telegram's cloud-synced note, editable inline), 简介, 共同群聊 count, 手机号, and 添加/删除联系人. Every write answers the refreshed card, so no field is patched locally. Mock + browser preview implement the same channels. |
 | 图片说明编辑 | `messages:editCaption`; `editMessageCaption` in `actions/send.ts`; `lib/editTarget.ts`; menu 编辑 / 编辑说明 | The row's kind picks the call (`can_be_edited` covers both): text edits go through `editMessageText`, media captions through `editMessageCaption`. `show_caption_above_media` is read back with `getMessage` first, so an edit never moves a caption from above the picture to below it. An empty caption clears it (the composer allows an empty save only on that path). Mock + browser preview both implement it. |
 | 共同群聊列表 | `users:commonChats` (`protocol/user.ts`); `actions/users.ts userCommonChats` (`getGroupsInCommon`); `tdlib/user-api.ts`; `ProfileCard` 共同群聊行 → the row opens | The card shows the count (`userFullInfo.group_in_common_count`) and fetches one page of chat rows only when the reader opens the row (`limit: 50`, `offset` = TDLib's `offset_chat_id`); tapping a row opens that conversation. Photos come through `evt:avatars` like a chat-list page. Fixtures: `commonChatIds` on the person's seed (妈 shares 2 and 4; Ada shares 2), read by both fakes. |
@@ -361,17 +361,20 @@ Incoming typing already works; the other side never sees ours.
   answers `reportChatResultOptionRequired { title, options }`; call again with
   the chosen `option_id` (and optionally `message_ids` / `text`). Gate the
   entry on `chat.can_be_reported` / `messageProperties.can_report_chat`.
-  **The reasons are the server's**: each `reportOption` is an opaque `id` plus a
-  localized `text` (`reportOption id:bytes text:string`; there is no `type` field
-  in 1.8.70), and behind them sit the ten `ReportReason` constructors
-  (`reportReasonSpam` / `Fake` / `Violence` / `ChildAbuse` / `Pornography` /
-  `IllegalDrugs` / `PersonalDetails` / `Copyright` / `UnrelatedLocation` /
-  `Custom`); the server picks the subset per chat kind. Never hard-code the list
-  — `ReportDialog` renders whatever came back. A `reportChatResultTextRequired`
-  carries `is_optional`, i.e. the comment may be skipped; the sheet honours it.
-  The fakes carry the whole taxonomy (nine rows: `UnrelatedLocation` only applies
-  to location-based chats) and make `其他` ask for details, so the sheet's height
-  and its comment step are exercised without a server.
+  **The reasons are the server's**, text included: each `reportOption` is an
+  opaque `id` plus a `text` Telegram has already localized to the session's language
+  (`reportOption id:bytes text:string`; 1.8.70 has no `type` field), and the client
+  cannot re-label them from the id. The list is **not** the `ReportReason` enum: that
+  enum is only an *input* to APIs where the client names the reason
+  (`reportChatPhoto`; `reportStory` takes an `option_id` like `reportChat`), and a
+  real dialog shows labels outside it — measured on Telegram Desktop: "I don't like
+  it", "Illegal goods and services", "Illegal adult content", "Scam or fraud",
+  "It's not illegal, but must be taken down" beside Child abuse / Violence / Spam /
+  Copyright / Other. Never hard-code the list; `ReportDialog` renders whatever came
+  back. A `reportChatResultTextRequired` carries `is_optional`, i.e. the comment may
+  be skipped; the sheet honours it. The fakes imitate the shape (nine rows, `其他`
+  asking for details) so the sheet's height and comment step are exercised without a
+  server — their text is fixture copy and will differ from production.
 - **Other report entry points in 1.8.70, not wired** (decide before adding):
   `reportChatPhoto { chat_id, file_id, reason, text }` reports a chat photo (gated
   by `chat.can_be_reported`; needs the full-size photo's `file_id`, which
