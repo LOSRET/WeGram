@@ -84,6 +84,25 @@
   opacity: 1;
 }
 
+/* 未发送 must be visible without hovering: unlike the meta line, it reports a
+   failure, and a failed row that looks delivered is the bug it prevents. */
+.wx-message__retry {
+  align-self: flex-end;
+  margin: 2px 4px 0 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--wx-badge);
+  font-size: 11px;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.wx-message__retry:disabled {
+  color: var(--wx-text-tertiary);
+  cursor: default;
+}
+
 .wx-message-more {
   align-self: center;
   border: none;

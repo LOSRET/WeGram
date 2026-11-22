@@ -8,6 +8,7 @@ export interface MessageMenuHandlers {
   onForward: (message: Message) => void
   onEdit: (message: Message) => void
   onDelete: (message: Message, forBoth: boolean) => void
+  onResend: (message: Message) => void
 }
 
 export interface MessageMenuOptions {
@@ -35,6 +36,10 @@ export function buildMessageMenuItems(
   { canReply, properties }: MessageMenuOptions,
 ): MenuItem[] {
   const items: MenuItem[] = []
+  // 未发送 rows get 重试 first: it is the only action that can still deliver them.
+  if (message.sendingState === 'failed' && message.canRetry !== false) {
+    items.push({ label: '重试', onSelect: () => handlers.onResend(message) })
+  }
   if (canReply && (properties === null || properties.canBeReplied)) {
     items.push({ label: '回复', onSelect: () => handlers.onReply(message) })
   }

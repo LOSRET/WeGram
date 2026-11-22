@@ -14,6 +14,7 @@ import type {
   Message,
   MessageOp,
   MessageProperties,
+  PeerStatus,
   ProxyConfig,
   ProxyTestResult,
   Self,
@@ -65,6 +66,23 @@ export type AdapterEvent =
   | { type: 'chats'; ops: ChatOp[] }
   | { type: 'messages'; chatId: number; ops: MessageOp[] }
   | { type: 'avatars'; avatars: UserAvatar[] }
+  /** A peer's online / last-seen state (TDLib `updateUserStatus`). */
+  | { type: 'status'; userId: number; status: PeerStatus }
+  /**
+   * A notification TDLib decided the user should see (`updateNotification` /
+   * `updateNotificationGroup`). Main turns it into an OS notification; it never
+   * crosses IPC to the renderer, so it has no `evt:*` channel. TDLib has already
+   * applied the chat's mute rules, mentions and preview privacy.
+   */
+  | {
+      type: 'notification'
+      chatId: number
+      messageId: number
+      title: string
+      text: string
+      isSilent: boolean
+      date: number
+    }
   | { type: 'typing'; chatId: number; userId: number; action: string; until: number }
   /** TDLib reloaded the installed sticker sets (cache first, then server). */
   | { type: 'stickerSets' }
@@ -160,6 +178,15 @@ export interface TelegramAdapter {
    */
   clearHistory(chatId: number): Promise<void>
   /**
+   * 删除聊天: removes the chat from this account's list and its copy of the
+   * history behind it (TDLib `deleteChatHistory` with
+   * `remove_from_chat_list: true`, `revoke: false`). Never "delete for
+   * everyone": that is `deleteChat`, which deletes the history for every member.
+   */
+  deleteChat(chatId: number): Promise<void>
+  /** 标为未读 / 标为已读; answers the refreshed summary (the row reads the flag). */
+  setChatUnread(chatId: number, unread: boolean): Promise<ChatSummary>
+  /**
    * The 聊天信息 panel's member grid. Private chats answer with an empty list
    * (the panel draws the chat's own face); a channel's member list needs
    * administrator rights, so it degrades to an empty grid instead of failing.
@@ -186,6 +213,8 @@ export interface TelegramAdapter {
    * card's 发消息 is pressed.
    */
   listContacts(): Promise<Contact[]>
+  /** Online / last seen for one user; `null` when TDLib has no status to show. */
+  userStatus(userId: number): Promise<PeerStatus | null>
 
   history(
     input: InvokeRequest<'messages:history'>,
@@ -226,6 +255,16 @@ export interface TelegramAdapter {
   deleteMessages(input: InvokeRequest<'messages:delete'>): Promise<void>
   forwardMessages(input: InvokeRequest<'messages:forward'>): Promise<void>
   markRead(input: InvokeRequest<'messages:read'>): Promise<void>
+  /**
+   * 对方正在输入: one `sendChatAction` for the chat. A failure is swallowed on
+   * purpose — a typing ping must never raise the error bar.
+   */
+  sendTyping(chatId: number, typing: boolean): Promise<void>
+  /**
+   * 重试 a failed message (`messages:resend` → TDLib `resendMessages`). The new
+   * states arrive as message ops; the answer carries nothing else.
+   */
+  resendMessages(chatId: number, messageIds: number[]): Promise<void>
   /**
    * TDLib's per-message capabilities (`getMessageProperties`, an offline call).
    * The context menu asks when it opens: the edit window, protected content and

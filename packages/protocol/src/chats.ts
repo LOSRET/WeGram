@@ -56,6 +56,14 @@ export const chatInvokeChannels = [
   'chats:setPinned',
   /** 清空聊天记录: removes this account's copy of the history, not the peers'. */
   'chats:clearHistory',
+  /**
+   * 删除聊天: WeChat's local removal. TDLib `deleteChatHistory` with
+   * `remove_from_chat_list: true` and `revoke: false` — never `deleteChat`,
+   * which would delete the history for every member.
+   */
+  'chats:delete',
+  /** 标为未读 / 标为已读, TDLib `toggleChatIsMarkedAsUnread`; answers the row. */
+  'chats:setUnread',
   /** The 聊天信息 panel's member grid; private chats answer with an empty list. */
   'chats:members',
   /** 群聊名称: renames the group (TDLib `setChatTitle`). */
@@ -110,6 +118,12 @@ export const chatInvokeSchemas = {
   },
   /** `revoke: false` on purpose — WeChat's 清空聊天记录 clears this account's copy. */
   'chats:clearHistory': { request: z.object({ chatId: z.number().int() }), response: noPayload },
+  /** 删除聊天 is local to this account: the peers keep their history (§5.4). */
+  'chats:delete': { request: z.object({ chatId: z.number().int() }), response: noPayload },
+  'chats:setUnread': {
+    request: z.object({ chatId: z.number().int(), unread: z.boolean() }),
+    response: chatSummarySchema,
+  },
   'chats:members': {
     request: z.object({
       chatId: z.number().int(),

@@ -2,6 +2,7 @@ import type { Message, Sticker } from '@wegram/protocol'
 import { useEffect, useRef, useState } from 'react'
 
 import { loadLatestWindow } from '../lib/anchoredWindow'
+import { TypingPing } from '../lib/typingPing'
 import { useComposerInput } from '../lib/useComposerInput'
 import { errorMessage, invoke } from '../lib/ipc'
 import { messagePreview } from '../lib/format'
@@ -50,8 +51,25 @@ export function Composer({
   const [busy, setBusy] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const draftTimer = useRef<number | null>(null)
+  /**
+   * 对方正在输入. One throttle per open chat: the cleanup cancels the indicator
+   * when the reader switches conversations, and the ping itself is fire-and-forget
+   * (a failed typing action must never raise the error bar).
+   */
+  const pingerRef = useRef<TypingPing | null>(null)
 
   // Drafts are stored by the main process (§5.1) and restored per chat.
+  useEffect(() => {
+    const pinger = new TypingPing((typing) => {
+      void invoke('messages:typing', { chatId, typing }).catch(() => undefined)
+    })
+    pingerRef.current = pinger
+    return () => {
+      pingerRef.current = null
+      pinger.stop()
+    }
+  }, [chatId])
+
   useEffect(() => {
     let cancelled = false
     setText('')
@@ -91,6 +109,14 @@ export function Composer({
     }
   }, [text, chatId, editing])
 
+  /** Every keystroke also pings (throttled); emptying the box cancels at once. */
+  const changeText = (next: string): void => {
+    setText(next)
+    if (editing) return
+    if (next.trim().length === 0) pingerRef.current?.stop()
+    else pingerRef.current?.typing()
+  }
+
   const submit = async (): Promise<void> => {
     const value = text.trim()
     if (!value || busy) return
@@ -100,6 +126,9 @@ export function Composer({
         await onSaveEdit(editing.messageId, value)
         setText('')
       } else {
+        // Sending ends the peer's "typing" state immediately; waiting for the
+        // throttle to expire would leave the indicator over a delivered message.
+        pingerRef.current?.stop()
         await onSend(value, replyTo?.id)
         setText('')
       }
@@ -193,7 +222,8 @@ export function Composer({
 
       <ComposerCard
         value={text}
-        onChange={setText}
+        onChange={changeText}
+        onBlur={() => pingerRef.current?.stop()}
         textareaRef={textareaRef}
         placeholder={editing ? '编辑后回车保存，Esc 取消' : '输入消息'}
         inputHandlers={inputHandlers}

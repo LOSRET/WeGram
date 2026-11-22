@@ -12,10 +12,12 @@ import type { Logger } from '../../util'
 import type { AdapterEvent } from '../adapter'
 import type { TdObject } from './client'
 import { asArray } from './json'
+import { previewContent } from './map/content'
 import { mapConnectionBoot, mapConnectionState } from './map/chat'
 import type { MapperContext } from './map/context'
 import { isTranscriptRemoval } from './map/deletion'
 import { mapMessage } from './map/message'
+import { mapPeerStatus } from './map/status'
 
 /** What the update stream needs from the adapter. */
 export interface UpdateDeps {
@@ -171,6 +173,60 @@ export function createUpdateHandler(deps: UpdateDeps): (update: TdObject) => Pro
         await emitChatUpsert(deps, update.chat_id)
         return
       /**
+       * The server acknowledged a send. It may have renumbered the message: the
+       * answer of `sendMessage` carried a pending id, and every later edit /
+       * delete / read receipt must name the server id instead. The row is re-keyed
+       * in place, never re-appended — its position is already the reader's.
+       */
+      case 'updateMessageSendSucceeded': {
+        const raw = update.message
+        if (!raw) return
+        const chatId: number = raw.chat_id
+        const message = await mapMessage(deps.mapper, chatId, raw)
+        const oldId = Number(update.old_message_id ?? raw.id)
+        const ops =
+          oldId > 0 && oldId !== message.id
+            ? [{ op: 'replaceId' as const, chatId, oldId, message }]
+            : [{ op: 'replace' as const, message }]
+        deps.emit({ type: 'messages', chatId, ops })
+        await emitChatUpsert(deps, chatId)
+        return
+      }
+      /**
+       * The send failed: the message keeps its pending id and gains 未发送 plus the
+       * reason. `can_retry` decides whether the row offers 重试; a failure with
+       * `retry_after` is still retryable, TDLib enforces the delay on resend.
+       */
+      case 'updateMessageSendFailed': {
+        const raw = update.message
+        if (!raw) return
+        const chatId: number = raw.chat_id
+        const state = raw.sending_state ?? {}
+        const reason = state.error?.message ?? update.error?.message
+        deps.emit({
+          type: 'messages',
+          chatId,
+          ops: [
+            {
+              op: 'sendState',
+              chatId,
+              messageId: Number(update.old_message_id ?? raw.id),
+              sendingState: 'failed',
+              ...(typeof reason === 'string' && reason ? { sendError: reason } : {}),
+              canRetry: Boolean(state.can_retry),
+            },
+          ],
+        })
+        return
+      }
+      /** The server took the message; the success/failure update follows. */
+      case 'updateMessageSendAcknowledged':
+        return
+      case 'updateChatIsMarkedAsUnread':
+        // 标为未读 is a flag, not a counter: the row redraws its dot from the summary.
+        await emitChatUpsert(deps, update.chat_id)
+        return
+      /**
        * TDLib answers `getInstalledStickerSets` from its local cache first and
        * replaces the list once the server copy arrives (measured: 14 cached sets,
        * then 192 a minute later). The picker has to refetch on this update or it
@@ -209,6 +265,33 @@ export function createUpdateHandler(deps: UpdateDeps): (update: TdObject) => Pro
         // Somebody in a transcript changed their picture (or their name only,
         // which `syncUserPhoto` answers with a no-op).
         deps.avatars.syncUserPhoto(user.id, fileId)
+        return
+      }
+      /**
+       * Desktop notifications. TDLib has already decided *whether* this is worth
+       * notifying (mute state, mentions, preview privacy), so the adapter forwards
+       * its notification objects instead of deriving them from every new message.
+       * Both update shapes carry them: `updateNotification` for a single-chat
+       * group, `updateNotificationGroup` for the batched ones.
+       */
+      case 'updateNotification':
+        await emitNotification(deps, update.notification)
+        return
+      case 'updateNotificationGroup': {
+        for (const notification of asArray<TdObject>(update.added_notifications)) {
+          await emitNotification(deps, notification)
+        }
+        return
+      }
+      /**
+       * 在线 / 最后上线. The update carries only the user and the new status, and a
+       * private chat's header redraws from it — no chat summary is refetched, since
+       * presence changes far more often than the row does.
+       */
+      case 'updateUserStatus': {
+        const status = mapPeerStatus(update.status)
+        if (!status) return
+        deps.emit({ type: 'status', userId: Number(update.user_id), status })
         return
       }
       case 'updateChatAction':
@@ -317,6 +400,38 @@ async function handleAuthorizationState(
       // previous state visible; nothing actionable for the UI.
       return
   }
+}
+
+/**
+ * One TDLib notification → the title and preview the OS shows.
+ *
+ * Only `notificationTypeNewMessage` becomes a toast for now (calls and push
+ * messages have no UI to open yet). The chat title needs a `getChat`, which
+ * TDLib serves from its cache; a chat that vanished is not worth a failure.
+ */
+async function emitNotification(deps: UpdateDeps, notification: TdObject | undefined): Promise<void> {
+  if (!notification) return
+  const type = notification.type
+  if (type?._ !== 'notificationTypeNewMessage' || !type.message) return
+  const message = type.message
+  const chatId = Number(message.chat_id)
+  if (!Number.isFinite(chatId) || chatId <= 0) return
+  let title = ''
+  try {
+    const chat = await deps.invoke({ _: 'getChat', chat_id: chatId })
+    title = typeof chat?.title === 'string' ? chat.title : ''
+  } catch {
+    return
+  }
+  deps.emit({
+    type: 'notification',
+    chatId,
+    messageId: Number(message.id),
+    title,
+    text: previewContent(message.content),
+    isSilent: Boolean(notification.is_silent),
+    date: Number(notification.date ?? Math.floor(Date.now() / 1000)),
+  })
 }
 
 async function emitChatUpsert(deps: UpdateDeps, chatId: number | undefined): Promise<void> {

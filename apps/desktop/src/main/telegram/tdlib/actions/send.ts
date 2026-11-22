@@ -4,6 +4,8 @@ import type { Message } from '@wegram/protocol'
 import { probeImageSize } from '../../../media/image-size'
 import type { MediaKind } from '../../adapter'
 import type { TdObject } from '../client'
+import { asArray } from '../json'
+import { mapMessage } from '../map/message'
 import type { ActionDeps } from './deps'
 import { history } from './history'
 import { formattedText, inputText, sendAndMap } from './message-input'
@@ -70,6 +72,60 @@ export async function markRead(
     message_ids: [input.upToMessageId],
     force_read: true,
   })
+}
+
+/**
+ * 对方正在输入: one TDLib chat action.
+ *
+ * Deliberately never throws. Typing is ambient presence, not a command the reader
+ * asked for: a failed `sendChatAction` (offline, a chat that no longer exists)
+ * must not raise the error bar over the composer. The renderer throttles the
+ * repeat rate, so this is one call per few keystrokes-seconds, not per keystroke.
+ */
+export async function sendTyping(
+  deps: Pick<ActionDeps, 'invoke' | 'logger'>,
+  chatId: number,
+  typing: boolean,
+): Promise<void> {
+  try {
+    await deps.invoke({
+      _: 'sendChatAction',
+      chat_id: chatId,
+      topic_id: null,
+      business_connection_id: '',
+      action: { _: typing ? 'chatActionTyping' : 'chatActionCancel' },
+    })
+  } catch (error) {
+    deps.logger.warn(
+      `typing action for chat ${chatId} failed: ${error instanceof Error ? error.message : String(error)}`,
+    )
+  }
+}
+
+/**
+ * 重试 a failed message (`resendMessages`).
+ *
+ * TDLib answers with the messages it retried, each still `pending`; the final
+ * state arrives later as `updateMessageSendSucceeded` / `updateMessageSendFailed`.
+ * The answer is applied as a full replacement so the row leaves 未发送 at once.
+ */
+export async function resendMessages(
+  deps: ActionDeps,
+  chatId: number,
+  messageIds: number[],
+): Promise<void> {
+  const response = await deps.invoke({
+    _: 'resendMessages',
+    chat_id: chatId,
+    message_ids: messageIds,
+    quote: null,
+    paid_message_star_count: 0,
+  })
+  const messages = asArray<TdObject>(response?.messages)
+  for (const raw of messages) {
+    const message = await mapMessage(deps.mapper, chatId, raw)
+    deps.emit({ type: 'messages', chatId, ops: [{ op: 'replace', message }] })
+  }
 }
 
 /**

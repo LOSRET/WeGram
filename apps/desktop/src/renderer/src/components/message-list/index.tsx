@@ -72,6 +72,8 @@ export interface MessageListProps {
   onCopy: (message: Message) => void
   /** Opens the full-pane comment view of the message (design doc §9.8). */
   onOpenComments: (message: Message) => void
+  /** 重试 a message TDLib marked `failed` with `can_retry`. */
+  onResend: (message: Message) => void
 }
 
 interface MenuState {
@@ -126,6 +128,7 @@ export function MessageList({
   onForward,
   onCopy,
   onOpenComments,
+  onResend,
 }: MessageListProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const hostRef = useRef<HTMLDivElement | null>(null)
@@ -328,6 +331,7 @@ export function MessageList({
                   readOutboxMaxId={chat.lastReadOutboxMessageId ?? 0}
                   onOpenMenu={openMenu}
                   onOpenComments={onOpenComments}
+                  onResend={onResend}
                 />
               </div>
             )
@@ -366,7 +370,7 @@ export function MessageList({
           y={menu.y}
           items={buildMessageMenuItems(
             menu.message,
-            { onReply, onCopy, onForward, onEdit, onDelete },
+            { onReply, onCopy, onForward, onEdit, onDelete, onResend },
             { canReply, properties: menu.properties },
           )}
           onClose={closeMenu}

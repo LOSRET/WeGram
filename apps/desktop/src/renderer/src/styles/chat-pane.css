@@ -43,6 +43,15 @@
   color: var(--wx-brand-text);
 }
 
+/* 在线 / 最后上线 sits in the title's own line, after the name: the header is a
+   fixed 48 px band, so a second line would either overflow or move the transcript. */
+.wx-chat__status {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--wx-text-tertiary);
+}
+
 .wx-chat__subtitle {
   display: none;
 }

@@ -15,9 +15,12 @@ app settings, `app:info`), `viewer.ts` (the 图片和视频 window's payloads),
 `chats.ts` (the chat domain's channel keys and schemas), `qr.ts` (the 群二维码
 window's channels), `poll.ts` (the poll DTO + the vote/add-option channels),
 `comment.ts` (the comment-thread contract, including what a
-comment carries: text, a sticker or a local file) and `search.ts` (the cross-chat
-message search schemas), with the
-channel tables of `chats.ts` and `qr.ts` spread into the two tables.
+comment carries: text, a sticker or a local file), `search.ts` (the cross-chat
+message search schemas), `events.ts` (the `evt:*` tables + `EventChannel`/`EventEnvelope`,
+moved out of `channels.ts` at its budget), `message-ops.ts` (the `MessageOp` patch table),
+`send.ts` (outgoing typing + resend) and `presence.ts` (peer status, the active-chat
+report). The channel tables of `chats.ts`, `qr.ts`, `send.ts` and `presence.ts` are
+spread into the two command tables; `events.ts` owns its own.
 The package is exported straight from source (`src/index.ts`, no build step), so
 `pnpm typecheck` in the consumer is the only build. A new field that pushes `dto.ts`
 over the budget is a signal to split the domain out, not to raise the cap.
@@ -28,8 +31,8 @@ over the budget is a signal to split the domain out, not to raise the cap.
   renderer needs it, it is a protocol field — never read raw TDLib JSON in the
   renderer.
 - A new channel goes into `invokeChannels` / `invokeSchemas` (commands) or
-  `eventChannels` / `eventSchemas` (events) — a **chat** channel goes into
-  `chats.ts`, which both tables spread. The `satisfies Record<Channel,
+  `eventChannels` / `eventSchemas` (events, in `events.ts`) — a **chat** channel goes
+  into `chats.ts`, which both command tables spread. The `satisfies Record<Channel,
   Schema>` clauses make a missing schema a compile error, and preload + the main
   router pick the channel up automatically. **Never build channel names by
   concatenation** — preload whitelists literal names only.

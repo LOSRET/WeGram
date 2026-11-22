@@ -95,6 +95,11 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   private nextMessageId = 5000
   private nextFileId = 9000
   private timer: NodeJS.Timeout | null = null
+  /**
+   * `WEGRAM_MOCK_FAIL_SEND=1` fails the next text send once, so the 未发送 row and
+   * 重试 can be exercised without a network: the retry then succeeds normally.
+   */
+  private failNextSend = /^(1|true|yes|on)$/i.test(process.env['WEGRAM_MOCK_FAIL_SEND']?.trim() ?? '')
   /** Pending fake QR confirmation; the scan is simulated on this timer. */
   private qrTimer: NodeJS.Timeout | null = null
 
@@ -241,11 +246,14 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   readonly setChatMuted = this.chatApi.setMuted
   readonly setChatPinned = this.chatApi.setPinned
   readonly clearHistory = this.chatApi.clearHistory
+  readonly deleteChat = this.chatApi.deleteChat
+  readonly setChatUnread = this.chatApi.setChatUnread
   readonly chatMembers = this.chatApi.members
   readonly setChatTitle = this.chatApi.setTitle
   readonly leaveChat = this.chatApi.leave
   readonly pinnedMessage = this.chatApi.pinnedMessage
   readonly inviteLink = this.chatApi.inviteLink
+  readonly userStatus = this.chatApi.userStatus
 
   /** The mock address book; see `listMockContacts`. */
   async listContacts(): Promise<Contact[]> {
@@ -279,6 +287,12 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
       text: input.text,
       replyTo: input.replyTo,
     })
+    if (this.failNextSend) {
+      this.failNextSend = false
+      message.sendingState = 'failed'
+      message.sendError = '网络连接中断（模拟）'
+      message.canRetry = true
+    }
     appendMessage({ emit: (event) => this.emit(event) }, fixture, message, input.text)
     return { localId: `mock-${message.id}`, message }
   }
@@ -385,6 +399,31 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
       target.messages.push({ ...original, id: this.nextMessageId++, chatId: input.toChatId })
     }
     this.emit({ type: 'chats', ops: [{ op: 'upsert', chat: { ...target.chat } }] })
+  }
+
+  /** 对方正在输入: a fixture peer never reads it, so the mock only acknowledges. */
+  async sendTyping(_chatId: number, _typing: boolean): Promise<void> {
+    // Nothing to tell a fake peer.
+  }
+
+  /**
+   * 重试 a failed fixture message. The failed row stays in the transcript (TDLib
+   * keeps those too); resending clears its state and announces the replacement.
+   */
+  async resendMessages(chatId: number, messageIds: number[]): Promise<void> {
+    const fixture = this.requireFixture(chatId)
+    for (const id of messageIds) {
+      const message = fixture.messages.find((item) => item.id === id)
+      if (!message) continue
+      delete message.sendingState
+      delete message.sendError
+      delete message.canRetry
+      this.emit({
+        type: 'messages',
+        chatId,
+        ops: [{ op: 'replace', message: { ...message } }],
+      })
+    }
   }
 
   async markRead(input: { chatId: number; upToMessageId: number }): Promise<void> {

@@ -42,6 +42,8 @@ export interface ComposerCardProps {
   onNotice: (label: string) => void
   /** A channel's way back to the 服务号 bar; absent everywhere else. */
   onCollapse?: () => void
+  /** The box lost focus: a chat cancels its 对方正在输入 ping here. */
+  onBlur?: () => void
 }
 
 /**
@@ -69,6 +71,7 @@ export function ComposerCard({
   onAttach,
   onNotice,
   onCollapse,
+  onBlur,
 }: ComposerCardProps) {
   const [pickerOpen, setPickerOpen] = useState(false)
   const [attachAnchor, setAttachAnchor] = useState<PopupAnchor | null>(null)
@@ -120,6 +123,7 @@ export function ComposerCard({
           title="Enter 发送 · Shift+Enter 换行"
           value={value}
           onChange={(event) => onChange(event.target.value)}
+          onBlur={onBlur}
           {...inputHandlers}
         />
 

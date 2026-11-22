@@ -82,6 +82,26 @@ export function clearPreviewHistory(store: PreviewChatStore, chatId: number): vo
   announce(store, chat)
 }
 
+/** 删除聊天: the preview drops the row and the transcript, like the mock adapter. */
+export function deletePreviewChat(store: PreviewChatStore, chatId: number): void {
+  const chat = findChat(store, chatId)
+  store.chats.splice(store.chats.indexOf(chat), 1)
+  delete store.messagesByChat[chat.id]
+  store.emit('evt:chats', { ops: [{ op: 'remove', chatId }] })
+}
+
+/** 标为未读 / 标为已读: the preview's row draws its dot from this flag. */
+export function setPreviewUnread(
+  store: PreviewChatStore,
+  chatId: number,
+  unread: boolean,
+): ChatSummary {
+  const chat = findChat(store, chatId)
+  chat.markedUnread = unread
+  announce(store, chat)
+  return { ...chat }
+}
+
 /**
  * `@username` mentions: the fixture's address book is its only user directory,
  * so a known username answers with that person's private chat — the preview's

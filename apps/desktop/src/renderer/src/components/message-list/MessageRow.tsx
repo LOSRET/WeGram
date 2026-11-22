@@ -56,6 +56,12 @@ export interface MessageRowProps {
   onOpenMenu: (message: Message, x: number, y: number) => void
   /** Opens Telegram's full-pane discussion view for that message's thread. */
   onOpenComments: (message: Message) => void
+  /**
+   * 重试 a 未发送 row (`messages:resend`). Optional: the comment panel draws rows
+   * from its own thread (no store, no resend path), and a retry button that
+   * cannot work must not be drawn.
+   */
+  onResend?: (message: Message) => void
 }
 
 /**
@@ -95,6 +101,7 @@ export const MessageRow = memo(
     readOutboxMaxId,
     onOpenMenu,
     onOpenComments,
+    onResend,
   }: MessageRowProps) {
     /**
      * A premium sticker's effect plays once; a tap on the sticker replays it, so
@@ -327,6 +334,18 @@ export const MessageRow = memo(
               bubble: under it, on the transcript's own background, so the buttons
               read as their own control strip instead of part of the body. */}
           {buttons ? <InlineButtons rows={buttons} /> : null}
+          {/* 未发送: always visible, unlike the hover meta — a failed message that
+              looks delivered is the one bug this row exists to prevent. */}
+          {last.sendingState === 'failed' && onResend ? (
+            <button
+              className="wx-message__retry"
+              title={last.sendError ?? '发送失败'}
+              onClick={() => onResend(last)}
+              disabled={last.canRetry === false}
+            >
+              未发送{last.canRetry === false ? '' : '，点击重试'}
+            </button>
+          ) : null}
           {/* 评论 N 条 (design doc §9.8): just the handle — the thread opens in the
               full-pane CommentPanel, like Telegram's discussion view. A thread that
               nobody has commented in yet keeps the handle too (写评论), or the reader
@@ -363,5 +382,6 @@ export const MessageRow = memo(
     previous.repliedTo === next.repliedTo &&
     previous.onOpenMenu === next.onOpenMenu &&
     previous.onOpenComments === next.onOpenComments &&
+    previous.onResend === next.onResend &&
     sameRow(previous.messages, next.messages),
 )

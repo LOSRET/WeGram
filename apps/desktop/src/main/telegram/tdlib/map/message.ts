@@ -48,6 +48,7 @@ export async function mapMessage(
   if (senderUserId) ctx.prefetchUserAvatars([senderUserId])
   const content = await resolveContent(ctx, chatId, raw)
   const mapped = mapContent(content)
+  const sending = mapSendingState(raw.sending_state)
   const buttons = mapReplyMarkup(raw.reply_markup)
   const albumId = albumIdOf(raw)
   const interaction = mapInteraction(raw)
@@ -84,7 +85,33 @@ export async function mapMessage(
     ...(albumId ? { albumId } : {}),
     ...(raw.reply_to?.message_id ? { replyToId: raw.reply_to.message_id } : {}),
     ...(raw.edit_date ? { edited: true } : {}),
+    ...sending,
     ...(interaction ? { interaction } : {}),
+  }
+}
+
+/**
+ * TDLib `message.sending_state`: absent for a delivered message, 'pending' while
+ * the send is in flight, 'failed' when TDLib gave up. The failed branch carries
+ * the reason and whether 重试 is allowed (`can_retry`); a failed message with
+ * `can_retry: false` is shown as 未发送 with no retry gesture.
+ */
+function mapSendingState(
+  state: TdObject | undefined,
+): Pick<Message, 'sendingState' | 'sendError' | 'canRetry'> | Record<string, never> {
+  switch (state?._) {
+    case 'messageSendingStatePending':
+      return { sendingState: 'pending' }
+    case 'messageSendingStateFailed': {
+      const reason = state.error?.message
+      return {
+        sendingState: 'failed',
+        ...(typeof reason === 'string' && reason ? { sendError: reason } : {}),
+        canRetry: Boolean(state.can_retry),
+      }
+    }
+    default:
+      return {}
   }
 }
 

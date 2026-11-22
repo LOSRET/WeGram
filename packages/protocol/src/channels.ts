@@ -2,16 +2,16 @@ import { z } from 'zod'
 
 import {
   authStateSchema,
-  connectionStateSchema,
-  messageOpSchema,
   messagePropertiesSchema,
   messageSchema,
   scrollAnchorSchema,
   selfSchema,
-  userAvatarSchema,
 } from './dto'
 import { bootStateSchema } from './boot'
-import { chatOpSchema, chatSummarySchema } from './chat'
+import { chatSummarySchema } from './chat'
+import type { EventChannel, EventEnvelope } from './events'
+import { sendInvokeChannels, sendInvokeSchemas } from './send'
+import { presenceInvokeChannels, presenceInvokeSchemas } from './presence'
 import { chatInvokeChannels, chatInvokeSchemas } from './chats'
 import { qrInvokeChannels, qrInvokeSchemas } from './qr'
 import { pollInvokeChannels, pollInvokeSchemas } from './poll'
@@ -34,7 +34,6 @@ import {
   commentTargetSchema,
 } from './comment'
 import { contactSchema } from './contact'
-import { appErrorSchema } from './errors'
 import { searchMessagesRequestSchema, searchMessagesResponseSchema } from './search'
 
 /**
@@ -112,6 +111,9 @@ export const invokeChannels = [
   'messages:forward',
   'messages:read',
   'messages:sendSticker',
+  /** Outgoing typing and failed-message retry; see ./send.ts. */
+  ...sendInvokeChannels,
+  ...presenceInvokeChannels,
   'search:global',
   'search:inChat',
   /**
@@ -292,6 +294,8 @@ export const invokeSchemas = {
     }),
     response: z.object({ localId: z.string(), message: messageSchema }),
   },
+  ...sendInvokeSchemas,
+  ...presenceInvokeSchemas,
   'search:global': {
     request: z.object({ q: z.string().min(1), limit: z.number().int().positive().max(50) }),
     response: z.array(chatSummarySchema),
@@ -476,69 +480,8 @@ export type InvokeResponse<C extends InvokeChannel> = z.output<
   (typeof invokeSchemas)[C]['response']
 >
 
-/** Every event main pushes to the renderer is sequenced, so gaps are detectable (§7.2). */
-const envelope = <S extends z.ZodType>(payload: S) => z.object({ seq: z.number().int(), payload })
+/** The event tables live in ./events.ts (that file hit its own budget line). */
 
-export const eventChannels = [
-  'evt:auth',
-  /** The startup phase changed; terminal kinds stop the login spinner. */
-  'evt:boot',
-  'evt:connection',
-  'evt:chats',
-  'evt:messages',
-  /**
-   * Profile photos of other people that finished downloading after their
-   * messages were mapped (a group's senders, the peer of a private chat).
-   */
-  'evt:avatars',
-  'evt:typing',
-  'evt:file',
-  /** TDLib reloaded the installed sticker sets; the picker refetches them. */
-  'evt:stickerSets',
-  /**
-   * The viewer asked the shell to show a message (定位到聊天位置). Main raises the
-   * shell window first, then publishes this; the viewer window stays open.
-   */
-  'evt:locate',
-  'evt:error',
-] as const
-
-export type EventChannel = (typeof eventChannels)[number]
-
-export const eventSchemas = {
-  'evt:auth': envelope(authStateSchema),
-  'evt:boot': envelope(bootStateSchema),
-  'evt:connection': envelope(connectionStateSchema),
-  'evt:chats': envelope(z.object({ ops: z.array(chatOpSchema) })),
-  'evt:messages': envelope(z.object({ chatId: z.number().int(), ops: z.array(messageOpSchema) })),
-  'evt:avatars': envelope(z.object({ avatars: z.array(userAvatarSchema) })),
-  'evt:typing': envelope(
-    z.object({
-      chatId: z.number().int(),
-      userId: z.number().int(),
-      action: z.string(),
-      until: z.number(),
-    }),
-  ),
-  'evt:file': envelope(
-    z.object({
-      fileId: z.number().int(),
-      downloaded: z.number(),
-      total: z.number(),
-      /** Set once the file is fully local; a `wx-media://` URL for the renderer. */
-      url: z.string().optional(),
-      /** Bytes are going up rather than down (media being sent). */
-      uploading: z.boolean().optional(),
-      completed: z.boolean().optional(),
-    }),
-  ),
-  'evt:stickerSets': envelope(z.object({})),
-  'evt:locate': envelope(z.object({ chatId: z.number().int(), messageId: z.number().int() })),
-  'evt:error': envelope(appErrorSchema),
-} satisfies Record<EventChannel, z.ZodType>
-
-export type EventEnvelope<C extends EventChannel> = z.output<(typeof eventSchemas)[C]>
-export type EventPayload<C extends EventChannel> = EventEnvelope<C>['payload']
 
 /** The only API the preload script exposes on `window.tg`. */
 export interface TgBridge {

@@ -7,6 +7,7 @@ import type {
   ChatMember,
   ChatPinnedMessage,
   ChatSummary,
+  PeerStatus,
 } from '@wegram/protocol'
 
 import type { AdapterEvent } from '@wegram/adapter-contract'
@@ -47,8 +48,12 @@ export function getMockChat(store: MockChatStore, chatId: number): ChatSummary {
 
 export function openMockChat(store: MockChatStore, chatId: number): void {
   // Opening does not consume the unread messages: the renderer reports
-  // `messages:read` per viewport (see `tdlib/actions.openChat`).
-  requireFixture(store, chatId)
+  // `messages:read` per viewport (see `tdlib/actions.openChat`). It does clear
+  // 标为未读, which is a hand-set flag rather than a count.
+  const fixture = requireFixture(store, chatId)
+  if (!fixture.chat.markedUnread) return
+  fixture.chat.markedUnread = false
+  store.emit({ type: 'chats', ops: [{ op: 'upsert', chat: { ...fixture.chat } }] })
 }
 
 /**
@@ -123,6 +128,34 @@ export function clearMockHistory(store: MockChatStore, chatId: number): void {
   delete fixture.chat.lastMessageText
   delete fixture.chat.lastMessageAt
   store.emit({ type: 'chats', ops: [{ op: 'upsert', chat: { ...fixture.chat } }] })
+}
+
+/**
+ * 在线 / 最后上线: the fixture has no presence schedule, so its private peers were
+ * online an hour and a half ago — the "last seen" flavour the header formats.
+ */
+export function mockUserStatus(store: MockChatStore, userId: number): PeerStatus | null {
+  const known = [...store.fixtures.values()].some((fixture) => fixture.chat.userId === userId)
+  return known ? { kind: 'offline', wasOnline: Math.floor(Date.now() / 1000) - 5_400 } : null
+}
+
+/** 删除聊天: the fixture drops the conversation and its transcript. */
+export function deleteMockChat(store: MockChatStore, chatId: number): void {
+  requireFixture(store, chatId)
+  store.fixtures.delete(chatId)
+  store.emit({ type: 'chats', ops: [{ op: 'remove', chatId }] })
+}
+
+/** 标为未读 / 标为已读: the fixture's row draws a dot from this flag. */
+export function setMockChatUnread(
+  store: MockChatStore,
+  chatId: number,
+  unread: boolean,
+): ChatSummary {
+  const fixture = requireFixture(store, chatId)
+  fixture.chat.markedUnread = unread
+  store.emit({ type: 'chats', ops: [{ op: 'upsert', chat: { ...fixture.chat } }] })
+  return { ...fixture.chat }
 }
 
 /**
@@ -213,11 +246,14 @@ export interface MockChatApi {
   setMuted(chatId: number, muted: boolean): Promise<ChatSummary>
   setPinned(chatId: number, pinned: boolean): Promise<ChatSummary>
   clearHistory(chatId: number): Promise<void>
+  deleteChat(chatId: number): Promise<void>
+  setChatUnread(chatId: number, unread: boolean): Promise<ChatSummary>
   members(chatId: number, limit: number, query?: string): Promise<ChatMember[]>
   setTitle(chatId: number, title: string): Promise<ChatSummary>
   leave(chatId: number): Promise<void>
   pinnedMessage(): Promise<ChatPinnedMessage | null>
   inviteLink(chatId: number, temporary?: boolean): Promise<ChatInviteLink | null>
+  userStatus(userId: number): Promise<PeerStatus | null>
 }
 
 export function createMockChats(
@@ -238,10 +274,13 @@ export function createMockChats(
     setMuted: async (chatId, muted) => setMockMuted(store, chatId, muted),
     setPinned: async (chatId, pinned) => setMockPinned(store, chatId, pinned),
     clearHistory: async (chatId) => clearMockHistory(store, chatId),
+    deleteChat: async (chatId) => deleteMockChat(store, chatId),
+    setChatUnread: async (chatId, unread) => setMockChatUnread(store, chatId, unread),
     members: async (chatId, limit, query) => mockChatMembers(store, chatId, limit, query),
     setTitle: async (chatId, title) => setMockTitle(store, chatId, title),
     leave: async (chatId) => leaveMockChat(store, chatId),
     pinnedMessage: async () => mockPinnedMessage(),
     inviteLink: async (chatId, temporary) => mockInviteLink(chatId, temporary),
+    userStatus: async (userId) => mockUserStatus(store, userId),
   }
 }

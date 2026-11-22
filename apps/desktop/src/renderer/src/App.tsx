@@ -124,6 +124,10 @@ export function App() {
         track(event.seq)
         store.setUserAvatars(event.payload.avatars)
       }),
+      window.tg.on('evt:status', (event) => {
+        track(event.seq)
+        store.setPeerStatus(event.payload.userId, event.payload.status)
+      }),
       window.tg.on('evt:typing', (event) => {
         track(event.seq)
         // `updateChatAction` is a one-shot event: without an expiry timer the
@@ -165,9 +169,21 @@ export function App() {
         const { chatId, messageId } = event.payload
         const state = useAppStore.getState()
         const chat = state.chats.find((item) => item.id === chatId)
-        if (!chat) return
-        state.requestLocate(chatId, messageId)
-        if (state.activeChatId !== chatId) activateChat(chat)
+        if (chat) {
+          state.requestLocate(chatId, messageId)
+          if (state.activeChatId !== chatId) activateChat(chat)
+          return
+        }
+        // A notification can name a chat the list has not paged in yet: ask for
+        // its summary, then land on the message the toast was about.
+        void invoke('chats:get', { chatId })
+          .then((fresh) => {
+            const next = useAppStore.getState()
+            next.applyChatOps([{ op: 'upsert', chat: fresh }])
+            next.requestLocate(chatId, messageId)
+            activateChat(fresh)
+          })
+          .catch((cause) => useAppStore.getState().setError(errorMessage(cause)))
       }),
       window.tg.on('evt:error', (event) => {
         track(event.seq)

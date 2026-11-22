@@ -60,7 +60,21 @@ export async function listChats(
  * `from_message_id` as *exclusive*, measured 2026-11-17.)
  */
 export async function openChat(deps: ActionDeps, chatId: number): Promise<void> {
-  await deps.invoke({ _: 'getChat', chat_id: chatId })
+  const chat = await deps.invoke({ _: 'getChat', chat_id: chatId })
+  /**
+   * 标为未读 is a flag the reader set by hand, and opening the chat consumes it —
+   * WeChat clears its red dot the same way. Reading itself still moves the server
+   * marker one viewport at a time through `messages:read` (see above), so this
+   * call only touches the flag, never `unread_count`.
+   */
+  if (!chat?.is_marked_as_unread) return
+  await deps.invoke({
+    _: 'toggleChatIsMarkedAsUnread',
+    chat_id: chatId,
+    is_marked_as_unread: false,
+  })
+  const summary = await fetchChatSummary(deps, chatId)
+  deps.emit({ type: 'chats', ops: [{ op: 'upsert', chat: summary }] })
 }
 
 /**
@@ -295,6 +309,45 @@ export async function clearHistory(deps: ActionDeps, chatId: number): Promise<vo
   })
   const summary = await fetchChatSummary(deps, chatId)
   deps.emit({ type: 'chats', ops: [{ op: 'upsert', chat: summary }] })
+}
+
+/**
+ * 删除聊天, the way WeChat means it: the conversation disappears from this
+ * account's list, and its copy of the history goes with it.
+ *
+ * `deleteChatHistory` with `remove_from_chat_list: true, revoke: false` — the
+ * peers keep their messages. `deleteChat` would be the other thing entirely
+ * (delete for every member), which WeChat has no gesture for and this client must
+ * never send by accident.
+ */
+export async function deleteChat(deps: ActionDeps, chatId: number): Promise<void> {
+  await deps.invoke({
+    _: 'deleteChatHistory',
+    chat_id: chatId,
+    remove_from_chat_list: true,
+    revoke: false,
+  })
+  deps.emit({ type: 'chats', ops: [{ op: 'remove', chatId }] })
+}
+
+/**
+ * 标为未读 / 标为已读. TDLib keeps this as a boolean flag next to `unread_count`
+ * (a chat can be marked unread with nothing new), so the row draws a dot and the
+ * refreshed summary carries the new state.
+ */
+export async function setChatUnread(
+  deps: ActionDeps,
+  chatId: number,
+  unread: boolean,
+): Promise<ChatSummary> {
+  await deps.invoke({
+    _: 'toggleChatIsMarkedAsUnread',
+    chat_id: chatId,
+    is_marked_as_unread: unread,
+  })
+  const summary = await fetchChatSummary(deps, chatId)
+  deps.emit({ type: 'chats', ops: [{ op: 'upsert', chat: summary }] })
+  return summary
 }
 
 /**

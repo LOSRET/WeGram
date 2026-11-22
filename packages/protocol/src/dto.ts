@@ -459,6 +459,19 @@ export const messageSchema = z.object({
   albumId: z.string().optional(),
   replyToId: z.number().int().optional(),
   edited: z.boolean().optional(),
+  /**
+   * TDLib `message.sending_state`, only present while a message is on its way or
+   * after it failed. A normal delivered row carries neither field.
+   *
+   * `sendMessage` answers *before* the server acknowledges it: the row first
+   * arrives 'pending', then `updateMessageSendSucceeded` re-keys it (the server id
+   * may differ) or `updateMessageSendFailed` marks it 'failed' with `canRetry`.
+   */
+  sendingState: z.enum(['pending', 'failed']).optional(),
+  /** Why the send failed (TDLib `error.message`), shown as the retry hint. */
+  sendError: z.string().optional(),
+  /** TDLib `messageSendingStateFailed.can_retry`: 重试 is offered only when true. */
+  canRetry: z.boolean().optional(),
   /** Views / forwards / comments under the message; absent when there are none. */
   interaction: messageInteractionSchema.optional(),
 })
@@ -492,40 +505,10 @@ export const userAvatarSchema = z.object({
 })
 export type UserAvatar = z.infer<typeof userAvatarSchema>
 
-export const messageOpSchema = z.discriminatedUnion('op', [
-  z.object({ op: z.literal('new'), message: messageSchema }),
-  z.object({
-    op: z.literal('edit'),
-    chatId: z.number().int(),
-    messageId: z.number().int(),
-    text: z.string(),
-  }),
-  /** Full replacement, used when the server changes the content (media, caption). */
-  z.object({ op: z.literal('replace'), message: messageSchema }),
-  z.object({
-    op: z.literal('delete'),
-    chatId: z.number().int(),
-    messageIds: z.array(z.number().int()),
-  }),
-  z.object({ op: z.literal('read'), chatId: z.number().int(), upToMessageId: z.number().int() }),
-  /**
-   * Engagement moved (views, forwards, replies) without the message changing:
-   * patching the counter is far cheaper than remapping the whole message, and
-   * `updateMessageInteractionInfo` fires on every view.
-   *
-   * The patch is partial on purpose: TDLib omits `reply_info` from an update
-   * whenever it has no reply data at hand, and a missing field must not erase
-   * what the history page already delivered (a view-only update used to zero a
-   * real comment count and take the comment bar with it).
-   */
-  z.object({
-    op: z.literal('interaction'),
-    chatId: z.number().int(),
-    messageId: z.number().int(),
-    interaction: messageInteractionSchema.partial(),
-  }),
-])
-export type MessageOp = z.infer<typeof messageOpSchema>
+/* Message operations moved to `message-ops.ts` when this file reached its
+   550-line budget: the op table is its own concern and the schema it carries is
+   the only thing here that changes with every new event. */
+
 
 /**
  * Where the reader stopped in a chat (design doc §8.2 rule 5).

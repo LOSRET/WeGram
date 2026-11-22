@@ -23,6 +23,7 @@ export const DATA_DEFAULTS: AppData = {
   locate: null,
   replyToByChat: {},
   typingByChat: {},
+  peerStatusByUser: {},
   editing: null,
   toast: null,
   error: null,

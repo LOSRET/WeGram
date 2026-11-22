@@ -49,6 +49,11 @@ export interface HandlerDeps {
    * the renderer to open that conversation on that message.
    */
   onLocate: (target: { chatId: number; messageId: number }) => void
+  /**
+   * Which conversation the shell shows (or null). Main uses it to suppress a
+   * desktop notification for the chat the reader is already looking at.
+   */
+  setActiveChat: (chatId: number | null) => void
 }
 
 /**
@@ -66,6 +71,7 @@ export function createHandlers({
   onLoginEnter,
   onAuthInteraction,
   onLocate,
+  setActiveChat,
 }: HandlerDeps): IpcHandlerMap {
   /**
    * The viewer's own downloads (open / save / copy / reveal) outrank the
@@ -157,6 +163,8 @@ export function createHandlers({
     'chats:setMuted': (payload) => adapter.setChatMuted(payload.chatId, payload.muted),
     'chats:setPinned': (payload) => adapter.setChatPinned(payload.chatId, payload.pinned),
     'chats:clearHistory': (payload) => adapter.clearHistory(payload.chatId),
+    'chats:delete': (payload) => adapter.deleteChat(payload.chatId),
+    'chats:setUnread': (payload) => adapter.setChatUnread(payload.chatId, payload.unread),
     'chats:members': (payload) =>
       adapter.chatMembers(payload.chatId, payload.limit ?? 12, payload.query),
     'chats:setTitle': (payload) => adapter.setChatTitle(payload.chatId, payload.title),
@@ -164,6 +172,8 @@ export function createHandlers({
     'chats:pinned': (payload) => adapter.pinnedMessage(payload.chatId),
     'chats:inviteLink': (payload) => adapter.inviteLink(payload.chatId, payload.temporary),
     'contacts:list': () => adapter.listContacts(),
+    'users:status': (payload) => adapter.userStatus(payload.userId),
+    'ui:setActiveChat': (payload) => setActiveChat(payload.chatId),
 
     'messages:history': (payload) => adapter.history(payload),
     'messages:around': (payload) => adapter.historyAround(payload),
@@ -178,6 +188,8 @@ export function createHandlers({
     'messages:properties': (payload) => adapter.messageProperties(payload),
     'messages:forward': (payload) => adapter.forwardMessages(payload),
     'messages:read': (payload) => adapter.markRead(payload),
+    'messages:typing': (payload) => adapter.sendTyping(payload.chatId, payload.typing),
+    'messages:resend': (payload) => adapter.resendMessages(payload.chatId, payload.messageIds),
     'messages:vote': (payload) => adapter.votePoll(payload),
     'messages:addPollOption': (payload) => adapter.addPollOption(payload),
 

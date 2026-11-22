@@ -1,9 +1,19 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { ChatSummary } from '@wegram/protocol'
-import { memo, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+} from 'react'
 
 import { Avatar } from './Avatar'
+import { buildChatMenuItems, runChatMenuAction } from './chat-list/chatMenu'
 import { SearchHitRow } from './chat-search/SearchHitRow'
+import { ContextMenu } from './ContextMenu'
 import { SearchTabs } from './chat-search/SearchTabs'
 import { OverlayScrollbar } from './OverlayScrollbar'
 import { PlusIcon } from './Icon'
@@ -19,6 +29,8 @@ interface ChatRowProps {
   chat: ChatSummary
   active: boolean
   onSelect: (chat: ChatSummary) => void
+  /** Right-click / long-press: the chat list's own menu (置顶/免打扰/未读/删除). */
+  onContextMenu: (chat: ChatSummary, x: number, y: number) => void
   /**
    * The normalised query while this row is a global-search hit: the matched run of
    * the title turns green. Undefined for a normal conversation row, which also
@@ -34,13 +46,23 @@ interface ChatRowProps {
  * field and on every incoming `evt:chats` batch, and most of those touches one chat
  * or none. The props are kept referentially stable by the caller for this to bite.
  */
-const ChatRow = memo(function ChatRow({ chat, active, onSelect, highlight }: ChatRowProps) {
+const ChatRow = memo(function ChatRow({
+  chat,
+  active,
+  onSelect,
+  onContextMenu,
+  highlight,
+}: ChatRowProps) {
   return (
     <div
       className={`wx-chat-item${active ? ' wx-chat-item--active' : ''}${
         !active && !highlight && chat.pinned ? ' wx-chat-item--pinned' : ''
       }`}
       onClick={() => onSelect(chat)}
+      onContextMenu={(event) => {
+        event.preventDefault()
+        onContextMenu(chat, event.clientX, event.clientY)
+      }}
       role="button"
       tabIndex={0}
       aria-pressed={active}
@@ -83,6 +105,12 @@ const ChatRow = memo(function ChatRow({ chat, active, onSelect, highlight }: Cha
             <span className={`wx-badge${chat.muted ? ' wx-badge--muted' : ''}`}>
               {chat.unread > 99 ? '99+' : chat.unread}
             </span>
+          ) : chat.markedUnread ? (
+            // 标为未读: a flag, not a count — WeChat draws a bare dot for it.
+            <span
+              className={`wx-badge--dot${chat.muted ? ' wx-badge--dot--muted' : ''}`}
+              title="标为未读"
+            />
           ) : null}
         </div>
       </div>
@@ -132,6 +160,13 @@ export function ChatList({
   // latter must be positioned; see `.wx-list__body`).
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
+
+  /** The row whose right-click menu is open, with the point it opened at. */
+  const [menu, setMenu] = useState<{ chat: ChatSummary; x: number; y: number } | null>(null)
+
+  const openMenu = useCallback((chat: ChatSummary, x: number, y: number) => {
+    setMenu({ chat, x, y })
+  }, [])
 
   const needle = normalizeQuery(query)
   const searching = needle !== ''
@@ -237,6 +272,7 @@ export function ChatList({
                       chat={chat}
                       active={chat.id === activeChatId}
                       onSelect={onSelectHit}
+                      onContextMenu={openMenu}
                       highlight={needle}
                     />
                   ))}
@@ -276,7 +312,12 @@ export function ChatList({
                     data-index={virtualItem.index}
                     style={{ transform: `translateY(${virtualItem.start}px)` }}
                   >
-                    <ChatRow chat={chat} active={chat.id === activeChatId} onSelect={onSelect} />
+                    <ChatRow
+                      chat={chat}
+                      active={chat.id === activeChatId}
+                      onSelect={onSelect}
+                      onContextMenu={openMenu}
+                    />
                   </div>
                 )
               })}
@@ -285,6 +326,19 @@ export function ChatList({
         </div>
         <OverlayScrollbar scrollerRef={scrollRef} hostRef={bodyRef} />
       </div>
+
+      {menu ? (
+        <ContextMenu
+          x={menu.x}
+          y={menu.y}
+          items={buildChatMenuItems(menu.chat, (action) => {
+            const chat = menu.chat
+            setMenu(null)
+            void runChatMenuAction(chat, action)
+          })}
+          onClose={() => setMenu(null)}
+        />
+      ) : null}
     </section>
   )
 }

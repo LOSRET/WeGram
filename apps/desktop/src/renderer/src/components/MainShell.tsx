@@ -47,6 +47,19 @@ export function MainShell() {
    */
   const [contactQuery, setContactQuery] = useState('')
 
+  /**
+   * Tell main which conversation the shell shows, so a desktop notification for
+   * that chat is suppressed while the window is focused. Closing the pane or
+   * switching to 通讯录 reports null: the reader is no longer looking at a chat.
+   */
+  useEffect(() => {
+    const shownId = section === 'chats' ? activeChatId : null
+    void invoke('ui:setActiveChat', { chatId: shownId }).catch(() => undefined)
+    return () => {
+      void invoke('ui:setActiveChat', { chatId: null }).catch(() => undefined)
+    }
+  }, [activeChatId, section])
+
   // Toasts are fire-and-forget and owned here: the rail can raise one before a
   // conversation is even open.
   useEffect(() => {

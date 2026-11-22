@@ -34,6 +34,8 @@ components/composer/       ComposerCard: the ONE bordered input card (§8.4 + §
                          ExpressionPicker. Both composers render it; a caller only says where
                          a send goes, so the comment box is not a cut-down copy of a chat's.
 components/chat-pane/     render tree + useChatHistory (history/ modules) + messageActions +
+                         useMarkRead (已读上报 effect) + usePeerStatus (在线/最后上线 for a
+                         private chat's header) +
                          CommentPanel (full-pane discussion view, slides in from the right;
                          chat-style rows + CommentComposer, the shared composer card posting
                          text / sticker / photo-file through messages:sendComment; non-members
@@ -87,6 +89,9 @@ lib/mediaBox.ts       (pure, unit-tested) the reserved media box + percent text
 lib/unreadBoundary.ts (type only) the snapshot a chat opens with; `UnreadMarker` is an alias
 lib/listMetrics.ts    (pure, unit-tested via scripts/style-contract) the virtualised row height
 lib/composerInput.ts  (pure, unit-tested) Enter / Shift+Enter / IME rule
+lib/typingPing.ts     (pure, unit-tested) 对方正在输入 throttle: one ping, 3.5 s refresh,
+                      cancel on empty/send/blur
+lib/presence.ts       (pure, unit-tested) 在线 / 最后上线 copy for the peer-status DTO
 lib/useComposerInput.ts  composition ref + textarea props, shared by both composers
 lib/contacts.ts       通讯录 initial/grouping, pinyin via ICU (pure, unit-tested)
 lib/entities.ts       TL entity → text segments (pure, unit-tested)
@@ -115,8 +120,8 @@ lib/useInView.ts      the visibility gate a sticker and its effect share (geomet
 lib/preview-bridge.ts DEV-ONLY entry point (re-exports lib/preview)
 lib/preview/          browser-preview session + invoke switch (index.ts); fixtures.ts is a
                       thin adapter over @wegram/mock-fixtures (data: URLs + gradient faces);
-                      chats.ts / messages.ts / comments.ts / qr.ts hold the handler rules the
-                      invoke switch delegates to
+                      chats.ts / messages.ts / comments.ts / qr.ts / media.ts / ui.ts /
+                      viewer.ts hold the handler rules the invoke switch delegates to
 ```
 
 `styles/index.css` is the entry point only: it imports `styles/*.css` in source order
@@ -276,6 +281,18 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   number in a message would disappear. Never "fix" that by adding digits back — it
   breaks every number in the transcript. Rebuild with `scripts/emoji-art.py` then
   `scripts/emoji-font.py`, and treat the two as one change.
+- **A failed send must stay visible without hovering.** 未发送 is drawn as its own
+  row button (`.wx-message__retry`), not inside the opacity-0 meta line: a failed row
+  that looks delivered is the bug the marker exists to prevent. The 重试 action is also
+  the first item of the message menu, gated on `canRetry`.
+- **对方正在输入 is throttled in `lib/typingPing.ts`, and its IPC call never raises an
+  error.** One ping, one refresh per 3.5 s, cancel on empty / send / blur / chat switch.
+  Do not move the throttle into the composer's onChange or add a per-keystroke call.
+- **标为未读 is a dot, not a count.** `ChatSummary.markedUnread` draws a bare
+  `.wx-badge--dot` when `unread` is 0; opening the chat clears the flag (the adapter
+  does it). Do not render it through the count badge.
+- **The peer-status line is part of the title, in the same 48 px header**, and typing
+  wins over it when both exist; a second header row would move the transcript.
 - User-facing copy is Chinese (`回复`/`复制`/`转发`…), code, identifiers and
   comments are English.
 

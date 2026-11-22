@@ -293,6 +293,8 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   readonly setChatMuted = this.chatApi.setChatMuted
   readonly setChatPinned = this.chatApi.setChatPinned
   readonly clearHistory = this.chatApi.clearHistory
+  readonly deleteChat = this.chatApi.deleteChat
+  readonly setChatUnread = this.chatApi.setChatUnread
   readonly chatMembers = this.chatApi.chatMembers
   readonly setChatTitle = this.chatApi.setChatTitle
   readonly leaveChat = this.chatApi.leaveChat
@@ -390,6 +392,18 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
 
   async markRead(input: { chatId: number; upToMessageId: number }): Promise<void> {
     return actions.markRead(this.actionDeps, input)
+  }
+
+  async userStatus(userId: number) {
+    return actions.userStatus(this.actionDeps, userId)
+  }
+
+  async sendTyping(chatId: number, typing: boolean): Promise<void> {
+    return actions.sendTyping(this.actionDeps, chatId, typing)
+  }
+
+  async resendMessages(chatId: number, messageIds: number[]): Promise<void> {
+    return actions.resendMessages(this.actionDeps, chatId, messageIds)
   }
 
   async searchGlobal(input: { q: string; limit: number }): Promise<ChatSummary[]> {

@@ -171,6 +171,7 @@ describe('buildMessageMenuItems', () => {
     onForward: () => undefined,
     onEdit: () => undefined,
     onDelete: (_message: Message, _forBoth: boolean) => undefined,
+    onResend: (_message: Message) => undefined,
   }
   const props = (overrides: Partial<MessageProperties> = {}): MessageProperties => ({
     canBeEdited: false,
@@ -227,6 +228,21 @@ describe('buildMessageMenuItems', () => {
       labels(message(1, { outgoing: true }), props({ canBeDeletedForAllUsers: true })),
     ).toContain('撤回')
     expect(labels(message(1), props({ canBeDeletedForAllUsers: true }))).not.toContain('撤回')
+  })
+
+  it('offers 重试 first on a failed row TDLib allows retrying', () => {
+    const failed = message(1, {
+      outgoing: true,
+      sendingState: 'failed',
+      canRetry: true,
+    })
+    expect(labels(failed)).toEqual(['重试', '回复', '复制', '转发', '删除'])
+    const unrecoverable = message(2, {
+      outgoing: true,
+      sendingState: 'failed',
+      canRetry: false,
+    })
+    expect(labels(unrecoverable)).not.toContain('重试')
   })
 
   it('deletes locally by default and revokes only through 撤回', () => {

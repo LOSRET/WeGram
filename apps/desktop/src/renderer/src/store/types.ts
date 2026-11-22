@@ -6,6 +6,7 @@ import type {
   ConnectionState,
   Message,
   MessageOp,
+  PeerStatus,
   UserAvatar,
 } from '@wegram/protocol'
 import type { StateCreator } from 'zustand'
@@ -89,6 +90,12 @@ export interface AppData {
   locate: { chatId: number; messageId: number; tick: number } | null
   replyToByChat: Record<number, number | null>
   typingByChat: Record<number, boolean>
+  /**
+   * userId → online / last seen. Kept apart from the chat rows because presence
+   * changes on its own schedule (`evt:status`) and the same person can be the peer
+   * of one chat and a member of another.
+   */
+  peerStatusByUser: Record<number, PeerStatus>
   editing: EditingState | null
   toast: string | null
   error: string | null
@@ -158,6 +165,7 @@ export interface MediaActions {
 
 export interface UiActions {
   setTyping: (chatId: number, active: boolean) => void
+  setPeerStatus: (userId: number, status: PeerStatus) => void
   setToast: (message: string | null) => void
   setError: (message: string | null) => void
   noteStickerSetsChanged: () => void
