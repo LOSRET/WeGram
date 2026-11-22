@@ -219,88 +219,109 @@
 }
 
 /* ---------- 语音消息 ----------
-   A voice note is held down, not typed. While the mic tool is active the card's
-   textarea gives way to WeChat's 按住 说话 bar, and the recording panel floats
-   over the pane (portalled to body) so the virtualised list never re-measures a
-   row while the reader is holding the button. */
+   WeChat 4.x records inside the card, not in a floating panel: the input shows
+   开始说话, the mic stays active, and while a clip runs the send button gives way
+   to a cancel cross, a live dot meter and the green send arrow. */
 
-.wx-composer__hold {
+.wx-composer__voice {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
   min-height: 84px;
-  margin: 8px 10px 0;
-  border: 1px solid var(--wx-line);
-  border-radius: 6px;
-  background: var(--wx-divider);
-  font-size: 15px;
-  color: var(--wx-text);
-  user-select: none;
-  touch-action: none;
-}
-
-.wx-composer__hold:hover:not(:disabled) {
-  background: var(--wx-row-hover);
-}
-
-.wx-composer__hold--live,
-.wx-composer__hold--live:hover {
-  background: var(--wx-row-selected);
-}
-
-.wx-composer__hold:disabled {
+  padding: 10px 12px 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.5;
   color: var(--wx-text-tertiary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.wx-composer__voice:hover:not(:disabled) {
+  color: var(--wx-text-secondary);
+}
+
+/* A live clip keeps the words but drops the pointer: the controls are the way out. */
+.wx-composer__voice--live,
+.wx-composer__voice--live:hover {
+  color: var(--wx-text-secondary);
   cursor: default;
 }
 
-.wx-voice-rec {
-  position: fixed;
-  inset: 0;
-  z-index: 85;
+.wx-composer__voice:disabled {
+  opacity: 1;
+}
+
+.wx-voice-ctl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wx-voice-ctl__cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--wx-line);
+  color: var(--wx-text-secondary);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.wx-voice-ctl__cancel:hover {
+  background: var(--wx-line-strong);
+  color: var(--wx-text);
+}
+
+/* The live meter: a quiet pill with the dots travelling across it. */
+.wx-voice-ctl__meter {
   display: flex;
   align-items: center;
   justify-content: center;
-  pointer-events: none;
+  gap: 5px;
+  width: 168px;
+  height: 30px;
+  border-radius: 15px;
+  background: var(--wx-divider);
 }
 
-.wx-voice-rec__panel {
-  display: flex;
-  flex-direction: column;
+.wx-voice-ctl__meter span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--wx-brand);
+  transition:
+    opacity 90ms linear,
+    transform 90ms linear;
+}
+
+.wx-voice-ctl__send {
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  width: 208px;
-  padding: 18px 16px 14px;
-  border-radius: 12px;
-  background: var(--wx-rec-surface);
-  color: var(--wx-rec-text);
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--wx-brand);
+  color: var(--wx-text-on-brand);
 }
 
-.wx-voice-rec__panel--cancel {
-  background: var(--wx-rec-cancel-surface);
+.wx-voice-ctl__send:hover {
+  background: var(--wx-brand-active);
 }
 
-.wx-voice-rec__wave {
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  height: 46px;
-}
-
-.wx-voice-rec__wave span {
-  width: 3px;
-  border-radius: 2px;
-  background: currentColor;
-  opacity: 0.85;
-  /* The bar heights come from the recorder's level, one step per 100 ms. */
-  transition: height 90ms linear;
-}
-
-.wx-voice-rec__time {
-  font-size: 13px;
-  letter-spacing: 0.5px;
-}
-
-.wx-voice-rec__hint {
-  font-size: 12px;
-  color: var(--wx-rec-hint);
+/* The mic tool stays green while 语音消息 mode is open, like the client's. */
+.wx-tool-button--voice,
+.wx-tool-button--voice:hover {
+  background: var(--wx-row-hover);
+  color: var(--wx-brand-text);
 }

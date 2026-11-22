@@ -69,13 +69,6 @@
   --wx-badge: #fa5151;
   /* A muted chat keeps the count: same badge shape, grey instead of red. */
   --wx-badge-muted: #b2b2b2;
-  /* 语音消息's floating recording panel. Like the client's, it is a dark sheet in
-     BOTH themes (it sits over the transcript, not in the chrome) — so these are
-     declared once here and deliberately not overridden by the dark block. */
-  --wx-rec-surface: rgba(23, 23, 23, 0.88);
-  --wx-rec-cancel-surface: rgba(190, 44, 44, 0.92);
-  --wx-rec-text: #ffffff;
-  --wx-rec-hint: rgba(255, 255, 255, 0.62);
 
   /* Overlay scrollbar: WeChat floats a translucent pill over the rows. */
   --wx-scrollbar-thumb: rgba(0, 0, 0, 0.22);

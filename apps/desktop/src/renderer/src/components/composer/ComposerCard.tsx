@@ -21,8 +21,8 @@ import {
   MicIcon,
   ScissorsIcon,
 } from '../Icon'
-import { KeyboardIcon } from '../WechatIcons'
-import { VoiceRecorder } from './VoiceRecorder'
+import { VoiceControls } from './VoiceControls'
+import { useVoiceRecording } from './useVoiceRecording'
 
 export interface ComposerCardProps {
   value: string
@@ -86,8 +86,14 @@ export function ComposerCard({
   onBlur,
 }: ComposerCardProps) {
   const [pickerOpen, setPickerOpen] = useState(false)
-  /** 语音消息 mode: the textarea gives way to WeChat's 按住 说话 bar. */
+  /** 语音消息 mode: the input shows 开始说话 and the mic stays active. */
   const [voiceMode, setVoiceMode] = useState(false)
+  const voice = useVoiceRecording({
+    onSend: (clip) => {
+      void onSendVoice?.(clip)
+    },
+    ...(onRecordingChange ? { onRecordingChange } : {}),
+  })
   const [attachAnchor, setAttachAnchor] = useState<PopupAnchor | null>(null)
   /** Where the next render should put the caret after an emoji pick. */
   const pendingCaret = useRef<number | null>(null)
@@ -130,18 +136,32 @@ export function ComposerCard({
    * (which owns the textarea) always wins over it.
    */
   const voiceActive = voiceMode && Boolean(onSendVoice) && !editing
-  // In voice mode the card sends by gesture, so 发送 must not invite an empty send.
+  // In voice mode the card sends through the mic's own controls, so 发送 must not
+  // invite an empty send there.
   const sendReady = !busy && !sendBlocked && !voiceActive && value.trim().length > 0
+
+  // Losing the voice surface (an edit opens, the tool is switched off) must drop
+  // the clip instead of leaving the microphone open behind the textarea.
+  const { recording: voiceRecording, cancel: cancelVoice } = voice
+  useEffect(() => {
+    if (!voiceActive && voiceRecording) cancelVoice()
+  }, [voiceActive, voiceRecording, cancelVoice])
 
   return (
     <>
       <div className="wx-composer__card">
         {voiceActive ? (
-          <VoiceRecorder
-            disabled={busy}
-            onSend={(voice) => onSendVoice?.(voice)}
-            {...(onRecordingChange ? { onRecordingChange } : {})}
-          />
+          <button
+            type="button"
+            className={`wx-composer__voice${voice.recording ? ' wx-composer__voice--live' : ''}`}
+            onClick={() => {
+              if (!voice.recording) voice.start()
+            }}
+            disabled={busy || !voice.supported || voice.recording}
+            title={voice.recording ? '正在录音，点右下角发送或取消' : '点击麦克风开始说话'}
+          >
+            {voice.recording ? '正在说话…' : voice.supported ? '开始说话' : '无法录音'}
+          </button>
         ) : (
           <textarea
             ref={textareaRef}
@@ -202,21 +222,22 @@ export function ComposerCard({
               <ChevronDownIcon size={9} className="wx-tool-button__chevron" />
             </button>
             <button
-              className={`wx-tool-button${voiceActive ? ' wx-tool-button--active' : ''}`}
+              className={`wx-tool-button${voiceActive ? ' wx-tool-button--voice' : ''}`}
               onClick={() => {
                 if (!onSendVoice) {
                   onNotice('语音消息')
                   return
                 }
+                if (voice.recording) voice.cancel()
                 setPickerOpen(false)
                 setAttachAnchor(null)
                 setVoiceMode((current) => !current)
               }}
               disabled={toolsDisabled}
-              title={voiceActive ? '切换到键盘' : '语音消息'}
-              aria-label={voiceActive ? '切换到键盘' : '语音消息'}
+              title={voiceActive ? '退出语音输入' : '语音消息'}
+              aria-label={voiceActive ? '退出语音输入' : '语音消息'}
             >
-              {voiceActive ? <KeyboardIcon size={20} /> : <MicIcon size={20} />}
+              <MicIcon size={20} />
             </button>
           </div>
 
@@ -234,13 +255,22 @@ export function ComposerCard({
             </button>
           ) : null}
 
-          <button
-            className={`wx-send-button${sendReady ? ' wx-send-button--ready' : ''}`}
-            onClick={onSend}
-            disabled={!sendReady}
-          >
-            {sendLabel}
-          </button>
+          {voice.recording ? (
+            <VoiceControls
+              level={voice.level}
+              seconds={voice.seconds}
+              onCancel={voice.cancel}
+              onSend={voice.send}
+            />
+          ) : (
+            <button
+              className={`wx-send-button${sendReady ? ' wx-send-button--ready' : ''}`}
+              onClick={onSend}
+              disabled={!sendReady}
+            >
+              {sendLabel}
+            </button>
+          )}
         </div>
       </div>
 
