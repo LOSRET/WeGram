@@ -165,7 +165,15 @@ export function ProfileCard({ userId, onOpenChat, onClose }: ProfileCardProps) {
             <section className="wx-profile__section">
               <div className="wx-profile__row">
                 <span className="wx-profile__label">备注</span>
-                {editingNote ? (
+                {/*
+                  Telegram refuses `setUserNote` for somebody who is not in the
+                  address book ("User isn't a contact", measured on the test DC),
+                  so the row explains the order instead of offering a write that
+                  can only error. 添加为联系人 sits right below it.
+                */}
+                {!profile.isContact && !profile.note ? (
+                  <span className="wx-profile__value">添加为联系人后可写备注</span>
+                ) : editingNote ? (
                   <div className="wx-profile__note-editor">
                     <input
                       className="wx-profile__note-input"

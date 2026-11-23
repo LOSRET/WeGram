@@ -31,6 +31,10 @@ export function mapChat(ctx: MapperContext, chat: TdObject): ChatSummary {
     pinned: placement.pinned,
     muted: isMuted(chat.notification_settings),
     archived: placement.archived,
+    // 标为未读 is its own flag next to the counter (a chat can be marked unread
+    // with nothing new); the row draws a dot from it, so dropping it here made
+    // the menu's 标为未读 a no-op on the real adapter.
+    ...(chat.is_marked_as_unread === true ? { markedUnread: true } : {}),
     ...(lastReadInbox > 0 ? { lastReadInboxMessageId: lastReadInbox } : {}),
     lastReadOutboxMessageId: Number(chat.last_read_outbox_message_id ?? 0),
     ...(lastMessage ? { lastMessageText: previewContent(lastMessage.content) } : {}),

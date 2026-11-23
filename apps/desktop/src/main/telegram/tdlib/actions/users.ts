@@ -122,7 +122,26 @@ export async function setUserContact(
   } else {
     await deps.invoke({ _: 'removeContacts', user_ids: [input.userId] })
   }
-  return userProfile(deps, input.userId)
+  /**
+   * `addContact` answers Ok before `user.is_contact` flips (measured on the test
+   * DC: ~1.2 s later), and the card is painted straight from this answer — so a
+   * single `getUser` left 添加为联系人 showing its old label until the sheet was
+   * reopened. Wait for the flag, but never longer than the card can look busy.
+   */
+  const deadline = Date.now() + CONTACT_SETTLE_MS
+  for (;;) {
+    const profile = await userProfile(deps, input.userId)
+    if (profile.isContact === input.contact || Date.now() >= deadline) return profile
+    await pause(CONTACT_POLL_MS)
+  }
+}
+
+/** How long `addContact` / `removeContacts` may take to reach `user.is_contact`. */
+const CONTACT_SETTLE_MS = 3_000
+const CONTACT_POLL_MS = 150
+
+function pause(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 /**

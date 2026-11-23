@@ -58,6 +58,22 @@ describe('mapChat', () => {
     })
   })
 
+  it('carries 标为未读 as its own flag, and omits it when unset', () => {
+    const marked = mapChat(makeContext(), {
+      id: 7,
+      title: 'Marked',
+      type: { _: 'chatTypePrivate' },
+      unread_count: 0,
+      is_marked_as_unread: true,
+    })
+    const plain = mapChat(makeContext(), { id: 8, type: { _: 'chatTypePrivate' } })
+
+    // A chat can be marked unread with nothing new: the flag travels on its own.
+    expect(marked.markedUnread).toBe(true)
+    expect(marked.unread).toBe(0)
+    expect(plain.markedUnread).toBeUndefined()
+  })
+
   it('treats a zero countdown and an inherited default as unmuted', () => {
     const open = mapChat(makeContext(), {
       id: 3,

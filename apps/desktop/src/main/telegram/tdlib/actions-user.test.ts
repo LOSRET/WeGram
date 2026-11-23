@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { reportMessage, userCommonChats } from './actions'
+import { reportMessage, setUserContact, userCommonChats } from './actions'
 import type { ActionDeps } from './actions'
 import type { TdObject } from './client'
 import type { MapperContext } from './map/context'
@@ -120,5 +120,67 @@ describe('reportMessage (举报 one message)', () => {
       reportMessage(deps, { chatId: 1, messageId: 2, optionId: 'c3BhbQ==', text: '说明' }),
     ).resolves.toEqual({ reported: true })
     expect(calls[0]).toMatchObject({ option_id: 'c3BhbQ==', message_ids: [2], text: '说明' })
+  })
+})
+describe('setUserContact (添加 / 删除联系人)', () => {
+  /**
+   * TDLib answers `addContact` with Ok *before* `user.is_contact` flips —
+   * measured at ~1.2 s on the test DC — and the card paints straight from this
+   * answer, so the action has to wait for the flag instead of reading it once.
+   */
+  it('waits for the contact flag that TDLib applies asynchronously', async () => {
+    let getUserCalls = 0
+    const { deps, calls } = makeDeps((method) => {
+      if (method._ === 'addContact') return { _: 'ok' }
+      if (method._ === 'getUser') {
+        getUserCalls += 1
+        return {
+          _: 'user',
+          id: 42,
+          first_name: 'Ada',
+          last_name: '',
+          // The first read is still the old object; the next one has the flag.
+          is_contact: getUserCalls > 1,
+        }
+      }
+      if (method._ === 'getUserFullInfo') return { _: 'userFullInfo', group_in_common_count: 0 }
+      if (method._ === 'createPrivateChat') return { _: 'chat', id: 42, can_be_reported: false }
+      return null
+    })
+
+    const profile = await setUserContact(deps, { userId: 42, contact: true })
+
+    expect(profile.isContact).toBe(true)
+    // The name comes first (TDLib wants non-empty names), the add second.
+    expect(calls[0]).toMatchObject({ _: 'getUser', user_id: 42 })
+    expect(calls[1]).toEqual({
+      _: 'addContact',
+      user_id: 42,
+      contact: {
+        _: 'importedContact',
+        phone_number: '',
+        first_name: 'Ada',
+        last_name: '',
+        note: null,
+      },
+      share_phone_number: false,
+    })
+  })
+
+  it('deletes through removeContacts and reads the flag back', async () => {
+    const { deps, calls } = makeDeps((method) => {
+      if (method._ === 'removeContacts') return { _: 'ok' }
+      if (method._ === 'getUser') {
+        return { _: 'user', id: 7, first_name: 'Bob', last_name: '', is_contact: false }
+      }
+      if (method._ === 'getUserFullInfo') return { _: 'userFullInfo', group_in_common_count: 0 }
+      if (method._ === 'createPrivateChat') return { _: 'chat', id: 7, can_be_reported: false }
+      return null
+    })
+
+    const profile = await setUserContact(deps, { userId: 7, contact: false })
+
+    expect(profile.isContact).toBe(false)
+    expect(calls[0]).toEqual({ _: 'removeContacts', user_ids: [7] })
   })
 })
