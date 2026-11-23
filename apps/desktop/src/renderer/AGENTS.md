@@ -480,6 +480,12 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   `lib/query.ts` is `staleTime: Infinity`: a query that reuses its key for another
   topic needs `staleTime: 0` (focus/reconnect refetch off) or it will never fetch
   again after `enabled` flips back on.
+- **A switch only animates a click.** `Switch` carries `is-static` until the reader
+  clicks it (the stylesheet keeps that class transition-free): a panel that paints a
+  switch before its read answers — `desktop === true`, `mode ?? 'system'` — used to mount
+  it off, flip it a frame later and *animate* the correction, which read as the client
+  changing a setting by itself. Panels that must read first should not draw the control
+  at all until the answer lands.
 - **消息字号 moves the bubble, never the root font.** The step is written by the
   shell to `<html data-msg-size>` and reaches the transcript through
   `--wx-msg-scale` (`tokens.css`); `:root { font-size }` would also grow the chat

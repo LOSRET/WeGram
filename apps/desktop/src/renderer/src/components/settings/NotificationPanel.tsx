@@ -79,14 +79,16 @@ export function NotificationPanel() {
     <>
       <SettingsGroup title="通知">
         <SettingsRow label="桌面通知" description="在系统通知中心弹出新消息提醒">
-          <Switch
-            checked={desktop === true}
-            // Nothing to flip before the read lands: painting it "on" from a default
-            // would let the reader change a switch the panel never saw.
-            disabled={desktop === null}
-            label="桌面通知"
-            onChange={(next) => void toggleDesktop(next)}
-          />
+          {/* Nothing to flip before the read lands: painting the default "on"
+              would be a guess, and painting "off" showed a switch that changed
+              itself a frame later (the panel was measured doing exactly that). */}
+          {desktop === null ? null : (
+            <Switch
+              checked={desktop}
+              label="桌面通知"
+              onChange={(next) => void toggleDesktop(next)}
+            />
+          )}
         </SettingsRow>
       </SettingsGroup>
 

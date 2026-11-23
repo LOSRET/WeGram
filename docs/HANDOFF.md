@@ -1849,6 +1849,17 @@ claim is. Nothing here replaces §1 (state) or §9 (gaps).
   the bubble's `calc(14px * var(--wx-msg-scale))`.
 - `pnpm verify` green.
 
+**2026-11-23 (night, after 0.2.4) — 开关不再自己播放动画**
+- Reported from the running client: entering 设置 → 消息通知 (and 网络与代理) showed a switch
+  animating 关 → 开 by itself. Cause: those panels painted a guessed value
+  (`desktop === true`, `mode ?? 'system'`, `preferIpv6` default false) and the read
+  landed a frame later; the 150 ms transition turned the correction into an animation.
+- Fix, in two layers: `Switch` now carries `is-static` until the reader clicks it (the
+  stylesheet keeps that state transition-free, so a value that arrives without a click
+  changes in place), and 消息通知 / 网络与代理 no longer paint a switch before their read
+  answers (a switch is not drawn with a value the panel has not seen).
+- `pnpm verify` green. Not in the v0.2.4 installer (that build predates the fix).
+
 
 
 

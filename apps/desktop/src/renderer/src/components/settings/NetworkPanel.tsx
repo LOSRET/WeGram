@@ -94,11 +94,15 @@ export function NetworkPanel({ onError }: NetworkPanelProps) {
     <>
       <SettingsGroup title="代理">
         <SettingsRow label="使用系统代理" description="跟随 Windows 的代理设置，没配置时直连">
-          <Switch
-            checked={mode === 'system'}
-            label="使用系统代理"
-            onChange={(next) => void toggleSystem(next)}
-          />
+          {/* Both switches wait for `proxy:get` / `network:get`: before that answer
+              `mode` would be the 跟随系统 guess and the reader would watch it flip. */}
+          {state ? (
+            <Switch
+              checked={mode === 'system'}
+              label="使用系统代理"
+              onChange={(next) => void toggleSystem(next)}
+            />
+          ) : null}
         </SettingsRow>
 
         {mode === 'system' ? (
@@ -113,11 +117,13 @@ export function NetworkPanel({ onError }: NetworkPanelProps) {
         ) : null}
 
         <SettingsRow label="优先使用 IPv6" description="网络或代理只有 IPv6 时再打开">
-          <Switch
-            checked={proxy.preferIpv6}
-            label="优先使用 IPv6"
-            onChange={(next) => void proxy.toggleIpv6(next)}
-          />
+          {state ? (
+            <Switch
+              checked={proxy.preferIpv6}
+              label="优先使用 IPv6"
+              onChange={(next) => void proxy.toggleIpv6(next)}
+            />
+          ) : null}
         </SettingsRow>
       </SettingsGroup>
 

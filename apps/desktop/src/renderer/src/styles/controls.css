@@ -481,6 +481,14 @@
   transform: translateX(16px);
 }
 
+/* No slide without a click (see Switch.tsx): a switch whose value comes from an
+   async read mounted "off" and flipped on a frame later, and the transition made
+   that look like the client changing a setting by itself. */
+.wx-switch.is-static,
+.wx-switch.is-static .wx-switch__knob {
+  transition: none;
+}
+
 .wx-switch:disabled {
   opacity: 0.55;
   cursor: default;
