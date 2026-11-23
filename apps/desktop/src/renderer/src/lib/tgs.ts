@@ -16,6 +16,8 @@ const CACHE_LIMIT = 24
 const FAILURE_COOLDOWN_MS = 60_000
 
 const cache = new Map<string, unknown>()
+/** The decompressed JSON text, for a renderer that parses it itself (ThorVG). */
+const textCache = new Map<string, string>()
 const failures = new Map<string, number>()
 
 /**
@@ -31,12 +33,17 @@ function recentlyFailed(url: string): boolean {
   return false
 }
 
-export async function loadTgsAnimation(url: string): Promise<unknown> {
-  const cached = cache.get(url)
-  if (cached) {
+/**
+ * The decompressed Lottie JSON text, measured against the same guards as the
+ * decoded object. ThorVG's canvas parses Lottie itself, so the grid hands it this
+ * string instead of an already-parsed tree.
+ */
+export async function loadTgsText(url: string): Promise<string> {
+  const cached = textCache.get(url)
+  if (cached !== undefined) {
     // Refresh LRU order.
-    cache.delete(url)
-    cache.set(url, cached)
+    textCache.delete(url)
+    textCache.set(url, cached)
     return cached
   }
   if (recentlyFailed(url)) throw new Error('TGS recently failed to decode')
@@ -56,6 +63,25 @@ export async function loadTgsAnimation(url: string): Promise<unknown> {
   if (ratio > MAX_EXPANSION_RATIO) throw new Error(`TGS expansion ratio ${Math.round(ratio)}x`)
 
   const text = new TextDecoder().decode(decompressed)
+  textCache.set(url, text)
+  while (textCache.size > CACHE_LIMIT) {
+    const oldest = textCache.keys().next().value
+    if (oldest === undefined) break
+    textCache.delete(oldest)
+  }
+  return text
+}
+
+export async function loadTgsAnimation(url: string): Promise<unknown> {
+  const cached = cache.get(url)
+  if (cached) {
+    // Refresh LRU order.
+    cache.delete(url)
+    cache.set(url, cached)
+    return cached
+  }
+
+  const text = await loadTgsText(url)
   const data: unknown = JSON.parse(text)
   if (!isLottie(data)) throw new Error('TGS payload is not a Lottie animation')
 

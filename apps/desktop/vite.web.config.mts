@@ -5,6 +5,8 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
+import { thorvgWasm } from './vite-thorvg-wasm'
+
 /**
  * Browser-only preview of the renderer.
  *
@@ -23,7 +25,10 @@ export default defineConfig({
   root: resolve(here, 'src/renderer'),
   // The browser preview never sees app.getVersion(): inline the root version.
   define: { __WEGRAM_VERSION__: JSON.stringify(version) },
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), thorvgWasm(here)],
+  // The ThorVG canvas resolves its .wasm next to the package module; Vite's
+  // prebundling would move import.meta.url into .vite/deps and 404 it.
+  optimizeDeps: { exclude: ['@thorvg/webcanvas'] },
   resolve: {
     alias: {
       '@wegram/mock-fixtures': resolve(here, '../../packages/mock-fixtures/src/index.ts'),

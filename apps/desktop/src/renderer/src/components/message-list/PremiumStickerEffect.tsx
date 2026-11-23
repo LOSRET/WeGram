@@ -72,6 +72,8 @@ export function PremiumStickerEffect({ media, sticker, replay }: PremiumStickerE
           autoplay: false,
           animationData: data,
         })
+        // Whole frames only; see StickerRenderer's TgsSticker.
+        animation.setSubframe(false)
         animationRef.current = animation
         animation.addEventListener('complete', () => {
           if (!cancelled) setFinished(true)

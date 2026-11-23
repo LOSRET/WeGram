@@ -5,14 +5,16 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 
+import { thorvgWasm } from './vite-thorvg-wasm'
+
 /**
  * The root package.json is the single source of truth for the version (see
  * scripts/sync-version.mjs). The renderer has no access to Electron's
  * app.getVersion(), so the value is inlined here; main reads app.getVersion().
  */
-const { version } = JSON.parse(
-  readFileSync(resolve(__dirname, '../../package.json'), 'utf8'),
-) as { version: string }
+const { version } = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf8')) as {
+  version: string
+}
 
 const protocolAlias = {
   '@wegram/mock-fixtures': resolve(__dirname, '../../packages/mock-fixtures/src/index.ts'),
@@ -52,7 +54,8 @@ export default defineConfig({
     ...shared,
     resolve: { alias: { ...protocolAlias, ...adapterAlias } },
     define: { __WEGRAM_API_CREDENTIALS__: apiCredentials() },
-    plugins: [externalizeDepsPlugin({
+    plugins: [
+      externalizeDepsPlugin({
         exclude: [
           '@wegram/adapter-contract',
           '@wegram/mock-adapter',
@@ -60,7 +63,8 @@ export default defineConfig({
           '@wegram/mock-session',
           '@wegram/mock-fixtures',
         ],
-      })],
+      }),
+    ],
     build: {
       rollupOptions: {
         input: { index: resolve(__dirname, 'src/main/index.ts') },
@@ -69,9 +73,11 @@ export default defineConfig({
   },
   preload: {
     ...shared,
-    plugins: [externalizeDepsPlugin({
+    plugins: [
+      externalizeDepsPlugin({
         exclude: ['@wegram/protocol', '@wegram/mock-session', '@wegram/mock-fixtures'],
-      })],
+      }),
+    ],
     build: {
       rollupOptions: {
         input: { index: resolve(__dirname, 'src/preload/index.ts') },
@@ -82,7 +88,10 @@ export default defineConfig({
     ...shared,
     root: resolve(__dirname, 'src/renderer'),
     define: { __WEGRAM_VERSION__: JSON.stringify(version) },
-    plugins: [react(), tailwindcss()],
+    plugins: [react(), tailwindcss(), thorvgWasm(__dirname)],
+    // ThorVG's canvas locates thorvg.wasm next to its ESM; prebundling would move
+    // import.meta.url into .vite/deps and the loader would fetch a missing file.
+    optimizeDeps: { exclude: ['@thorvg/webcanvas'] },
     resolve: {
       alias: {
         ...protocolAlias,

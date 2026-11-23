@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react'
 
-/** How far outside the viewport a cell still counts as "about to be read". */
+/** How far outside the scroller a cell still counts as "about to be read". */
 const PRELOAD_PX = 200
 
 export interface InView {
@@ -11,14 +11,34 @@ export interface InView {
 }
 
 /**
- * Visibility gate for one cell. `marginPx` preloads that far outside the
- * viewport so a sticker does not visibly start from nothing when it scrolls into
- * view; a photo bubble asks for about half a screen, because a picture that
- * arrives while the reader is still scrolling reads as "instant".
+ * The nearest scrolling ancestor, or null for a panel that scrolls the page itself.
+ *
+ * Comparing against the window is wrong for a cell inside a panel: a row scrolled
+ * out of the 表情 panel's body still has a rect inside the window, so a WebM cell
+ * would keep decoding while clipped. The observer needs the actual scroller.
+ */
+function scrollParent(node: Element): Element | null {
+  let parent = node.parentElement
+  while (parent && parent !== document.body) {
+    const overflowY = getComputedStyle(parent).overflowY
+    if (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay') {
+      return parent
+    }
+    parent = parent.parentElement
+  }
+  return null
+}
+
+/**
+ * Visibility gate for one cell. `marginPx` preloads that far outside the scroller
+ * so a sticker does not visibly start from nothing when it scrolls into view; a
+ * photo bubble asks for about half a screen, because a picture that arrives while
+ * the reader is still scrolling reads as "instant".
  *
  * Shared by the sticker renderer, a premium sticker's effect and the media
  * bubbles: each draws a file only once its box is about to be read, and each must
- * keep playing while its box is on screen.
+ * keep playing while its box is on screen. A cell that is scrolled out of its
+ * panel's body is not visible even though the window still contains its rect.
  */
 export function useInView<T extends Element>(marginPx = PRELOAD_PX): [RefObject<T | null>, InView] {
   const ref = useRef<T | null>(null)
@@ -27,6 +47,13 @@ export function useInView<T extends Element>(marginPx = PRELOAD_PX): [RefObject<
   useEffect(() => {
     const node = ref.current
     if (!node) return
+
+    const root = scrollParent(node)
+    const bounds = (): { top: number; bottom: number } => {
+      if (!root) return { top: 0, bottom: window.innerHeight }
+      const rect = root.getBoundingClientRect()
+      return { top: rect.top, bottom: rect.bottom }
+    }
 
     const apply = (onScreen: boolean): void => {
       setState((current) =>
@@ -37,7 +64,8 @@ export function useInView<T extends Element>(marginPx = PRELOAD_PX): [RefObject<
     }
     const check = (): void => {
       const rect = node.getBoundingClientRect()
-      apply(rect.bottom > -marginPx && rect.top < window.innerHeight + marginPx)
+      const limits = bounds()
+      apply(rect.bottom > limits.top - marginPx && rect.top < limits.bottom + marginPx)
     }
 
     // Geometry first: IntersectionObserver delivery rides the rendering pipeline and
@@ -50,7 +78,7 @@ export function useInView<T extends Element>(marginPx = PRELOAD_PX): [RefObject<
 
     const observer = new IntersectionObserver(
       (entries) => apply(Boolean(entries[0]?.isIntersecting)),
-      { rootMargin: `${marginPx}px 0px` },
+      { root, rootMargin: `${marginPx}px 0px` },
     )
     observer.observe(node)
     return () => {

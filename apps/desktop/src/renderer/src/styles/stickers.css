@@ -145,7 +145,8 @@
   border: none;
   border-radius: 5px;
   background: transparent;
-  font-family: 'WeGram Emoji', 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif;
+  font-family:
+    'WeGram Emoji', 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', sans-serif;
   /* The client paints 24 px emoji art; a 24 px color glyph measures the same. */
   font-size: 24px;
   line-height: 1;
@@ -157,6 +158,7 @@
 
 /* 4×104 px sticker cells fill the same content width as the emoji grid. */
 .wx-picker__stickers {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
@@ -355,4 +357,196 @@
   font-size: 12px;
   line-height: 1.5;
   color: var(--wx-danger);
+}
+
+/* 贴纸包详情 — the box Telegram Desktop shows when a sticker is clicked (design
+   doc §8.5): a 464 × 558 card floating un-dimmed over the conversation, with the
+   pack title, a ⋮ menu, a five-column grid and the 移除贴纸包 footer. */
+.wx-pack-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Telegram's box does not dim the chat behind it; the shadow separates it. */
+  background: transparent;
+}
+
+.wx-pack {
+  display: flex;
+  flex-direction: column;
+  width: 464px;
+  height: 558px;
+  border-radius: 10px;
+  background: var(--wx-picker);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.22),
+    0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.wx-pack__head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 52px;
+  padding: 0 10px 0 18px;
+}
+
+.wx-pack__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--wx-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wx-pack__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wx-icon);
+}
+
+.wx-pack__icon:hover {
+  background: var(--wx-row-hover);
+}
+
+.wx-pack__icon--close {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.wx-pack__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 12px 8px;
+  scrollbar-width: thin;
+}
+
+.wx-pack__grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 2px;
+}
+
+.wx-pack__sticker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 82px;
+  padding: 2px;
+  border-radius: 8px;
+}
+
+.wx-pack__state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 0 20px;
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: center;
+  color: var(--wx-text-secondary);
+}
+
+.wx-pack__state--error {
+  color: var(--wx-danger);
+}
+
+.wx-pack__foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 58px;
+  border-top: 1px solid var(--wx-divider);
+}
+
+.wx-pack__remove {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wx-danger);
+  font-size: 14px;
+}
+
+.wx-pack__remove:hover {
+  background: var(--wx-row-hover);
+}
+
+.wx-pack__remove:disabled {
+  color: var(--wx-text-disabled);
+}
+
+.wx-pack__add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wx-brand);
+  font-size: 14px;
+}
+
+.wx-pack__add:hover {
+  background: var(--wx-row-hover);
+}
+
+.wx-pack__add:disabled {
+  color: var(--wx-text-disabled);
+}
+
+.wx-pack__count {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 9px;
+  background: var(--wx-fill-disabled);
+  color: var(--wx-text-secondary);
+  font-size: 12px;
+  line-height: 16px;
+  text-align: center;
+}
+
+/* ---------- Shared sticker canvas (ThorVG) ----------
+
+   A TGS pack is one WebGL scene with one render() per frame, laid over the grid's
+   cells. The cells keep hover/title/click; a cell whose animation is ready hides
+   its static thumbnail and the canvas draws the artwork. See
+   components/StickerCanvasLayer.tsx and design doc §8.5. */
+.wx-sticker-canvas-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.wx-sticker-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.wx-sticker-canvas-cell .wx-sticker {
+  visibility: hidden;
 }

@@ -51,6 +51,10 @@ export class MockAssets {
     await writeFile(heartPath, Buffer.from(STICKER_HEART_WEBP, 'base64'))
     const wavePath = join(mediaDir, 'sticker-wave.tgs')
     await writeFile(wavePath, Buffer.from(STICKER_WAVE_TGS, 'base64'))
+    // The TGS's static frame: TDLib always ships one, and a grid cell rests on it
+    // until the pointer plays the animation.
+    const waveThumbPath = join(mediaDir, 'sticker-wave-thumb.png')
+    await writeFile(waveThumbPath, createGradientPng(128, 128, [126, 214, 165], [40, 120, 80]))
     const premiumPath = join(mediaDir, 'premium-sticker-effect.tgs')
     await writeFile(premiumPath, Buffer.from(PREMIUM_EFFECT_TGS, 'base64'))
     const clipPath = join(mediaDir, 'sample-video.webm')
@@ -65,6 +69,7 @@ export class MockAssets {
     this.addFile(7001, facePath, '笑脸贴纸', 'image/webp', 128, 128)
     this.addFile(7002, heartPath, '爱心贴纸', 'image/webp', 128, 128)
     this.addFile(7003, wavePath, '旋转贴纸', 'application/gzip', 128, 128)
+    this.addFile(7006, waveThumbPath, '旋转贴纸预览', 'image/png', 128, 128)
     // The premium sticker's effect: a second file, like the real one.
     this.addFile(7005, premiumPath, '会员贴纸特效', 'application/gzip', 512, 512)
     this.addFile(7101, designPath, 'design-v3.png', 'image/png', 1200, 800)
@@ -78,7 +83,18 @@ export class MockAssets {
     this.stickers.push(
       { fileId: 7001, format: 'webp', emoji: '😀', width: 128, height: 128, thumbFileId: 7001 },
       { fileId: 7002, format: 'webp', emoji: '❤️', width: 128, height: 128, thumbFileId: 7002 },
-      { fileId: 7003, format: 'tgs', emoji: '✨', width: 128, height: 128 },
+      {
+        fileId: 7003,
+        format: 'tgs',
+        emoji: '✨',
+        width: 128,
+        height: 128,
+        thumbFileId: 7006,
+        thumbFormat: 'webp',
+      },
+      // A WebM sticker so the demo pack exercises the third format (and the
+      // grid's visible-only video playback).
+      { fileId: 7301, format: 'webm', emoji: '🎬', width: 270, height: 480 },
     )
     // One custom emoji for the fixture transcript. The entity's id is the same
     // number as the sticker file it draws (7003, the ✨ TGS); the fixture data in

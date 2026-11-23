@@ -199,6 +199,9 @@ importers:
       '@tanstack/react-virtual':
         specifier: ^3.14.26
         version: 3.14.26(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@thorvg/webcanvas':
+        specifier: 1.1.4
+        version: 1.1.4
       '@wegram/adapter-contract':
         specifier: workspace:*
         version: link:../../packages/adapter-contract
@@ -1032,6 +1035,9 @@ packages:
 
   '@tanstack/virtual-core@3.19.11':
     resolution: {integrity: sha512-/5iHb0RHBvj8Di59FDs4ESNm45jls33aZAi4zccVXZjc/6ZvwQP6nzEYeT6weXjTf9E6/vrp2JhYWRyO+ZP13A==}
+
+  '@thorvg/webcanvas@1.1.4':
+    resolution: {integrity: sha512-tyS2HP6F8X/+zYjrFKIfLKlls4jL/17+ESE6RI0YgvBi/64pdvyb8ODC7Ibna42276R36QG4aCVfG03O9B3nOQ==}
 
   '@tybys/wasm-util@0.10.5':
     resolution: {integrity: sha512-dOGOPxlaNV+G046mZzN+9C0dAcQZeSKcXiVaM0TYy/LM4ttTmgSBDxYfovcYI8Em3+eAbiAYpvWLOv8+ZVRJKA==}
@@ -3350,6 +3356,8 @@ snapshots:
       react-dom: 19.3.1(react@19.3.1)
 
   '@tanstack/virtual-core@3.19.11': {}
+
+  '@thorvg/webcanvas@1.1.4': {}
 
   '@tybys/wasm-util@0.10.5':
     dependencies:

@@ -15,10 +15,9 @@ interface StickerRendererProps {
   size?: number
   /**
    * Draw the static thumbnail only — the picker's tab covers and search hits, which
-   * are 28-36 px and exist a hundred times over.
-   *
-   * Sticker cells pass nothing: they play the sticker itself and use the thumbnail
-   * as the first paint while the real file downloads.
+   * are 28-36 px and exist a hundred times over, and a TGS grid cell whose artwork
+   * the shared ThorVG canvas is already drawing (its thumbnail is hidden once the
+   * canvas paints it).
    */
   preview?: boolean
   /**
@@ -33,6 +32,16 @@ interface StickerRendererProps {
    * floor, because they are drawn inside a line of text.
    */
   minSize?: number
+  /**
+   * Play a TGS/WebM only while the pointer is over the cell, and rest on the
+   * static thumbnail otherwise. Sticker **grids** use this: a pack is a hundred
+   * animations, and Telegram Desktop keeps that affordable with one shared
+   * renderer plus a 30 fps repaint budget (lib_lottie's MultiPlayer). A DOM
+   * sticker player has no such renderer, so the grid mounts at most the one
+   * animation under the pointer; the transcript keeps auto-playing, where only a
+   * screenful of stickers is ever visible.
+   */
+  playOnHover?: boolean
 }
 
 /**
@@ -43,9 +52,10 @@ interface StickerRendererProps {
  * - WebM: Chromium's own VP9 decoder via `<video>`; no extra dependency.
  *
  * Nothing is downloaded until the box is on (or just before) the screen — a
- * sticker set is a hundred cells but only a screenful is ever looked at — and an
- * animation pauses whenever it scrolls out of view, which is what keeps a long
- * chat or a full 表情 grid at 60 fps.
+ * sticker set is a hundred cells but only a screenful is ever looked at. A looping
+ * animation is mounted only while a visible row (or a hovered grid cell) can show
+ * it, so a 120-sticker pack costs no Lottie work at rest; the transcript keeps
+ * auto-playing the handful of stickers a screen actually holds.
  */
 export function StickerRenderer({
   media,
@@ -53,11 +63,21 @@ export function StickerRenderer({
   preview = false,
   playback = 'loop',
   minSize,
+  playOnHover = false,
 }: StickerRendererProps) {
-  const [ref, view] = useInView<HTMLDivElement>()
+  // A video sticker plays whenever it is on screen (no preload margin): the grid
+  // mounts one <video> per visible WebM cell, so the margin must not pull a row
+  // that is scrolled out of the panel into the playing set.
+  const [ref, view] = useInView<HTMLDivElement>(media.stickerFormat === 'webm' ? 0 : undefined)
   const once = playback === 'once'
   /** Bumped by a tap; the artwork component replays the animation from frame 0. */
   const [replay, setReplay] = useState(0)
+  /** A grid cell is hovered; see `playOnHover`. */
+  const [hovered, setHovered] = useState(false)
+
+  const hoverPlay = playOnHover && !preview
+  /** Whether an already-mounted animation may run right now. */
+  const playing = view.visible && (!hoverPlay || hovered)
 
   const box = stickerBox(media, size, minSize)
 
@@ -86,54 +106,42 @@ export function StickerRenderer({
     if (media.soundFileId) void playEmojiSound(media.soundFileId)
   }
 
+  const ratio = Math.round((progressRatio(progress) ?? 0) * 100)
+  /** The still frame: TDLib's static thumbnail, or a spinner until there is one. */
+  const still: ReactNode =
+    thumbUrl && thumbIsPicture ? (
+      <img
+        className="wx-sticker"
+        style={box}
+        src={thumbUrl}
+        alt={label}
+        title={media.stickerEmoji}
+        draggable={false}
+      />
+    ) : (
+      <div className="wx-sticker wx-sticker--loading" style={box} title={media.stickerEmoji}>
+        {ratio > 0 ? (
+          <span className="wx-sticker__pct">{ratio}%</span>
+        ) : (
+          <span className="wx-spinner" />
+        )}
+      </div>
+    )
+
+  const animated = format === 'tgs' || format === 'webm'
+  /**
+   * The animation element is only mounted while it can run. A grid cell that is
+   * not hovered keeps its still frame, so opening a 120-sticker pack neither
+   * parses nor ticks 120 Lottie instances. 'once' is the exception: it stays
+   * mounted from the moment its file lands, so scrolling a row back does not
+   * restart the single pass.
+   */
+  const showAnimation =
+    Boolean(artworkUrl) && animated && (once || view.visible) && (!hoverPlay || hovered)
+
   let content: ReactNode
-  if (!artworkUrl) {
-    const ratio = Math.round((progressRatio(progress) ?? 0) * 100)
-    content =
-      thumbUrl && thumbIsPicture ? (
-        // The still frame stands in while the animation downloads.
-        <img
-          className="wx-sticker"
-          style={box}
-          src={thumbUrl}
-          alt={label}
-          title={media.stickerEmoji}
-          draggable={false}
-        />
-      ) : (
-        <div className="wx-sticker wx-sticker--loading" style={box} title={media.stickerEmoji}>
-          {ratio > 0 ? (
-            <span className="wx-sticker__pct">{ratio}%</span>
-          ) : (
-            <span className="wx-spinner" />
-          )}
-        </div>
-      )
-  } else if (format === 'tgs') {
-    content = (
-      <TgsSticker
-        url={artworkUrl}
-        box={box}
-        emoji={media.stickerEmoji}
-        label={label}
-        active={view.visible}
-        once={once}
-        replay={replay}
-      />
-    )
-  } else if (format === 'webm') {
-    content = (
-      <WebmSticker
-        url={artworkUrl}
-        box={box}
-        label={label}
-        active={view.visible}
-        once={once}
-        replay={replay}
-      />
-    )
-  } else {
-    content = (
+  if (!animated) {
+    content = artworkUrl ? (
       <img
         className="wx-sticker"
         style={box}
@@ -142,11 +150,44 @@ export function StickerRenderer({
         title={media.stickerEmoji}
         draggable={false}
       />
+    ) : (
+      still
     )
+  } else if (showAnimation && artworkUrl) {
+    content =
+      format === 'tgs' ? (
+        <TgsSticker
+          url={artworkUrl}
+          box={box}
+          emoji={media.stickerEmoji}
+          label={label}
+          active={playing}
+          once={once}
+          replay={replay}
+        />
+      ) : (
+        <WebmSticker
+          url={artworkUrl}
+          box={box}
+          label={label}
+          active={playing}
+          once={once}
+          replay={replay}
+        />
+      )
+  } else {
+    // Resting grid cell, or the animation is still downloading.
+    content = still
   }
 
   return (
-    <div ref={ref} style={box} onClick={once ? replayEmoji : undefined}>
+    <div
+      ref={ref}
+      style={box}
+      onClick={once ? replayEmoji : undefined}
+      onPointerEnter={hoverPlay ? () => setHovered(true) : undefined}
+      onPointerLeave={hoverPlay ? () => setHovered(false) : undefined}
+    >
       {content}
     </div>
   )
@@ -194,6 +235,10 @@ function TgsSticker({ url, box, label, emoji, active, once, replay }: AnimatedPr
           autoplay: false,
           animationData: data,
         })
+        // Evaluate whole frames only, like Telegram's C++ renderer: interpolating
+        // between them doubles the per-frame work for no visible gain at these
+        // sizes, and the browser's compositor is what actually paces the clock.
+        animation.setSubframe(false)
         animationRef.current = animation
         animation.addEventListener('complete', () => {
           doneRef.current = true
