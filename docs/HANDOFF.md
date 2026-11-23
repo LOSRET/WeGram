@@ -458,7 +458,9 @@ screenshot px against our 40 CSS px, so **CSS px = screenshot px ÷ 1.25**):
 | canvas | `#f7f7f7`, clip fitted **by height with no padding** (410 × 728 CSS for 9:16 there) |
 | player bar | 40 px tall, **84 px from the left, 82 px from the right, 20 px above the bottom**, radius 8, `rgba(0,0,0,.45)` — samples `#888888` over the canvas |
 | bar contents | ▶/❚❚ 32 px icon, elapsed `00:01` 13 px tabular, timeline (2 px track, played part white, 10 px white thumb), total `00:51`, 倍速 text button, speaker |
-| bar behaviour | floats over the clip, hides after 2.4 s of playback without pointer movement; visible while paused, while dragging the timeline and while 倍速 is open |
+| 音量 capsule | point/click the speaker and the client lifts a **34 × 128 px** capsule above it (radius 17, `rgba(0,0,0,.4)`), a 2 px white track with a 22 px knob, the **top** of the track being 100 % (measured 1:1 off a 1253 × 820 capture, 2026-11-23; the player bar is 40 px in that shot, so CSS px = screenshot px) |
+| bar behaviour | floats over the clip, hides after 2.4 s of playback without pointer movement; visible while paused, while dragging the timeline, while 倍速 is open and while the 音量 capsule is up |
+| 音量 persistence | the level is stored in `ui.db` (`app_settings.viewer_volume`, one value for the app) and reused by the next window; 静音 is per-session — it slides the capsule to the bottom and clicking again puts it back, the level itself never changes |
 | keyboard | Space / K play-pause, ←/→ seek ±5 s, M mute, Escape closes the menu / 预览 / window |
 
 ### 5.4 The login window

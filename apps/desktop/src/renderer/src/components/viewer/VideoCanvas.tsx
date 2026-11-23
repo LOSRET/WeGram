@@ -11,7 +11,9 @@ import {
 } from '../../lib/player'
 import { elementSize, fitScale, type Size } from '../../lib/zoom'
 import { Popup } from '../ContextMenu'
-import { MutedIcon, PauseIcon, PlayIcon, VolumeIcon } from './ViewerIcons'
+import { useViewerVolume } from './useViewerVolume'
+import { PauseIcon, PlayIcon } from './ViewerIcons'
+import { VolumeControl } from './VolumeControl'
 
 /** How long the bar stays on screen while the video plays (the client hides it). */
 const IDLE_HIDE_MS = 2400
@@ -54,7 +56,7 @@ export function VideoCanvas({
   const [current, setCurrent] = useState(0)
   const [duration, setDuration] = useState(item.duration ?? 0)
   const [rate, setRate] = useState<PlaybackRate>(1)
-  const [muted, setMuted] = useState(false)
+  const { volume, muted, setVolume, commit, step, toggleMute } = useViewerVolume()
   /** A GIF has no transport: it loops, and the bar would only cover it. */
   const animation = Boolean(item.isAnimation)
   const [dragging, setDragging] = useState(false)
@@ -110,11 +112,14 @@ export function VideoCanvas({
     video.playbackRate = rate
   }, [rate, url])
 
+  // 音量 and 静音 are element state: the level is stored across windows, the toggle is
+  // not, so a reopened clip is audible again at the level the last one was left at.
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
-    video.muted = muted
-  }, [muted, url])
+    video.volume = volume
+    video.muted = muted || volume <= 0
+  }, [volume, muted, url])
 
   const onSeekPointer = (event: PointerEvent<HTMLDivElement>): void => {
     const track = trackRef.current
@@ -200,12 +205,12 @@ export function VideoCanvas({
         event.preventDefault()
         seek(seekTarget(video.currentTime, duration, SEEK_STEP))
       } else if (event.key === 'm' || event.key === 'M') {
-        setMuted((value) => !value)
+        toggleMute()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [duration, seek, toggle])
+  }, [duration, seek, toggle, toggleMute])
 
   return (
     <div className="wx-viewer__stage" onPointerMove={wake}>
@@ -244,7 +249,6 @@ export function VideoCanvas({
               setClip({ width: video.videoWidth / ratio, height: video.videoHeight / ratio })
             }
             video.playbackRate = rate
-            video.muted = muted
           }}
         />
       ) : null}
@@ -297,14 +301,14 @@ export function VideoCanvas({
           {rate === 1 ? '倍速' : `${rate}x`}
         </button>
 
-        <button
-          type="button"
-          className="wx-player__icon"
-          title={muted ? '取消静音' : '静音'}
-          onClick={() => setMuted((value) => !value)}
-        >
-          {muted ? <MutedIcon size={18} /> : <VolumeIcon size={18} />}
-        </button>
+        <VolumeControl
+          volume={volume}
+          muted={muted}
+          onVolume={setVolume}
+          onStep={step}
+          onCommit={commit}
+          onToggleMute={toggleMute}
+        />
       </div>
 
       {menu ? (

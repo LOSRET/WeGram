@@ -82,6 +82,8 @@ components/proxy/         ProxyForm: the one proxy form, shown by the login wind
                          deciding which proxy is in force (that is main's job)
 components/viewer/        the 图片和视频 window: MediaViewer shell + useViewerItem /
                          useViewerZoom + ViewerToolbar / ViewerGrid + viewerMenu / viewerActions
+                         + VolumeControl / useViewerVolume (the player's 音量 capsule and the
+                         level it stores in ui.db)
 components/StickerSetBox.tsx  贴纸包盒子 (§8.5): clicking a sticker message opens its
                         set (title + ⋮ menu + grid + 移除/添加贴纸包); it fetches
                         `stickers:set` by `MessageMedia.stickerSetId` and writes

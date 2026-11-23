@@ -411,6 +411,10 @@ export function createHandlers({
     'ui:saveRecentEmoji': (payload) => {
       uiDb.setSetting(RECENT_EMOJI_KEY, JSON.stringify(payload.emoji.slice(0, RECENT_EMOJI_LIMIT)))
     },
+    'ui:getViewerVolume': () => uiDb.getViewerVolume(),
+    'ui:setViewerVolume': (payload) => {
+      uiDb.setViewerVolume(payload.volume)
+    },
 
     'settings:get': () => ({
       theme: storedTheme(uiDb),

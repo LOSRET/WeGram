@@ -11,6 +11,9 @@ export interface DraftRecord {
 
 const logger = createLogger('ui-db')
 
+/** `app_settings` key of the 图片和视频 window's level (design doc §9.5). */
+const VIEWER_VOLUME_KEY = 'viewer_volume'
+
 /**
  * UI database (`ui.db`, design doc §5.1/§5.2).
  *
@@ -218,6 +221,24 @@ export class UiDatabase {
          ON CONFLICT(k) DO UPDATE SET v = excluded.v`,
       )
       .run(key, value)
+  }
+
+  /**
+   * The 图片和视频 window's volume (§9.5): one level for the whole app, so a clip
+   * opened later starts where the last one was left. `null` means "never saved" and
+   * the player reads it as full volume, which is also the answer to a broken row —
+   * a lost setting must never open a clip silent.
+   */
+  getViewerVolume(): number | null {
+    const stored = this.getSetting(VIEWER_VOLUME_KEY)
+    if (stored === null || stored.trim().length === 0) return null
+    const volume = Number(stored)
+    return Number.isFinite(volume) ? Math.min(1, Math.max(0, volume)) : null
+  }
+
+  setViewerVolume(volume: number): void {
+    if (!Number.isFinite(volume)) return
+    this.setSetting(VIEWER_VOLUME_KEY, String(Math.min(1, Math.max(0, volume))))
   }
 
   /**

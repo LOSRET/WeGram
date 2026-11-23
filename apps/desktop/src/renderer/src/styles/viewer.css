@@ -253,6 +253,95 @@
   background: rgba(255, 255, 255, 0.14);
 }
 
+/* 音量: the speaker and the capsule the client lifts above it (§9.5). Measured at
+   4× off the client: 34 × 128 px, radius 17, rgba(0,0,0,.4), 2 px white track, 22 px
+   knob. The capsule hangs off the volume cell inside the bar, so the bar still sees
+   the pointer as hovering and never hides mid-drag. */
+.wx-player__volume {
+  position: relative;
+  display: flex;
+  flex: none;
+}
+
+.wx-player__volume.is-open .wx-player__icon {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.wx-player__volume-pop {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  display: flex;
+  justify-content: center;
+  width: 34px;
+  height: 128px;
+  padding: 14px 0;
+  border-radius: 17px;
+  background: rgba(0, 0, 0, 0.4);
+  transform: translateX(-50%);
+}
+
+/* The 6 px the capsule floats above the speaker is part of its hit box: without this
+   bridge the pointer leaving the speaker upwards crosses dead space, the wrapper sees
+   pointerleave and the capsule closes before the cursor reaches it. */
+.wx-player__volume-pop::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -8px;
+  left: 0;
+  height: 8px;
+}
+
+.wx-player__volume-track {
+  position: relative;
+  width: 22px;
+  height: 100%;
+  cursor: pointer;
+}
+
+.wx-player__volume-track::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.wx-player__volume-fill {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: #fff;
+  transition: height 0.15s ease;
+}
+
+.wx-player__volume-thumb {
+  position: absolute;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  margin-bottom: -8px;
+  margin-left: -8px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: bottom 0.15s ease;
+}
+
+/* 静音 slides the knob to the bottom; a drag must not lag behind the pointer. */
+.wx-player__volume-track.is-dragging .wx-player__volume-fill,
+.wx-player__volume-track.is-dragging .wx-player__volume-thumb {
+  transition: none;
+}
+
 .wx-viewer__status {
   position: absolute;
   display: flex;

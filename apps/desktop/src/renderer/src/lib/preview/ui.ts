@@ -17,6 +17,8 @@ interface PreviewUiStore {
   /** Comment-thread positions, keyed `chatId:messageId` like the `ui.db` row. */
   commentAnchors: Record<string, { messageId: number; offset: number }>
   recentEmoji: string[]
+  /** The 图片和视频 window's 音量; `null` is "never dragged", which plays at full. */
+  viewerVolume: number | null
 }
 
 export const previewUiStore: PreviewUiStore = {
@@ -24,6 +26,7 @@ export const previewUiStore: PreviewUiStore = {
   anchors: {},
   commentAnchors: {},
   recentEmoji: [],
+  viewerVolume: null,
 }
 
 type PreviewUiPayload = Record<string, unknown>
@@ -60,6 +63,13 @@ export function handlePreviewUi(channel: InvokeChannel, payload: PreviewUiPayloa
         messageId: Number(payload['anchorMessageId']),
         offset: Number(payload['offset'] ?? 0),
       }
+      return undefined
+    }
+    case 'ui:getViewerVolume':
+      return store.viewerVolume
+    case 'ui:setViewerVolume': {
+      const level = Number(payload['volume'])
+      store.viewerVolume = Number.isFinite(level) ? Math.min(1, Math.max(0, level)) : null
       return undefined
     }
     case 'ui:getRecentEmoji':
