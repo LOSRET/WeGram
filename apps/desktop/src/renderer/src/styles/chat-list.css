@@ -83,9 +83,9 @@
 }
 
 /* The scroller is its own layer so the overlay bar can float above it without
-   being part of the scrolling content. It is the body's flex child, so the
-   已归档会话 entry can sit above it without being scrolled away; the overlay bar
-   measures the scroller's own rect, so the offset costs nothing. */
+   being part of the scrolling content. It is the body's flex child and holds every
+   row — 已归档会话's first — so the whole column scrolls as one, and the overlay bar
+   measures the scroller's own rect. */
 .wx-list__view {
   position: relative;
   flex: 1;
@@ -278,11 +278,12 @@
 
 /* ---------- 已归档会话 ---------- */
 
-/* The archive row above the conversation list: a door to the second chat list,
-   not a collapsible header. Same 65 px rhythm as a conversation row, so the two
-   read as one column. */
+/* 已归档会话's row: a door to the second chat list, not a collapsible header. It is
+   the conversation list's own first row (inside the scroller, so it scrolls away
+   with the rest of the column) and keeps the 65 px rhythm of a conversation row —
+   the .wx-chat-item height, which is also the CHAT_ROW_H ChatList's resting offset
+   is built from. */
 .wx-archive-entry {
-  flex: 0 0 var(--wx-list-item-h);
   width: 100%;
   border: none;
   background: transparent;

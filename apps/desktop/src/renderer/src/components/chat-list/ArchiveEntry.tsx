@@ -8,7 +8,9 @@ interface ArchiveEntryProps {
 }
 
 /**
- * 已归档会话: the one row Telegram puts above the conversation list.
+ * 已归档会话: the conversation list's first row — it scrolls with the rows instead of
+ * being pinned above them, and ChatList rests the list one row down so it starts out
+ * of view (the reader scrolls up to find it).
  *
  * It is a list of its own (TDLib's `chatListArchive`), so the row is a door, not a
  * collapsible header: the count on the right is everything waiting inside it. The

@@ -20,7 +20,7 @@ interface ArchivePageProps {
 }
 
 /**
- * 已归档会话 (design doc §9.2), the page the row above the conversation list opens.
+ * 已归档会话 (design doc §9.2), the page the conversation list's first row opens.
  *
  * It is an OVERLAY inside the conversation column: the page slides in from the
  * right over the list, which keeps its rows and its scroll position underneath.
