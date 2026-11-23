@@ -39,6 +39,18 @@ const threadCache = new Map<string, ThreadPage>()
 /** Pixels from the top that trigger loading an older page, like the transcript. */
 const LOAD_OLDER_AT = 90
 
+/** The retry line a failed page leaves, on its own or above the rows it kept. */
+function ErrorHint({ error, onRetry }: { error: string; onRetry: () => void }) {
+  return (
+    <div className="wx-comments-panel__hint">
+      <span>{error}</span>
+      <button className="wx-comments-panel__retry" onClick={onRetry}>
+        重试
+      </button>
+    </div>
+  )
+}
+
 function BackIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
@@ -246,6 +258,23 @@ export function CommentPanel({
     [key, message.chatId, message.id],
   )
 
+  /**
+   * Ask for the next older page while the list still sits at the top of what it
+   * has. A wheel that cannot move the list raises no scroll event, so a panel
+   * that opens at `scrollTop 0` never triggers the rule in `onScroll`: the
+   * reader had to scroll *down* first, and only then did the comments above
+   * appear. One page is fetched after the landing (the transcript keeps a page
+   * ahead of the reader too), and the prepend compensation leaves them on the
+   * same row, so scrolling up has history to move into.
+   */
+  const topUpAbove = useCallback((): void => {
+    const el = scrollRef.current
+    if (!el || !page?.hasMore || loadingRef.current) return
+    if (el.scrollTop > LOAD_OLDER_AT) return
+    const oldest = page.messages[0]?.id
+    if (oldest !== undefined) void load(oldest)
+  }, [load, page])
+
   // The first page: the cache answers instantly, otherwise one request. Where the
   // list lands is decided once, in the layout effect below (a saved row or the top).
   useEffect(() => {
@@ -321,6 +350,7 @@ export function CommentPanel({
         : null
     if (!landing || !row) {
       el.scrollTop = 0
+      topUpAbove()
       return
     }
     el.scrollTop = Math.max(
@@ -330,7 +360,8 @@ export function CommentPanel({
         el.getBoundingClientRect().top -
         landing.offset,
     )
-  }, [anchor, anchorKnown, page])
+    topUpAbove()
+  }, [anchor, anchorKnown, page, topUpAbove])
 
   // A posted comment is appended at the end of the thread; reveal it. It runs
   // here, not on a timer, so the new row's height is already measured.
@@ -343,11 +374,7 @@ export function CommentPanel({
 
   const onScroll = (): void => {
     scheduleSave()
-    const el = scrollRef.current
-    if (!el || !page?.hasMore || loadingRef.current) return
-    if (el.scrollTop > LOAD_OLDER_AT) return
-    const oldest = page.messages[0]?.id
-    if (oldest !== undefined) void load(oldest)
+    topUpAbove()
   }
 
   /** Appends the comment the input just posted and keeps the reader at the bottom. */
@@ -422,20 +449,14 @@ export function CommentPanel({
 
         <div className="wx-comments-panel__scroll" ref={scrollRef} onScroll={onScroll}>
           <div className="wx-comments-panel__list" ref={listRef}>
-            {error ? (
-              <div className="wx-comments-panel__hint">
-                <span>{error}</span>
-                <button
-                  className="wx-comments-panel__retry"
-                  onClick={() => void load(shown[0]?.id)}
-                >
-                  重试
-                </button>
-              </div>
-            ) : page === null || (loading && shown.length === 0) ? (
-              <div className="wx-comments-panel__hint">正在加载评论…</div>
-            ) : shown.length === 0 ? (
-              <div className="wx-comments-panel__hint">还没有评论</div>
+            {shown.length === 0 ? (
+              error !== null ? (
+                <ErrorHint error={error} onRetry={() => void load()} />
+              ) : page === null || loading ? (
+                <div className="wx-comments-panel__hint">正在加载评论…</div>
+              ) : (
+                <div className="wx-comments-panel__hint">还没有评论</div>
+              )
             ) : (
               /**
                * The rows are the panel's own list, not a chat's history: the media
@@ -443,7 +464,14 @@ export function CommentPanel({
                * photo or a video in the comments opens nothing at all.
                */
               <ViewerSource value={shown}>
-                {page.hasMore && loading ? (
+                {error !== null ? (
+                  /**
+                   * A failed older page keeps the comments already on screen: the
+                   * retry line sits above them, because that page is exactly what
+                   * is out of view up there.
+                   */
+                  <ErrorHint error={error} onRetry={() => void load(shown[0]?.id)} />
+                ) : page !== null && page.hasMore && loading ? (
                   <div className="wx-comments-panel__hint">正在加载更早的评论…</div>
                 ) : null}
                 {shown.map((comment) => (

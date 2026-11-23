@@ -297,6 +297,17 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   the top in one. Never insert it without the `afterId` check, an empty page must not be
   buffered (a cold cache answers `[]`), and a delete/edit/replace of a buffered row, or a
   `setHistory`, has to drop it — otherwise a deleted message is prepended back.
+- **A list that opens at `scrollTop 0` gets no scroll event, so "load more at the top"
+  never fires.** The comment panel lands on the oldest comment of the *newest* page
+  (`getMessageThreadHistory` answers newest-first, so that row is not the thread's first
+  one); a wheel up cannot move the list, `onScroll` never runs, and the older page was
+  only fetched after the reader scrolled *down* — measured as "向上滑没反应,往下滑一下上面
+  才加载出来". `CommentPanel.topUpAbove` therefore runs after the landing and after every
+  prepend, while the list is still within `LOAD_OLDER_AT` of the top (one page, like the
+  transcript's `prefetchOlder`), and the prepend compensation leaves the reader on the
+  same row. A failed older page must keep the rows already on screen and put its 重试
+  line above them — an error that replaces the list throws away the comments the reader
+  was reading.
 - **The read marker follows the viewport, not the bottom.** `MessageList` reports
   `onSeenUpToChange` (the newest row whose top edge is inside the viewport) and
   `ChatPane` sends `messages:read` up to it, still gated by `lib/readGate.ts`
