@@ -4,7 +4,7 @@ import { z } from 'zod'
  * The chat domain's DTOs (design doc §6; the 聊天信息 rows are §9.9).
  *
  * Split out of `dto.ts` when the panel's member and pinned-message schemas pushed
- * that file over its 550-line budget. `channels.ts` and `chats.ts` import from
+ * that file over its size budget. `channels.ts` and `chats.ts` import from
  * here; the renderer still sees every type through the package index.
  */
 

@@ -75,7 +75,7 @@ same hash, 60.32 kB — that is the check to repeat if the order is ever edited)
 **main/index.ts**'s window factory moved to `main/windows.ts` (createMainWindow,
 openExternal, storedTheme, applyTitleBarTheme, raiseShellAboveViewer), leaving the
 lifecycle/hand-over in `index.ts`; the mock's read marker and transfer simulation
-moved to `mock/effects.ts`; and ESLint now enforces `max-lines: 550` on app and
+moved to `mock/effects.ts`; and ESLint now enforces a `max-lines` cap on app and
 protocol sources (generated `WechatIcons.tsx` exempt) so the tree cannot silently grow
 back to 1000-line files.
 
@@ -97,19 +97,19 @@ feature itself is in the 2026-11-21 handoff bullet.
 | Was | Now |
 | --- | --- |
 | `tdlib/index.ts` (send family + the new `sendVoiceNote`) | `tdlib/send-api.ts`: `createSendApi` returns send/edit/delete/forward/read/typing/retry/media/album/sticker/voice as one object the class binds as fields, lazily reading `actionDeps` (the `chat-api.ts` / `user-api.ts` shape) |
-| `renderer/lib/preview/index.ts` at 550 (the invoke switch) | `renderer/lib/preview/sends.ts`: `handlePreviewSend` owns the nine outgoing/row-mutating message channels, and the switch dispatches them in one `case` group |
-| `renderer/components/MediaBubble.tsx` at 550 (the voice strip) | `renderer/components/VoiceBubble.tsx`: 语音消息's bubble, which shares nothing with the photo/video/file geometry |
+| `renderer/lib/preview/index.ts` at its cap (the invoke switch) | `renderer/lib/preview/sends.ts`: `handlePreviewSend` owns the nine outgoing/row-mutating message channels, and the switch dispatches them in one `case` group |
+| `renderer/components/MediaBubble.tsx` at its cap (the voice strip) | `renderer/components/VoiceBubble.tsx`: 语音消息's bubble, which shares nothing with the photo/video/file geometry |
 
 Both moves are call-shape-preserving: the seam signatures and the preview's answers are
 unchanged, and the feature's own status note is in `docs/PRIVATE-CHAT-HANDOFF.md` §6.1.
 
 Still open from the original plan: optional **batch 8** (`packages/protocol` split by
 domain; the export surface must stay identical because preload bundles it). The two
-files that remain above the 550 cap are gone; `mock/index.ts` (540) is the adapter
+files that remain above the cap are gone; `mock/index.ts` (540) is the adapter
 surface and `WechatIcons.tsx` (513) is generated artwork.
 
 **2026-11-22: the cap moved to 1100, and it now counts logic, not lines (explicit
-request).** `max-lines` in `eslint.config.mjs` is 1100 (was 550) with
+request).** `max-lines` in `eslint.config.mjs` is 1100 with
 `skipBlankLines` + `skipComments` on; no file was moved. Measured over the 437
 ts/tsx files: 48,768 raw lines = 34,724 code + 8,184 comment-only + 3,902 blank +
 1,958 import. Imports still count (the rule has no `skipImports`); blank lines and
@@ -121,9 +121,7 @@ It stays a backstop against a giant file reappearing, not a new target: the ~350
 budget and "one file = one reason to change" still decide a split, the
 `/* eslint-disable max-lines -- <reason> */` exemption still covers the one-concern
 files above it, and the split question reopens at ~700 counted lines on readability
-alone. The "550" in the header comments of modules
-split before this date records the budget that applied *then* — it is history, not a
-live rule.
+alone.
 
 ## Commits from this session (oldest first)
 
@@ -365,7 +363,7 @@ Per-domain modules re-exported from `index.ts` — the export surface must stay 
 (preload bundles the protocol index, 190 kB). Optional / lowest value.
 
 **Partially done 2026-11-20**: the comment/interaction DTO pushed `dto.ts` over the
-550-line cap, so `settings.ts` (MASK / proxy / app settings / `app:info`) and
+size budget, so `settings.ts` (MASK / proxy / app settings / `app:info`) and
 `viewer.ts` (the 图片和视频 payloads, importing `appSettingsSchema`) were split out and
 `channels.ts` now imports from those two. `dto.ts` is at ~470 lines; the message schemas
 still live in it, so the rest of this batch is unchanged.

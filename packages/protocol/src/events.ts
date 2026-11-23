@@ -11,7 +11,7 @@ import { appErrorSchema } from './errors'
 /**
  * The event half of the IPC contract (design doc §7.2).
  *
- * Split out of `channels.ts` when that table reached its 550-line budget: the
+ * Split out of `channels.ts` when that table reached its size budget: the
  * command tables and the event tables are two concerns, and every event still has
  * to be declared here with its schema (the `satisfies` clause below is the
  * compile-time gate). The package index re-exports this module, so consumers keep

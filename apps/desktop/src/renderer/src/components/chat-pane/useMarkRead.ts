@@ -12,7 +12,7 @@ const MARK_READ_DELAY_MS = 350
 
 /**
  * 已读上报, split out of `chat-pane/index.tsx` when that file reached its
- * 550-line budget.
+ * size budget.
  *
  * Reading happens while the chat is open, and it happens *message by message*:
  * the report moves to whatever the reader has actually had on screen, so the

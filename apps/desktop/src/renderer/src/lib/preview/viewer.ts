@@ -2,7 +2,7 @@ import type { ViewerItem } from '@wegram/protocol'
 
 /**
  * The 图片和视频 window in the browser preview, split out of `preview/index.ts`
- * when that file reached its 550-line budget.
+ * when that file reached its size budget.
  *
  * In Electron the viewer is its own window; in the preview it is a route, so the
  * "open" call only records the strip. Save / copy / reveal need a filesystem and

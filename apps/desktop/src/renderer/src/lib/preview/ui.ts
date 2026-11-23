@@ -4,7 +4,7 @@ import { RECENT_EMOJI_LIMIT } from '../emoji'
 
 /**
  * The `ui:*` channels of the browser preview, split out of `preview/index.ts`
- * when that file reached its 550-line budget.
+ * when that file reached its size budget.
  *
  * In Electron these rows live in `ui.db` (drafts, reading positions, recent
  * emoji). The preview keeps the same shapes in memory for the session, so the

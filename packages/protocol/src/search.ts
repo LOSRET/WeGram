@@ -5,7 +5,7 @@ import { messageSchema } from './dto'
 
 /**
  * The cross-chat message search contract (design doc §9.2), split out of
- * `channels.ts` when that table hit its 550-line budget.
+ * `channels.ts` when that table hit its size budget.
  *
  * `chat` covers private chats and groups, `channel` covers channels; the adapter
  * asks TDLib for each chat type and merges the streams. `cursor` holds TDLib's

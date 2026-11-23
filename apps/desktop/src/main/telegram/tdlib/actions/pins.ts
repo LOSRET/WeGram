@@ -7,7 +7,7 @@ import type { ActionDeps } from './deps'
 /**
  * 置顶消息: the chat's pinned message as 群公告 reads it, plus pin / unpin.
  *
- * Split out of `chats.ts` when the pin batch pushed that file over its 550-line
+ * Split out of `chats.ts` when the pin batch pushed that file over its size
  * budget. Telegram keeps one newest pinned message per chat; a group uses it as the
  * announcement, and the bar above the transcript shows it for every chat kind.
  */

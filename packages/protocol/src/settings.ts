@@ -4,7 +4,7 @@ import { z } from 'zod'
  * Settings, proxy and app-metadata DTOs.
  *
  * Split out of `dto.ts` when the comment/interaction field brought that file to
- * its 550-line budget (the same reason `contact.ts` exists). Nothing here
+ * its size budget (the same reason `contact.ts` exists). Nothing here
  * depends on the message model: these cross IPC on `settings:*`, `proxy:*` and
  * `app:info`.
  */

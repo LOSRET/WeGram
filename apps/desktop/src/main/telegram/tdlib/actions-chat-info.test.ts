@@ -19,7 +19,7 @@ import type { MapperContext } from './map/context'
  * 记录, 退出群聊, 群聊名称, 群公告 and 群二维码, plus the member grid and its
  * 搜索群成员 query.
  *
- * Split from `actions.test.ts` when that file reached the 550-line budget; the
+ * Split from `actions.test.ts` when that file reached the size budget; the
  * fake adapter below is the same one, kept here so the two halves stay independent.
  */
 

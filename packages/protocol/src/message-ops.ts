@@ -6,7 +6,7 @@ import { messageReactionSchema } from './reaction'
 /**
  * One patch against a loaded transcript (`evt:messages`).
  *
- * Split out of `dto.ts` when that file reached its 550-line budget. The set grows
+ * Split out of `dto.ts` when that file reached its size budget. The set grows
  * with every TDLib update the app honours, so it is the part of the DTO layer most
  * likely to change; `Message` itself (the shape an op carries) stays in `dto.ts`.
  */

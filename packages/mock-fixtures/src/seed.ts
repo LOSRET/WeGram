@@ -2,7 +2,7 @@ import type { ChatSummary, Message, MessageMedia } from '@wegram/protocol'
 
 /**
  * The shape of the fake account's data (design doc §9.8–9.9), split out of
- * `data.ts` when that file reached its 550-line budget.
+ * `data.ts` when that file reached its size budget.
  *
  * The dataset fills these types; both fakes (the mock adapter and the browser
  * preview) read them, so a new field here is a contract change for two sides.

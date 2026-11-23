@@ -4,7 +4,7 @@ import { previewFiles } from './fixtures'
 
 /**
  * The media channels of the browser preview, split out of `preview/index.ts`
- * when that file reached its 550-line budget.
+ * when that file reached its size budget.
  *
  * The preview has no filesystem and no `wx-media://`: every fixture file is a
  * data URL, so a download "returns" that URL and streaming plays the whole clip.

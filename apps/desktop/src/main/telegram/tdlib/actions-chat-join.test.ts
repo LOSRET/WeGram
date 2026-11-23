@@ -9,7 +9,7 @@ import type { MapperContext } from './map/context'
  * 频道底栏 (design doc §9.9): whether the account subscribes to a channel, and the
  * 加入 / 申请加入 call the bar makes when it does not.
  *
- * Split from `actions.test.ts` when that file reached the 550-line budget; the
+ * Split from `actions.test.ts` when that file reached the size budget; the
  * fake adapter below is the same one, kept here so the halves stay independent.
  */
 

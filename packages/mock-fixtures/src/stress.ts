@@ -4,7 +4,7 @@ import type { ChatSummary, Message } from '@wegram/protocol'
  * The virtualised list's stress chat: 5000 messages in one conversation.
  *
  * Split out of `data.ts` when the custom-emoji fixture pushed that file to its
- * 550-line budget — it is a different concern from the demo account (it exists to
+ * size budget — it is a different concern from the demo account (it exists to
  * measure scrolling, not to demo the UI). Its ids start at 10 000 so they never
  * collide with the conversations `data.ts` builds.
  */

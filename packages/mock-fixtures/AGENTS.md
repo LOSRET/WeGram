@@ -10,13 +10,13 @@ Scope: the demo account both fakes serve — the Electron mock adapter
   one premium sticker, one custom emoji, a channel post, the 通讯录 people), comment
   threads on the posts that own one, and the contact fields the address book reads.
 - `seed.ts` — the dataset's shape (`FixtureSeed`, `FixtureOptions`, `SeedMedia`).
-  Split out of `data.ts` when the channel fixtures pushed it to its 550-line budget;
+  Split out of `data.ts` when the channel fixtures pushed it to its size budget;
   `FixtureSeed` carries `canPost` and `joined` for channels, `contact.bio` /
   `contact.note` for the 资料卡, and `commonChatIds` for 共同群聊 (both fakes read them).
 - `contacts.ts` — the 通讯录 people as private chats (`addContactFixtures`), moved out of
   `data.ts` when the 表情回应 + 语音转文字 fixtures pushed it over budget.
 - `stress.ts` — the 5000-message stress chat 99 for the virtualised list. Split out
-  of `data.ts` when the custom-emoji fixture pushed it to its 550-line budget.
+  of `data.ts` when the custom-emoji fixture pushed it to its size budget.
 - `threads.ts` — the comment authors, bodies and the id formula
   (`900 000 + messageId × 100 + index`), so a thread can never collide with a
   transcript id.
@@ -24,7 +24,7 @@ Scope: the demo account both fakes serve — the Electron mock adapter
   quiz; the closed poll with results stays inline in `data.ts`.
 - `services.ts` — the demo's service rows (a missed call, a self-destructed photo):
   the finished text a fixture carries, so the centered notices can be seen without
-  TDLib. Split out of `data.ts` for the same 550-line budget.
+  TDLib. Split out of `data.ts` for the same size budget.
 
 The data says *what* a message is, never *where its bytes live*: a media reference is
 a `fileId` plus the protocol fields (size, duration, format), and the caller's

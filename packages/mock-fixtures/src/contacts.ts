@@ -8,7 +8,7 @@ import type { FixtureSeed } from './seed'
  * too, so 发消息 opens a real transcript.
  *
  * Split out of `data.ts` when the 表情回应 + 语音 fixtures pushed that file over its
- * 550-line budget. The rows are data only: the caller's clock (`at`) and message
+ * size budget. The rows are data only: the caller's clock (`at`) and message
  * builder (`text`) come in, so the dataset keeps no clock of its own.
  */
 interface ContactSeedRow {

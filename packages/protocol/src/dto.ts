@@ -515,7 +515,7 @@ export const userAvatarSchema = z.object({
 export type UserAvatar = z.infer<typeof userAvatarSchema>
 
 /* Message operations moved to `message-ops.ts` when this file reached its
-   550-line budget: the op table is its own concern and the schema it carries is
+   size budget: the op table is its own concern and the schema it carries is
    the only thing here that changes with every new event. */
 
 /**

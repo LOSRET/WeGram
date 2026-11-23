@@ -6,7 +6,7 @@ import { useAppStore } from '../../store/useAppStore'
 
 /**
  * 在线 / 最后上线 for one person, split out of `chat-pane/index.tsx` when that
- * file reached its 550-line budget.
+ * file reached its size budget.
  *
  * The answer is asked for whenever the conversation opens (TDLib serves it from
  * its cache) and then kept live by `evt:status`, so a peer who goes offline while

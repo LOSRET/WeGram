@@ -5,7 +5,7 @@ import { z } from 'zod'
  * one sticker from a set, a set itself, and a custom emoji's artwork.
  *
  * Split out of `dto.ts` when the custom-emoji channel pushed that file to its
- * 550-line budget. `MessageMedia` stays in `dto.ts` — a message's media is part
+ * size budget. `MessageMedia` stays in `dto.ts` — a message's media is part
  * of the message domain — and imports `stickerFormatSchema` from here.
  */
 

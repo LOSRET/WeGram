@@ -12,7 +12,7 @@ import type { ActionDeps } from './actions'
 
 /**
  * The chat domain's adapter methods (design doc §6; 聊天信息 / 频道底栏 §9.9),
- * lifted out of `TdlibAdapter` when that class reached the 550-line budget with
+ * lifted out of `TdlibAdapter` when that class reached the size budget with
  * the 频道底栏 work. Each function is the same delegation the class carried
  * inline; the class now binds this object instead of growing another method per
  * call, the way the mock adapter binds `createMockChats`.

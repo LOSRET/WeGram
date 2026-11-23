@@ -235,7 +235,7 @@ Greenfield → working skeleton in three milestones:
   `chats:setPinned` / `clearHistory` /
   `members` / `setTitle` / `leave` / `pinned` / `inviteLink`; the chat channels live in
   `packages/protocol/src/chats.ts` and the chat DTOs in `chat.ts` (both split at the
-  550-line budget). Design: `技术方案.md` §9.9; measured metrics and the deliberate
+  size budget). Design: `技术方案.md` §9.9; measured metrics and the deliberate
   deltas: `UI-HANDOFF.md` §2.8 / §5 item 33.
 - **未加入频道的底栏 (2026-11-21)**: a channel opened from 搜索 or an `@username` is
   readable without being subscribed, and the 服务号 card used to offer 静音 anyway. The
@@ -1046,7 +1046,7 @@ Shipped from `docs/PRIVATE-CHAT-HANDOFF.md` §3 (P0): outgoing typing, 标为未
     Menu shortcut), and the tray icon — `Shell_NotifyIcon` refused it in the agent's
     launch session (`Unable to create status tray icon`). `createTray` now logs and
     carries on without the icon, so neither failure can stop the app from starting.
-- **Protocol split:** `channels.ts` was at its 550-line budget, so the event tables
+- **Protocol split:** `channels.ts` was at its size budget, so the event tables
   moved to `packages/protocol/src/events.ts`, the message ops to
   `message-ops.ts`, and the new channels to `send.ts` (typing, resend) and
   `presence.ts` (status, active chat). `dto.ts` is under budget again.

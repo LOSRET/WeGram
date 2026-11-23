@@ -8,7 +8,7 @@ import { z } from 'zod'
  * per-chat rights, the delete-for-me vs delete-for-everyone split, whether speech
  * can be recognised and whether the row may be pinned.
  *
- * Split out of `dto.ts` when 转文字 and 置顶 pushed that file over its 550-line
+ * Split out of `dto.ts` when 转文字 and 置顶 pushed that file over its size
  * budget: the capability question is its own domain, and only the menu reads it.
  */
 export const messagePropertiesSchema = z.object({

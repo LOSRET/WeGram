@@ -88,7 +88,7 @@ These rules keep it that way:
   starts acquiring a second concern, split it instead of adding another branch.
 - **Size budget: ~350 lines is normal, 1100 is the hard cap.** ESLint enforces
   `max-lines: 1100` on `apps/desktop/src/**` and `packages/protocol/src/**` (generated
-  `WechatIcons.tsx` is exempt; the cap was 550 until 2026-11-22). It counts neither
+  `WechatIcons.tsx` is exempt). It counts neither
   blank nor comment-only lines (`skipBlankLines` + `skipComments`), so the number
   measures logic density rather than reading volume — imports still count, and so does a
   trailing comment on a line that has code. The cap is the backstop that stops a giant

@@ -25,7 +25,7 @@ export function initialMockStickerSetState(): MockStickerSetState {
 /**
  * The mock's installed sticker sets.
  *
- * Split out of `mock/index.ts` when the 通讯录 pushed that file to its 550-line
+ * Split out of `mock/index.ts` when the 通讯录 pushed that file to its size
  * budget; the real adapter keeps the same concern in `tdlib/stickers.ts`.
  */
 export function listMockStickerSets(

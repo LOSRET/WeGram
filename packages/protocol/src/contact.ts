@@ -4,7 +4,7 @@ import { z } from 'zod'
  * 通讯录 (contacts) DTOs.
  *
  * Split out of `dto.ts` when the contact card landed: that file sits on its
- * 550-line budget, and the address book is a self-contained concern.
+ * size budget, and the address book is a self-contained concern.
  *
  * A contact is a person from the account's Telegram address book
  * (`getContacts`), not a conversation: someone you never wrote to still has a

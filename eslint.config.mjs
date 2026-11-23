@@ -59,7 +59,7 @@ export default tseslint.config(
   // ---- agent-maintainability: keep files loadable in one context window ----
   // The tree was split into <400-line modules on 2026-11-19; this is the hard
   // backstop that stops a feature from quietly recreating a giant file. The cap
-  // is 1100 (raised from 550 on 2026-11-22 by request); it is not the working
+  // is 1100 (raised on 2026-11-22 by request); it is not the working
   // budget — the split rules in CLAUDE.md ("agent-maintainable code") still ask
   // for ~350 lines and a split as soon as a file grows a second concern.
   //

@@ -13,7 +13,7 @@ import {
  * The chat domain's IPC surface (design doc §6; the 聊天信息 rows are §9.9).
  *
  * It sits beside `channels.ts` instead of inside it because that file is the one
- * protocol table and had reached its 550-line budget. These keys partition
+ * protocol table and had reached its size budget. These keys partition
  * cleanly — the list, opening a chat, its settings and its member grid — so they
  * are the first domain to move: a new chat channel now costs a row here instead
  * of another line in the shared table.

@@ -6,7 +6,7 @@ import { mapUser } from './user'
  * name and a chat's title.
  *
  * They live here rather than on the adapter because they are cache-plus-one-request
- * logic, and `tdlib/index.ts` is at its 550-line budget. Both caches are the
+ * logic, and `tdlib/index.ts` is at its size budget. Both caches are the
  * adapter's own maps — passing them in keeps this module testable without TDLib.
  */
 export interface ResolverDeps {
