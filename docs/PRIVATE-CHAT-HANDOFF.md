@@ -196,7 +196,7 @@ which is the point.
 1. **Protocol first** — `packages/protocol/src/channels.ts` (channel + zod
    request/response), or the domain module it spreads (`chat.ts`, `poll.ts`,
    `comment.ts`, `search.ts`). New `Message` fields go in `dto.ts`; if
-   `dto.ts` or `channels.ts` approaches the 550-line budget, split a module
+   `dto.ts` or `channels.ts` starts carrying a second concern, split a module
    (`user.ts`, `reaction.ts`) instead of growing them.
 2. **Adapter seam** — `packages/adapter-contract/src/adapter.ts`: the method and
    any event. Both adapters must implement it in the same batch.

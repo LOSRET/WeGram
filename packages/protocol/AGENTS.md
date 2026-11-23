@@ -7,8 +7,7 @@ Scope: the IPC contract shared by main, preload and renderer. Read the root
 
 Every value that crosses IPC is declared here **first**: `dto.ts` (the core zod
 schemas + inferred types), `channels.ts` (channel tables and their request/response
-schemas), `errors.ts` (`AppError`) and the modules split out when a file hit its
-550-line budget — `stickers.ts` (formats, `Sticker`, sticker sets, custom emoji),
+schemas), `errors.ts` (`AppError`) and the modules split out as those two files grew — `stickers.ts` (formats, `Sticker`, sticker sets, custom emoji),
 `contact.ts` (the 通讯录 `Contact` row), `settings.ts` (proxy,
 app settings, `app:info`), `network.ts` (the TDLib network-option channels —
 `prefer_ipv6`), `viewer.ts` (the 图片和视频 window's payloads),
