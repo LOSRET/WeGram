@@ -11,7 +11,7 @@
  *
  * Call this after ANY write to `scrollTop` that the reader did not perform.
  * (Measured: 13 rows at y −4842…−2708 before, the real 2025↔today window at
- * y −1098…+394 after. See docs/HANDOFF.md "Non-obvious facts".)
+ * y −1098…+394 after. See docs/HANDOFF.md §6.2.)
  */
 export function resyncScroller(element: HTMLElement | null): void {
   element?.dispatchEvent(new Event('scroll'))

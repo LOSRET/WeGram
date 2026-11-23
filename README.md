@@ -10,7 +10,7 @@
 
 ## 这是什么
 
-WeGram 是一个自用的 Telegram 桌面客户端：协议层用 Telegram 官方的 TDLib（`tdl` + `prebuilt-tdlib`），外壳是 Electron，界面则按本机微信 4.x 客户端的实测 token 与尺寸重建——栏宽、行高、气泡颜色、圆角、图标都来自对真实客户端的测量（见 `docs/UI-HANDOFF.md`），不是凭印象画的。
+WeGram 是一个自用的 Telegram 桌面客户端：协议层用 Telegram 官方的 TDLib（`tdl` + `prebuilt-tdlib`），外壳是 Electron，界面则按本机微信 4.x 客户端的实测 token 与尺寸重建——栏宽、行高、气泡颜色、圆角、图标都来自对真实客户端的测量（见 `docs/HANDOFF.md` §5），不是凭印象画的。
 
 登录的是你自己的账号，会话、群、频道都按 Telegram 的真实数据展示；它不是演示界面。
 
@@ -171,9 +171,7 @@ scripts\start-test.cmd          # 连测试 DC（WEGRAM_TDLIB_TEST_DC=1，复用
 | 文件 | 内容 |
 | --- | --- |
 | `docs/技术方案.md` | 权威设计（中文）：选型、架构、每个模块的决策 |
-| `docs/HANDOFF.md` | 当前状态、硬规则、实测到的坑、下一步 |
-| `docs/UI-HANDOFF.md` | 微信 4.x 的 token 与尺寸（实测）、图标来源、已知偏差 |
-| `docs/REFACTOR-HANDOFF.md` | 文件拆分与机械约束、待办批次 |
+| `docs/HANDOFF.md` | 唯一的一份交接文档：当前状态、硬规则、环境与命令、架构图、微信 4.x 的实测 token/尺寸与图标来源、实测到的坑、私聊缺口与 API 表、代码拆分与机械约束、下一步 |
 | `spikes/tdlib/RESULTS.md` | TDLib 在 Windows 上的实测结论（打包硬约束） |
 | `CLAUDE.md` / `AGENTS.md` | 编码规范与架构红线 |
 

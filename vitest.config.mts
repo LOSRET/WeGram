@@ -7,7 +7,7 @@ import { defineConfig } from 'vitest/config'
  * deliberately no DOM environment here: React components are exercised through
  * the mock adapter in the real Electron window, and the browser preview
  * (`pnpm web`), because their bugs are timing/measurement bugs that jsdom cannot
- * reproduce (see docs/HANDOFF.md "Non-obvious facts").
+ * reproduce (see docs/HANDOFF.md §6).
  */
 export default defineConfig({
   test: {

@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project state
 
-> **New session? Read `docs/HANDOFF.md` first** — current state, hard rules, measured surprises and next steps. For anything under `src/renderer`, read **`docs/UI-HANDOFF.md`** as well: the WeChat 4.x tokens/metrics that were measured off the real client, the icon provenance, the known deltas and the pitfalls.
+> **New session? Read `docs/HANDOFF.md` first** — one consolidated document: current state, hard rules, environment and commands, the architecture map, the measured WeChat 4.x tokens/metrics (icon provenance and the known deltas included), the measured behaviour and pitfalls, the private-chat API/status map, the code-split rules and the next steps. Its §0 says which section to read for which kind of work.
 >
 > **Then read the layer notes** for the directory you are about to touch — they are short and they hold the rules that are specific to that layer: `packages/protocol/AGENTS.md`, `apps/desktop/src/main/AGENTS.md`, `apps/desktop/src/renderer/AGENTS.md`.
 >
-> **Restructuring or splitting files? Read `docs/REFACTOR-HANDOFF.md` first** — what already moved and why, the conventions the code now enforces mechanically, and the one batch still pending (`packages/protocol`). The split rules themselves are in "Agent-maintainable code" below.
+> **Restructuring or splitting files? Read `docs/HANDOFF.md` §8 first** — what already moved and why, the conventions the code now enforces mechanically, and the one batch still pending (`packages/protocol`). The split rules themselves are in "Agent-maintainable code" below.
 >
 > **`pnpm verify` is the one command that decides whether a change is done** (lint → typecheck → test → build). It must pass before you report success.
 
@@ -27,7 +27,7 @@ W2 scope is in: virtualised message list (`@tanstack/react-virtual`), anchored p
 
 W3 main body is in: media send/receive (photo + document, upload/download progress over `evt:file`), media files served to the renderer through the `wx-media://` protocol (never raw paths), the three sticker formats (WebP `<img>`, TGS → `DecompressionStream('gzip')`, WebM `<video>`; the transcript plays TGS through lottie-web while the 表情/贴纸包 grids draw every TGS of the pack on one ThorVG canvas), the client's 表情 panel (a 464 px card with 最近使用 over a 10-column emoji grid, a 搜索 tab and one tab per installed sticker set from `getInstalledStickerSets`; recents persist in `ui.db`), one-emoji messages drawn as their AnimatedEmoji sticker (no bubble, one pass, click replays with its sound), TL entity rendering (bold/italic/code/pre/link/spoiler, mentions that open the person's chat — `mentionName` by id, `@username` through `chats:openUsername` — and Telegram links that open the chat/post inside the app — `t.me`/`tg://`), day separators, the unread divider, read receipts, and a typing indicator that expires. The mock adapter generates real PNG/WebP/TGS fixture media under `userData/mock-media`.
 
-The login is its **own window**, like WeChat's: a frameless 280×373 `BrowserWindow` (`main/login-window.ts`, renderer `screens/LoginWindow.tsx` via the `#login` hash) shows a **QR code** fed by TDLib (`requestQrCodeAuthentication` → `AuthState.waitQr`, rendered locally with the approved `qrcode` dependency). A user-driven sign-in — the QR, or the 用手机号登录 fallback — opens the shell **directly**; only a session restored at startup stops on the profile step first. `login:enter` opens the shell from that step, and signing out recreates the login window before closing the shell. TDLib cannot cancel a pending QR confirmation, so the phone fallback goes through `auth:reset` (destroy + rebuild the auth client). Design and the measured metrics: `docs/技术方案.md` §9.6, `docs/UI-HANDOFF.md` §2.2.
+The login is its **own window**, like WeChat's: a frameless 280×373 `BrowserWindow` (`main/login-window.ts`, renderer `screens/LoginWindow.tsx` via the `#login` hash) shows a **QR code** fed by TDLib (`requestQrCodeAuthentication` → `AuthState.waitQr`, rendered locally with the approved `qrcode` dependency). A user-driven sign-in — the QR, or the 用手机号登录 fallback — opens the shell **directly**; only a session restored at startup stops on the profile step first. `login:enter` opens the shell from that step, and signing out recreates the login window before closing the shell. TDLib cannot cancel a pending QR confirmation, so the phone fallback goes through `auth:reset` (destroy + rebuild the auth client). Design and the measured metrics: `docs/技术方案.md` §9.6, `docs/HANDOFF.md` §5.4.
 
 `ui.db` uses the built-in `node:sqlite` (Electron 45 ships Node 24.22) instead of better-sqlite3, so there is no native module to rebuild for the Electron ABI. All SQL is confined to `apps/desktop/src/main/store/ui-db.ts`; `settings.json` keeps what must exist before any window does — the proxy config (sealed secret) and the TDLib network options (`prefer_ipv6`).
 
@@ -42,7 +42,7 @@ W1 is verified by `pnpm typecheck`, `pnpm build` and the browser preview (`pnpm 
 
 The real TDLib adapter is verified headlessly instead: `pnpm tdlib:smoke` runs the same `TdlibAdapter` under Node against an authorized session and checks `getMe` / `getChats` / history paging. See `spikes/tdlib/RESULTS.md` (Spike 2) for the measured findings, including why a proxy is mandatory and how `getChatHistory` anchoring works.
 
-**Real-account pass (same day):** the adapter was then driven end-to-end in the Electron window behind the mandatory SOCKS proxy, which surfaced three defects that the mock cannot reproduce — history paging stopped on short TDLib answers, read receipts poisoned every chat's cache, and an occluded window could freeze the transcript's visibility gate. All three are fixed; the rail and the chat rows now load real profile photos, and both long panes use WeChat's floating overlay scrollbar. Details: `docs/HANDOFF.md` → "Real-account session" and "Non-obvious facts".
+**Real-account pass (same day):** the adapter was then driven end-to-end in the Electron window behind the mandatory SOCKS proxy, which surfaced three defects that the mock cannot reproduce — history paging stopped on short TDLib answers, read receipts poisoned every chat's cache, and an occluded window could freeze the transcript's visibility gate. All three are fixed; the rail and the chat rows now load real profile photos, and both long panes use WeChat's floating overlay scrollbar. Details: `docs/HANDOFF.md` §6.1–§6.4.
 
 ## Coding standards
 
@@ -80,7 +80,7 @@ The TypeScript/Electron equivalent of rustracker's "no `.unwrap()` in production
 ### Agent-maintainable code (the split rules)
 
 The tree was split on 2026-11-19 so that an agent can read a whole module before editing
-it — what moved, why, and the checks that were run are in `docs/REFACTOR-HANDOFF.md`.
+it — what moved, why, and the checks that were run are in `docs/HANDOFF.md` §8.
 These rules keep it that way:
 
 - **One file = one reason to change.** A component owns its render tree; data fetching,
@@ -119,7 +119,7 @@ These rules keep it that way:
 - **A split changes no behaviour and no contract.** No channel/DTO/`wx-*` renames, no
   drive-by edits, one logical batch per commit, `pnpm verify` before each.
 - **A move updates the map.** Update the touched layer note (`renderer/AGENTS.md`,
-  `main/AGENTS.md`, `packages/protocol/AGENTS.md`) and `docs/REFACTOR-HANDOFF.md` in
+  `main/AGENTS.md`, `packages/protocol/AGENTS.md`) and `docs/HANDOFF.md` §8 in
   the same batch, or the next session rediscovers the layout the hard way.
 - **New features share the budget.** Prefer a new module plus a small call site over
   growing an existing component; run `pnpm lint` (it includes the cap) before opening a

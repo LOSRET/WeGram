@@ -1,1255 +1,1635 @@
 # Handoff — WeGram
 
-Written 2026-11-17 at the end of the W1/W2 session, extended the same day with the
-W3 main body. Read this first, then `docs/技术方案.md` (authoritative design, Chinese)
-and `spikes/tdlib/RESULTS.md` (measured TDLib behaviour). `CLAUDE.md` holds the rules
-that must not drift.
+**One document, consolidated 2026-11-23.** It absorbs the four earlier handoffs —
+`docs/HANDOFF.md` (project state + measured pitfalls), `docs/UI-HANDOFF.md` (the
+WeChat 4.x contract), `docs/PRIVATE-CHAT-HANDOFF.md` (the 1:1 gap audit, kept here as a
+status + API map) and `docs/REFACTOR-HANDOFF.md` (the split). Duplicated narration was
+dropped; every measured number, hard rule, API and open gap is kept. The originals remain in
+git history — `git log --diff-filter=D -- docs/` finds them.
 
-The renderer was later rebuilt against the real WeChat 4.x client; that work has its
-own handoff — **`docs/UI-HANDOFF.md`** (measured tokens and metrics, icon provenance,
-known deltas, pitfalls). Read it before touching anything under `src/renderer`.
+Companions this document does **not** replace:
 
-The code was then split for agent maintenance and given a real verification layer
-(`pnpm verify`, 132 unit tests, lint-enforced architecture rules). **`docs/REFACTOR-HANDOFF.md`**
-records what moved where, the conventions the code now enforces, and the batches that are
-still pending (`mock.ts`, `preview-bridge.ts`, `styles/index.css`,
-`packages/protocol`). Read it before restructuring anything.
+- `docs/技术方案.md` — authoritative design (Chinese). Change the design there first, then
+  the code.
+- `spikes/tdlib/RESULTS.md` — the raw TDLib spike measurements and packaging constraints.
+- `CLAUDE.md` (root; `AGENTS.md` is a symlink to it) — the coding rules and the split
+  rules. Read it before writing code.
+- Layer notes, short and specific, win for their subtree: `packages/protocol/AGENTS.md`,
+  `apps/desktop/src/main/AGENTS.md`, `apps/desktop/src/renderer/AGENTS.md`.
 
-**Private-chat gap audit (2026-11-22):** `docs/PRIVATE-CHAT-HANDOFF.md` inventories
-what 1:1 chats still lack — send failure/retry, outgoing typing, online status, delete
-chat / mark unread, notifications, voice notes, reactions, the peer profile card, album
-send and more — with the exact TDLib 1.8.70 API for each, the insertion points, and an
-implementation order. Read it before starting private-chat work.
+## Contents
 
-**Private-chat P0 batch (same day):** the audit's five P0 gaps are implemented —
-outgoing typing, 标为未读 + 删除聊天 with a chat-list context menu, send failure
-(未发送) with 重试, online / last-seen in a private chat's header, and desktop
-notifications with a tray icon. Measured notes and the still-unverified parts are in
-"Private-chat P0 batch — measured notes" below; the audit document keeps the P1/P2
-backlog.
+- [0. How to use this document](#0-how-to-use-this-document)
+- [1. Status at a glance](#1-status-at-a-glance)
+- [2. Hard rules](#2-hard-rules)
+- [3. Environment, commands, verification](#3-environment-commands-verification)
+- [4. Architecture map](#4-architecture-map)
+- [5. The measured WeChat 4.x UI contract](#5-the-measured-wechat-4x-ui-contract)
+- [6. Measured behaviour and pitfalls — do not re-derive](#6-measured-behaviour-and-pitfalls--do-not-re-derive)
+- [7. Private chat (1:1): gap audit, API map, status](#7-private-chat-11-gap-audit-api-map-status)
+- [8. Code organisation: the split and what it enforces](#8-code-organisation-the-split-and-what-it-enforces)
+- [9. Known gaps and next steps](#9-known-gaps-and-next-steps)
+- [Appendix A — TDLib 1.8.70 signatures cited here](#appendix-a--tdlib-1870-signatures-cited-here)
+- [Appendix B — dated history (what shipped when)](#appendix-b--dated-history-what-shipped-when)
 
-**Private-chat P1 batch (same day):** the audit's P1 list is closed except for two
-items that need the owner. Landed: 相册发送 (one `sendMessageAlbum` call), 置顶消息栏,
-语音转文字, 表情回应 (display only), 拉黑 + 举报 (a person **and** one message, one
-phased `reportChat` sheet), the 资料卡 with 备注 / 共同群聊 (count + a page of chat rows
-fetched on demand) / 添加删除联系人, 编辑说明 for a media caption, the 聊天信息
-panel's face opening that card, and **语音消息** (recorded in the renderer with
-WebCodecs Opus and muxed into OGG in-repo — no new dependency; see
-`docs/PRIVATE-CHAT-HANDOFF.md` §6.1). Still open: the **reactions picker** (WeChat has
-no reactions; display-only until the owner signs one off) and the 置顶消息 bar's
-product call. **No test DC was available in this session either**, so the P1/P2 TDLib
-writes (`sendMessageAlbum`, `pinChatMessage`, `setUserNote`, `setMessageSenderBlockList`,
-`reportChat`, `editMessageCaption`, `recognizeSpeech`, `addContact`, `removeContacts`,
-`getGroupsInCommon`, `inputMessageVoiceNote`) are compile- and mock-verified only —
-run `pnpm tdlib:test-dc` before calling them proven. The voice **gesture** was then
-clicked through in a mock Electron window (isolated profile, fake media device): a
-2 s hold produced a decodable voice bubble (`<audio>` duration 1.9, `readyState 4`)
-and a valid OGG/Opus file; the slide-up cancel sent nothing. `inputMessageVoiceNote`
-was then confirmed on the **test DC** by the owner's own send: the transcript drew
-it as an outgoing voice bubble (0:02), so the server accepts our OGG and an empty
-waveform. The CLI probe step is in `scripts/tdlib-test-dc.ts` for the next clean
-run — see `docs/PRIVATE-CHAT-HANDOFF.md` §11.
+---
 
-## 设置 window batch A (2026-11-22)
+## 0. How to use this document
 
-**Shipped in two commits:** `3367958` (HTTP proxy) and `2685642` (设置 batch A), both
-GPG-signed; `pnpm verify` was green before them and the working tree is clean.
+| You are about to… | Read this first |
+|---|---|
+| start any session | §1 (state), §2 (rules), §3 (how to run/verify) |
+| touch `src/renderer` or judge a visual | §5 (tokens, metrics, deltas) and §6 (pitfalls) |
+| touch the TDLib adapter or paging | §6 (every entry was measured against a real account) |
+| implement a private-chat gap | §7 (API map + status) then §8 (layering recipe) |
+| split / move files | §8 and the "Agent-maintainable code" rules in `CLAUDE.md` |
+| report work as done | `pnpm verify` green; say exactly what you ran and what you skipped |
 
-- 设置 is its own window (`main/settings-window.ts`, `#settings`,
-  `renderer/src/screens/SettingsWindow.tsx`): frameless **640×558**, **no parent**,
-  centred on the display the shell sits on, single instance (a second 打开 focuses the
-  open one). Design, measured metrics and the light/dark palette:
-  `docs/技术方案.md` §9.11 and `docs/UI-HANDOFF.md` §2.10.
-- Batch A ships four groups: **账号与安全** (own identity, read-only, plus 退出登录),
-  **通用** (外观 with a 跟随系统 state, 关闭主窗口 tray/quit, 发送消息 Enter/Ctrl+Enter),
-  **网络与代理** (the proxy form extracted into `components/proxy/ProxyForm.tsx` and shared
-  with the login window's modal) and **关于**. The other four groups are specified in
-  §9.11.3 and are deliberately **not** drawn as dead rows.
-- Protocol: `settings:open` / `settings:close`, `evt:theme`, `evt:settings`, and
-  `appSettings` = `theme` (resolved) + `themePreference` + `closeBehavior` + `sendKey`.
+The rule that matters most in this repo: **only what `pnpm verify` proves counts as done**,
+and anything that writes to Telegram is unproven until it ran on a test DC (§3.4).
 
-**Rules that are easy to break**
+---
 
-- The window has **no parent on purpose** (the shell must be able to cover it, and it must
-  be draggable on its own). Nothing closes it for us: the shell's `closed`,
-  `auth:logout` and `before-quit` each call `closeSettingsWindow()`. Drop one and
-  `window-all-closed` never fires — the app lives on with a single settings window.
-- A theme change must repaint **four** things: the shell's native title strip, the viewer,
-  the settings window itself, and both renderers through `evt:theme`. `applyTheme()` in
-  `main/index.ts` is the one place; a fifth window means a fifth line there.
-- `theme` in `appSettings` is always the **resolved** value (`light`/`dark`);
-  `themePreference` is what is stored. `storedTheme(uiDb)` resolves `system` through
-  `nativeTheme`, and `nativeTheme.on('updated')` only acts while the preference is
-  `system`.
-- 关闭主窗口 defaults to **quit**, not tray: an installed copy must not start surviving
-  its own × after an update.
-- 发送消息 is read **at keydown time** (`useComposerInput` reads the store), never captured
-  in a render — otherwise the new rule only applies after a restart.
+## 1. Status at a glance
 
-**Verified** — mock Electron pass (`launch-detached.ps1 -Mock -NoSandbox`): ≡ → 设置
-opens the window, the four groups render, 外观 light↔dark repaints the settings window
-**and** the shell, Esc closes only the settings window, 网络与代理 renders the shared proxy
-form, and closing the shell with 设置 open quits the whole app. `pnpm verify` green
-(lint → typecheck → 95 files / 726 tests → build).
+pnpm workspace, W1 + W2 + the W3 main body implemented, plus the private-chat P0/P1 batches.
 
-**Next (B/C — design doc §9.11.3, §9.11.7)**
+- `packages/protocol` — IPC contract (zod DTOs, channel tables, `AppError`), the single
+  source of truth shared by main, preload and renderer; exported straight from source.
+- `packages/adapter-contract` — the `TelegramAdapter` seam (`adapter.ts`) shared by the
+  TDLib adapter and the fake one.
+- `packages/mock-adapter` — the fake `TelegramAdapter` with generated PNG/WebP/TGS/WebM/WAV
+  fixtures; development only.
+- `packages/mock-session` — the fake session's pure rules (paging, read marker, comment
+  access, chat-list order), bundled into the renderer for the preview. Imports nothing.
+- `packages/mock-fixtures` — the demo account both fakes serve; each side injects its media
+  and clock.
+- `apps/desktop` — Electron 45 + React 19 + Tailwind v4: `src/main` (adapter, IPC, store,
+  media protocol), `src/preload` (`window.tg`), `src/renderer` (the UI).
+- `spikes/tdlib` — measured TDLib behaviour; `RESULTS.md` holds build-time packaging
+  constraints.
 
-- **B**: 消息通知 (私聊/群/频道 scope via `setScopeNotificationSettings`), the six 隐私
-  rules + 黑名单 (`setUserPrivacySettingRules`, `setMessageSenderBlockList`), 登录设备
-  (`getActiveSessions` / `terminateSession`), 存储统计/清理 (`getStorageStatistics` /
-  `optimizeStorage`), 自动下载 (`getAutoDownloadSettingsPresets`), 消息字号, 开机自启.
-- **C**: 两步验证, 本地锁, 全局快捷键, 检查更新, 保存目录, 贴纸管理, 恢复默认.
-- Each batch adds panels to the same nav table in `screens/SettingsWindow.tsx`; prefer
-  per-domain channels (`notifications:*`, `privacy:*`, `sessions:*`, …) over growing the
-  one `settings:set` patch.
-- 清理缓存 must invalidate `media/registry.ts` tokens, or bubbles keep retrying files that
-  were just deleted (see the media rules above).
+### 1.1 Shipped
 
-## Proxy: 跟随系统代理 is the default (2026-11-22)
+| Area | State |
+|---|---|
+| Shell | WeChat 4.x three-column shell (native 32 px `titleBarOverlay`), rail with four real sections, 通讯录, 收藏/朋友圈 placeholders, overlay scrollbars on both long panes, 设置 as its own window |
+| Chat list | 65 px rows, search pill → global search, chat right-click menu (置顶/免打扰/标为未读/删除聊天), unread dot, 已归档会话 row + archive page |
+| Transcript | virtualised list, anchored prepend, load-around anchors, day/unread separators, real sender photos, read receipts, typing + presence, reply/edit/delete/forward, polls, comments bar, channel post composition, pinned bar, reaction chips |
+| Media | photo/document send+receive with progress, `wx-media://` Range streaming (including a file TDLib is still downloading), viewer window for photos **and** videos, 表情 panel, 贴纸包盒子, album send, caption edit |
+| Stickers / emoji | WebP `<img>`, TGS → lottie-web (transcript) or one ThorVG canvas (grids), WebM `<video>`, animated-emoji messages (no bubble, one pass, click sound), premium sticker effects, custom emoji entities, Apple emoji as a CBDT colour font |
+| Polls | `PollBubble` + `lib/poll.ts`, `messages:vote` / `messages:addPollOption`, option order vs position |
+| Login | own frameless 280×373 window: TDLib QR (local `qrcode`), 用手机号登录 fallback via `auth:reset`, profile step only for a restored session |
+| 通讯录 | TDLib address book (`getContacts` + `getUser`), pinyin initials via ICU, contact card with 备注/DC/phone, 发消息 creates the private chat |
+| Comments | 评论 N 条 handle on channel posts, Telegram discussion view panel (paged, anchored, joins to send), the full composer card as its input |
+| 聊天信息 | overlaying 314 px sheet: private/group/channel layouts, member search, rename, pinned announcement, invite QR in its own 360×560 window, clear, leave |
+| Channels | 服务号 bottom card, 加入/申请加入 for an unjoined channel, keyboard switch for admins |
+| Settings | batch A: 账号与安全 / 通用 (外观 with 跟随系统, 关闭主窗口, 发送消息 key) / 网络与代理 / 关于; B and C pending (§9) |
+| Private chat P0/P1 | send failure + 重试, outgoing typing, online/last-seen, delete chat / mark unread, notifications + tray, voice notes (recorded in-renderer, OGG/Opus muxed in-repo), albums, pinned bar, speech-to-text, reactions (display only), block/report, profile card with 备注 + 共同群聊, caption edit, add/remove contact |
+| Proxy | 跟随系统代理 by default, `proxy:refresh` / `evt:proxy`, probe + 30 s retry, DPAPI-sealed secrets |
+| Packaging | `.github/workflows/release.yml`: version bump on `main` → NSIS installer → GitHub Release (proven by v0.1.0–v0.1.2); the installer has never been installed or signed |
 
-The client now behaves like the other messengers: it reads the Windows proxy and
-connects directly when there is none.
+### 1.2 What is proven, and what is not
 
-- `settings.json` carries `proxyMode`: `system` (default) / `manual` / `off`. An
-  older file without the field keeps its proxy as `manual`; a profile with no proxy
-  becomes `system` — which is how the machine that had "connected but offline" healed.
-- Precedence: manual → `WEGRAM_PROXY` (development override) → the OS proxy → direct.
-  `scripts/start-*.cmd` no longer hard-code `127.0.0.1:7890`; that default is exactly
-  what made a closed FlClash look like a broken client (TDLib dialled a port nothing
-  listened on while the OS pointed at a working one).
-- `main/system-proxy.ts` asks Chromium (`resolveProxy` on a private, memory-only
-  partition: static settings, PAC, WPAD) and falls back to `reg query` on
-  `…\Internet Settings`. `main/system-proxy-rules.ts` holds the parsers and their tests.
-- A proxy the user did not choose is probed before it is used (`pingProxy` once the
-  client exists, a TCP connect before), and a failure falls back to direct with a 30 s
-  retry, so closing or reopening the proxy client heals without a restart. A manual
-  configuration is applied as written.
-- `proxy:refresh` (重新检测) and `evt:proxy` (the state changed by itself) are the two
-  new channels; `proxy:get` / `proxy:set` now carry `ProxyState` (mode, manual config,
-  the OS reading, what TDLib really uses, and one sentence explaining it).
+| Claim | Evidence |
+|---|---|
+| The build is sound | `pnpm verify` = lint → typecheck → test → build, zero warnings. Last recorded green run: 95 files / 726 tests (the count grows; read the run) |
+| The UI behaves | mock Electron passes (`launch-detached.ps1 -NoSandbox -Mock`) and the browser preview; the numbers in §5 were measured off those windows |
+| Paging / scroll / FPS | CDP against the real account: 5000 messages at 60 fps, **0.0 px** drift when prepending, 60 pages with no duplicates |
+| The read path against real TDLib | `pnpm tdlib:smoke` (read-only) + real-account Electron sessions |
+| **Writes** to Telegram | only the ones run on the test DC: send/edit/photo/delete, and `inputMessageVoiceNote`. **Everything else in §7 marked compile/mock-verified is not proven** |
+| The QR login with a real phone | **not yet** — mapping, encoding and fallback are mock-verified only |
+| Windows toasts, tray icon | **not yet** on this machine (no Start-Menu shortcut; `Shell_NotifyIcon` refused in the agent session) |
+| The installer, code signing, auto-update, sandboxed launch on a clean machine | **not yet** (v0.1.0 artifact predates the inlined credentials, so it still boots the mock) |
+| Settings batch A against a real account | **not yet** — mock only |
 
-## Where things stand
+---
 
-Greenfield → working skeleton in three milestones:
+## 2. Hard rules
 
-- **W1** Electron shell, `packages/protocol` IPC contract, mock adapter, real TDLib
-  adapter with manual auth state machine, SOCKS5/HTTP/MTProxy proxy support, WeChat-style
-  standalone login window + three-column shell.
-- **W2** virtualised message list, anchored history paging, send / reply / edit /
-  delete / forward, per-chat drafts, `ui.db` (drafts, theme, scroll-anchor columns).
-- **W3 main body** media send/receive (photo + document with upload/download progress),
-  `wx-media://` serving for downloaded files, the three sticker formats
-  (WebP/TGS/WebM), a sticker picker, TL entity rendering, day separators, the unread
-  divider, read receipts, and a typing indicator that expires. Mock fixtures now carry
-  real generated PNG/WebP/TGS media, so every renderer path is exercised offline.
-- **Login window (W3 addendum, 2026-11-18; QR login the same day)**: sign-in is no
-  longer a page inside the shell. The app starts in its own frameless **280×373**
-  window (`main/login-window.ts` + `screens/LoginWindow.tsx`, `#login` hash) with the
-  client's self-drawn strip (WeGram / 齿轮 / ×). The first screen is the **QR code**
-  fed by TDLib (`requestQrCodeAuthentication` → `waitQr` / `tg://login?token=…`,
-  encoded locally with the approved `qrcode` dependency); **用手机号登录** falls back
-  to the phone → code → 2FA form through a client restart (`auth:reset`). A
-  user-driven sign-in ends **directly in the shell**; only a session restored at
-  startup shows the client's profile step (80 px avatar, 168×36 进入 WeGram) first.
-  A sign-out recreates the login window first so `window-all-closed` never fires
-  mid-swap. Design: `技术方案.md` §9.6; measured metrics and deltas (footer copy,
-  hand-drawn glyphs, fixed size): `UI-HANDOFF.md` §2.2 / §5 items 21–26.
-- Spike 2 (real login + session reuse) is **done and verified**; the session lives in
-  `spikes/tdlib/data`.
-- **Image viewer (W3 addendum)**: a photo no longer opens an overlay inside the
-  transcript — it opens WeChat's standalone viewer window (75 % × 90 % of the screen,
-  40 px toolbar carrying 置顶 / 上一张 / 下一张 / 预览 / 缩放 / 原始大小 / 旋转 / 保存 / 更多,
-  wheel + drag zoom, Esc to close). Design: `技术方案.md` §9.5; measured metrics and the
-  deltas vs the client: `UI-HANDOFF.md` §2.1 and §5 items 12–16.
-- **Video in the same window (W3 addendum, later)**: the client's 图片和视频 window also
-  plays videos. A video bubble no longer plays inline with Chromium's native controls —
-  clicking it opens the viewer window, which takes `ViewerItem.kind` and renders
-  `VideoCanvas` (fitted `<video>` + the client's translucent player bar: play/pause,
-  2 px timeline with a 10 px thumb, `00:00` clocks, 倍速 0.5–2×, mute, idle hiding,
-  Space/←/→/M). Toolbar loses the zoom/rotate group for videos; 保存 lands in 视频 and
-  复制/打印 are hidden. Measured metrics: `UI-HANDOFF.md` §2.1 (second table), deltas 17–20.
-  The mock now ships a 6 s WebM fixture (`mock-assets.ts` `SAMPLE_VIDEO_WEBM`) so the
-  window is reachable without the real account.
-- **通讯录 (contacts, 2026-11-19, reworked the same day)**: the rail's 通讯录 tab
-  switches the shell to the address book. The middle column carries the client's
-  header stack (search, 通讯录管理 card, 新的朋友 / 公众号、服务号 / 企业微信联系人 /
-  我的企业 / 联系人) and the account's Telegram contacts grouped by initial; the right
-  pane is the contact card (60 px avatar, Telegram号, 朋友资料, 更多信息 —
-  手机号 / 数据中心 — and 发消息 / 语音聊天 / 视频聊天). **Data = TDLib `getContacts` + `getUser`** (`contacts:list`), not the
-  chat list: a person you never wrote to has a card but no conversation, and 发消息
-  creates the private chat on demand (`chats:openPrivate` → `createPrivateChat`).
-  Measured on the real account: 4 contacts, 2 with a username, 3 with a phone.
-  The 数据中心 row is decoded from the profile photo's persistent file id
-  (`tdlib/file-dc.ts`): TDLib exposes no DC field, and the photo is the only DC
-  signal a client gets (Pyrogram's `user.dc_id` is the same MTProto field), so
-  the value is approximate and 未知 for someone without a photo. Phone numbers
-  arrive without the leading `+`; the card adds it (`lib/format.ts`).
-  Metrics, icon provenance and the deliberate deltas: `docs/UI-HANDOFF.md` §2.4, §3,
-  §5 items 27–30.
-- **Message comments (2026-11-20)**: a message that owns a Telegram comment thread draws
-  WeChat's 评论 N 条 bar under its bubble; opening it fetches one page of
-  `getMessageThreadHistory` into Telegram's discussion view — a full-pane panel that
-  slides in from the right over the chat, with the commented post pinned on top. The
-  comments are the transcript's own rows (`MessageRow`: avatar, sender, bubble, hover
-  time, media), the input at the bottom is the chat composer's card, and
-  `messages:sendComment` posts into the thread's discussion group (`getMessageThread`
-  resolves it from the clicked message). Whether the input is offered at all follows
-  the official desktop client: `messages:commentInfo` composes membership, join-to-send
-  and permissions into canComment/canJoin (pure rule in `telegram/comment-access.ts`),
-  and a non-member gets 加入讨论组 / 申请加入讨论组 instead of the composer. The list opens
-  at the top of the thread — WeChat reads a channel's comments from there — and each
-  thread remembers the row the reader left (`ui:saveCommentAnchor` → `comment_ui_state`,
-  keyed by the commented message so a channel's own anchor stays untouched). Reaching
-  the top loads an older page (with scroll compensation); Esc / ‹ closes with the
-  reverse slide. The bar's numbers come from
-  `message.interaction_info` (comments, plus 阅读/转发 for channels) and live updates patch
-  the counter through the new `interaction` message op instead of remapping the message.
-  New channel `messages:comments`; new DTO `MessageInteraction`; mock fixtures carry two
-  group threads and the channel's 78-comment thread. Design:
-  `技术方案.md` §9.8. Posting landed later, and the box is now the full composer:
-- **完整的评论框 (2026-11-21)**: the discussion view's input used to be a stripped
-  textarea; it is now the chat composer's **own card** — `components/composer/ComposerCard.tsx`
-  (text, the 表情/收藏/文件/截图/语音 tool row, 发送, attach menu, expression panel) rendered by
-  both `Composer` (chat) and `CommentComposer` (thread). The two callers only own where a
-  send goes: drafts / reply-edit banners / anchored-window reloads for a chat, slow mode and
-  `messages:sendComment` for a comment. So `messages:sendComment` now carries a
-  discriminated `content` — text, a sticker, or a local photo/document — and the adapter
-  builds sticker/media content with the same `stickerContent` / `mediaContent` helpers a
-  chat send uses, replying to the thread root inside the discussion group. The 表情 panel no
-  longer sends by itself (`onSendSticker`), and the mock builds comment rows through the new
-  `packages/mock-adapter/src/media.ts`, so the two fakes and TDLib all answer the same shape.
-- **聊天信息 side panel (2026-11-21; group layout the same day)**: the header's "…"
-  opens the client's 聊天信息 panel — a 314 px sheet that **overlays** the transcript and
-  the composer (the owner corrected the first push version: the panel presses on the
-  messages, it does not reflow them). A private chat gets the peer + 查找聊天内容 /
-  免打扰 / 置顶 / 清空; a group gets 搜索群成员, the member grid + 添加, 群聊名称 (rename,
-  `setChatTitle`), 群公告 (the newest **pinned message**, tap → locate), 群二维码 (invite
-  link QR), the same rows, and 退出群聊 (`leaveChat`). 查找聊天内容 stays an in-panel
-  search over `search:inChat`; 清空聊天记录 is `deleteChatHistory` with `revoke: false`
-  (this account's copy only). 群二维码 opens its **own frameless 360 × 560 window**
-  (`main/qr-window.ts` + `screens/QrWindow.tsx`, `#qr`): member collage, 群聊：…, a
-  280 px code, the 7-day validity line and 转发给朋友 / 复制图片 / 保存图片. The code is a
-  temporary invite link (`createChatInviteLink` + 7 days); the window rasterises the
-  PNG itself and the actions copy it (main clipboard), save it (native dialog) or send
-  it as a photo message. New channels `qr:open/info/copy/save/share/close` and
-  `chats:setPinned` / `clearHistory` /
-  `members` / `setTitle` / `leave` / `pinned` / `inviteLink`; the chat channels live in
-  `packages/protocol/src/chats.ts` and the chat DTOs in `chat.ts` (both split at the
-  size budget). Design: `技术方案.md` §9.9; measured metrics and the deliberate
-  deltas: `UI-HANDOFF.md` §2.8 / §5 item 33.
-- **未加入频道的底栏 (2026-11-21)**: a channel opened from 搜索 or an `@username` is
-  readable without being subscribed, and the 服务号 card used to offer 静音 anyway. The
-  bottom edge now asks `chats:joinState` (`supergroup.status` is the account's own
-  membership; `join_by_request` decides the wording) and draws a single 加入 item instead
-  — 申请加入 for a request-based channel, 已申请加入 after the request went out, and no
-  keyboard switch. 加入 calls `chats:join` → `joinChat`: `chatJoinResultSuccess` flips
-  the card back to 静音 (with the keyboard when the account administers the channel) and
-  toasts 已加入频道, while `chatJoinResultRequestSent` only toasts. The fake account's
-  Telegram News channel starts unjoined, so both states are clickable offline. Design:
-  `技术方案.md` §9.9.
-- **Sender photos in the transcript (W3 addendum)**: group members are no longer
-  initials. `Message.senderAvatarUrl` carries the picture a row can already draw, and
-  the adapter's photo pool (the one that fetched chat photos) now resolves **people**
-  too, keyed by user id; a photo that finishes after the page was mapped arrives on the
-  new `evt:avatars` event instead of forcing a refetch. Our own rows draw
-  `Self.avatarUrl`, a channel post draws the chat photo. Design: `技术方案.md` §7.2.
-
-Verified at the end of the W2 session: `pnpm typecheck`, `pnpm build`, `pnpm tdlib:smoke`,
-`pnpm ui:db-check`, and the browser acceptance panel (`?perf=1`) — 5000 messages at
-60 fps, 0 px viewport drift when prepending a page.
-
-Verified at the end of the W3 session (same commands, plus CDP): `pnpm typecheck`,
-`pnpm build`, `pnpm tdlib:smoke` (real session, read-only), `pnpm ui:db-check`; Electron
-mock login → media + sticker flows end-to-end; measured in Electron via CDP
-(`-RemoteDebugPort`): prepend 50 → 100 messages, anchor row visible, **0.0 px** drift,
-**60.6 fps**, worst frame 17 ms, P95 17 ms, 27 rendered rows. Browser preview verified
-the same UI with `data:` URLs instead of `wx-media://`.
-
-Follow-up session (same day), after the import below: repo created, `senderChatId` fix
-for channel posts, the dark title-bar overlay verified end-to-end plus a login-screen
-drag strip, and the `ui.db` reading-position wiring (details in "Known gaps"). The
-`git log --oneline` of `main` is the source of truth for those commits.
-
-**Git exists now**: `main`, root commit `262996a` ("chore: initial import of the W1/W2
-skeleton"), 69 files, clean tree. `.gitignore` covers `.env*`, `node_modules`, `out`,
-`.cache`, `spikes/*/data`; `.gitattributes` pins `eol=lf` so the machine's global
-`core.autocrlf=true` cannot rewrite the whole tree on the next checkout.
-
-Two gotchas from that commit:
-
-- `commit.gpgsign=true` is set globally, but gpg cannot reach `keyboxd` from the agent
-  shell ("can't create … sentinel.lock"). The root commit was made with
-  `git -c commit.gpgsign=false`; re-sign in a normal terminal with
-  `git commit --amend -S --no-edit` if signed history matters.
-- `AGENTS.md` is a symlink to `CLAUDE.md` and is stored as one (mode `120000`). This
-  machine cannot create symlinks without admin/Developer Mode, so `core.symlinks=false`
-  is in effect — a `git checkout`/`git restore` of that path would replace the link with
-  a one-line text file containing `CLAUDE.md`. Don't restore it casually; recreate the
-  link with `New-Item -ItemType SymbolicLink` from an elevated shell.
-
-**Same day, WeChat 4.x UI pass** — details in `docs/UI-HANDOFF.md`. Summary: the
-renderer now mirrors the client on this machine (measured with PIL off a 125%-scaled
-screenshot, not guessed).
-
-- Tokens in `styles/index.css` (rail `#e0e0e0`, list `#e7e7e9`, pane `#fbfbfb`, selected
-  row `#15ad70`, incoming bubble `#eeeef0`, outgoing `#95ec69`) and §9.1 of the design
-  doc. Metrics: 32 px title strip, 42 px rail, 238 px list, 65 px rows, 40/38 px
-  avatars, 46 px chat header, 128 px composer card.
-- Structure: `SideRail` + list + pane, search pill and "+" inside the list column,
-  composer as a bordered card. `TitleBar.tsx` deleted — the strip is the native
-  `titleBarOverlay` (32 px, rail colour) and settings/theme/sign-out live in the rail's
-  "≡" menu (`AppMenu.tsx`). The footer with the adapter hint is gone; that hint is a
-  caption in the same menu.
-- Icons: the chrome glyphs are WeChat's own vectors, extracted from `Weixin.dll`
-  (2346 embedded SVGs) into the generated `components/WechatIcons.tsx` — including the
-  ＋ menu's 发起群聊 / 添加朋友 / 写笔记 glyphs; the rest (compass tab, "…", scissors)
-  are hand-drawn, and the brand mark — rail 聊天 tab, login window, empty-pane watermark —
-  is the Telegram roundel from Simple Icons. The name manifest in the DLL has no
-  recoverable name→payload mapping — see `UI-HANDOFF.md` §3 before trying again.
-- **@提及可点 (2026-11-21)**: a mention is a conversation entry point, not decoration.
-  Both TL kinds render as the same blue, clickable name — `mention` (`@username`) and
-  `mentionName` (TDLib's id-carrying mention, which the mapper used to drop). A tap
-  opens that person's chat: the id goes through `chats:openPrivate`, the username through
-  the new `chats:openUsername` (`searchPublicChat`), and a name nobody owns becomes a
-  Chinese toast instead of a dead click. `@all` stays plain (it names a group), tapping
-  your own name says so instead of opening 文件传输助手, and fake-account group chat 4
-  carries both entity kinds for the preview and the mock Electron window.
-- **Telegram 链接在应用内跳转 (2026-11-21)**: `t.me/<username>[/<post>]`, `t.me/s/…`,
-  `t.me/c/<id>/<post>`, `tg://resolve`, `tg://user` and `tg://openmessage` now open the
-  chat inside the shell instead of leaving it; a link that names a post also lands on that
-  row (`requestLocate` before activation, so the first page is fetched around it). The
-  parser is `lib/telegramLink.ts` (pure, every form unit-tested), the opener is
-  `lib/openTelegramLink.ts`, and the one anchor used by message text and inline-keyboard
-  buttons is `components/TelegramLink.tsx`. Invite/action links (`t.me/+…`, `joinchat`,
-  `/addstickers`, `/share`, `/proxy`) still go to the OS, and modifier/middle clicks keep
-  the "open outside" meaning. Group chat 4 in the fake account carries a `t.me` link.
-- **Polls (2026-11-21)**: `messagePoll` is now a real card, not just its question as
-  text. `Message.poll` (protocol `poll.ts`) carries the options, counters, flags and
-  quiz answer; `messages:vote` / `messages:addPollOption` drive `setPollAnswer` /
-  `addPollOption`, and TDLib's `updateMessageContent` remaps the row as a `replace`.
-  The card lives in `components/message-list/PollBubble.tsx` + `lib/poll.ts`, with
-  `--wx-poll-*` tokens in both themes; the fake account carries an open multi-answer
-  poll, an unanswered quiz and a closed poll with results. Switching an answer, a
-  retract (tap the chosen single answer), staging + 投票 for multi-answer, a quiz's
-  correct/wrong colours and 添加选项 were all checked in the browser preview.
-- Also fixed while testing: the login field regains focus after each step (it is
-  disabled while a request is in flight, which used to drop the caret and force a click).
-
-### Real-account session (the one that produced this revision)
-
-First time the real TDLib adapter was driven end-to-end in the Electron window (a proxy
-is mandatory here). Three real defects surfaced and were fixed — all of them only
-reproduce against a real account, none with the mock:
-
-1. **Groups opened empty and never paged.** `updateChatReadInbox` fires for every chat,
-   and `applyMessageOps` was creating an empty `messagesByChat[chatId]` for each one, so
-   `ChatPane`'s "history is cached" check skipped the first-page fetch forever.
-2. **`hasMore` lied.** TDLib often answers `getChatHistory` from its local window (1–5
-   messages in ~2 ms); the old `hasMore = raw.length >= limit` read that as "no older
-   messages", so paging stopped dead.
-3. **A loaded transcript stayed invisible.** When the window is occluded, Chromium
-   throttles `requestAnimationFrame`, and the anchor-restore path only released the
-   `--pending` gate from a rAF loop — messages were in the DOM but `visibility: hidden`.
-   Together with defect 1 this is what the owner saw as "群组加载旧消息无法加载".
-
-UI work in the same session: WeChat-style **overlay scrollbars** (no layout gutter) and
-**real profile photos** for the rail avatar and every chat row (`avatarUrl` added to
-`Self` and `ChatSummary`; downloaded in the background with a 4-wide worker pool and
-pushed back as batched `chats` upserts). Details in `docs/UI-HANDOFF.md`; the measured
-quirks are in "Non-obvious facts" below.
-
-Verified in that session: `pnpm typecheck`, `pnpm build`, and CDP measurements against
-the real account — first page 50 messages / `hasMore: true` on cold groups, 60 pages
-(3000 messages) with no duplicates and strictly ascending ids, rail + list photos at
-160×160 in 40×40 boxes, and a chat opened while the window was occluded rendering
-correctly after the visibility fix. The Electron window is left running.
-
-## Hard rules
-
-1. **Writes never touch the real account.** The Telegram account in
-   `spikes/tdlib/data` is real and **read-only** (`getMe`/`getChats`/`getChatHistory`).
+1. **Writes never touch the real account.** The session in `spikes/tdlib/data` is a real
+   Telegram account and stays **read-only** (`getMe` / `getChats` / `getChatHistory`).
    Anything that sends, edits, deletes, forwards or marks read with real TDLib runs on
-   Telegram's test DCs — `pnpm tdlib:test-dc`, or `WEGRAM_TDLIB_TEST_DC=1` for the app
-   (its own session under `userData/tdlib/test`). The mock adapter
-   (`WEGRAM_ADAPTER=mock` / the launch script's `-Mock`, also the browser preview) is now
-   only the UI-fixture path, for work that should not talk to a Telegram account at all.
-2. **Never start Electron from the agent shell.** Shell commands run inside a Windows
-   job object; Chromium aborts there (see Environment). Use
-   `pwsh scripts/launch-detached.ps1`.
-3. **`--no-sandbox` is a local workaround only.** It must never reach a release build.
-   The sandboxed path has to be verified on a clean machine before shipping.
-4. `api_id`/`api_hash` are per-deployment from my.telegram.org. `apps/desktop/.env`
-   and `spikes/tdlib/.env` are gitignored; do not copy them anywhere else.
+   Telegram's **test DCs**: `pnpm tdlib:test-dc`, or `WEGRAM_TDLIB_TEST_DC=1` for the app
+   (its own session under `userData/tdlib/test`). The mock adapter is the UI-fixture path
+   only.
+2. **Never start Electron from the agent shell.** Shell commands run inside a Windows job
+   object and Chromium aborts there. Use `pwsh scripts/launch-detached.ps1` (§3.2).
+3. **`--no-sandbox` is a local workaround only.** It must never reach a release build; the
+   sandboxed path has to be verified on a clean machine before shipping.
+4. **Credentials are per deployment** (`api_id`/`api_hash` from my.telegram.org, in
+   env / dev `.env` / the value a release build inlined). `apps/desktop/.env` and
+   `spikes/tdlib/.env` are gitignored; never copy them elsewhere, never reuse another
+   client's credentials.
+5. **The code rules in `CLAUDE.md` are hard too**: no non-null assertions, no `as` to
+   silence the checker, no new `any`, no empty `catch`, no `console.log` on shipped
+   paths, validate every external input at its boundary, protocol first, no dependency
+   without asking.
+6. **One logical change per commit**, Conventional Commit messages, GPG-signed
+   (`git log -1 --format=%G?` must print `G`).
 
-## Environment (this machine)
+---
+
+## 3. Environment, commands, verification
+
+### 3.1 This machine — measured quirks
 
 | Symptom | Cause | Workaround |
 |---|---|---|
 | `electron.exe --version` exits `0x80000003`; the app exits `0xC0000005` (WER: APPCRASH in `electron.exe`) | Chromium cannot initialise inside the agent shell's job object | launch detached via WMI (`scripts/launch-detached.ps1`) |
-| Same crash with the sandbox on, even when launched detached | Chromium's sandbox is broken on this machine — Electron 30.5.1 / 38.8.6 / 45.3.3 all reproduce it. Kaspersky 21.27 is running; Windows is an Insider build 10.0.26300 | `-NoSandbox` locally; verify the real path on another machine |
-| `require('electron')` is `undefined` | `ELECTRON_RUN_AS_NODE=1` is set globally | `Remove-Item Env:ELECTRON_RUN_AS_NODE` before launching |
-| `pnpm install` fails / ignored builds | pnpm 12 reads `allowBuilds:` (name → bool map) from `pnpm-workspace.yaml`, store lives outside the workspace | already configured; needs full filesystem access |
+| Same crash **with** the sandbox, even detached | Chromium's sandbox is broken on this machine (Electron 30.5.1 / 38.8.6 / 45.3.3 all reproduce it; Kaspersky 21.27, Windows Insider 10.0.26300) | `-NoSandbox` locally; verify the real path elsewhere |
+| `require('electron')` is `undefined` | `ELECTRON_RUN_AS_NODE=1` is global | `Remove-Item Env:ELECTRON_RUN_AS_NODE` before launching |
+| `pnpm install` ignores build scripts / fails | pnpm 12 reads `allowBuilds:` from `pnpm-workspace.yaml`; the store lives outside the workspace | already configured; needs full filesystem access |
 | Vite watcher dies with `EBUSY` | editors save through `*.tmpdir` folders | both Vite configs ignore `**/*.tmpdir/**` and `**/*.tmp` |
-| `getChats` hangs, `getMe` works | no proxy → TDLib reads users/chats from the local DB but cannot reach the network | set a proxy; `socks5://127.0.0.1:7890` worked here (Clash mixed port) |
-| `launch-detached.ps1` dies with `Invoke-CimMethod … 拒绝访问` | the DSH shell is sandboxed (`workspace-write`): WMI process creation is denied, and so are the obvious detours (starting through `explorer.exe`, `schtasks /create`) | only works when the session runs with full access (this session was `danger-full-access`). Do not "fix" the script — ask for full access instead |
-| avatars/photos trickle in, one 30 KB thumbnail takes 16 s | the SOCKS tunnel is saturated or flapping, not the code | measured: the same file later took 65–230 ms. Check FlClash/Clash before debugging |
-| `-RemoteDebugPort` connects but `Runtime.evaluate` sees a stale UI | a second Electron instance was requested while one was running; the single-instance lock kept the old window | close `electron.exe` first (`windows close electron.exe`), then launch |
+| `getChats` hangs, `getMe` works | no proxy: TDLib reads users/chats locally but cannot reach the network | configure a proxy; `socks5://127.0.0.1:7890` worked (Clash mixed port) |
+| `launch-detached.ps1` dies with `Invoke-CimMethod … 拒绝访问` | the DSH shell is sandboxed (`workspace-write`): WMI creation and its detours (`explorer.exe`, `schtasks`) are denied | only works with full access; do not "fix" the script |
+| Avatars/photos trickle in (one 30 KB thumbnail took 16 s) | saturated or flapping SOCKS tunnel, not the code | measured 65–230 ms on a healthy tunnel — check FlClash/Clash first |
+| `-RemoteDebugPort` connects but `Runtime.evaluate` sees a stale UI | a second instance was requested while one ran; the single-instance lock kept the old window | `windows close electron.exe`, then launch |
+| `node:sqlite` warning in the log | Electron 45 ships Node 24.22, the module is experimental | expected; that is why better-sqlite3 is not used |
+| A fresh checkout cannot launch Electron | Electron 45 dropped its `postinstall` downloader | `pnpm electron:install` (dev only) |
 
-## How to run and verify
+### 3.2 Commands
 
 ```powershell
-pnpm install
-pnpm typecheck                  # protocol + main/preload + renderer
-pnpm build                      # → apps/desktop/out
+pnpm install                     # allowBuilds configured in pnpm-workspace.yaml
+pnpm electron:install            # Electron 45: fetch the binary (dev only)
+pnpm verify                      # THE gate: lint → typecheck → test → build, 0 warnings
+pnpm lint / pnpm test / pnpm typecheck / pnpm build
+pnpm format                      # prettier --write .   (format:check to verify only)
 
 cd apps\desktop
-pnpm web                        # renderer-only preview; ?perf=1 shows the W2 panel
-pnpm tdlib:smoke                # real adapter headlessly (needs .env + proxy env)
-pnpm ui:db-check                # ui.db via node:sqlite, headless
-pwsh scripts\launch-detached.ps1 -NoSandbox -Mock   # the only way Electron starts here
-pwsh scripts\launch-detached.ps1 -NoSandbox -Mock -RemoteDebugPort 9224  # + CDP
-# real account (read-only; the proxy is mandatory, see the environment table)
+pnpm dev                                                  # Electron dev (unset ELECTRON_RUN_AS_NODE)
+pnpm web                                                  # renderer preview :5174 (?perf=1 → acceptance panel)
+pnpm tdlib:smoke                                          # headless real-TDLib read check
+pnpm tdlib:test-dc                                        # write checks on Telegram's test DCs
+pnpm ui:db-check                                          # headless ui.db check (node:sqlite)
+pwsh scripts\launch-detached.ps1 -NoSandbox -Mock         # mock adapter in the real shell
+pwsh scripts\launch-detached.ps1 -NoSandbox -Mock -RemoteDebugPort 9224   # + CDP
 pwsh scripts\launch-detached.ps1 -NoSandbox -Proxy socks5://127.0.0.1:7890 -SessionDir ..\..\spikes\tdlib\data
 ```
 
-### Release packaging
+The launcher logs to `.cache/app.log` and spawns a WindowsTerminal wrapper: **minimise** it
+(closing the console takes the app down). Close any running `electron.exe` first — the
+single-instance lock silently keeps the old bundle on screen.
 
-`.github/workflows/release.yml` builds the NSIS installer on `windows-latest` and publishes
-it as a GitHub Release; the version tag is the only input:
+### 3.3 Adapter selection and fixtures
 
-```powershell
-git tag v0.2.0
-git push origin v0.2.0        # verify → package → Release
-gh workflow run release.yml -f tag=v0.2.0    # re-run an existing tag
-```
+- `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` (env, dev `.env`, or a release build's inlined
+  value) select TDLib. A development build without them runs the mock adapter.
+  `WEGRAM_ADAPTER=mock` forces the mock **in development only**; a packaged build refuses to
+  start without credentials and ignores the variable.
+- The mock adapter generates its media into `%APPDATA%\WeGram\mock-media`
+  (`design-v3.png`, `sunset.png`, `需求说明.md`, `sticker-face.webp`, `sticker-heart.webp`,
+  `sticker-wave.tgs`, `premium-sticker-effect.tgs`, the video WebM, `emoji-click.wav`).
+  Delete the folder to force regeneration.
+- Browser preview: `pnpm web` → `http://localhost:5174` (shell) and `/#login`, `/#viewer`,
+  `/#qr` (the standalone windows). It fakes IPC through `lib/preview-bridge.ts`; app logic
+  must never depend on it.
+- Dev flags that make unprovable paths testable: `WEGRAM_MOCK_FAIL_SEND=1` (fails the next
+  text send once), `WEGRAM_MOCK_NOTIFY=1` (ambient arrivals become notifications), and
+  Chromium's `--use-fake-device-for-media-stream` (voice recording without a microphone).
+  There is **no** `WEGRAM_USER_DATA` in the tree today: a second instance shares
+  `%APPDATA%\WeGram` and the single-instance lock makes it a no-op.
+- `tdlib:smoke` env: `TDLIB_PROXY`, `WEGRAM_TDLIB_DIR` (defaults to the spike session),
+  `SMOKE_DEBUG=1`. Expected output: `auth state : ready`, 20 chats,
+  `history: 10 messages, hasMore=true`. Without a proxy it times out on `listChats` — known
+  behaviour, not a bug.
 
-The workflow stamps `apps/desktop/package.json` from the tag (the committed version is a
-placeholder), runs `pnpm verify`, then `pnpm --filter @wegram/desktop package:win`
-(`electron-vite build && electron-builder --win`). A re-run uploads the assets with
-`--clobber` instead of failing on the existing release.
+### 3.4 Test-DC writes (the only place writes may run)
 
-**Two repository secrets are required**: `TELEGRAM_API_ID` and `TELEGRAM_API_HASH`
-(the deployment's own my.telegram.org app). `electron.vite.config.ts` inlines them into the
-**main bundle only** — preload and renderer never see them — and the workflow fails in ~2s
-when either is missing. A packaged build therefore always has credentials:
+The reserved `99966XYYYY` test numbers are **dead** (TDLib maintainer, tdlib/td#3083:
+test accounts were disabled for abuse; a real number and an official app are required). A
+test-DC account is created by an **official app**, then used by TDLib:
 
-- credentials precedence: `process.env`/dev `.env` → the inlined value;
-- a packaged build without credentials shows an error dialog and quits, and it **ignores**
-  `WEGRAM_ADAPTER=mock` — the fixture data set is development-only (`createAdapter` refuses
-  it when `!allowMock`);
-- the mock-only UI hints (登录窗's `Mock 适配器：10 秒后自动模拟扫码`, the 设置菜单's
-  `Mock 适配器 · v0.1.0`) can only appear in `pnpm dev`.
+1. Telegram Desktop **beta**: hold Alt+Shift, right click "Add account" → **Test server**,
+   sign a real number in there.
+2. `WEGRAM_TEST_PHONE=+... WEGRAM_TEST_ALLOW_REAL_PHONE=1 pnpm tdlib:test-dc` drives the
+   TDLib login; the 6-digit code arrives **inside that official session**
+   (`authenticationCodeTypeTelegramMessage`; `resend` is refused).
+3. `WEGRAM_TEST_CODE=<code>` runs the write checks. Measured on a fresh account:
+   authorization → `ready`, 3 chats, send → edit → photo upload → delete all pass; voice
+   note accepted with an empty waveform.
 
-The first real build is in: run 44301387485 on tag `v0.1.0` finished green in 4m31s and
-published `WeGram-0.1.0-x64.exe` (108 MB) + its `.blockmap`.
+`pnpm tdlib:test-dc` needs the test session **exclusively** (`db/td_test.binlog`): close
+the app first, and a torn/VSS copy of the DB loses authorization. If no test DC is
+available, say so and mark the write path **unverified** — never probe writes against the
+real session.
 
-Packaging **cannot** be verified locally, so always read the run instead: the same script does
-produce `release/win-unpacked` here with
-`app.asar.unpacked/node_modules/@prebuilt-tdlib/win32-x64/tdjson.dll` in place, but the NSIS
-phase runs the freshly built installer stub once (its `BUILD_UNINSTALLER` pass writes
-`__uninstaller.exe`, which electron-builder then signs), and that child process does not survive
-this shell — the same job-object class of failure as Electron itself. It works on the runner.
-
-**Shipping the dll unpacked is not enough — the loader must be handed the unpacked path.**
-`prebuilt-tdlib.getTdjson()` resolves through `require.resolve`, so inside a packaged build it
-returns `…\app.asar\node_modules\@prebuilt-tdlib\win32-x64\tdjson.dll`. Electron redirects `fs`
-reads there (an `existsSync` check passes) but not `LoadLibrary`, so `createClient` throws
-`Dynamic Loading Error: Win32 error 126` and `bootstrap` only logs `adapter failed to start`:
-the login window spins on 正在连接 Telegram… forever and TDLib never even opens
-`userData/tdlib` (measured on the installed 0.1.1 build). `tdlib/client.ts` →
-`resolveTdjsonPath()` maps the path onto `app.asar.unpacked`; with it the same packaged exe logs
-`TDLib client created` and `TDLib 1.8.70 ready for phone login`. That silent failure now reaches
-the window: `tdlib/lifecycle.ts` reports `BootState.failed` with the throw reason, and the login
-window shows 未能启动 instead of spinning (see the 技术方案 §6.1 / §9.6 notes).
-
-Reading and driving the real renderer over CDP is what produced the numbers above. The
-helper is `.cache/cdp-eval.mjs` (gitignored; ~30 lines: read
-`http://127.0.0.1:9224/json`, open the page's `webSocketDebuggerUrl`, send one
-`Runtime.evaluate`):
+### 3.5 Driving the real renderer over CDP
 
 ```powershell
 node .cache\cdp-eval.mjs "document.querySelectorAll('.wx-message-slot').length"
-node .cache\cdp-eval.mjs "@script.js"   # same, expression read from a file (quoting!)
+node .cache\cdp-eval.mjs "@script.js"   # expression from a file (quoting)
 ```
 
-It can call the app's own IPC, which is the cheapest way to isolate a bug:
+`.cache/cdp-eval.mjs` (gitignored, ~30 lines) reads `http://127.0.0.1:9224/json`, opens the
+page's `webSocketDebuggerUrl` and sends one `Runtime.evaluate`. It can call the app's own
+IPC, the cheapest way to isolate a bug:
 
 ```javascript
 await window.tg.invoke('messages:history', { chatId: -1001125107539, limit: 50 })
 await window.tg.invoke('chats:list', { offset: 0, limit: 5 })
 ```
 
-Anything that opens a chat also marks it read on the server — use it deliberately.
+Anything that opens a chat also marks it read on the server — use it deliberately. rAF and
+`PerfPanel` only run while the window is visible, so focus it first.
 
-- The mock adapter writes its generated media to `userData/mock-media` on startup
-  (`%APPDATA%\WeGram\mock-media`): `design-v3.png`, `sunset.png`, `需求说明.md`,
-  `sticker-face.webp`, `sticker-heart.webp`, `sticker-wave.tgs`,
-  `premium-sticker-effect.tgs`. Delete that folder to force regeneration.
-- `-RemoteDebugPort` exposes the renderer over CDP (`http://127.0.0.1:9224/json`); that
-  is how the prepend/FPS numbers above were measured without opening DevTools. rAF and
-  `PerfPanel` only run while the window is actually visible, so focus it first.
+### 3.6 Checklist used to verify UI work
 
-- `tdlib:smoke` env: `TDLIB_PROXY=socks5://host:port` (or `http://host:port`), `WEGRAM_TDLIB_DIR`,
-  `SMOKE_DEBUG=1`. It defaults to the spike session, so no second login is needed.
-- The browser preview installs `lib/preview-bridge.ts` when `window.tg` is missing.
-  It mirrors the mock adapter for the UI only — never let app logic depend on it.
-- Expected smoke output: `auth state : ready`, 20 chats, `history: 10 messages,
-  hasMore=true`. Without a proxy it times out on `listChats` — that is the known
-  network behaviour, not a code bug.
+1. `pnpm typecheck && pnpm build`.
+2. Mock Electron pass: login window (QR → mock confirms after 10 s; phone fallback
+   `+8613800000000` / `12345` / `wegram`), then the shell: rail icons, list header, row
+   spacing, selected row, bubbles both sides, day/unread separators, composer card, hover
+   timestamp, context menus, delete confirm, forward sheet, sticker panel, app menu, chat-info
+   panel, settings window, dark mode, empty-pane watermark.
+3. For a visual judgement, crop the same region from app and reference, scale to the same
+   width, paste side by side, read once. Reference crops live in `.cache/wxref` (gitignored).
+4. `pnpm web` is fine for CSS iteration, but **do not judge the pane there**: Chrome's
+   "save password" bubble sits over the transcript and DSH refuses clicks on it.
 
-## Architecture map
+`pnpm test` is DOM-free by design (node environment); rendering, hook order and
+scroll/virtualisation timing must be verified in the Electron window, `wx-media://` has no
+handler in the preview, and anything touching `ui.db` needs `pnpm ui:db-check`.
+
+---
+
+## 4. Architecture map
 
 ```
-packages/protocol/src/       dto.ts (zod schemas + types), channels.ts (channel tables,
-                             schemas, TgBridge), errors.ts (AppError), index.ts
+packages/protocol/src/        dto.ts (message + ops zod schemas), channels.ts + the domain
+                             tables it spreads (chats.ts, qr.ts, send.ts, presence.ts,
+                             network.ts, settings.ts, voice.ts, poll.ts, comment.ts,
+                             search.ts, user.ts, reaction.ts, stickers.ts, chat.ts,
+                             contact.ts), events.ts, errors.ts, index.ts
 packages/adapter-contract/src/  the seam: TelegramAdapter + AdapterEvent/Emitter
-packages/mock-adapter/src/      the fake adapter + generated fixture media (mock-assets.ts)
+packages/mock-adapter/src/      the fake adapter + generated fixture media
 packages/mock-session/src/      the fake session's pure rules (shared with the preview)
 packages/mock-fixtures/src/     the demo account both fakes serve
 apps/desktop/src/main/
-  index.ts                   app lifecycle, main-window creation, theme overlay, adapter
-                             wiring, the login↔shell hand-over (login:enter / sign-out)
-  login-window.ts            the frameless 280×373 login BrowserWindow (#login hash)
+  index.ts                   lifecycle, adapter wiring, theme overlay, the login↔shell hand-over
+  windows.ts                 window factory, openExternal, storedTheme, applyTitleBarTheme
+  app-window.ts              createAppWindow + attachNavigationPolicy (all three factories)
+  login-window.ts            frameless 280×373 login BrowserWindow (#login)
   viewer.ts, viewer-size.ts  the 图片和视频 BrowserWindow and its measured size maths
+  qr-window.ts               the 群/频道二维码 sheet (frameless 360×560, child of the shell)
+  settings-window.ts         the 设置 window (640×558, no parent, single instance)
+  system-proxy.ts            Chromium resolveProxy + registry fallback
+  system-proxy-rules.ts      (pure) PAC/static/registry parsers
   ipc/router.ts              per-channel zod validation, Result envelope
-  ipc/handlers.ts            one handler per invoke channel (incl. native file picker)
+  ipc/handlers.ts            one handler per invoke channel (IpcHandlerMap typed by InvokeResponse)
   media/registry.ts          token → path | fileId registry (renderer never sees paths)
-  media/protocol.ts          protocol.handle('wx-media'): disk Range streams + the branch
-                             that tails a file TDLib is still downloading
-  media/stream.ts            (pure, unit-tested) the byte pump behind that branch
-  media/leases.ts            (pure, unit-tested) who still waits for a file's transfer
+  media/protocol.ts          protocol.handle('wx-media'): Range streams + still-downloading tail
+  media/stream.ts, leases.ts (pure) the byte pump; refcounted download leases
   media/image-size.ts        PNG/JPEG/WebP/GIF header probe (inputPhoto needs real sizes)
-  telegram/adapter.ts        re-export of the seam from @wegram/adapter-contract
-  telegram/tdlib/           ONLY folder allowed to import `tdl` (index/lifecycle/boot/client/actions/updates/avatar-cache/stickers/proxy/map)
+  media/voice-file.ts        materialises recorded OGG under userData/voice
+  notifications.ts, tray.ts  Electron Notification + task-bar flash; best-effort tray
+  telegram/adapter.ts        re-export of the seam
+  telegram/tdlib/            ONLY folder allowed to import tdl (index, client, boot, lifecycle,
+                             chat-api, send-api, user-api, actions/, updates, avatar-cache,
+                             stickers, proxy, map/)
   telegram/updates.ts        EventBus: 60 ms batching, monotonic seq
   telegram/events.ts         AdapterEvent → evt:* channels
   telegram/index.ts          adapter selection (mock / tdlib, WEGRAM_ADAPTER)
   store/ui-db.ts             ALL node:sqlite access (drafts, theme, anchors, media cache)
-  store/settings.ts          JSON store for the proxy only (DPAPI-sealed secret)
+  store/settings.ts          JSON store for what must exist before a window (proxy, prefer_ipv6)
   proxy.ts, proxy-url.ts     stored ↔ view/masked config, URL parsing
-  security/secrets.ts        safeStorage seal/unseal
+  security/secrets.ts        safeStorage (DPAPI) seal/unseal
   preload/index.ts           window.tg.invoke / window.tg.on, channel whitelist
 apps/desktop/src/renderer/src/
-  main.tsx                   route by hash: plain = shell, #viewer = 图片和视频, #login = login
-  App.tsx                    shell only (auth must be ready) + event subscription, typing expiry
-  screens/LoginWindow.tsx    the login window: QR screen, phone/code/2FA fallback, profile step
-  components/QrCode.tsx      login QR: one SVG path from the qrcode matrix
-  lib/qr.ts                  QR matrix/path helpers (pure, unit-tested)
-  store/                     zustand, split: types.ts (AppData + action interfaces),
-                             initialState.ts (DATA_DEFAULTS, the only initial state),
-                             reducers.ts (pure sortChats/upsertMessage/reduceOps),
-                             slices/{auth,chats,messages,media,ui}.ts,
-                             useAppStore.ts (assembler; unchanged import path)
-  components/message-list/   index.tsx (virtualiser + render tree) + MessageRow.tsx,
-                             Divider.tsx, useInitialPosition.ts (anchor restore or land
-                             at the bottom + reveal nets), usePrependRestore.ts (two-stage
-                             compensation, loadOlder), useAnchorSave.ts (ui:saveAnchor),
-                             scrollFlags.ts, scroller.ts (resyncScroller),
-                             emoji.ts / menu.ts / unread.ts (pure helpers)
-  components/chat-pane/      index.tsx (render tree + modal state) + useChatHistory.ts
-                             (first page, empty-page retries, paging to the saved anchor,
-                             loadOlder), messageActions.ts (send/edit/delete/forward/copy),
-                             ChatHeader.tsx, ChatInfoPanel.tsx, ChatInfoSearch.tsx,
-                             Placeholders.tsx, labels.ts
-  components/MediaBubble.tsx photo lightbox / video / file card / voice bar + progress
-  components/StickerRenderer.tsx WebP <img>, TGS lottie, WebM <video>, offscreen pause
-  components/StickerPanel.tsx installed sets → grid → send sticker
-  components/RichText.tsx    TL entity renderer (bold/italic/code/pre/link/spoiler)
-  components/Composer.tsx    IME guard, reply bar, edit mode, draft debounce, attachments
-  lib/useAnchoredScroll.ts   ready gate, 40px stick-to-bottom, resize compensation
-  lib/media.ts               per-owner request dedupe + media URL/progress hooks + cancel
-  lib/mediaVariant.ts        (pure, unit-tested) which photo size covers a box
-  lib/mediaPriority.ts       (pure, unit-tested) the TDLib download priority ladder
-  lib/tgs.ts                 gzip guards + Lottie decode cache (LRU)
-  lib/entities.ts            UTF-16 offset segmentation for TL entities
-  components/PerfPanel.tsx   dev-only acceptance panel (?perf=1)
-  lib/preview-bridge.ts      browser-preview-only fake IPC
-scripts/                     launch-detached.ps1 (-RemoteDebugPort for CDP),
-                             tdlib-smoke.ts, ui-db-check.ts
+  main.tsx                   route by hash: plain shell, #viewer, #login, #qr, #settings
+  App.tsx                    shell only (auth ready) + event subscription, typing expiry, locate
+  screens/{LoginWindow,QrWindow,SettingsWindow}.tsx
+  components/MainShell.tsx   three columns, toast, app menu
+  components/SideRail.tsx, SectionPlaceholder.tsx, ChatList.tsx, ChatListItem
+  components/chat-list/chatMenu.ts   the row context menu
+  components/chat-pane/      index (render tree + state), useChatHistory, history/,
+                             messageActions, ChatHeader, ChatInfoPanel/Rows/Dialogs/Search,
+                             CommentPanel, CommentComposer, ChannelBar, PinnedBar,
+                             Placeholders, labels
+  components/message-list/   index (virtualiser + reveal), MessageRow, Divider, rows.ts,
+                             useInitialPosition / usePrependRestore / useAnchorSave /
+                             useJumpToLatest / useLocateScroll / useLandingSave,
+                             scrollFlags, scroller, emoji/menu/unread (pure), PollBubble,
+                             CommentBar, ChannelMeta, PremiumStickerEffect
+  components/composer/       ComposerCard (the ONE input card), useComposerInput,
+                             useVoiceRecording, VoiceControls
+  components/contacts/       ContactsList, ContactDetail
+  components/viewer/         MediaViewer, VideoCanvas, ViewerToolbar/Grid/Icons, useViewer*
+  components/{ExpressionPicker,StickerRenderer,StickerCanvasLayer,MediaBubble,VoiceBubble,
+              RichText,Avatar,ContextMenu,AppMenu,PlusMenu,Icon,WechatIcons,OverlayScrollbar,
+              SearchField,AnchoredPopup,ProfileCard,ReportDialog,QrCode,PerfPanel}.tsx
+  store/                     types, initialState (DATA_DEFAULTS), reducers, slices/{auth,
+                             chats,messages,media,ui}, useAppStore (assembler)
+  lib/                       pure rules + hooks: format, entities, media, mediaVariant,
+                             mediaPriority, tgs, poll, comments, presence, typingPing,
+                             albumSend, editTarget, voice/ (recorder + oggOpus), qr, zoom,
+                             player, viewer, chatInfo, listMetrics, scrollGeometry,
+                             telegramLink, stickerMedia, stickerSetLink, customEmoji,
+                             preview/ (browser preview only)
+scripts/                     launch-detached.ps1, tdlib-smoke.ts, tdlib-test-dc.ts,
+                             ui-db-check.ts, style-contract.test.ts
 ```
 
-Layered agent notes live next to the code they govern: `packages/protocol/AGENTS.md`,
-`apps/desktop/src/main/AGENTS.md`, `apps/desktop/src/renderer/AGENTS.md`. `pnpm verify`
-(lint → typecheck → vitest → build) is the gate; the unit tests cover the pure modules
-only (formatters, entity segmentation, image header probe, proxy URL, store reducers and
-the store invariants) — scroll/virtualisation behaviour still has to be confirmed in the
-Electron window.
+Per-directory detail (what each module owns and why it exists) is in the layer notes; the
+split history and the invariants it preserved are in §8.
 
-Rules that keep it maintainable: only `telegram/tdlib/**` knows TDLib JSON; new fields
-start in `dto.ts`; new channels go into the channel tables in `channels.ts` (preload and
-router pick them up); all `node:sqlite` calls stay in `ui-db.ts`.
+Rules that keep this maintainable: only `telegram/tdlib/**` knows TDLib JSON and only
+`store/ui-db.ts` touches `node:sqlite` — both enforced by ESLint; a new field starts in
+`dto.ts`; new channels go into the channel tables; every event carries `seq`.
 
-## Non-obvious facts, already measured — do not re-derive
+---
 
-- **`getChatHistory` anchoring**: `from_message_id = 0` does **not** fetch from the
-  server, it returns only the locally cached last message. The first page must anchor
-  on `chat.last_message.id`; paging older means anchoring on the oldest loaded id and
-  filtering `id < anchor`. A negative `offset` returns *newer* messages, so it cannot
-  page backwards. First server fetch of 50 messages took ~3.4 s.
-- **Virtualised prepend needs two stages**: rough compensation from the height delta
-  for a few frames (the virtualizer remeasures rows over several frames), then exact
-  correction against the anchor row's DOM offset. Anchor-only fails because right after
-  a prepend the anchor row is outside the rendered window and has no DOM node.
-- **Older history has to be *prefetched*, not fetched at the top** (2026-11-19). The
-  fetch itself is the jank: an older page comes from TDLib's local cache or from the
-  server (first server answer measured at ~3.4 s, which is why `LOAD_OLDER_TIMEOUT_MS`
-  exists), while a wheel gesture covers the last screen in about a second — the reader
-  hits `scrollTop < 160` and the wheel goes dead until the page lands. `useChatHistory`
-  `.prefetchOlder` now keeps one page in `olderPagesByChat` (fetched on mount and after
-  every landing); `loadOlder` only has to prepend it, so the "正在加载更早的消息…" chip
-  does not show in normal reading. The buffer is a *snapshot*: it is dropped when a
-  buffered row is deleted/edited, when the window is replaced by `setHistory`, and an
-  empty answer is never buffered (a cold TDLib cache answers `[]`).
-- **Never put a percentage `max-width` on the bubble itself** — on a flex child it
-  resolves against the content size and collapses to min-content. It lives on
-  `.wx-message-stack`.
-- **`titleBarOverlay` buttons are painted above web content**, so the title bar must
-  reserve space with `padding-right: calc(16px + (100% - env(titlebar-area-x, 0px) -
-  env(titlebar-area-width, 100%)))`. A fixed spacer only pushes content into the buttons.
-  The overlay colour also has to be repainted from the main process on theme change.
-  **Whatever sits under the controls must match the overlay colour** (what
-  `applyTitleBarTheme` sends — currently the rail colour `#e0e0e0` / `#2d2d2e`, height
-  32 px) or the bitmap shows a seam. The overlay covers only the right-hand control
-  area, not the whole strip, so the strip keeps the rest of the window looking
-  consistent. The login window is a separate case: it is `frame: false`, draws its own
-  × and gear, and needs no overlay at all (design doc §9.6).
-- **A pending QR login cannot be cancelled in TDLib.** `requestQrCodeAuthentication`
-  works from `waitPhoneNumber`, and TDLib then keeps re-sending
-  `authorizationStateWaitOtherDeviceConfirmation` with a fresh
-  `tg://login?token=…` link. `setAuthenticationPhoneNumber` is refused in that state
-  and there is no cancel call, so the login window's phone fallback restarts the
-  client (`auth:reset` → `destroy` + new client). Do not replace that with a direct
-  phone submit — it fails at the TDLib boundary.
-- **Test-DC accounts can only be created from an official app, not from TDLib
-  (measured 2026-11-20, confirmed upstream).** `WEGRAM_TDLIB_TEST_DC=1` → `use_test_dc`
-  does connect to the test environment (test DC 1 `149.154.175.10:443`, binlog
-  `td_test.binlog`; `99966XYYYY` numbers are even validated, `X` 4–5 →
-  `PHONE_NUMBER_INVALID`). But the reserved-number derived code (DC id ×5/×6, still
-  documented on core.telegram.org/api/auth#test-accounts and in Telethon/Pyrogram) is
-  answered with `PHONE_CODE_INVALID` — with this project's `api_id` and with the public
-  test `api_id` 17349, and after `resendAuthenticationCode`. TDLib's maintainer says why
-  in tdlib/td#3083: *"Test accounts were disabled due to extensive abuse of them. Now a
-  real phone number is required to create an account in Test DC"* and *"an official
-  mobile application is required to create an account"* (iOS Debug menu / Android beta;
-  Telegram Desktop beta can also switch to the test server). A real number gets
-  `authenticationCodeTypeTelegramMessage` (6 digits) instead of SMS: the code is
-  delivered into an **already authorized test-DC session**, and `resend` is refused for
-  that type — so with no session on the test server there is nowhere for the code to go.
-  Path forward (proven end-to-end 2026-11-20): log the number into the test server with
-  an official app first — Telegram Desktop beta, Alt+Shift + right click "Add account" →
-  **Test server** — then the TDLib login's 6-digit code arrives as a Telegram service
-  message inside that session and `WEGRAM_TEST_CODE` completes the sign-in. Measured on a
-  fresh test account: `ready`, 3 chats, send → edit → photo upload → delete all pass.
-  Also measured: `sendMessage` answers with TDLib's **local** message id, and
-  `editMessageText`/`deleteMessages` on that id fail with "Message not found" until
-  `updateMessageSendSucceeded` swaps in the server id (`td-5242881` → `6291456`) — any
-  headless write check must wait for the row's id to stop changing.
-- **The dark palette is a *lifted* grey scheme, not near-black — measured 2026-11-18.**
-  Captured the running client with `PrintWindow(hwnd, dc, 2)` and took a pixel histogram
-  per surface: title strip / rail **#2D2D2E**, conversation list **#3B3B3D**, chat pane
-  **#1E1E1F**, incoming bubble **#2F2F30**, own bubble **#35D28D**, selected row
-  **#0DA869**, search pill **#454547**, text **#E1E1E5**, secondary **#7B7B80**, rail glyphs
-  **#969697**, toolbar glyphs **#A5A5A5**, disabled send fill **#29292A** with **#6A6A6A**
-  ink. The dark accents are the vivid light-theme greens, not darkened ones, and there is
-  **no divider under the pane header** — one flat surface. The previous dark block
-  (`#191919` / `#1f1f1f` / `#111111`, muted greens) was wrong. Why PrintWindow: the DSH
-  overlay card sits on top of the screen, so `ImageGrab` captures *it*; the computer-tool
-  screenshot excludes the card but is a re-encoded JPEG; `PrintWindow` returns the
-  window's own pixels (pass `PW_RENDERFULLCONTENT = 2`, and call
-  `SetProcessDpiAwareness(2)` first or `GetWindowRect` answers in virtualised pixels and
-  the bottom of the window is cut off).
-- **`node:sqlite` exists in Electron (45 ships Node 24.22)** — no better-sqlite3, no
-  Electron-ABI rebuild.
-- **Electron 45 changed two things this code depended on.** `clipboard.writeImage()` is
-  gone: the clipboard is now the web-standard async API, so 复制图片 (`viewer:copy` in
-  `main/ipc/handlers.ts`) writes `new ClipboardItem({ 'image/png': blob })` through
-  `clipboard.write()`. And the binary no longer comes from a `postinstall` — 45 ships
-  `install.js` as the `install-electron` bin, so a fresh checkout needs
-  `pnpm electron:install` before `pnpm dev` / `launch-detached.ps1` (`pnpm build` and
-  electron-builder fetch their own copy). It is flagged experimental upstream, hence the single-file
-  confinement. Expect an `ExperimentalWarning` in the log.
-- **`sender_id` has two shapes.** It is `messageSenderUser { user_id }` **or**
-  `messageSenderChat { chat_id }`; channel posts and anonymous admins only fill
-  `chat_id`. Reading `user_id` alone left those at `未知`. `Message` now carries an
-  optional `senderChatId`, `senderName` falls back to the chat title, and the adapter
-  caches titles (`chatTitles`, filled from `mapChat` and `updateChatTitle`) next to
-  `userNames`. Measured on the real account: 20/20 messages in a channel use
-  `messageSenderChat` (`senderChat` line in `tdlib:smoke`).
-- **A comment thread is a TDLib message thread, and the count is free.**
-  `message.interaction_info.reply_info.reply_count` is filled only for channel posts
-  with a linked discussion group and for the posts inside that group — exactly the rows
-  that get WeChat's comment bar. `getMessageThreadHistory` is called with the
-  *commented* message's `chat_id`; for a channel post TDLib routes to the linked
-  supergroup itself, so the renderer never needs the discussion chat id. It answers
-  newest-first and treats `from_message_id` as exclusive, like `getChatHistory`;
-  `actions/comments.ts` sorts a page ascending.
-  Measured on 2026-11-20 (live, over CDP and the shipped type defs), three facts that
-  shape the bar:
-  (a) **`message.properties` does not exist in TDLib 1.8.70** — `getMessageProperties`
-  is a call, not a field — so the old `raw.properties?.can_get_message_thread` read was
-  `undefined` on every real message and `canOpen` never arrived (every row had
-  `canOpen: null`); "this post owns a thread" is now read from `reply_info` being
-  present, which is true from the first post with `reply_count: 0` until somebody
-  comments. A 0-comment thread therefore still draws the bar, as 写评论 — hiding it made
-  "有评论区" posts indistinguishable from posts with none, and nobody could be the first.
-  (b) `getMessageThreadHistory` answers a 0-comment thread with **"Receive messages in
-  an unexpected chat"**, so `CommentPanel` seeds an empty page for it instead of asking.
-  (c) `updateMessageInteractionInfo` fires on every view and **may carry no
-  `reply_info`**, so the `interaction` op is a partial patch: the old
-  `?? { comments: 0 }` fallback zeroed a real count and the bar vanished on the first
-  view after opening the post (several posts in 心惊报 reproduced it; the fix keeps
-  only the fields the update actually mentions).
-  (d) **The handle is a channel-post feature, not a `reply_info` one.** TDLib also
-  reports `reply_info` for rows inside a linked discussion group, and a count-only test
-  drew 写评论 under ordinary group messages. The official clients gate on the post
-  (tdesktop `checkDiscussionLink`, Android `hasDiscussion && isLinkedToChat`); checked
-  against Telegram Desktop 7.4.5 on 2026-11-21, those group rows carried no handle.
-  `isCommentablePost` now gates ours the same way: channel chats only — a discussion
-  group's history holds comments, never the post, so the thread a group row names is
-  one this client cannot open.
-- **Restoring a reading position needs all three pieces.** (a) the list must not mount
-  before the stored anchor is known — a cached chat otherwise captures the bottom as its
-  position; (b) `scrollToIndex` is only an estimate with dynamic row heights, so the
-  position is corrected against the anchor row's DOM node, the same way prepends are;
-  (c) `unpin()` must be called before restoring or the stick-to-bottom `ResizeObserver`
-  undoes it. The anchor is "first visible slot + its offset", and *no row at all* (a
-  null anchor) means "was at the bottom".
-- **"Anchor known" has to be reset during render, not in an effect.** `useChatHistory`
-  used to set `anchorKnown = false` inside its effect, so the render for a *new* chat still
-  carried the old chat's `true`. `ChatPane` then mounted the list one frame early — with
-  `pendingAnchor` already per-chat (null) — and that mount landed at the bottom and wrote
-  `bottom` into `ui.db` before the new chat's `ui:getAnchor` could answer. Measured on the
-  mock: the stored anchor `{14958, -46}` was read as `null` on the very next open, so every
-  *cached* chat reopened at the bottom. The reset is now an in-render state adjustment
-  (`stateChatId !== activeChatId`), which React resolves before committing children. The
-  cold path was never affected: with no cached messages the pane shows a placeholder, not
-  the list.
+## 5. The measured WeChat 4.x UI contract
+
+Status: layout, colours, typography, chrome and dialogs match the client **on this
+machine**; the chrome glyphs are WeChat's own vector artwork (§5.12). Everything in §5.13 is a
+deliberate, documented difference. Do not re-derive these numbers — measure a **new**
+reference only if the client itself changes.
+
+### 5.1 How the numbers were obtained
+
+Everything was read off the running client: colours sampled with PIL, control boxes measured
+from a screenshot, converted to CSS px. The display is 1920×1080 at **125 % scaling**; DSH
+returns screenshots at 1366×768 (×0.7115), so **CSS px = screenshot px × 1.1245** for the
+shell. The measured WeChat window sat at (276,105)–(1145,656) in that screenshot space.
+Other windows have their own scale factor — it is stated per subsection.
+
+For dark mode the client window was captured with `PrintWindow(hwnd, dc, 2)`
+(`PW_RENDERFULLCONTENT`) and histogrammed per surface, because the DSH overlay card sits on
+top of the screen and `ImageGrab` captures *it*; the computer-tool screenshot excludes the
+card but is a re-encoded JPEG. `PrintWindow` needs `SetProcessDpiAwareness(2)` first or
+`GetWindowRect` answers in virtualised pixels and the bottom of the window is cut off.
+
+### 5.2 Shell: tokens and metrics
+
+| Token | Light | Dark |
+|---|---|---|
+| rail / title strip | `#e0e0e0` | `#2d2d2e` |
+| conversation list | `#e7e7e9` | `#3b3b3d` |
+| chat pane | `#fbfbfb` | `#1e1e1f` |
+| composer card | `#fcfcfc` | `#1e1e1f` + 1 px `#2f2f30` border |
+| 表情 panel / selected tab pill | `#fbfbfb` / `#ececec` | `#2f2f30` / `#3a3a3c` (inferred) |
+| selected row | `#15ad70` | `#0da869` |
+| incoming bubble | `#eeeef0` | `#2f2f30` |
+| outgoing bubble | `#95ec69` | `#35d28d` |
+| brand | `#07c160` | `#07c160` |
+| search pill | `#fbfbfb` | `#454547` |
+| text / secondary / tertiary | `#191919` / `#9a9a9a` / `#b7b7b7` | `#e1e1e5` / `#7b7b80` / `#7b7b80` |
+| hairline / strong / pane line | `#ececec` / `#dedede` / `#f2f2f2` | `#2f2f30` / `#3a3a3c` / `#1e1e1f` (no header divider) |
+| rail glyphs | `#5c5c5c` | `#969697` |
+| pane-header + composer glyphs / list "+" | `#6f6f6f` / `#8a8a8a` | `#a5a5a5` / `#b1b1b1` |
+| disabled fill / ink | `#ececec` / `#b7b7b7` | `#29292a` / `#6a6a6a` |
+
+The dark scheme is a **lifted** grey scheme, not near-black (re-measured 2026-11-18): the
+previous `#191919` / `#1f1f1f` / `#111111` block with muted greens was wrong, the real
+client lifts surfaces and keeps the vivid light-theme accents. There is **no divider under
+the pane header** in dark. Dark mode has only two text greys, so
+`--wx-text-tertiary` equals `--wx-text-secondary` there (day labels, timestamps, the search
+placeholder all sample `#7B7B80`).
+
+| Metric | Value |
+|---|---|
+| title strip | 32 px (native `titleBarOverlay`, rail colour) |
+| rail width | **61 px**; avatar 32 px (radius 8), 21–24 px glyphs, 48 px pitch |
+| rail glyph ink | core `#5a–#5d` (`--wx-rail-icon`); the lighter `#8a8a8a` read thinner *and* smaller at the same stroke width |
+| list column | 238 px; header row 43 px; search pill 29 px tall, radius 5; rows 65 px |
+| list avatar / type | 40 px, radius 6; title 14 px, preview 12 px, time 11 px |
+| pane header | 46 px, title 15 px/500, left padding 18 |
+| message avatar | 38 px, radius 6; 8 px gap to the bubble; row padding-bottom 14 px |
+| transcript inset | 22 px on **both** sides (client 21–25, symmetric); the 跳转到最新消息 pill shares it |
+| bubble | `padding: 8px 12px`, radius 6, 14 px/1.45, max-width `min(560px, 66%)` |
+| composer card | radius 8, 1 px `#ececec`, margins 6/9 px, input min-height 84, toolbar 42 |
+| channel bar (服务号 card) | 54 px tall, radius 8, 1 px border, same 6/9 px margins; each item is a full-height equal-width segment (whole segment is the hit target, highlight fills edge to edge); keyboard glyph 20 px in a 46 px right strip |
+| send button | 72×30, radius 4; disabled `#ececec` on tertiary text, enabled brand green |
+| day separator | 12 px centred, no pill; message meta 11 px, hover-only |
+| popup card | fill `#fafafa`, radius 6, 5 px padding; the ＋ card is 143×144 with 45 px rows |
+| popup hover | **brand green `#07c160` fill with white label *and* white glyph** — never a grey wash |
+| overlay scrollbar | 6 px wide, `right: 2px`, radius 3, thumb `rgba(0,0,0,.22)` → `.38` on hover/drag (dark: white, same alphas); fades in on hover / for 900 ms after a wheel scroll; **no gutter** |
+
+`wx-list__plus` draws no circle of its own — the button *is* WeChat's circle-plus SVG, in
+`--wx-icon-strong`.
+
+### 5.3 The 图片和视频 window (photo + video)
+
+Measured off a live viewer window (screenshot 1366×768, CSS = ×1.1245). The window sat at
+(93,17)–(1113,705): **1147 × 774 CSS px on a 1536×864 display** — 75 % of the screen width,
+90 % of its height, *not* sized to the photo (which was 591 px wide with ~309 px gutters).
+
+| Token / metric | Value |
+|---|---|
+| toolbar strip | 40 px, `#e6e6e6` (lighter than the shell's `#e0e0e0`), 1 px `#ececec` bottom line |
+| canvas | `#f7f7f7`, **no padding**: a height-limited photo touches the toolbar and the bottom edge |
+| buttons | 32 × 32, 8 px gap (40 px pitch), 18 px glyphs, radius 4, hover `rgba(0,0,0,.045)` |
+| group dividers | 1 px × 18 px `#dedede`, 3 px either side (→ 54 px between groups) |
+| first button | 45 px from the window edge |
+| toolbar order | 📌 ｜ ← → ▦ ｜ ⊕ ⊖ 1:1 ｜ ↻ ｜ ⇩ ｜ … 更多 ｜ native window controls |
+| 预览 board | the client docks it in its **own** window; here a 268 px column of 4 × 62 px cells inside the viewer |
+| 更多 menu | 复制 / 打印 / 转发… / 收藏 / 定位到聊天位置 / 使用系统默认方式打开; 132 px min width |
+| active state | 置顶 and 预览 turn **brand green** — the only coloured glyphs in the strip |
+
+Dark (**measured on a live dark viewer**, 2026-11-18): bar `#3b3b3d` — the conversation
+list's grey and *lighter* than the canvas, the opposite of the light theme — canvas
+`#242424`, glyphs `#b1b1b1`, hairlines `#4f4f51`, and a 1 px `#2d2d2d` line under the bar.
+That is why the viewer uses `--wx-viewer-icon` / `--wx-viewer-sep` rather than the general
+`--wx-text` / `--wx-line-strong`; the native overlay is repainted from `main/viewer.ts` and
+must equal `--wx-viewer-bar` or the strip shows a seam.
+
+The video window is **the same window** (the client titles both 图片和视频). Measured off a
+second live window showing a 9:16 clip (screenshot 1538×978; the button pitch measures 50
+screenshot px against our 40 CSS px, so **CSS px = screenshot px ÷ 1.25**):
+
+| Token / metric | Value |
+|---|---|
+| window | **1230 × 782 CSS px** — 80 % of the 1536 px CSS width, same 90 % height; we still create 75 % (delta 17) |
+| toolbar | identical to the photo window (40 px, `#e6e6e6`), pin 45 px from the edge |
+| toolbar order | 📌 ｜ ← → ▦ ｜ ⇩ ｜ … ｜ window controls — **no zoom group, no rotate**, no 查看原视频 pill |
+| canvas | `#f7f7f7`, clip fitted **by height with no padding** (410 × 728 CSS for 9:16 there) |
+| player bar | 40 px tall, **84 px from the left, 82 px from the right, 20 px above the bottom**, radius 8, `rgba(0,0,0,.45)` — samples `#888888` over the canvas |
+| bar contents | ▶/❚❚ 32 px icon, elapsed `00:01` 13 px tabular, timeline (2 px track, played part white, 10 px white thumb), total `00:51`, 倍速 text button, speaker |
+| bar behaviour | floats over the clip, hides after 2.4 s of playback without pointer movement; visible while paused, while dragging the timeline and while 倍速 is open |
+| keyboard | Space / K play-pause, ←/→ seek ±5 s, M mute, Escape closes the menu / 预览 / window |
+
+### 5.4 The login window
+
+The client's login is a **separate window**, not a page inside the shell. Measured off two
+reference screenshots (366×487 and 365×487 at 125 %, so **CSS = screenshot ÷ 1.25**; both
+windows are 350×466 device px):
+
+- **Window 280 × 373 CSS px**, frameless — the client draws its own × and has no
+  minimise/maximise — centred in the work area, flat `#fafafa`, OS-rounded corners.
+- **Title strip 32 px**: `微信` 12 px from the left, 14 px `#6e6e73`; gear and × are 1.2 px
+  `#4d4d4d` hairlines in 28 px hit boxes on a 44 px pitch (centres 214 / 258), 8 px from the
+  right edge. The whole strip drags the window.
+- **QR step**: QR 136 × 136 at (72, 80); green 扫码登录 14 px `#00c375` centred at y 255;
+  footer link 14 px `#304b82` centred at y 341. Our 136 px is the **whole square, quiet zone
+  included** — the client's code can borrow its white sheet, ours cannot (delta 21).
+- **Profile step**: avatar 80 × 80, radius 12, at (100, 70); name 16 px `#191919` at y 180;
+  **168 × 36, radius 6, `#00c375`** button, 16 px white text, at (56, 272); footer
+  `切换账号 | 仅传输文件` at y 341, 1 px `#dedede` divider, 17 px gaps.
+- Dark was **not** measured on the client; `--wx-login-*` follows the shell's scheme.
+
+What we built: the same QR step, driven by TDLib. `requestQrCodeAuthentication` yields a
+`tg://login?token=…` link (`AuthState.waitQr`), encoded locally with `qrcode` into a 136 px
+SVG — near-black on white, **never inverted** in dark mode; the token never leaves the app.
+The footer's right link is 登录帮助 instead of 仅传输文件; the left is 用手机号登录, which
+rebuilds the auth client (`auth:reset`) because TDLib cannot leave a pending QR confirmation.
+The gear opens the proxy settings. A user-driven sign-in ends in the shell; only a session
+restored at startup shows the profile step.
+
+### 5.5 The 表情 panel and the 贴纸包盒子
+
+**表情 panel ≈ 464 × 464**, radius 8, `#fbfbfb`, no border, soft shadow. It floats above the
+input, **centred on the 表情 toolbar button**, its bottom edge 18 px above the toolbar glyph
+centres — so it overlaps the input but leaves the toolbar row visible, and on a 1000 px
+window it **overhangs the conversation list** by ~200 px (the client does the same).
+Section labels 12 px `#9a9a9a`, 22 px from the card's edge, 20 px above the first row, 8 px
+between a label and its grid; 最近使用 is one row of the same grid. Emoji grid **10 columns ×
+44 px**, 12 px side inset, art **24 px**. Tab strip 45 px tall, 14 px inset, 5 px gaps,
+**44 px slots**, selected pill **32 × 32** radius 7 `#ececec`; order 搜索 / 表情 / installed
+sets, paged by 上一页/下一页 at the row's ends (nine slots: eight tabs with one arrow, seven
+between two; the last page clamps and only shows the left arrow — maths in
+`lib/pickerTabs.ts`). No scrollbar in the card; grid columns are `1fr` so a bar could never
+clip the tenth column.
+
+- **Every tab shows a picture**: `getInstalledStickerSets` leaves `thumbnail` null for most
+  sets but always ships `covers`, so the adapter resolves thumbnail → first sticker →
+  `covers[0]` like tdesktop's `lookupThumbnailDocument`; the tab paints that sticker's
+  **static** thumbnail (a TGS/WebM pack shows one frame at 28 px), downloaded only when the
+  tab is on screen. The two-character fallback remains for a cover TDLib has not sent yet.
+- The installed list arrives in two steps (`evt:stickerSets` + `stickerSetsVersion`): 14
+  cached sets on cold start, 192 about a minute later. Without the bump the panel kept the
+  14-set cache for the whole session.
+- Emoji are real Unicode characters (a Telegram message carries text, not WeChat's closed
+  emoticon set), so the grid paints the same glyph the transcript will. 最近使用 persists in
+  `ui.db` → `app_settings['emoji.recent']`.
+- Dark has no measured counterpart: `#2f2f30` card, `#3a3a3c` pill.
+
+**Animated-cell budget.** A 120-sticker pack is 120 TGS/WebM files; Telegram Desktop animates
+with `lib_lottie`'s MultiPlayer (one render pass, 30 fps cap, objects dropped two screens
+away, ≤10 MB frame caches). lottie-web cannot, so the **grids** (the panel's set body and the
+贴纸包盒子) use `@thorvg/webcanvas`: one WebGL canvas, every TGS cell a `TVG.Animation`, one
+`canvas.render()` per frame capped at 30 fps. Cells parse two screens ahead/behind, two at a
+time with a main-thread yield, 120 ms after the last scroll. Painting does **not** pause while
+scrolling (one immediate frame when a cell becomes visible); off screen a sticker only
+pauses, three screens away its scene is released but its last frame is first read back into
+an `<img>` (`savedFrame`) so a revisit never flashes the thumbnail. The scene is disposed
+when the panel closes or another set opens. Measured with 120 copies of one TGS on a
+464 × 1968 canvas: **56.5 fps, `render()` 1.83 ms average**. WebM cells mount a `<video>`
+only while inside their panel's scroller (0 px margin, nearest scroll container — not the
+window). The canvas layer sits above the cells with `pointer-events: none`; a ready cell
+hides its thumbnail. The ThorVG wasm is inlined as a `data:` URL, the CSP carries
+`'wasm-unsafe-eval'`, and an init failure falls back to per-cell hover animation. The
+transcript keeps lottie-web with `setSubframe(false)`.
+
+**贴纸包盒子 464 × 558** (the client measured 462 × 558). Clicking a sticker in a message
+opens the box of its pack, floating **un-dimmed** over the conversation in a transparent
+full-window layer (click outside or Esc closes): a **52 px** title row (title / ⋮ / ×), the
+pack in a **5-column grid at 82 px cells**, and a **58 px** footer with **移除贴纸包** in
+`--wx-danger` (or **添加贴纸包** in `--wx-brand` for an uninstalled pack) beside a count pill.
+Title → ⋮ → 分享表情包 / 复制链接 / 归档贴纸 (归档 only while installed); the link is
+`https://t.me/addstickers/<name>` from TDLib's `stickerSet.name`. The grid is display-only.
+It needs `MessageMedia.stickerSetId` (TDLib `sticker.set_id`) so one `stickers:set` call opens
+it; removing or archiving closes it and main emits `evt:stickerSets`.
+
+Missing on purpose: the **自定义表情** (heart) tab — favourites are TDLib custom-emoji sets,
+whose messages are custom-emoji entities, and the protocol has no send path for them yet.
+
+### 5.6 Transcript rows that are Telegram, not WeChat
+
+**Animated-emoji message** (one-emoji message → `messageAnimatedEmoji`): drawn as the
+AnimatedEmoji sticker, **no bubble**, longest edge **112 px** (our text emoji is 48 px). Plays
+**one pass** when it appears and does not loop; a click replays it and plays the click sound
+(`animated_emoji.sound`, fetched on that first click). Stickers keep looping — the difference
+is `StickerRenderer`'s `playback` prop. A custom emoji whose sticker TDLib has not resolved
+falls back to the 48 px glyph until `updateMessageContent` remaps the row. Not every emoji has
+an animated version (✨, 😀, 🥺 answered 404 on the test DC) — the 48 px big emoji is then the
+**correct** rendering; use ❤️ or 🎉 when checking that path.
+
+**Premium sticker effect**: the effect is a second TGS, painted in a square **1.49×** the
+sticker (tdesktop's `kPremiumMultiplier = 1 + 0.245 * 2`), centred, mouse-transparent: a
+140 px sticker row draws 209 × 209. One pass per sticker instance, replay on tap (opacity
+transition, not an unmount, so no re-decode). No badge in messages (the official client marks
+premium only in the picker/panels, and our picker has no premium mark). It is decoration: a
+bad or missing file hides itself and never surfaces an error.
+
+**Custom emoji in text**: **20 px inside 14 px body text**, 0.32 em below the baseline
+(`.wx-custom-emoji`). The box is square (custom-emoji stickers are 512 × 512) and the line
+height does not change. The glyph is the fallback everywhere — until the sticker arrives, for
+an unknown id, offline — so nothing is ever a hole. Lookups batch per frame and cache for the
+session (eight premium emoji in a post = one IPC call; scrolling back in = none). A message
+that is one custom emoji is a different path (`messageAnimatedEmoji`, §5.6 above).
+
+### 5.7 通讯录 (contacts)
+
+Measured off the owner's address book at 1377×892 **physical** px, 125 % (`CSS = ÷1.25`);
+the list column measured 238.4 CSS px — the same 238 px used here.
+
+| Metric | Value |
+|---|---|
+| list column | 238 px, `--wx-list` background |
+| contacts header | 85 px: 12 top + **26 px search pill** + 12 + **35 px 通讯录管理 card** |
+| 通讯录管理 card | full width minus 12 px insets, radius 8, 16 px label, 21 px payload glyph |
+| service rows | **36 px**, 16 px label, 12 px chevron (16 px inset), count 13 px right (10 px inset) |
+| group header | **30 px**, 13 px, 36 px left inset |
+| contact row | **54 px**, 30 px avatar (radius 4), 36 px left inset, 8 px gap, 16 px name |
+| detail card | fixed **310 px** wide, centred, 59 px top padding |
+| detail avatar | **60 px**, radius 6; name 17 px/500; 微信号 14 px, 4 px below the 24 px name line |
+| detail rules | 19 px below the header block, 1 px `#f0f0f0` |
+| detail sections | 20 px top / 10 px bottom (更多信息 16); label 14 px; rows 24 px line-height, 72 px label column |
+| detail actions | three 96 px columns, 11 px insets (centres 59/155/251), 30 px above, 24 px glyph + 8 px + 14 px label |
+
+Colours (light; dark inferred): action blue `#304b82` (`--wx-link`, the login-link ink),
+section labels / chevrons / 微信号 `#6e6e73`, trailing counts `#9f9fa6`, hairline `#f0f0f0`.
+A selected contact row is a neutral `rgba(0,0,0,.08)`, never the chat list's green.
+
+The card's vertical layout is exact: avatar top 91, header rule 170, 朋友资料 label 191,
+备注 219, 更多信息 label 273, 来源 303, 添加时间 329, action icons 397, labels 429 (CSS px from
+the window top). Our DOM measures 91 / 170 / 191 / 219 / 273 / 301 / 367 with the same
+paddings. The one deliberate change: Telegram has no 添加时间 / 来源, so **数据中心** (DC N,
+decoded from the profile photo; 未知 without one) and **手机号** (with the leading `+` Telegram
+omits) take those rows.
+
+### 5.8 聊天信息 panel and the QR window
+
+| what | value |
+|---|---|
+| panel | 314 px wide, starts under the 46 px header, left hairline `#f0f0f0` |
+| insets | left 19, right 18 (rules 18/19); rows reserve 33 on the right for the switch |
+| participant grid | 66 px cells, 47 px avatar (radius 4), caption 12 px `#9f9fa6` 4 px below, single line |
+| 搜索群成员 | search pill 32 px tall, 19 px sides, 12 px above the grid |
+| 群聊名称 / 群公告 | label 14/20 over hint 12/16 (clamped to two lines), 9–10 px vertical padding |
+| 群二维码 | 64 px row; QR pictogram then chevron, both `#b7b7b7` |
+| 查找聊天内容 | 64 px row, 14 px label, trailing chevron |
+| mute / pin block | 10 px above and below, two 41 px rows, no rule between |
+| 清空聊天记录 / 退出群聊 | 64 px rows, centred, `#fa5151` |
+| switch | 36 × 20, 16 px white knob inset 2, off `#ededed`, on `#00c375` |
+
+- **It overlays; it must not push.** The owner corrected this (2026-11-21: "这个信息面板是压在
+  消息上面的"): the sheet slides over the transcript and the composer, which keep their width
+  underneath. A push layout re-lays-out every virtualised row each frame. The animation is
+  only `translateX(100% → 0)` (200 ms); `lib/chatInfo.ts` owns the duration and
+  `style-contract.test.ts` pins the stylesheet to it.
+- **Private chat**: peer face, 查找聊天内容, 消息免打扰, 置顶聊天, 清空聊天记录.
+- **Group**: 搜索群成员 over the grid + dashed 添加, 群聊名称, 群公告, 群二维码, 查找聊天内容,
+  mute/pin, 清空聊天记录, 退出群聊.
+- **Channel** reuses the group layout with channel nouns (频道名称 / 频道公告 / 频道二维码 /
+  退出频道). The participant block is **administrator-only**: the panel asks
+  `chats:canGetMembers` (`supergroupFullInfo.can_get_members`) and draws 搜索群成员 + the grid
+  only when true, otherwise the block is absent (never a fake one-row grid).
+- 搜索群成员 is a **server** search (`searchChatMembers`, 260 ms debounce), not a filter over
+  the visible tiles; a query with no hits draws no tiles.
+- 群聊名称 opens `RenameDialog` → `chats:setTitle` (`setChatTitle`, needs `can_change_info`);
+  the dialog owns the draft so a refusal keeps the typed name.
+- 群公告 is the newest **pinned** message (`chats:pinned` → `getChatPinnedMessage`; a 404 is
+  "nothing pinned"); tapping it locates that message.
+- 清空聊天记录 → `deleteChatHistory` with `revoke: false` (this account's copy only); the
+  store's history is emptied in place. 退出群聊 → `leaveChat` + a `remove` op.
+- 查找聊天内容 switches the panel to its own search view (`search:inChat`, 260 ms debounce);
+  picking a result closes the panel and rides the locate path.
+- **群二维码 is its own window** (frameless 360 × 560, child of the shell so it closes and
+  minimises with it): member collage (up to six faces, else the chat photo), 群聊：first three
+  names, a 280 px code, a validity line, 转发给朋友 / 复制图片 / 保存图片. The code is a
+  **temporary invite link** (`createChatInviteLink`, 7 days) so the line reads 该二维码 7
+  天内（M月D日前）有效，重新进入将更新 — and it is true, every open mints a fresh code;
+  without invite rights it falls back to the public username and reads 该链接长期有效. The
+  actions work on a 1024 px PNG the window rasterises itself from the same `qrMatrix`:
+  复制图片 (main clipboard), 保存图片 (native dialog into 图片), 转发给朋友 (in-window chat
+  list, then `qr:share` sends a temporary PNG as a **photo message**). Esc closes the chat
+  list first, then the window; the frameless × goes through `qr:close`.
+- Esc ordering everywhere: dialog → search view → panel → chat list → window.
+
+### 5.9 Global search
+
+- **The pill is the entry, not a filter.** Typing swaps the list column's body for the search
+  panel, 260 ms debounce, newest request wins; an empty box restores the conversation list.
+- **Two tabs, 聊天 / 频道** (private + groups vs channels). Both scopes are fetched for one
+  query, so switching tabs is instant.
+- **Each tab is two sections**: conversations whose name matches (`search:global` →
+  `searchChats`), then the messages themselves (`search:messages` → `searchMessages` with
+  `chat_type_filter`, the 聊天 tab merging the private and group streams) under a
+  `找到 N 条消息` line. A hit row is the chat's 32 px face, its title with the time, and the
+  preview; picking it opens that chat at that message through the pane's locate path.
+- **Paging** is cursor-based (TDLib's `next_offset` per stream), asked for within 160 px of
+  the scroller's end; empty offsets exhaust the scope. Results are drawn plainly (no
+  virtualiser), 20 rows appended per page.
+- **Hit emphasis**: the matched run of a conversation title is `--wx-brand`; on the selected
+  row it turns white and underlined.
+- The pill grows a 14 px × only while it has text; Esc clears it too (and stops there).
+
+### 5.10 The 设置 window
+
+微信 4.x's 设置 is a **separate top-level window**, not an overlay: the chat behind it is not
+dimmed and keeps working, the 8 px radius and drop shadow are the window's (DWM), the × is
+self-drawn and there is no title strip. Measured at 125 % (800×698 device px → 640×558 CSS):
+
+| Metric | Device px | CSS |
+|---|---|---|
+| window | 800×698 | 640×558 |
+| nav column | 200 | 160 |
+| nav row height | 50 | 40 |
+| content padding (left/right) | 50 | 40 |
+| row, single line | 63 | 50 |
+| row, with a caption | 78 | 62 |
+| group heading | 16 | 13 |
+| nav icon | 20 | 16 |
+
+| Element | Light | Dark |
+|---|---|---|
+| content background | `#FAFAFA` | `#1E1E1F` |
+| nav background | `#EEEEF0` | `#2F2F30` |
+| selected nav row | `#15AC70` | `#0DA869` |
+| primary text (row label, group heading) | `#19191A` | `#E1E1E5` |
+| caption / description | `#9F9FA6` | `#7B7B80` |
+| divider | `#F0F0F0` | `#272728` |
+| select pill | `#F2F2F2` | `#303031` |
+| switch on / off | `#00C375` / `#EDEDED` | `#00A361` / `#29292A` |
+
+Both columns run the full window height; there is no rule under a title strip, and the top
+40 px is empty drag space on both sides. Group headings are the primary colour at 13 px,
+**not grey**. Do not draw the card's radius/shadow in CSS — they belong to the window. Select
+pills are 28 px high with a 12 px label and a green chevron badge; switches are 40×22 with a
+white knob; the 快捷键 capture control is the same pill with `按下...` as its empty state.
+
+**Window rules that are easy to break**: the window has **no parent on purpose** (the shell
+must be able to cover it and it must drag on its own), and nothing closes it for us — the
+shell's `closed`, `auth:logout` and `before-quit` each call `closeSettingsWindow()`; drop one
+and `window-all-closed` never fires. A theme change must repaint **four** things: the shell's
+native title strip, the viewer, the settings window and both renderers through `evt:theme`
+(`applyTheme()` is the one place). `appSettings.theme` is always the **resolved**
+`light`/`dark`; `themePreference` is what is stored, and `nativeTheme.on('updated')` only acts
+while the preference is `system`. 关闭主窗口 defaults to **quit**, not tray. 发送消息 is read
+**at keydown time** (`useComposerInput` reads the store), never captured in a render.
+
+### 5.11 How a channel post is composed
+
+The owner's instruction (2026-11-20): "依旧是微信的气泡，但是像 Telegram 一样把图片、消息和
+评论嵌入到一块". A channel has one author, so a post is one WeChat bubble (same fill, 6 px
+radius, avatar column, hover row) whose *inside* is Telegram's composition: the media gets a
+3 px inset of the bubble's own colour, the caption continues on the same surface, 评论 N 条 is
+the last row (hairline above, the bubble's own bottom corners, no card of its own), and the
+view counter with the time closes it (`ChannelMeta`). The hover timestamp is suppressed for
+channels (no read receipt; counters are part of the post). Channel photos may grow to
+420×480, every other chat keeps WeChat's 240×300. Two measured traps: the bubble's width is
+taken **from the media** (`channelMediaWidth` + the 3 px inset), otherwise a long caption wins
+the `fit-content` race and leaves empty bubble right of the picture; and the 评论 row is
+`calc(100% + 2 × inset)` with negative margins — `width: auto` shrank it to its label.
+
+### 5.12 Icon provenance (the part people get wrong)
+
+**Where the artwork came from.**
+`C:\Program Files\Tencent\Weixin\4.2.0.13\Weixin.dll` embeds **2346 complete SVG documents
+as plain text** (`<svg viewBox="0 0 24 24">…`), outlines already expanded. Not compressed,
+not obfuscated — a byte scan for `<svg` finds all of them.
+
+**Dead ends — do not repeat:**
+
+- The DLL also contains a 618-entry **zip** (`PK\x03\x04`): the web bundle, not icons.
+- There **is** a 2615-entry manifest of asset names (UTF-16LE, sorted, with a `u16` and a
+  `u32` per record). It does not index the payload block: `payload_offset − field` gives five
+  different bases for five identified icons, and the two manifest copies disagree. The
+  manifest's `u32` is not a hash with a lookup table either (`scissor_regular`'s tag occurs
+  exactly once, at its own record; 2615 records, 2615 names, 2280 unique tags). **No
+  name→payload mapping is recoverable from this build.**
+- The `:/gui/svg/...` strings (238) are a runtime path table, not a static map.
+
+**How icons were picked.** Crop each icon from the live client, binarise to a 24×24 ink mask,
+render each candidate SVG at 24 px headless, compare by IoU / symmetric Chamfer distance on
+outer contours, confirm the top hit by eye. Scripts: `.cache/wxsvg/*.py` (gitignored).
+
+| Component | payload | Component | payload |
+|---|---|---|---|
+| `ContactsTabIcon` | `#1213` | `PlusIcon` | `#1435` |
+| `CubeTabIcon` | `#1268` | `EmojiIcon` | `#0717` |
+| `DeviceIcon` | `#0498` | `FolderIcon` | `#0436` |
+| `MenuIcon` (≡) | `#0158` | `MicIcon` | `#0768` |
+| `SearchIcon` | `#0760` | `CallBubbleIcon` | `#1206` |
+| `NewGroupIcon` (＋) | `#0698` | `AddFriendIcon` (＋) | `#1463` |
+| `NoteIcon` (＋) | `#0391` | `KeyboardIcon` (频道底栏) | `#1065` |
+| `MoreIcon` (…) | `#0846` | `ScissorsIcon` | `#0859` |
+| `CallIcon` | `#0300` | `ChevronDownIcon` | `#0555` (12×12) |
+| `ContactsManageIcon` | `#0345` | `MessageOutlineIcon` (发消息) | `#0579` |
+| `CallOutlineIcon` (语音聊天) | `#0079` | `VideoCallOutlineIcon` | `#0310` |
+
+Viewer toolbar (eight of nine buttons are payload art): 置顶 `#0531` (`pushpin_regular`),
+上一张/下一张 `#2344`/`#2336` (16), 放大/缩小 `#2341`/`#2342` (16), 原始大小 `#2337`
+(`picture_original_normal`, literally a 1:1 pill), 旋转 `#2340` (`image_rotate_normal`, 24,
+its `transform="scale(-1 1) translate(-24 0)"` is load-bearing), 保存 `#0776`
+(`download_regular`). 预览 (3×3 board) has **no payload** and is traced. All are filled
+`evenodd` outlines painted at `fill-opacity="0.9"` in the client; `ViewerIcons.tsx` drops
+the opacity and fills `currentColor`.
+
+- **Weight is per family**, not per library: regular/medium/heavy siblings differ only in
+  stroke (measured at 24-unit scale: 1.12 / 1.38 / 1.88, with 0.88 and 1.62 in the tails).
+  Match the lightest sibling — the cube, scissors and call bubble had to move down a weight
+  or one icon read visibly bolder than its neighbours.
+- The service-row `›` and the 联系人 `⌄` are `ChevronDownIcon` rotated −90°, not new art. The
+  composer's filled `CallIcon`/`CallBubbleIcon` are a different weight from the outline family
+  — do not swap them.
+- `WechatIcons.tsx` is **generated** by `.cache/wxsvg/gen_icons.py` (drop width/height, strip
+  `style`, `fill="black"` → `currentColor`, hyphenated attrs → JSX, one element per line),
+  then `pnpm exec prettier --write`. Never hand-edit; the script's `ICONS` list is the
+  complete set (`KeyboardIcon` was once lost by a regeneration).
+- `MomentsTabIcon` uses WeChat's design-system compass
+  (`.cache/wxres/tabBar_icons_outlined_discover.svg`) — the DLL has no compass with that
+  needle. The rail's 聊天 tab, the login mark and the empty-pane watermark are the **Telegram**
+  roundel (Simple Icons, CC0), tinted through `currentColor`.
+- **`masks.npz` can be clobbered**: `render.py <file…>` rewrites the archive with only the
+  named files; re-render before trusting a mask.
+- **Licence:** the extracted artwork is Tencent's. Fine for this local clone, **not for
+  redistribution** — do not ship it in a package.
+
+### 5.13 Deliberate deltas vs the client
+
+| Delta | Why |
+|---|---|
+| Composer toolbar keeps WeChat's five buttons (表情 / 收藏 cube / 文件夹 / 剪刀+chevron / 麦克风); 收藏, 剪刀 and the tool-row 麦克风 toast "还没有接入" | favourites and screenshot have no protocol source; the tool-row mic is the client's **dictation**, not voice notes (§7). The client's right-hand 语音输入 circle is left out — 发送 follows the toolbar. Voice notes live on the circled mic beside 发送 |
+| Avatars are real where the protocol carries them, initials elsewhere | `Self.avatarUrl`, `ChatSummary.avatarUrl`, `Message.senderAvatarUrl` + `evt:avatars`; a cold row shows its initial for a moment — intended, not a missing image |
+| 通讯录 is Telegram's address book, not the chat list | `getContacts` + `getUser`: a person you never wrote to still has a card; 发消息 creates the chat. Service rows are kept for the silhouette (公众号、服务号 shows the channel count; the rest toast) |
+| Chinese initials come from ICU, not a pinyin table | `contactInitial` compares the first Han character against 23 boundary characters with `Intl.Collator('zh-Hans-CN')`; polyphones (重/长) can land a letter off |
+| The contact card shows Telegram号 (= username) / 数据中心 / 手机号 | WeChat's 微信号 / 来源 / 添加时间 do not exist; the DC is decoded from the photo's persistent file id (`tdlib/file-dc.ts`, approximate — 未知 without a photo) |
+| No pin (always-on-top) button in the title strip; window controls are the native overlay ones (~46 px vs the client's ~30) | not implemented / native |
+| List column is a fixed 238 px | the client lets you drag it |
+| Search is a server search with 聊天 / 频道 only | missing vs the client: 应用/贴文/图片/视频/音频/链接 filters, 联系人 hits, archived chats (the pill asks `chatListMain`) |
+| The only inferred dark value is the link blue (`#576b95`, kept from light) | everything else was sampled |
+| Re-selecting the open conversation closes it; the rail switches sections | requested 2026-11-17; the client's filled tab payloads are not in the extracted set, so `Icon.tsx` rebuilds the three filled glyphs from the outlined geometry |
+| The ＋ card matches the client's three entries but none is wired | no create-chat / contact-search / notes channel |
+| Viewer: no 编辑 and no "用 AI 处理" block; 预览 is a 268 px column, not a second window; 定位到聊天位置 keeps the viewer open and raises the shell instead | no editor / no AI / one window / the viewer is a plain top-level window (see below) |
+| One window size for photos and videos; no 查看原视频 pill; video never zooms or pans; 保存 goes to 视频 | the video window is 80 % wide vs the photo window's 75 % in the client, but a strip can mix both; TDLib hands over one file per video, so the pill would be dead |
+| The viewer is a **plain top-level window**, not a child of the shell | that is what makes the task bar match the client (one button whose preview lists both windows). Ownership never grouped them differently anyway; what ownership gave is now explicit — the shell hide/show/closes the viewer itself |
+| Login: QR produced locally, footer is 用手机号登录 ｜ 登录帮助, gear and × hand-drawn, fixed 280×373, centred on the primary display | `仅传输文件` has no Telegram counterpart; the glyphs are not in the payload set; the client also is not resizable but remembers its position |
+| Comments = Telegram's discussion view, not WeChat's inline expansion | owner's call 2026-11-20; rows are the transcript's own `MessageRow`, input is the shared composer card, footer gates on join-to-send; no 赞/在看/收藏 reactions |
+| 聊天信息 maps the client's group rows onto Telegram: 群公告 = newest pinned message, 群二维码 = invite link, 添加 = invite sheet; 备注 / 我在本群的昵称 / 保存到通讯录 / 显示群成员昵称 are absent | no Telegram counterpart (the profile name is shown, groups are already in the list) |
+| A channel's bottom card is 加入 / 申请加入 until the account subscribes | a public channel is readable before joining; 静音 on an unjoined channel muted nothing |
+| Emoji are Apple artwork as a CBDT colour font (`WeGramEmoji.ttf`, 25 MB, built by `scripts/emoji-font.py`), family first in `--wx-font` | Apple's own sbix file does not paint in Chromium on Windows; CBDT does. ASCII digits, `#` and `*` are kept out of the cmap so a digit cannot resolve to a blank keycap — keycaps fall back to the system font. Provenance and licensing: `renderer/src/assets/fonts/NOTICE.md` |
+
+---
+
+## 6. Measured behaviour and pitfalls — do not re-derive
+
+Every entry below was measured on this machine, most of them against the real account. They
+are grouped by the layer that owns the rule; the code comments carry the same facts.
+
+### 6.1 History, paging, and the message store
+
+- **`getChatHistory` anchoring.** `from_message_id = 0` does **not** fetch from the server —
+  it returns only the locally cached last message. The first page anchors on
+  `chat.last_message.id`; paging older anchors on the oldest loaded id and filters
+  `id < anchor`. A negative `offset` returns *newer* messages, so it cannot page backwards.
+  First server fetch of 50 messages took ~3.4 s.
+- **`from_message_id` is exclusive** (measured 2026-11-17). A first page anchored exactly on
+  `last_message.id` never contained the newest message, and `openChat` marked the message
+  *below* it as read — so every chat kept a badge of at least 1 (reproduced on 心惊报:
+  `last_read_inbox_message_id` stayed one post behind, `from=4975493120` answered
+  `4974444544`). Fixed: the implicit first-page anchor is `last_message.id + 1`, and
+  `openChat` reads up to `getChat.last_message.id` directly instead of trusting a page. The
+  renderer additionally reports the newest message as read while the chat is open in a
+  focused, visible window. `mapChat` omits `lastReadInboxMessageId` when TDLib reports 0 —
+  0 means "nothing read yet", not message 0 — so the divider falls back to the unread counter.
+- **A short answer is normal, not the end of the chat.** For a cold chat TDLib answers from
+  its local window — measured 1 to 5 messages in 1–7 ms — even when the chat has thousands.
+  Re-anchoring *below* the oldest returned id is what makes it go to the server (50 in
+  65–230 ms). `history()` therefore tops a page up over up to `MAX_HISTORY_ROUNDS = 3` rounds
+  and only an **empty** round means "the chat begins here"; `hasMore` is
+  `!exhausted && messages.length > 0`. The old `raw.length >= limit` turned every cold chat
+  into "no more history" (this is the owner's "群组加载旧消息无法加载").
+- **An empty first page is not an empty chat.** A cold local database can answer `[]`; the
+  renderer used to cache that and the transcript stayed blank all session. Now the page is
+  retried three times *and* an empty answer is not cached at all while the chat list says the
+  chat has messages (`ChatSummary.lastMessageAt`) — the entry simply stays absent, so the
+  next open asks again, and the placeholder says 消息还没从服务器同步下来 instead of claiming
+  the chat is empty. A genuinely empty chat still caches its page. The adapter logs both
+  halves (`no last_message` / `getChatHistory returned nothing`).
+- **Never create a `messagesByChat` entry for an unloaded chat.** `updateChatReadInbox` fires
+  for *every* chat; `applyMessageOps` used to write `messagesByChat[chatId] = []`, and
+  `ChatPane` reads "an entry exists" as "cached", so every chat the read marker touched
+  opened empty and could never page. Entries come only from
+  `setHistory`/`prependHistory`.
+- **…but the ops of an unloaded chat must not be dropped.** While a first page was in flight,
+  ops were thrown away and the later `setHistory` wrote the pre-event snapshot. The store
+  queues meaningful ops in `pendingOps[chatId]` (pure read-marker batches are skipped) and
+  `setHistory` replays the queue onto the fresh page (`reduceOps`, shared with
+  `applyMessageOps`). A failed first fetch retries once quietly after 1.5 s before giving up.
+- **`updateDeleteMessages` is not always a deletion.** The update carries `is_permanent` and
+  `from_cache`; `from_cache: true` means "removed from the local cache, retrievable later".
+  TDLib emits those while the app idles in the background: leaving the window occluded for
+  ~2 minutes produced `{from_cache: true, is_permanent: false}` for **all 50** cached
+  messages of the open chat, and the adapter treated it as a user deletion — the
+  "切到后台再切回来消息就没了" bug. Only `from_cache !== true` removes rows; evictions are
+  logged, and the renderer refetches once when a transcript that *had* rows goes empty.
+- **Editing content is a full remap.** `updateMessageContent` can change media/captions, so
+  the adapter fetches the message and emits a `replace` op, not an `edit` with just text.
+- **`updateChatAction` is one-shot** — there is no "stopped typing" you can rely on, so the
+  renderer schedules an expiry from `until`; without it the header claims 对方正在输入… forever.
+- **`sender_id` has two shapes**: `messageSenderUser { user_id }` **or**
+  `messageSenderChat { chat_id }`; channel posts and anonymous admins fill only the latter.
+  Reading `user_id` alone left them 未知. `Message.senderChatId` + a chat-title cache
+  (`chatTitles`, filled from `mapChat` and `updateChatTitle`) fixed it. Measured on the real
+  account: 20/20 channel messages use `messageSenderChat`.
+- **A comment thread is a TDLib message thread and the count is free.**
+  `message.interaction_info.reply_info.reply_count` is filled only for channel posts with a
+  linked discussion group and for the posts inside that group.
+  `getMessageThreadHistory` takes the *commented* message's `chat_id`; for a channel post
+  TDLib routes to the linked supergroup itself. It answers newest-first with an exclusive
+  `from_message_id`. Four measured facts: (a) `message.properties` **does not exist** in
+  1.8.70 — that read was always `undefined`, so "this post owns a thread" is
+  `reply_info` being present, which is true from `reply_count: 0` (a 0-comment thread draws
+  the bar as 写评论, or nobody could be first); (b) a 0-comment thread answers
+  **"Receive messages in an unexpected chat"**, so the panel seeds an empty page instead of
+  asking; (c) `updateMessageInteractionInfo` fires on every view and may carry **no**
+  `reply_info`, so the `interaction` op is a partial patch — the old `?? { comments: 0 }`
+  fallback zeroed a real count and the bar vanished; (d) the handle is a **channel-post**
+  feature, not a `reply_info` one — group rows inside a discussion group also report
+  `reply_info`, and a count-only test drew 写评论 under ordinary group messages. The
+  official clients gate on the post (tdesktop `checkDiscussionLink`), and so does
+  `isCommentablePost`: channel chats only.
+- **`sendMessage` answers with TDLib's local id** and `editMessageText`/`deleteMessages` on
+  that id fail ("Message not found") until `updateMessageSendSucceeded` swaps in the server
+  id (`td-5242881` → `6291456`). The swap is real and is handled as a re-key: the
+  `replaceId` op keeps the row in place.
+- **A vote is not echoed by the command.** `setPollAnswer` answers `Ok`; the changed poll
+  arrives later as `updateMessageContent` (a `replace`), so the renderer must not invent
+  counters locally. Quiz correct answers stay empty until the account answers or the poll
+  closes.
+- **The poll schema is newer than the version number suggests**: 1.8.70 (c8828d50) already
+  has `pollOption.id`, `option_order`, `can_see_results`, `can_add_option`,
+  `vote_restriction_reason`. `setPollAnswer` takes `chat_id`/`message_id`/`option_ids`, and
+  `option_ids` are **positions**, not id strings; a poll whose `option_order` is non-empty is
+  drawn in that order while still voting by position.
+- **Real unread counts are large** (hundreds of thousands on unfollowed groups) — data, not a
+  mapping bug.
+
+### 6.2 Scroll, anchors and virtualisation
+
+- **Virtualised prepend needs two stages**: rough compensation from the height delta for a
+  few frames (the virtualizer remeasures over several frames), then exact correction against
+  the anchor row's DOM offset. Anchor-only fails because right after a prepend the anchor row
+  is outside the rendered window and has no DOM node.
+- **Older history has to be *prefetched*, not fetched at the top.** The fetch itself is the
+  jank: a page comes from TDLib's cache or the server (~3.4 s cold, which is why
+  `LOAD_OLDER_TIMEOUT_MS` exists), while a wheel gesture covers the last screen in about a
+  second — the reader hits `scrollTop < 160` and the wheel goes dead until the page lands.
+  `useChatHistory.prefetchOlder` keeps one page in `olderPagesByChat` (on mount and after
+  every landing); `loadOlder` only prepends it, so 正在加载更早的消息… no longer shows in
+  normal reading. The buffer is a *snapshot*: dropped when a buffered row is deleted/edited,
+  when `setHistory` replaces the window, and an empty answer is never buffered.
+- **A programmatic `scrollTop` write desyncs `@tanstack/react-virtual`.** Row transforms come
+  from the virtualizer's own `scrollOffset`, refreshed only on real scroll events, so landing
+  at the bottom / restoring an anchor / compensating a prepend can leave it painting the top
+  of the history while the element sits elsewhere — rows off-screen, pane looks blank (or
+  shows a slice of very old messages) with an empty tail, while `scrollTop` still reports
+  "at the bottom". Fix: `MessageList.resyncScroller()` dispatches one `scroll` event after
+  every programmatic scroll (measured: 13 rows at y −4842…−2708 before, the real
+  2025↔today window at −1098…+394 after), and `stickToNewest()` uses
+  `virtualizer.scrollToEnd()` and re-sticks at 150/400 ms.
+- **Restoring a reading position needs all three pieces**: (a) the list must not mount before
+  the stored anchor is known, or a cached chat captures the bottom as its position; (b)
+  `scrollToIndex` is only an estimate with dynamic heights, so the position is corrected
+  against the anchor row's DOM node; (c) `unpin()` must run before restoring or the
+  stick-to-bottom `ResizeObserver` undoes it. The anchor is "first visible slot + its offset",
+  and *no row at all* means "was at the bottom".
+- **"Anchor known" must be reset during render, not in an effect.** An effect reset let the
+  render for a *new* chat carry the old chat's `true`, so `ChatPane` mounted the list one
+  frame early at the bottom and wrote `bottom` into `ui.db` before the new chat's
+  `ui:getAnchor` answered (measured: stored `{14958, -46}` read back as `null` on the next
+  open — every *cached* chat reopened at the bottom). The reset is now an in-render state
+  adjustment (`stateChatId !== activeChatId`). The cold path was never affected.
 - **The stick-to-bottom pin is a function of geometry, not of scroll events.**
   `lib/scrollGeometry.ts` (`readScrollPin`) is the single rule; `useAnchoredScroll`
-  re-derives it from both `ResizeObserver`s (content *and* container) and after a restore,
-  and `useAnchorSave` uses the same predicate. Why: a transcript shorter than the viewport
-  never scrolls, so waiting for a scroll event leaves `atBottom === false` forever — the
-  next incoming message then raises "↓ N 条新消息" over a message the reader can see, and the
-  list stops following new messages. Three measured ways into that state: a restored anchor
-  whose rows measure shorter than the virtualizer's `estimateSize: 68`, a window grown until
-  the transcript fits, and a transcript that shrank (delete/edit). A layout change is also
-  when a stored anchor becomes unusable, so `MessageList` then records "bottom" once —
-  nothing else would ever clear it.
+  re-derives it from both `ResizeObserver`s (content *and* container) and after a restore, and
+  `useAnchorSave` uses the same predicate. A transcript shorter than the viewport never
+  scrolls, so waiting for a scroll event leaves `atBottom === false` forever — the next
+  message raises "↓ N 条新消息" over a message the reader can see, and the list stops
+  following. Three measured ways in: a restored anchor whose rows measure shorter than
+  `estimateSize: 68`, a window grown until the transcript fits, a transcript that shrank. A
+  layout change is also when a stored anchor becomes unusable, so the list then records
+  "bottom" once.
+- **Saving the anchor**: the save path is corrected for a real-account bug — the position was
+  often never written. Two causes: a single 250 ms debounce that *re-measured* in the timer
+  and bailed whenever a page was in flight (the common case while reading up), and a dead
+  "write on unmount" net (React nulls `scrollRef.current` before passive cleanups). Now the
+  first scroll of a burst writes immediately, later ones collapse into one trailing write,
+  the last measurement is kept in `latestAnchorRef` and flushed on unmount without touching
+  the DOM, prepend compensation no longer suppresses saving (only
+  `restoringRef`/`programmaticRef` do), and a hung `messages:history` is capped at 15 s.
+  Verified: scroll → close the app within the same second → `ui.db` holds the new position.
+- **Load-around beats a page budget.** When the saved row or the unread boundary is older
+  than the newest page, `useChatHistory` asks for a window *around* it (`messages:around`):
+  the adapter merges an older page, `getMessage` for the anchor (`getChatHistory` is
+  exclusive) and a *negative-offset* `getChatHistory` for the newer half. The window stops
+  short of the newest message and `hasNewer` says so; live arrivals are queued instead of
+  spliced under the window's last row, reaching the window end appends `messages:newer`, and
+  the buoy / every send path replace the window with the newest page before acting.
+- **`position: fixed` inside a virtualised row is broken**: rows are positioned with
+  `transform: translateY(...)`, which makes them the containing block for fixed descendants
+  (a lightbox was confined to the row). Media overlays go through
+  `createPortal(..., document.body)`.
+- **Never put a percentage `max-width` on the bubble itself** — on a flex child it resolves
+  against the content size and collapses to min-content. It lives on `.wx-message-stack`.
+
+### 6.3 The visibility gate (never gate content on layout timing)
+
+- **The gate could never open under React StrictMode**: the mount layout effect runs twice;
+  the first pass set `initialisedRef` and scheduled a frame, the cleanup cancelled it, the
+  second pass returned early — `visibility: hidden` forever. Do not cancel the frame, and add
+  a 150 ms `setTimeout` fallback because rAF is throttled while the window is occluded.
+- **Occlusion still froze the list after that fix** (real account: 12 rows in the DOM,
+  `scrollHeight 9968`, `messages:history` answering 50 in 8 ms, `wx-messages--pending` stuck
+  on) because the anchor-restore path waited on rAF and released the gate in its
+  `.finally`. Three layers now prevent a permanently hidden transcript: a 700 ms
+  `setTimeout(markReady)` beside the restore, a 900 ms deadline inside `restoreToAnchor`
+  (frames alone are not a bound), and a watchdog that force-readies any list that has
+  messages but is not ready after 1 s.
+- **Diagnosis recipe for a "blank" transcript**: check
+  `document.querySelector('[data-testid="message-scroller"]').className`; if it still has
+  `wx-messages--pending` while `.wx-message-slot` rows exist, the messages are there and
+  only the gate is stuck. Look at `restoreToAnchor` first, not at the data.
+
+### 6.4 Media: protocol, downloads, streaming, avatars
+
 - **`wx-media://` must be declared before `app.whenReady()`** with
-  `protocol.registerSchemesAsPrivileged` (standard/secure/supportFetchAPI/stream), or
-  `<img>`/`<video>`/`fetch` cannot load it. The CSP also needs it in **`connect-src`**,
-  not just `img-src`: TGS is fetched as bytes and gunzipped in the renderer. The handler
-  resolves opaque tokens and streams with `Range` support; request paths are never used
-  for filesystem access.
-- **`position: fixed` inside a virtualised row is broken.** Rows are positioned with
-  `transform: translateY(...)`, which makes them the containing block for fixed
-  descendants — a lightbox rendered inside the bubble was confined to the row. Media
-  overlays must go through `createPortal(..., document.body)`.
-- **The ready gate could never open under React StrictMode.** The mount layout effect
-  is run twice (effect → cleanup → effect); the first pass set `initialisedRef` and
-  scheduled `requestAnimationFrame`, the cleanup cancelled it, and the second pass
-  returned early — the list stayed `visibility: hidden` forever. Fix: do not cancel the
-  frame, and add a 150 ms `setTimeout` fallback because rAF is throttled while the window
-  is occluded (this also explains flaky `?perf=1` runs in background windows).
-- **…and occlusion was still able to freeze the list after that fix** (measured on the
-  real account: 12 rows in the DOM, `scrollHeight 9968`, `messages:history` answering 50
-  in 8 ms, and `wx-messages--pending` stuck on). The anchor-restore path waits on rAF and
-  only released the gate in its `.finally`. Three layers now prevent a permanently
-  hidden transcript: a 700 ms `setTimeout(markReady)` next to the restore, a 900 ms
-  deadline inside `restoreToAnchor` (frames alone are not a bound), and a watchdog that
-  force-readies any list that has messages but is not ready after 1 s. **Never gate
-  visibility on layout timing.**
-- **A short `getChatHistory` answer is normal, not the end of the chat.** For a cold
-  chat TDLib answers from its local window — measured 1 to 5 messages in 1–7 ms — even
-  when the chat has thousands. Re-anchoring *below* the oldest returned id is what makes
-  it go to the server (that request came back with 50 in 65–230 ms; the first cold fetch
-  after a long time took ~3.4 s). `history()` therefore tops a page up over up to
-  `MAX_HISTORY_ROUNDS = 3` rounds and only an **empty** round means "the chat begins
-  here". `hasMore` is `!exhausted && messages.length > 0`; the old
-  `raw.length >= limit` turned every cold chat into "no more history". Cost of the new
-  rule: one extra request when a chat is genuinely at its beginning.
-- **Never create a `messagesByChat` entry for a chat whose history is not loaded.**
-  `updateChatReadInbox` fires for *every* chat, and `applyMessageOps` used to write
-  `messagesByChat[chatId] = []` from it. `ChatPane` treats "an entry exists" as "cached",
-  so every chat the read marker touched opened empty and could not page (this is the bug
-  the product owner reported). `applyMessageOps` now returns without touching the store
-  when the chat has no entry; entries come only from `setHistory`/`prependHistory`.
-- **…but the ops of an unloaded chat must not be dropped either.** While a chat's first
-  page was in flight (a cold chat can take seconds), `applyMessageOps` threw the ops
-  away, and the subsequent `setHistory` wrote the pre-event snapshot — anything that
-  arrived during the fetch (a `updateNewMessage`, a late-batched edit) was missing from
-  the transcript until the chat was reloaded. The store now queues meaningful ops in
-  `pendingOps[chatId]` (pure read-marker batches are skipped) and `setHistory` replays
-  the queue onto the fresh page (`reduceOps`, shared with `applyMessageOps`). A failed
-  first fetch also used to leave the pane empty forever — `ChatPane` retries once
-  quietly after 1.5 s before giving up.
-- **`downloadFile(synchronous: true)` occupies a TDLib request slot until the file is
-  complete.** That is fine for user-triggered media, but avatars must not be fetched
-  naively: the adapter runs a 4-wide worker pool at priority 1, dedupes per chat id
-  (queue / in-flight / done / no-photo), and never emits `evt:file` for them
-  (`fetchFilePath()` is the silent variant; `downloadFile()` is the progress one). On a
-  saturated tunnel a single thumbnail took 16 s, so the pool is 4 — if opening a chat
-  feels starved right after start-up, this queue is the first suspect. Finished photos
-  are pushed as `chats` upserts coalesced over 120 ms, not one event per chat.
-- **Profile photos need `getChat`/`getMe` → `profile_photo.small` (or `chat.photo.small`),
-  not the media pipeline.** The file is registered through `registerMediaFile` exactly
-  like attachments, so the renderer only ever sees `wx-media://f/<token>`. The rail's
-  own photo is fetched in the background and announced with a second `auth` event, so
-  authorisation never waits on the network; `updateUser` (self) and `updateChatPhoto`
-  (a chat) invalidate and refetch.
-- **Sender photos ride the same pool and a second event.** `mapMessage` never waits for
-  a photo: it copies the cached URL (`userAvatarUrls`), then queues the sender through
-  the 4-wide pool. Finished ones are batched into `evt:avatars` (keyed by user id, so one
-  person's photo serves every chat) rather than re-emitting messages — a transcript page
-  has no way to patch 40 rows without a refetch. Consequences worth knowing: the pool is
-  shared with chat photos, so opening a big group right after start-up queues dozens of
-  senders (if chat photos feel slow, that queue is the first suspect); "this person has
-  no photo" is remembered for the session, and `updateUser` for somebody else refetches
-  only when the file id actually changed (it also fires for name-only changes).
-- **This TDLib's `inputMessagePhoto` has no width/height.** Dimensions live on
-  `inputPhoto`, so a photo cannot be sent without knowing its pixel size. The main
-  process parses PNG/JPEG/WebP/GIF headers first; when it cannot, the file is sent as a
-  document instead of producing a broken photo bubble. `inputMessageSticker` also needs
-  `inputSticker.width/height` and an emoji.
-- **Sticker set ids are int64 strings in TDLib.** They cross IPC as strings; the sticker
-  itself is identified by the numeric file id. `getInstalledStickerSets` only returns
-  set summaries — the grid needs a second `getStickerSet` call.
-- **The installed list ships a tab icon in `covers`, not in `thumbnail`.** Measured on
-  the real account: `thumbnail` was null for 6 of the 8 visible sets and `covers` held
-  the set's first sticker every time, so the strip fell back to two characters of the
-  title. `listStickerSets`/getStickerSet now resolve the icon the way tdesktop does
-  (`StickersSet::lookupThumbnailDocument`): set thumbnail → first sticker → `covers[0]`.
-  All 192 sets had an icon afterwards.
-- **A sticker's thumbnail is not the sticker's format.** TDLib serves a static WebP as
-  `sticker.thumbnail` even for a TGS/WebM sticker (measured 2026-11-19: the TGS pack's
-  thumbnail file came back `content-type: image/webp`, the WebM pack's too), so a grid
-  that paints the thumbnail must switch on `thumbFormat` (`MessageMedia.stickerThumbFormat`);
-  reusing `stickerFormat` there sent WebP bytes through lottie-web (gzip throw → emoji
-  fallback, 38/38 cells of a TGS pack) and through `<video>` (`MEDIA_ERR_SRC_NOT_SUPPORTED`,
-  `videoWidth === 0` → blank, 120/120 cells of a WebM pack). Chat bubbles were fine because
-  they draw the full file. Static WebP packs were the only ones that ever worked in the
-  picker — that is the whole "some packs load, some don't" symptom.
-- **One emoji is not a text message.** TDLib's `can_be_animated_emoji` (client side, in
-  `MessageContent.cpp`) turns a message whose whole text is one emoji — or one custom-emoji
-  entity covering it all — into `messageAnimatedEmoji`, carrying the AnimatedEmoji sticker
-  (`animated_emoji.sticker`, TGS/WebM/WebP) plus a click sound (`animated_emoji.sound`, an
-  OGG/Opus file that is downloaded only on the first click). The renderer draws it
-  bubble-less at 112 px, plays one pass and replays on click (`playback="once"`), which is
-  what Telegram's animated-emojis doc asks for; looping forever, as a sticker does, reads as
-  noise in a transcript. A custom emoji whose sticker TDLib has not resolved yet comes back
-  with no sticker file and falls back to the glyph (kind 'text'); `updateMessageContent`
-  remaps the row once the sticker lands. The glyph stays in `text`, so previews, quotes and
-  复制 keep working — and the chat list shows the emoji, not a label.
-- **Custom emoji are stickers keyed by an id, not characters.** `textEntityTypeCustomEmoji`
-  carries only `custom_emoji_id`; the art comes from `getCustomEmojiStickers`, which
-  answers **in arbitrary order and only for the ids it knows** — so the response must
-  carry each id back (TDLib puts it in `full_type.custom_emoji_id`), never rely on
-  position. One call takes up to 200 ids. The entity's covered text is the base glyph,
-  which is why it stays the fallback for 复制, chat-list previews, unknown ids and
-  offline. On the real account (2026-11-20) a channel post carried six custom emoji in
-  its caption while the app drew six plain emoji — that is the symptom this fixes.
-- **A premium sticker's effect is a second file, and `is_premium` is the switch.**
-  TDLib ships the effect as `sticker.full_type.premium_animation` (a TGS) and marks the
-  message with `messageSticker.is_premium`; the mapper only carries
-  `MessageMedia.premiumEffectFileId` when both say yes, because the flag can stand while
-  the file is still unknown. The renderer draws it once at 1.49× the sticker
-  (tdesktop's `kPremiumMultiplier = 1 + 0.245 * 2`), fades it out and replays it on a tap.
-  The mock's generated effect is built from the same Lottie constructs as
-  `sticker-wave.tgs` on purpose: a first version using polystar/ellipse shapes with
-  animated position and scale parsed fine and drew **nothing** (every layer's bbox was
-  0 × 0), while rounded rects with animated opacity/rotation render as expected — keep
-  fixture TGS art to the constructs that fixture already proves.
-- **The media scheme must be CORS-enabled, or every TGS sticker fails.** `wx-media://` was
-  registered with `supportFetchAPI` but without `corsEnabled`, and a renderer loaded from
-  `file://` counts as another origin: Chromium refused the `fetch()` outright ("Cross origin
-  requests are only supported for protocol schemes…", measured 2026-11-20). `lib/tgs.ts` then
-  marked the TGS failed and every animated sticker — the new animated emoji included — fell
-  back to its emoji glyph, which reads as "the sticker never loaded". Registration now sets
-  `corsEnabled: true` and the handler answers `access-control-allow-origin: *`; a real
-  account's ❤️ sticker then decoded through lottie-web.
-- **Not every emoji has an animated version.** TDLib replaces a one-emoji message with
-  `messageAnimatedEmoji` only when the emoji resolves in the AnimatedEmoji set; otherwise
-  the message stays `messageText` (measured on the test DC: ❤️, 🎉, 🔥, 💩, 👍, 👏 and 😭
-  resolve, while ✨, 😀 and 🥺 answer 404 from `getAnimatedEmoji`). Those messages are
-  correctly drawn as the 48 px big emoji — not a mapping failure. None of the resolved ones
-  carried a click `sound` on the test DC, so the sound path is exercised by the mock's
-  generated WAV instead.
-- **`updateChatAction` is a one-shot event.** It has no "stopped typing" notification you
-  can rely on, so the renderer schedules an expiry timer from `until`; without it the
-  header claims "对方正在输入…" forever.
-- **Editing content is a full remap, not a text patch.** `updateMessageContent` can change
-  media/captions, so the adapter fetches the message and emits a `replace` op instead of
-  an `edit` op with just the text.
-- **Mock media is generated, not referenced.** `packages/mock-adapter/src/mock-assets.ts` embeds two real
-  WebP stickers and one gzipped TGS animation, and encodes gradient PNGs at runtime with
-  `node:zlib`; the files land in `userData/mock-media` and are served through the same
-  `wx-media://` registry as TDLib downloads. This is what makes media/sticker work
-  testable without the real account.
-- **Real unread counts are large** (hundreds of thousands on unfollowed groups); that
-  is data, not a mapping bug.
-- **A programmatic `scrollTop` write can desync `@tanstack/react-virtual`.** Row
-  transforms come from the virtualizer's *own* `scrollOffset`, which it refreshes only on
-  real scroll events. Scrolling the transcript in the mount layout effect (landing at the
-  bottom, restoring an anchor, prepend compensation) can therefore leave it painting the
-  top of the history while the element sits elsewhere: the rows are all off-screen, so the
-  pane looks **blank** (or shows a slice of very old messages) with an empty tail under the
-  scrollbar, and `scrollTop` still reports "at the bottom". Symptom looked like a chat that
-  never loads. Fix: after every programmatic scroll, `MessageList.resyncScroller()` dispatches
-  one `scroll` event so the virtualizer re-reads the element (measured: 13 rows at y −4842…
-  −2708 before, the real 2025↔today window at y −1098…+394 after), plus `stickToNewest()`
-  uses `virtualizer.scrollToEnd()` and re-sticks at 150/400 ms once the first measurements
-  have landed.
-- **An empty first history page is not "an empty chat".** A cold local TDLib database can
-  answer `messages:history` with `[]`; the renderer used to cache that, after which the
-  transcript stayed blank for the rest of the session. Now (2026-11-17, second pass) the page
-  is retried three times *and* an empty answer is not cached at all while the chat list says
-  the chat has messages (`ChatSummary.lastMessageAt`, the same `last_message` the adapter
-  anchors its first page on) — the entry simply stays absent, so the next open or 重新加载 asks
-  again, and the placeholder says "消息还没从服务器同步下来" instead of claiming the chat is
-  empty. A genuinely empty chat (no `lastMessageAt`) still caches its page and still reads
-  "这个会话还没有可显示的消息". The adapter logs both halves of the chain (`no last_message` /
-  `getChatHistory returned nothing`) so the next occurrence is explainable from
-  `.cache/app.log`.
-- **`getChatHistory` treats `from_message_id` as exclusive (measured 2026-11-17).**
-  The request returns messages *strictly older* than the id, so a first page anchored
-  exactly on `chat.last_message.id` never contained the newest message — and `openChat`
-  marked the message *below* it as read. Every chat therefore kept a badge of at least
-  "1" however often it was opened, while clicking the same chat in the official client
-  cleared it (reproduced on 心惊报: TDLib's `last_read_inbox_message_id` stayed one post
-  behind, and `unread_count` never dropped to 0; `from=4975493120` answered `4974444544`).
-  Fixed in `actions.ts`: the implicit first-page anchor is `last_message.id + 1` (so the
-  newest message is loaded), and `openChat` reads up to `getChat.last_message.id`
-  directly instead of trusting a history page. The renderer additionally reports the
-  newest message as read while the chat is open in a focused, visible window
-  (`chat-pane`), so messages arriving during the conversation no longer leave the badge
-  lit. `mapChat` now omits `lastReadInboxMessageId` when TDLib reports 0 — 0 means
-  "nothing read yet", not message 0 — so the unread divider falls back to the unread
-  counter instead of being pinned above the first row of the loaded page.
-- **`updateDeleteMessages` is not always a deletion — and the cache-only variant emptied
-  the open chat (measured 2026-11-17).** The TDLib update carries `is_permanent` and
-  `from_cache`; `from_cache: true` means "deleted only from the cache and can possibly be
-  retrieved again in the future". TDLib emits those while the app sits idle in the
-  background: reproduced on the real account by leaving the window occluded for ~2 minutes —
-  a `{from_cache: true, is_permanent: false}` batch for **all 50** cached messages of the
-  open chat (`[dbg]` trace: `setHistory … 50` → the eviction → `applyMessageOps emptied
-  chat`), after which the pane showed "这个会话还没有可显示的消息" while 重新加载 fetched the
-  same 50 messages back from the server. The adapter ignored both flags, so every cache trim
-  looked like a user deletion — this is the "切到后台再切回来消息就没了" bug. Fixed in
-  `updates.ts` / `map/deletion.ts`: only `from_cache !== true` removes rows; evictions are
-  logged (`dropped N message(s) from the local cache — kept in the transcript`) and the
-  renderer additionally refetches once when a transcript that *had* rows goes empty
-  (`useChatHistory`), so no silent wipe can park the pane on the empty state again.
+  `protocol.registerSchemesAsPrivileged` (standard/secure/supportFetchAPI/stream/**corsEnabled**),
+  or `<img>`/`<video>`/`fetch` cannot load it, and the CSP needs it in **`connect-src`**, not
+  just `img-src` (TGS is fetched as bytes then gunzipped). Without `corsEnabled` a renderer on
+  `file://` counts as another origin and Chromium refuses the fetch outright ("Cross origin
+  requests are only supported for protocol schemes…"), after which every TGS sticker fell
+  back to its glyph. The handler answers `access-control-allow-origin: *` and streams with
+  Range support; it resolves opaque tokens only — request paths are never used for file
+  access. Only adapters (and the mock) register a path.
+- **`downloadFile(synchronous: true)` occupies a TDLib request slot** until the file is
+  complete. Fine for user-triggered media, fatal for avatars: the adapter runs a **4-wide
+  worker pool at priority 1**, dedupes per chat id (queue / in-flight / done / no-photo), and
+  never emits `evt:file` for them (`fetchFilePath()` is the silent variant,
+  `downloadFile()` the progress one). On a saturated tunnel one thumbnail took 16 s; if
+  opening a chat feels starved after start-up, this queue is the first suspect. Finished
+  photos are pushed as `chats` upserts coalesced over 120 ms.
+- **Profile photos use `getChat`/`getMe` → `profile_photo.small`** (or `chat.photo.small`),
+  not the media pipeline; the file is registered exactly like an attachment, so the renderer
+  only sees `wx-media://f/<token>`. The rail's own photo is fetched in the background and
+  announced with a second `auth` event, so authorisation never waits on the network;
+  `updateUser` (self) and `updateChatPhoto` invalidate and refetch.
+- **Sender photos ride the same pool and a second event.** `mapMessage` never waits for a
+  photo: it copies the cached URL then queues the sender through the pool; finished ones are
+  batched into `evt:avatars` keyed by user id (one person's photo serves every chat) instead
+  of re-emitting messages — a page cannot patch 40 rows without a refetch. Consequences: the
+  pool is shared with chat photos (a big group right after start-up queues dozens of
+  senders); "no photo" is remembered for the session; `updateUser` for somebody else refetches
+  only when the file id changed (it also fires for name-only changes).
 - **A bubble must ask for the photo size its box needs, not the original.** `photoMedia` maps
-  the whole `photo.sizes` table into `MessageMedia.sizes`, and `lib/mediaVariant.ts` picks the
-  smallest variant that covers `box × devicePixelRatio` — a 240 px bubble on a 100 % display
-  wants the 320 px file, not the 1280 px one. Until then the DTO carried only the largest file
-  id, so every bubble downloaded the original; that was the biggest single cost of opening a
-  cold chat. `fileId` still names the largest (保存 / 复制 / the viewer want it), and a DTO
-  with `localUrl` already on disk skips the choice.
-- **`downloadFile(synchronous: true)` answers only when the file is complete, and the bytes it
-  has written so far are a sparse file: `stat().size` is the *full* size, not the readable
-  length.** Streaming therefore asks `getFileDownloadedPrefixSize(fileId, offset)` — the
-  contiguous run actually on disk from that offset — and reads the file directly (main and
-  TDLib share one process, so `readFilePart`, which its own docs call the fallback for apps
-  without filesystem access, is unnecessary). `downloadFile(offset, limit: 0, synchronous:
-  false)` starts or re-targets the transfer; a *different* offset is how a seek works, and it
-  cancels the previous range. On a stall the pump sends the same offset again once a second.
-- **The first `downloadFile` answer describes the file *before* the transfer was queued.** A cold
-  clip comes back with an empty `local.path` (and `expected_size: 0`), both of which only arrive
-  with the next `updateFile`: the first click on any never-played video answered "File 1304 cannot
-  be streamed yet" while the download was in fact starting. Measured on the real account, the path
-  appeared **500 ms** after the click. `beginStream` now polls `getFile` (100 ms, 4 s cap) until
-  the state is usable and logs how long it waited; the renderer is unchanged.
-- **A cancel has to be refcounted, or two windows cancel each other.** `media/leases.ts` counts
-  holders per file: `media:download` holds, `media:cancel` drops, `cancelDownloadFile` runs
-  only when the last holder leaves. Owners are per hook instance, not per effect run — a
-  StrictMode remount runs cleanup→setup, so the cleanup's cancel waits
-  `RELEASE_GRACE_MS` (250 ms) and a re-hold of the same file clears the timer. Without that,
-  the second mount waits on the in-flight promise its own cleanup just killed and the picture
-  never appears (dev only, which is exactly where it is hardest to notice).
-- **A video bubble must not download the clip.** It used to call `media:download` on mount at
-  priority 6, so a chat with a few videos queued every clip at once and starved the requests
-  the reader was waiting for. The bubble now fetches only the poster (TDLib's `thumbFileId`);
-  the viewer streams the file (design doc §8.7), so playback starts after a few hundred
-  kilobytes instead of after the whole clip.
-- `userData` is pinned to `%APPDATA%\WeGram` via `app.setName`/`setPath`, because
-  the package name is `@wegram/desktop` and would otherwise create a nested folder.
+  the whole `photo.sizes` table and `lib/mediaVariant.ts` picks the smallest variant covering
+  `box × devicePixelRatio` — a 240 px bubble on a 100 % display wants the 320 px file, not the
+  1280 px one (this was the biggest single cost of opening a cold chat). `fileId` still names
+  the largest (保存 / 复制 / viewer).
+- **The bytes TDLib has written are a sparse file**: `stat().size` is the *full* size.
+  Streaming therefore asks `getFileDownloadedPrefixSize(fileId, offset)` for the contiguous
+  run and reads the file directly (main and TDLib share one process, so `readFilePart` is
+  unnecessary). `downloadFile(offset, limit: 0, synchronous: false)` starts or re-targets the
+  transfer; a *different* offset is a seek and cancels the previous range; on a stall the pump
+  re-sends the same offset once a second.
+- **The first `downloadFile` answer describes the file *before* the transfer was queued**: a
+  cold clip comes back with empty `local.path` and `expected_size: 0` (both arrive with the
+  next `updateFile`). The first click used to answer "File 1304 cannot be streamed yet" while
+  the download was starting; the path appeared **500 ms** after the click. `beginStream` now
+  polls `getFile` (100 ms, 4 s cap) until the state is usable.
+- **A cancel must be refcounted, or two windows cancel each other.**
+  `media/leases.ts` counts holders per file: `media:download` holds, `media:cancel` drops,
+  `cancelDownloadFile` runs only when the last holder leaves. Owners are per hook instance:
+  a StrictMode remount runs cleanup→setup, so the cleanup's cancel waits
+  `RELEASE_GRACE_MS` (250 ms) and a re-hold clears the timer. Without it the second mount
+  waits on the promise its own cleanup killed and the picture never appears (dev only).
+- **A video bubble must not download the clip.** It used to call `media:download` at priority
+  6 on mount, so a chat with a few videos queued every clip and starved the requests the
+  reader waited for. The bubble fetches only the poster (`thumbFileId`); the viewer streams
+  the file, so playback starts after a few hundred kB.
+- **`inputMessagePhoto` has no width/height in this TDLib.** Dimensions live on `inputPhoto`,
+  so a photo cannot be sent without knowing its pixel size: main parses PNG/JPEG/WebP/GIF
+  headers first, and when it cannot, the file is sent as a document instead of drawing a
+  broken photo bubble. `inputMessageSticker` also needs `width`/`height` and an emoji.
+- **`userData` is pinned to `%APPDATA%\WeGram`** via `app.setName`/`setPath`, because the package
+  name is `@wegram/desktop` and would otherwise create a nested folder.
 
-- **Poll schema is newer than its version number suggests.** This build's TDLib
-  1.8.70 (commit c8828d50) already has `pollOption.id`, `option_order`,
-  `can_see_results`, `can_add_option` and `vote_restriction_reason`; the API is
-  message-addressed: `setPollAnswer` takes `chat_id`/`message_id`/`option_ids`, and
-  `option_ids` are **positions**, not the option id strings. A poll whose
-  `option_order` is non-empty must be drawn in that order while still voting by
-  position — the DTO keeps both. `messagePoll` also carries `description` and media
-  (both optional here); the poll card ignores option media for now.
-- **A vote is not echoed by the command.** `setPollAnswer` answers `Ok`; the changed
-  poll arrives later as `updateMessageContent` (already mapped to a `replace`), so the
-  renderer must not invent counters locally. Quiz correct answers are empty until the
-  account answers (or the poll closes).
+### 6.5 Stickers, emoji and effects
 
-## Decisions already locked (design doc §15)
+- **Sticker set ids are int64 strings** — they cross IPC as strings; a sticker is identified
+  by its numeric file id. `getInstalledStickerSets` returns only summaries; the grid needs a
+  second `getStickerSet`.
+- **The installed list ships a tab icon in `covers`, not `thumbnail`** (measured: `thumbnail`
+  was null for 6 of 8 visible sets, `covers` held the first sticker every time; all 192 sets
+  had an icon after the tdesktop-style lookup).
+- **A sticker's thumbnail is not the sticker's format.** TDLib serves a static WebP as
+  `sticker.thumbnail` even for TGS/WebM stickers, so a grid that paints the thumbnail must
+  switch on `thumbFormat` (`MessageMedia.stickerThumbFormat`); reusing `stickerFormat` sent
+  WebP bytes through lottie-web (gzip throw → emoji fallback, **38/38** cells of a TGS pack)
+  and through `<video>` (`MEDIA_ERR_SRC_NOT_SUPPORTED`, `videoWidth === 0` → blank, **120/120**
+  cells of a WebM pack). Chat bubbles were fine because they draw the full file. Static WebP
+  packs were the only ones that ever worked — that is the whole "some packs load, some don't".
+- **One emoji is not a text message**: `can_be_animated_emoji` (client side) turns a message
+  whose whole text is one emoji (or one custom-emoji entity covering it) into
+  `messageAnimatedEmoji` carrying the AnimatedEmoji sticker plus a click sound (an
+  OGG/Opus file downloaded only on the first click). Rendering per §5.6.
+- **Custom emoji are stickers keyed by an id, not characters**: `textEntityTypeCustomEmoji`
+  carries only `custom_emoji_id`; `getCustomEmojiStickers` answers **in arbitrary order and
+  only for the ids it knows**, so the response must be keyed by `full_type.custom_emoji_id`,
+  never by position. Up to 200 ids per call.
+- **A premium sticker's effect is a second file and `is_premium` is the switch**: the effect
+  is `sticker.full_type.premium_animation`, and the mapper only carries
+  `MessageMedia.premiumEffectFileId` when both say yes (the flag can stand while the file is
+  unknown). Fixture lesson: a first TGS effect built from polystar/ellipse shapes with animated
+  position/scale parsed fine and drew **nothing** (every layer's bbox 0 × 0); rounded rects
+  with animated opacity/rotation render. Keep fixture TGS art to constructs the existing
+  fixture proves.
 
-Single account in v1 (multi-account is v2; session dir already shaped
-`tdlib/<accountId>/`), animated stickers in v1 (WebP + TGS + WebM), Electron (Tauri only
-if bundle size becomes a real pain), built-in SOCKS5 / HTTP / MTProxy with a connectivity test,
-5-week schedule instead of 4.
+### 6.6 Proxy, login, windows, process
 
-## Private-chat P0 batch — measured notes (2026-11-22)
+- **A pending QR login cannot be cancelled in TDLib.** `requestQrCodeAuthentication` works from
+  `waitPhoneNumber`, then TDLib keeps re-sending `authorizationStateWaitOtherDeviceConfirmation`
+  with a fresh link. `setAuthenticationPhoneNumber` is refused in that state and there is no
+  cancel call, so the phone fallback restarts the client (`auth:reset` → destroy + new
+  client). Do not "optimise" that into a direct phone submit.
+- **The login window is a real second window.** Before sign-in completes the shell does not
+  exist, so closing the login window (× / Alt+F4) quits through `window-all-closed`; after the
+  hand-over the shell is the only window, and signing out recreates the login window *before*
+  closing the shell. If a run leaves two windows or none, check `syncWindowsToAuth` /
+  `showMainWindow`.
+- **Login needs three submits**; the field is re-focused after each step by a focus effect —
+  if that regresses, typing goes nowhere.
+- **`titleBarOverlay` buttons are painted above web content**, so the title bar reserves space
+  with `padding-right: calc(16px + (100% - env(titlebar-area-x, 0px) -
+  env(titlebar-area-width, 100%)))`; a fixed spacer only pushes content into the buttons. The
+  overlay colour must be repainted from main on theme change, and **whatever sits under the
+  controls must match it** (rail colour, 32 px) or the bitmap shows a seam. The overlay covers
+  only the right-hand control area. The login window is a separate case: `frame: false`,
+  its own × and gear, no overlay.
+- A hidden transcript, a slow avatar, or a sender photo that never appears are §6.3/§6.4
+  symptoms, not data bugs — read those before touching the list or the pool.
+- **Electron 45 changed two things this code depended on**: `clipboard.writeImage()` is gone
+  (the clipboard is the web-standard async API, so 复制图片 writes `new ClipboardItem({
+  'image/png': blob })` through `clipboard.write()`), and the binary no longer comes from a
+  `postinstall` (`install-electron` bin → `pnpm electron:install`).
+- **The mock adapter floods new messages** every few seconds (`(mock) 新消息 #n`) and unread
+  counters grow — the fixture, not a regression.
+- **A response shape is checked by the handler map, not at runtime.** `chats:inviteLink` was
+  declared `{ link: string }` while the adapter returned a bare string; `answer?.link`
+  resolved to **`String.prototype.link`**, and passing that function to `useState` made React
+  call it as an updater — the renderer crashed and the window closed. The map is now typed by
+  `InvokeResponse<C>`; if a response ever looks like a function, suspect this class of
+  mismatch, not React.
 
-Shipped from `docs/PRIVATE-CHAT-HANDOFF.md` §3 (P0): outgoing typing, 标为未读,
-删除聊天, send failure + 重试, online / last seen, desktop notifications, tray.
+### 6.7 Private-chat behaviour that was measured (P0/P1 batches)
 
-- **Typing is renderer-side throttled, never thrown.** `lib/typingPing.ts` sends one
-  `messages:typing` immediately and at most one refresh per 3.5 s; emptying the box,
-  sending, switching chats or blurring sends the cancel. The adapter's `sendTyping`
-  swallows TDLib failures on purpose (ambient presence must not raise the error bar).
-  The mock adapter has no peer to show it, so the indicator is only observable against a
-  real account.
-- **The send id swap is real and handled as a re-key.** `sendMessage` answers with a
-  pending row; `updateMessageSendSucceeded.old_message_id` is patched through the new
-  `replaceId` op, so the row keeps its position and later edit/delete/read receipts
-  name the server id. `updateMessageSendFailed` patches `sendingState: 'failed'` +
-  `canRetry`; 重试 calls `messages:resend` (`resendMessages`) and the row goes back
-  to 'pending'. The message menu also offers 重试 first for a failed row.
-  - Dev path: `WEGRAM_MOCK_FAIL_SEND=1` fails the **next** text send once, so the
-    未发送 row and click-to-retry can be exercised without a network. Verified in the
-    mock Electron shell (row appeared red, retry delivered it, receipt returned).
-- **标为未读 is a flag, not a counter.** `ChatSummary.markedUnread` comes from
-  `chat.is_marked_as_unread`; the row draws a bare dot when there is no count, and
-  opening the chat clears the flag (the adapter calls `toggleChatIsMarkedAsUnread`).
-  Unread messages still move the server marker one viewport at a time.
-- **删除聊天 is local.** The adapter uses `deleteChatHistory` with
-  `remove_from_chat_list: true, revoke: false` — never `deleteChat`, which deletes
-  the history for every member. The `remove` op now drops the transcript, queued ops,
-  paging state and the active selection with the row.
-- **The chat list has a right-click menu** (置顶 / 免打扰 / 标为未读 / 删除聊天) built in
-  `components/chat-list/chatMenu.ts`; `ContextMenu` already handled placement and keys.
-- **Presence is a stream, not a chat field.** `users:status` answers once per open
-  private chat and `evt:status` keeps it live; the copy is `lib/presence.ts`
-  (在线 / 刚刚在线 / 今天 HH:mm / 昨天 HH:mm / M月D日 HH:mm / coarse sentences). Placement
-  was the audit's open decision #1: it sits **after the name inside the 48 px header**,
-  styled like the typing label, so the transcript never re-flows. Typing wins over
-  status when both exist.
-- **Notifications come from TDLib's notification objects**, not from
-  `updateNewMessage`: both `updateNotification` and
-  `updateNotificationGroup.added_notifications` are forwarded as a main-only
-  `notification` adapter event (`notificationTypeNewMessage` only). Main builds the
-  Electron `Notification`, flashes the task bar when the shell is not focused, and
-  suppresses the toast for the chat the focused shell is showing — the renderer reports
-  that through `ui:setActiveChat` (null when the pane is closed or 通讯录 is showing).
-  A notification click raises the shell and publishes `evt:locate`; a chat not yet in
-  the list is fetched with `chats:get` before the pane opens.
-  - Dev path: `WEGRAM_MOCK_NOTIFY=1` turns the mock's ambient arrivals into
-    notification events.
-  - **Unverified on this machine:** Windows toasts for an unpackaged build (no Start
-    Menu shortcut), and the tray icon — `Shell_NotifyIcon` refused it in the agent's
-    launch session (`Unable to create status tray icon`). `createTray` now logs and
-    carries on without the icon, so neither failure can stop the app from starting.
-- **Protocol split:** `channels.ts` was at its size budget, so the event tables
-  moved to `packages/protocol/src/events.ts`, the message ops to
-  `message-ops.ts`, and the new channels to `send.ts` (typing, resend) and
-  `presence.ts` (status, active chat). `dto.ts` is under budget again.
-- **Renderer splits that the batch forced:** `useMarkRead` and `usePeerStatus` left
-  `chat-pane/index.tsx`; the browser preview's media, viewer and `ui:*` handlers left
-  `preview/index.ts`.
+- **Typing is renderer-side throttled, never thrown**: `lib/typingPing.ts` sends one
+  `messages:typing` immediately and at most one refresh per 3.5 s; emptying the box, send,
+  chat switch or blur sends the cancel. The adapter swallows TDLib failures on purpose
+  (ambient presence must not raise the error bar). The mock has no peer, so the indicator is
+  only observable against a real account.
+- **标为未读 is a flag, not a counter** (`chat.is_marked_as_unread`); the row draws a bare dot
+  when there is no count, and opening the chat clears the flag.
+- **删除聊天 is local**: `deleteChatHistory(remove_from_chat_list: true, revoke: false)` —
+  never `deleteChat`, which deletes the history for every member. The `remove` op drops the
+  transcript, queued ops, paging state and the selection with the row.
+- **Presence is a stream, not a chat field**: `users:status` answers once per open private
+  chat, `evt:status` keeps it live, copy in `lib/presence.ts` (在线 / 刚刚在线 / 今天 HH:mm /
+  昨天 HH:mm / M月D日 HH:mm / coarse). It sits **after the name inside the 48 px header**,
+  styled like the typing label, so the transcript never re-flows; typing wins when both exist.
+- **Notifications come from TDLib's notification objects**, not `updateNewMessage`:
+  `updateNotification` and `updateNotificationGroup.added_notifications` are forwarded as a
+  main-only `notification` adapter event (`notificationTypeNewMessage` only). Main builds the
+  Electron `Notification`, flashes the task bar, suppresses the toast for the chat the focused
+  shell is showing (`ui:setActiveChat`, null when the pane is closed or 通讯录 is showing),
+  and a click raises the shell and publishes `evt:locate`; a chat not yet in the list is
+  fetched with `chats:get` first.
+- **相册发送 is one call** (`sendMessageAlbum`, 2–10 photos); every row carries the album id, so
+  the transcript folds them into the bubble it already draws for a received album. Documents
+  still send one message per file (`rows.ts` only folds photo/video).
+- **The 置顶消息 bar sits above the transcript**, never inside the scroller (it must not
+  re-measure the virtualised list): text + 定位 + ×, the menu item flips to 取消置顶 for the
+  pinned row, and an unpin resolves the current pin because `unpinChatMessage` wants its id.
+- **语音转文字 streams through the voice note's own content**: `recognizeSpeech` answers
+  `Ok`, and the finished text arrives as a content update through the ordinary `replace` op —
+  no polling, no extra event; `pending` keeps the partial text on screen. Gated on
+  `can_recognize_speech`.
+- **Reactions arrive as a full list** (`updateMessageReactions`): replace wholesale (an empty
+  list removes the chips), tint the chosen ones, draw a Premium custom-emoji reaction as its
+  sticker art. Display only — WeChat has no reactions and the picker is still an open product
+  decision.
+- **`reportChat` is two-phase and the reason list is the server's**: empty `option_id` →
+  `reportChatResultOptionRequired { title, options }` → the chosen id (+ optional
+  `message_ids` / `text`), and `reportChatResultTextRequired.is_optional` may skip the
+  comment. Ids are TDLib `bytes`, passed through verbatim as base64; the labels are already
+  localized by Telegram and cannot be re-derived (1.8.70 has no `type` field). **Which chats
+  are reportable is TDLib's rule**: a user only if `is_bot`, a basic group never, a
+  channel/supergroup unless the account is its creator — so 举报 appears on channel/supergroup
+  posts and in a bot's chat, nowhere else.
+- **The profile card never patches a field locally**: every write (`setUserNote`,
+  `setMessageSenderBlockList`, `addContact`, `removeContacts`) answers the refreshed card.
+  共同群聊 shows `group_in_common_count` and fetches one page of rows (`getGroupsInCommon`,
+  `limit: 50`, `offset` = `offset_chat_id`) only when the reader opens the row.
+- **Caption edit reads `show_caption_above_media` back first** (`getMessage`), so an edit never
+  moves a caption from above the picture to below it; an empty caption clears it.
+- **Voice notes**: WebCodecs `AudioEncoder` gives raw Opus and the OGG container is written
+  in-repo (`renderer/lib/voice/oggOpus.ts`), so no dependency was added and `MediaRecorder`'s
+  inability to emit `audio/ogg` (`isTypeSupported` false on this machine) is moot. Bytes cross
+  IPC (base64 + duration + replyTo), main writes `userData/voice/voice-<stamp>-<rand>.ogg`
+  and prunes files older than 6 h at the next start (a failed send deletes at once — the
+  upload starts *after* `sendMessage` answers, so the file must outlive the call). The
+  waveform is sent **empty on purpose** (the 5-bit packing is undefined and the bubble's wave
+  is decorative); the server accepted it on the test DC. A cancel pressed while the
+  microphone is still opening is remembered in the session ref and applied when it lands;
+  60 s auto-sends. Mic permission is narrowed to the shell window
+  (`setPermissionRequestHandler` + `setPermissionCheckHandler`); the login, 群二维码 and viewer
+  windows cannot open a device. The comment composer shares the card but passes no
+  `onSendVoice`, so its mic still toasts.
 
-## Known gaps / suggested next steps
+---
 
-1. ~~**Unverified:** the dark-mode window-controls overlay~~ — **verified** (Electron 38,
-   `-NoSandbox -Mock`, mock login `+8613800000000` / `12345` / `wegram`). Measured
-   pixels: light title bar `#F7F7F7` with `#171717` glyphs, dark title bar `#1A1A1A`
-   (JPEG of `#191919`) with `#E4E4E4` glyphs, overlay strip identical to the title bar in
-   both themes, and a dark profile restarts dark from `ready-to-show`. Fixing the
-   comparison exposed a real gap: the login screen has no title bar, so the controls sat
-   on `#111111`/`#EDEDED` — about 8/255 off the overlay colour, a faint but visible
-   rectangle in the corner. `.wx-login::before` now paints a 60 px `--wx-bg-list` strip
-   with a divider (same as the shell), which also gives the login window its **only drag
-   region** (it could not be moved before logging in).
-   *Superseded by the WeChat UI pass*: the overlay is now 32 px and rail-coloured
-   (`#e0e0e0` / `#2d2d2e`), and the same strip is 32 px — see `docs/UI-HANDOFF.md` §2.
-   The dark/light verification itself still holds.
-   *Superseded again 2026-11-18*: the login flow moved into its own frameless window
-   (`main/login-window.ts`), which draws its own ×/gear and has no native overlay.
-2. ~~**`ui.db` scroll-anchor wiring**~~ — **done** with the decided UX ("restore only when
-   the reader was not at the bottom"):
-   - `MessageList` measures the first visible `.wx-message-slot` (id + offset relative to
-     the viewport top, which may be negative) on scroll and sends `ui:saveAnchor`. At the
-     bottom (≤ 40 px) it sends `messageId: null`, which is what makes a reopen land on the
-     newest message.
-   - **Save-path correction (real-account bug)**: the position a reader left a chat at was
-     often never written, so a reopened app restored an older anchor. Two causes, both in
-     `MessageList`: the save was a single 250 ms debounce that *re-measured* inside the
-     timer and bailed whenever a history page was in flight (the common case while reading
-     up), and the "write on unmount" net was dead code — React nulls `scrollRef.current`
-     before passive cleanups run, so it measured nothing. Now the first scroll of a burst is
-     written immediately, later ones collapse into one trailing write, the last measurement
-     is kept in `latestAnchorRef` and flushed on unmount without touching the DOM, prepend
-     compensation no longer suppresses saving (only `restoringRef`/`programmaticRef` do), and
-     a hung `messages:history` is capped at 15 s so it cannot wedge paging. Verified on the
-     real account: scroll → close the app within the same second → `ui.db` holds the new
-     position, and the next start restores exactly that row.
-   - `ChatPane` resolves `ui:getAnchor` **before** mounting the list (a cached chat would
-     otherwise capture its position at the bottom and miss the restore), pages back up to
-     6 pages / 10 s until the anchor message is loaded, and passes it down as
-     `initialAnchor`.
-   - `MessageList` restores with `scrollToIndex` + correction against the anchor row's DOM
-     node (the virtualizer only estimates row heights), then reveals itself.
-   Verified with the mock adapter (Electron, `-NoSandbox -Mock`): chat switch restores the
-   exact row, a full app restart restores it from `ui.db`, a seeded deep anchor (#4771,
-   4 pages behind) paged back automatically, and scrolling to the bottom cleared the row
-   (`scroll_anchor_id = NULL`).
-   **Load-around (2026-11-18, replaces the page budget)**: when the saved row or the
-   unread boundary is older than the newest page, `useChatHistory` asks for a window
-   *around* it (`messages:around`): the adapter merges an older page (the existing
-   top-up pager), `getMessage` for the anchor (getChatHistory is exclusive) and a
-   *negative-offset* `getChatHistory` for the newer half (Spike 2 §2.3). The window
-   therefore stops short of the newest message; `hasNewer` says so. Live arrivals are
-   queued instead of spliced under the window's last row, reaching the window end
-   appends `messages:newer`, and the buoy / every send path replace the window with
-   the newest page before acting. The 6-page / 10 s budget and its "anchor is dropped,
-   chat opens at the bottom" failure are gone. Unit-tested (actions, reducers, store);
-   the real-account pass for a 5 000-message-deep anchor is still pending.
-3. ~~**W3 scope**: media send/receive, sticker renderer, day separators, unread
-   divider, sticker panel.~~ **Main body done**; what is left from W3 and what W3
-   deliberately did not include:
-   - **WebM stickers** are implemented (`<video>` + offscreen pause) but no fixture
-     exercises them: this machine has no VP8 encoder (ffmpeg absent) and the mock only
-     generates WebP/TGS. Verify with a real account or a recorded `.webm` sticker.
-   - ~~**Custom emoji** *entities inside text* still render as their base glyph~~ —
-     **done 2026-11-20**: `stickers:customEmoji` (`getCustomEmojiStickers`), batched
-     lookups cached in `renderer/lib/customEmoji.ts`, drawn by `components/CustomEmoji`
-     at 20 px inside 14 px text with the glyph as the fallback. A message that is one
-     custom emoji is not part of this path: TDLib reports it as `messageAnimatedEmoji`
-     and it already renders as its sticker (kind 'emoji').
-   - Media is sent immediately after the picker; no caption dialog and no album
-     *sending* (received albums are grouped into one bubble now, design doc §8.6),
-     no drag & drop / paste. Captions are supported end-to-end in the adapter
-     (`media:send` takes `caption`), just not surfaced in the UI yet.
-   - ~~Voice notes play, but there is no recording~~ — **done 2026-11-22**: the
-     renderer records 按住 说话 with WebCodecs Opus and muxes OGG itself
-     (`renderer/lib/voice/`), main materialises the bytes under `userData/voice`
-     and TDLib sends `inputMessageVoiceNote`. The waveform is still decorative
-     (and sent empty, see `docs/PRIVATE-CHAT-HANDOFF.md` §6.1). The mock/Electron
-     pass is done (fake media device) — see "Private-chat P1 batch" above; the
-     test-DC write is still pending.
-   - Download cache is TDLib's own file cache; the `media_cache` LRU table from §5.2 is
-     still unused, so nothing bounds the disk usage yet.
-   - Sticker panel only lists regular installed sets; no search/trending, no "recent".
-     A set cover whose thumbnail is MPEG4 would render as a broken `<img>` (rare).
-   - Premium stickers play their effect in messages, but the picker draws no premium
-     mark (the official client does), and sending one without a Premium subscription is
-     left to TDLib's error.
-   - `updateMessageContent`/`updateNewMessage` are mapped, but `updateMessageSendSucceeded`
-     is not handled separately; message ids are server ids already, so it is cosmetic.
-   - ~~Search is W4~~ — **done 2026-11-21**: the chat-list pill is a Telegram-style
-     panel — 聊天 / 频道 tabs, conversation hits (`searchChats`) and real message hits
-     across chats (`searchMessages` with `chat_type_filter`, cursor-paged) — and the
-     聊天信息 panel's 查找聊天内容 runs `search:inChat`. Still missing: the other
-     filter tabs (贴文/图片/视频/链接), 联系人 hits, and archived chats (the search
-     asks `chatListMain` only).
-4. ~~**Channel posts show senderName `未知`**~~ — **done**: `senderChatId` in the DTO,
-   `mapMessage` resolves `messageSenderChat` through the chat-title cache, verified on
-   the real account by the `senderChat` line of `tdlib:smoke`. Mock + preview fixtures
-   grew a channel-post example (chat 5, message 502).
-5. **The installer exists but has never been installed**: `v0.1.0` published
-   `WeGram-0.1.0-x64.exe` from CI (see Release packaging above), and `release/win-unpacked` is
-   verified locally. Nobody has run the installer yet, so these stay unverified: install /
-   uninstall / per-user vs per-machine, code signing (currently skipped — SmartScreen will
-   complain), auto-update (no `publish` config, no `electron-updater` in the app), the
-   sandboxed launch on a clean machine, and the inlined-credentials path end to end (the
-   v0.1.0 artifact predates it, so it still boots the mock adapter).
-6. Minor: the preload bundle is 187 kB because it imports the protocol index (zod). If it
-   matters, split a channels-only entry point.
-7. Minor: `tdlib:smoke` only checks the *first* channel of the chat list for
-   `messageSenderChat`; groups with anonymous admins are not covered by a fixture.
-8. Minor: the login window has no account picker. `切换账号` signs the only session out
-   and returns to the phone form; a multi-account list would need several TDLib sessions,
-   which the adapter does not model.
-9. **UI deltas vs the real client** are catalogued in `docs/UI-HANDOFF.md` §5 (composer
-   toolbar loses the scissors chevron, no pin button, fixed 238 px list, rail sections
-   other than 聊天 only raise a toast, dark rail icon grey untuned). §6 has the ordered
-   follow-ups.
-10. **The chat list is not virtualised.** This account renders **526 rows** at once
-    (measured in the DOM). It is still smooth, but it is the next scaling risk, and the
-    avatar pool only prefetches what it is handed: the 100-chat first page plus whatever
-    arrives through `emitChatUpsert`. A row scrolled into view without an update event
-    keeps its initials until the chat is touched.
-11. ~~**Message-row (sender) avatars are still initials.**~~ **Done** — `UserAvatar`
-    `{ userId, url }`, `Message.senderAvatarUrl` and `evt:avatars`; the adapter caches by
-    user id (`AvatarCache.userUrls`) and resolves through `getUser` → `profile_photo.small`,
-    the same `downloadFile(synchronous)` path chat photos use. Remaining edge: a linked
-    channel's photo in an anonymous-admin post only shows once that chat's own photo is
-    cached (the row then carries it); the open chat's photo is live via `chat.avatarUrl`.
-12. **Popovers keep native scrollbars** (modals, forward list, sticker grid). Only the
-    two long panes use `<OverlayScrollbar>`; converting the rest is mechanical but was
-    not worth the churn while the complaint was the list and the transcript.
-13. **The TDLib QR login has not been confirmed with a real phone.** The link mapping,
-    the local QR encoding, the QR-first UI and the phone fallback are verified with the
-    mock; the `requestQrCodeAuthentication` → scan → ready / 2FA chain and
-    `auth:reset`'s destroy + rebuild still need one real scan (design doc §14). The
-    stored app session was not authorized, so it could not be exercised here.
+## 7. Private chat (1:1): gap audit, API map, status
 
-## Open questions for the product owner
+This section is the audit of 2026-11-22, kept as a status map. Every API name was read from
+the **TDLib 1.8.70 scheme pinned by the installed `prebuilt-tdlib`**, not from memory.
 
-- ~~W3 order: media first or search first?~~ Media + stickers were done first (W3 main
-  body); search followed on 2026-11-21 (global pill + in-panel 查找聊天内容).
-- Scroll-position restore: WeChat restores where you left; we already do that when the
-  reader was not at the bottom. Confirm it should stay.
-- Multi-account stays v2 — confirm nothing in W3/W4 needs it.
+### 7.1 API source of truth
 
-## Session leftovers
+- `apps/desktop/package.json` → `prebuilt-tdlib: 0.1008070.0`; that package's metadata says
+  `tdlib.version: 1.8.70`, `tdlib.commit: c8828d50f5eac2fc7089ce1089d7ce9095c61b5e`.
+- The matching scheme is the authority:
+  [`td_api.tl` @ c8828d5](https://github.com/tdlib/td/blob/c8828d50f5eac2fc7089ce1089d7ce9095c61b5e/td/generate/scheme/td_api.tl).
+  Fetch it to the gitignored `.cache/` and grep instead of trusting memory:
 
-**2026-11-17, scroll-anchor session:** the recorded "short transcript restored a saved anchor
-but counts as not at the bottom" observation is **fixed** — the pin is now derived from
-geometry (`lib/scrollGeometry.ts`) instead of scroll events, and the stale anchor is cleared.
-Fixing it exposed the cached-chat mount race above (cached chats never restored at all),
-which is fixed too. Measured in the mock Electron window, with the CDP helpers in `.cache/`:
-stored `{14958, -46}` on the 5000-message chat restores to `scrollTop 586` /
-`firstVisible 14958 @ -46`; a cached short chat opens at the bottom, drops its anchor
-(`ui:getAnchor → null`) and raises no buoy when a message arrives; growing the viewport until
-the transcript fits re-pins the list (it used to show "↓ 1 条新消息" for a fully visible
-message) and it keeps following new messages; the buoy still appears when genuinely scrolled
-up and its click returns to the bottom. `apps/desktop/src/renderer/src/lib/scrollGeometry.test.ts`
-covers the predicate (5 cases). These changes are committed (`feat(viewer)`, 22039a5),
-together with the viewer window, the read-receipt and eviction fixes above.
-The Electron window used for the walkthrough was closed.
+```powershell
+Invoke-WebRequest -UseBasicParsing `
+  -Uri 'https://raw.githubusercontent.com/tdlib/td/c8828d50f5eac2fc7089ce1089d7ce9095c61b5e/td/generate/scheme/td_api.tl' `
+  -OutFile '.cache/td_api.tl'
+```
 
-**2026-11-17, refactor session:** `pnpm verify` (lint → typecheck → vitest → build) is the
-gate; 137 unit tests, ESLint now enforces the architecture rules, Prettier owns formatting.
-Batch 4 (the `tdlib.ts` split) is done — batch 4a added the explicit
-`MapperContext`, 4b moved the adapter into `telegram/tdlib/` and added 45 mapper tests.
-Remaining work is the split of `mock.ts`, `preview-bridge.ts`, `styles/index.css` and
-`packages/protocol`: see `docs/REFACTOR-HANDOFF.md`.
+- Read the `//@description` block above a constructor, not just the signature. Three examples
+  that move an estimate: `inputVoiceNote` requires Opus in an OGG container;
+  `inputVideoNote` requires MPEG4/H.264 with `length <= 640`;
+  `messageSchedulingStateSendWhenOnline` and `messageSendOptions.effect_id` are private-chat
+  only.
+- If TDLib is upgraded, re-run the audit against the new commit: the seam still typechecks
+  when a field was renamed, because `actions/` talks in `TdObject`.
 
-**Earlier (W3) session:** the Electron window was left running (real adapter, launched
-detached, maximised) so the next session could pick it up; close it with
-`windows close electron.exe` before the next launch, or the single-instance lock silently
-keeps the old bundle.
+### 7.2 Gap inventory
 
-The Vite preview server and the remote-debugged browser windows started during the
-session were closed. `.cache/` keeps logs and is gitignored; it also holds the throwaway
-CDP helpers (`cdp-eval.mjs`, `*-check.js`, `uitest.js`) used to measure the real
-renderer — recreate them from the snippets above if they are gone.
+Legend: P0 daily use · P1 next · P2 later · scope-out decided against. Each row says what
+is actually in the tree today, not what the 2026-11-22 audit found missing.
 
-The UI/real-account changes are **committed** on `main` in four commits on top of
-`a3d9a5f` — the "+" card and brand mark, avatars + overlay scrollbars, the three
-real-account fixes, and this documentation. `pnpm typecheck && pnpm build` were green
-before each of them; the working tree is clean.
+| P | Gap | Status | TDLib 1.8.70 API |
+|---|---|---|---|
+| P0 | Send failure + 重试 | **done** — `sendingState/sendError/canRetry`, ops `sendState`/`replaceId`, `messages:resend`, 未发送 row | `updateMessageSendFailed`/`Succeeded`, `messageSendingStateFailed`, `resendMessages` |
+| P0 | Outgoing typing | **done** — `messages:typing`, `lib/typingPing.ts` | `sendChatAction` + `chatActionTyping`/`chatActionCancel` |
+| P0 | Online / last seen | **done** — `users:status` + `evt:status`, `map/status.ts`, `lib/presence.ts`, header line | `user.status`, `updateUserStatus`, `userStatusOnline/Offline/Recently/LastWeek/LastMonth` |
+| P0 | 删除聊天 / 标为未读 | **done** — `chats:delete`, `chats:setUnread`, `ChatSummary.markedUnread`, row context menu | `deleteChatHistory`, `toggleChatIsMarkedAsUnread` + update |
+| P0 | Notifications / tray | **done (toast/tray unverified here)** — adapter `notification` event, `main/notifications.ts`, `main/tray.ts`, `ui:setActiveChat` suppression | `updateNotification`, `updateNotificationGroup` |
+| P1 | Voice notes | **done** (mock + test DC); waveform empty | `inputMessageVoiceNote` + `inputVoiceNote` + `chatActionRecordingVoiceNote` |
+| P1 | Reactions | **display done**; picker needs the owner | `addMessageReaction`/`removeMessageReaction`/`setMessageReactions`, `getMessageAvailableReactions`, `updateMessageReactions` |
+| P1 | Peer profile card | **done** — card, 共同群聊 list, 聊天信息 face | `getUserFullInfo` (bio, note, `group_in_common_count`, `block_list`), `getGroupsInCommon` |
+| P1 | Block / unblock | **done** (资料卡 加入黑名单 / 取消拉黑) | `setMessageSenderBlockList` (null unblocks), `getBlockedMessageSenders` |
+| P1 | Report chat / message | **done for the API-allowed paths**; a human's only path is the chat action bar (unwired) | `reportChat` (two-phase), `chat.can_be_reported`, `messageProperties.can_report_chat` |
+| P1 | Add/remove contact, 备注 | **done** | `addContact` + `importedContact`, `removeContacts`, `setUserNote` |
+| P1 | Album send | **done** — 2–10 photos, one call | `sendMessageAlbum` (returns `Messages`) |
+| P1 | Caption edit | **done** — menu 编辑 / 编辑说明 | `editMessageCaption` |
+| P1 | Speech-to-text | **done** for received voice notes | `recognizeSpeech` + `can_recognize_speech` + `speech_recognition_result` |
+| P1 | Pinned message bar | **bar done**, product call open (WeChat has no such bar) | `pinChatMessage`/`unpinChatMessage` + `can_be_pinned` |
+| P2 | Location / venue / live location / contact card / poll / dice **sending** | received only (locations flatten to `📍 lat, lon`) | `inputMessageLocation`, `inputMessageLiveLocation`, `inputMessageVenue`, `inputMessageContact`, `inputMessagePoll`, `inputMessageDice` |
+| P2 | Message effects | none | `getMessageEffect` + `messageSendOptions.effect_id` |
+| P2 | Scheduled / silent send | none | `messageSchedulingStateSendAtDate`, `...SendWhenOnline`, `disable_notification` |
+| P2 | Shared media / search filters | text search only | `searchChatMessages(filter: Photo/Video/Document/Url)` |
+| P2 | Archived chats | **done (2026-11-23)** — `chats:list { list: 'archive' }`, `chats:setArchived`, 已归档会话 row + page; **global search still reads the main list** | `chatListArchive`, `addChatToList`, `chat.action_bar.can_unarchive` |
+| P2 | More 举报 entries | chat + message wired; spam banners, photo and reaction reports not | `chatActionBarReportSpam`, `chatActionBarReportAddBlock`, `reportChatPhoto`, `reportMessageReactions` |
+| P2 | Draft cloud sync | local `ui.db` only | `setChatDraftMessage` + `updateChatDraftMessage` |
+| P2 | Multi-select / batch forward / forward-as-copy | one message at a time | `forwardMessages` array + `messageCopyOptions` |
+| P2 | Translate | none | `translateText` |
+| P2 | Chat background / theme | none | `setChatBackground`, `setChatTheme` |
+| P2 | Screenshot / 收藏 | placeholders | `desktopCapturer`; 收藏 can map to Saved Messages |
+| scope-out | 1:1 voice / video calls | header buttons disabled | `createCall` / `acceptCall` / `discardCall` / `updateNewCallSignalingData` (the API **does** exist; the blocker is the media stack) |
+| scope-out | Secret chats | v1 out of scope | `createNewSecretChat` exists; E2E unverified here |
 
-The refactor sessions added nine more commits on top of `395ac19` (`f1d0a9e` the pending
-real-account fixes, then batches 0–3, the doc updates, and batch 4 as two commits).
-`pnpm verify` — not just typecheck + build — was green before each; batch 4 also passed
-`pnpm tdlib:smoke` and a mock Electron pass, and the working tree is clean.
+Notes that move an estimate: **reactions** and **online status** have no WeChat counterpart,
+so they are product decisions as much as engineering ones; **notifications** must come from
+TDLib's notification API or mute/mention rules will be wrong; **round video notes** need
+MPEG4/H.264 ≤ 640 and a capture spike first.
 
-**2026-11-22, settings session:** designed and shipped 设置 batch A (above), plus HTTP
-CONNECT proxy support. Two things in that batch were **not** exercised for real:
+### 7.3 Recipe: adding one send type (the pattern for most P1/P2 items)
 
-- the settings window only ran against the **mock adapter** — a real-account pass is still
-  open for the profile photo, @username and 退出登录 against TDLib;
-- 跟随系统 was clicked in the mock window (light → system → light) but the OS theme was
-  never switched to watch `nativeTheme.on('updated')` fire, and `pingProxy`/`proxy:test`
-  was clicked with the mock's fixed 3 ms answer, not against a real proxy.
+Follow the layers in order; each step is a compile error until the next is done, which is the
+point.
 
-The mock Electron window used for the pass was closed at the end of the session.
+1. **Protocol first** — `packages/protocol/src/channels.ts` (channel + zod request/response)
+   or the domain module it spreads (`chats.ts`, `send.ts`, `poll.ts`, `comment.ts`,
+   `search.ts`, `user.ts`, `voice.ts`, `reaction.ts`). New `Message` fields go in `dto.ts`;
+   when a module starts carrying a second concern, split it instead.
+2. **Adapter seam** — `packages/adapter-contract/src/adapter.ts`: the method and any event;
+   both adapters implement it in the same batch.
+3. **TDLib action** — `main/telegram/tdlib/actions/<domain>.ts`, re-exported from
+   `actions/index.ts` and bound in `tdlib/index.ts` (or `chat-api.ts` / `send-api.ts` /
+   `user-api.ts` for that domain). Outgoing messages start from `message-input.ts`
+   `sendAndMap` plus a content builder next to `mediaContent` / `stickerContent`.
+4. **Mock adapter** — `packages/mock-adapter/src/` (the seam typecheck forces this); keep pure
+   rules in `packages/mock-session` when the preview needs the same behaviour.
+5. **Browser preview** — `renderer/src/lib/preview/index.ts` invoke switch (+ `sends.ts`,
+   `messages.ts`, `chats.ts`), typed against the same protocol.
+6. **Renderer** — composer/menu/panel entry, store op handling (`reducers.ts` `reduceOps`
+   **and** the `pendingOps` replay path in `setHistory`), then the component.
+7. **Tests** — a pure rule gets `lib/*.test.ts`; an action gets the fake-invoke pattern in
+   `tdlib/actions*.test.ts`.
+8. **Docs** — the layer `AGENTS.md` and this file's status table.
+9. **Verify** — `pnpm verify`, then mock Electron for UI and **test DC for any write path**.
+
+For a new event instead: `AdapterEvent` in `adapter.ts`, mapping in
+`telegram/events.ts`, `eventChannels`/`eventSchemas`, a subscriber in `App.tsx`, a store
+slice. Every event is wrapped in `envelope(seq)`.
+
+### 7.4 Corrections to older statements (kept so nobody re-inherits them)
+
+- `docs/技术方案.md` §1 says calls are "not on TDLib's public API". In 1.8.70 the signalling
+  API exists (`createCall`, `acceptCall`, `discardCall`, `callStateReady`,
+  `updateNewCallSignalingData`); the non-goal stands, but the reason is the media stack
+  (WebRTC/SRTP/Opus) and the test burden.
+- The same section's MVP list includes **在线状态** — implemented now (§7.2).
+- The old note "the send-id swap is cosmetic" was wrong: the id changes (§6.1).
+- MVP says media "含相册"; received-album grouping landed long ago, sending landed in P1.
+
+---
+
+## 8. Code organisation: the split and what it enforces
+
+The tree was split on 2026-11-19 so that an agent can read a whole module before editing it.
+The rules live in `CLAUDE.md` ("Agent-maintainable code"); this section records what was done,
+the invariants the moves preserved, and the one batch still pending.
+
+### 8.1 The rules in one paragraph
+
+One file = one reason to change; ~350 lines is normal, **1100 is the hard cap** (ESLint
+`max-lines` with `skipBlankLines` + `skipComments`; imports count, blank and comment-only
+lines do not). A file whose single concern is one indivisible algorithm may exceed the cap —
+only with a top-of-file `/* eslint-disable max-lines -- <the concern> */`, a row in the layer's
+`AGENTS.md` and a design-doc sentence, all in the same change; the split question reopens at
+~700 counted lines. Split by responsibility (keep the import path stable with a directory
+`index`), never by line count; no `utils.ts` dumping grounds. Pure rules leave the component
+and get a test. Comments travel with the code. A split changes no behaviour and no contract,
+one logical batch per commit, `pnpm verify` before each, and the touched layer note plus this
+document are updated in the same batch.
+
+### 8.2 What moved (and where)
+
+| Was | Now |
+|---|---|
+| `telegram/tdlib.ts` (1527) | `tdlib/`: `index` (composition root), `client`, `boot`, `lifecycle`, `avatar-cache`, `updates`, `actions/` (`chats`, `history`, `files`, `send`, `search`, `contacts`, `users`, `message-input`, `errors`, `deps`), `chat-api`, `send-api`, `user-api`, `stickers`, `proxy`, `map/` (`chat`, `message`, `content`, `service`, `media`, `entities`, `buttons`, `rich`, `sticker`, `user`, `status`, `deletion`, `resolvers`) |
+| `renderer/store/useAppStore.ts` (293) | `store/types`, `initialState` (`DATA_DEFAULTS`, the only initial state), `reducers` (`sortChats`/`upsertMessage`/`reduceOps`), `slices/{auth,chats,messages,media,ui}`, `useAppStore` (assembler, import path unchanged) |
+| `MessageList.tsx` (705) | `message-list/index` (composition + render) + `MessageRow`, `Divider`, `useInitialPosition`, `usePrependRestore`, `useAnchorSave`, `useJumpToLatest`, `useLocateScroll`, `useLandingSave`, `useViewportSeen`, `scrollFlags`, `scroller`, `emoji`/`menu`/`unread` (pure) |
+| `ChatPane.tsx` (415) | `chat-pane/index` (render tree + modal state) + `useChatHistory` (+ `history/`: `readFirstPage`, `types`, `useLocateRequest`, `usePrefetchOlder`, `usePaging`), `messageActions` (a factory, not a hook), `ChatHeader`, `ChatInfoPanel/Rows/Dialogs/Search`, `CommentPanel`, `CommentComposer`, `ChannelBar`, `Placeholders`, `labels` |
+| `viewer/MediaViewer.tsx` (586) | `MediaViewer` + `useViewerItem`, `useViewerZoom`, `useViewerNotice`, `ViewerToolbar`, `ViewerGrid`, `viewerActions`, `viewerMenu` (tested) |
+| `ExpressionPicker.tsx` (449) | `ExpressionPicker` + `picker/`: `useStickerSets`, `useActiveStickerSet`, `useRecentEmoji`, `usePickerDismiss`, `EmojiBody`, `SearchBody`, `StickerBody`, `PickerTabs`, `EmojiGrid`, `types` |
+| `Composer.tsx` | `composer/ComposerCard` (the ONE bordered card) + `Composer` (chat send path) + `chat-pane/CommentComposer` (thread send path) |
+| `LoginWindow.tsx` (491) | `LoginWindow` (chrome + bodies) + `login/`: `useLoginFlow`, `QrStep`, `ProfileStep`, `PhoneForm`, `LoginFooter`, `LoginHelp`, `loginCopy` (pure, tested) |
+| `telegram/mock.ts` (1122) | `packages/mock-adapter` (16 files) + `main/telegram/mock/{transcript,effects}` |
+| `lib/preview-bridge.ts` (775) | `lib/preview/` (`index`, `fixtures`, `sends`, `messages`, `chats`) behind a two-line entry point so the dev-only import stays visible |
+| `styles/index.css` (3206) | 14 files under `styles/`, imported in source order (`tokens` first). The compiled CSS came out byte-identical (same hash, 60.32 kB) — that is the check to repeat after any order edit |
+| `protocol/dto.ts` / `channels.ts` at cap | per-domain modules: `settings.ts`, `viewer.ts`, `chats.ts`, `chat.ts`, `comment.ts`, `stickers.ts`, `poll.ts`, `voice.ts`, `user.ts`, `reaction.ts`, `events.ts`, `message-ops.ts`. `index.ts` still exports every type, so no consumer import changed |
+| `mock-fixtures/data.ts` at cap | `seed.ts` (types) + `stress.ts` (the 5000-message chat) |
+| `tdlib/index.ts` at cap | `chat-api.ts` / `send-api.ts` / `user-api.ts`: `createXxxApi` returns a domain's seam methods as one object the class binds as fields, lazily reading `actionDeps` |
+| `MediaBubble.tsx` at cap | `VoiceBubble.tsx` (voice geometry shares nothing with photo/video/file) |
+
+### 8.3 Invariants the split (and the code) must keep
+
+1. **Slices return actions only.** State is seeded from `DATA_DEFAULTS`, so `reset()` cannot
+   forget a field; adding a state field means adding it to `AppData` **and** `DATA_DEFAULTS`.
+2. **`messagesByChat[chatId]` is created only by `setHistory`/`prependHistory`**; ops for a
+   chat without an entry queue in `pendingOps` (read-only batches are skipped by
+   `hasReplayableOps`) and replay in `setHistory`.
+3. **`resyncScroller()` after every programmatic `scrollTop` write** (§6.2).
+4. **Pure helpers stay React-free** so vitest can import them in the node environment (that
+   is why `isEmojiOnly` lives in `emoji.ts`: importing the row pulls `lottie-web`). `menu.ts`
+   imports `MenuItem` with `import type` on purpose.
+5. **`useChatHistory` is called before ChatPane's early return** (hooks order), and
+   `MessageList` must not mount before `anchorKnown`.
+6. `messageActions` is a factory rather than a hook: built only when a chat is active, call
+   sites need no null guards.
+7. **The renderer never sees raw TDLib JSON** and never a filesystem path: map at the adapter
+   boundary, serve media as `wx-media://f/<token>`.
+8. **A new channel goes into the tables**, never a concatenated name; **a new field starts in
+   `dto.ts`**. Every event carries `seq`.
+
+### 8.4 Dedupe and contract passes (done — do not redo)
+
+One-off duplication audits merged the real duplicates and left the look-alikes alone:
+
+- **Merged**: the three `BrowserWindow` factories → `main/app-window.ts`; the mock's
+  "append a message and announce it" (4 copies) → `mock/transcript.ts`; the send envelope +
+  thread resolver → `actions/message-input.ts`; the media field table → `map/media.ts`;
+  "a missing array means empty" (24 sites) → `json.ts asArray`; the newer-messages page →
+  `fetchNewerThan`; avatar boxes (7 copies) → `components/Avatar.tsx`; the search pill + query
+  rule (4 panels) → `SearchField` + `lib/search.ts`; Enter/Shift+Enter/IME →
+  `lib/composerInput.ts` + `useComposerInput`; popup placement → `lib/popupPlacement.ts` +
+  `AnchoredPopup`; the reserved media box → `lib/mediaBox.ts`; the signed-in identity →
+  `lib/self.ts`; calendar-day maths → `lib/format.ts calendarDaysAgo`; the fake session's
+  rules → `@wegram/mock-session`; the demo account (two drifted copies) →
+  `@wegram/mock-fixtures`.
+- **Contracts written once**: invoke request shapes (one zod schema; `IpcHandlerMap` typed by
+  `InvokeResponse<C>`, the only cast left is the channel loop in `router.ts`); the comment
+  contract → `protocol/comment.ts`; `AppErrorCode` → `appErrorCodeSchema` + `z.infer`;
+  `EventBus.publish` typed by event channel; row height 65 and the 250 ms panel slide →
+  `lib/listMetrics.ts` / `lib/comments.ts` pinned by `scripts/style-contract.test.ts`; the
+  recent-emoji limit, sticker-format enum, viewer bound and unread types each to one place.
+- **Deliberately not merged** (they only look duplicated): the two `TelegramAdapter`
+  implementations; the seam's forwarding chain; `store/settings.ts` vs `store/ui-db.ts` and
+  the three proxy modules (different formats by rule); the two `map/*` dispatch switches;
+  `setError(errorMessage(e))` at ~28 sites (where an error goes depends on the call site);
+  per-panel skeletons and CSS blocks (`wx-*` is a measured contract); the preview's invoke
+  switch vs `main/ipc/handlers.ts` (handlers need Electron, the preview may not import main).
+- Removing the casts found a real defect: `ui:saveDraft` declared an `entities` field nobody
+  sent or kept — deleted.
+
+### 8.5 Pending and not-to-do
+
+- **Pending**: `packages/protocol` is the one batch from the original plan still open (split by
+  domain with an identical export surface, because preload bundles the index). Partially done
+  already (§8.2). Measured now: no non-exempt file exceeds ~393 counted lines, so it is
+  housekeeping, not an emergency.
+- **Not done, on purpose**: `mock/index.ts` and the generated `WechatIcons.tsx` are the two
+  genuinely large files; the mock adapter and the renderer's preview bridge are still imported
+  statically (excluding fixtures from a release would be a build-time change covering both
+  sides at once).
+- **Do not**, while refactoring: change IPC channel names, DTO field names, `wx-*` class names
+  or the `wx-media://f/<token>` scheme; rewrite a scroll algorithm while moving it (the 250 ms
+  save window, 150/400 ms re-stick, 700/1000 ms reveal nets and the 15 s load cap are
+  load-bearing); add a DOM test environment without deciding it explicitly (the node-only
+  suite is intentional — the real bugs are timing and measurement bugs jsdom cannot
+  reproduce); bypass `pnpm verify` when reporting a change as done.
+- Traps that cost an hour: zustand v5 `StateCreator` takes **three** arguments
+  (`slice(set, get, api)`); a node-env test importing any `.tsx` that reaches media/lottie
+  drags the whole stack in; `pnpm format` must not reach `spikes/` or `*.md`
+  (`.prettierignore`); closing the launcher's console kills the app (minimise it).
+
+---
+
+## 9. Known gaps and next steps
+
+### 9.1 Verification debt (highest value — close these before building more)
+
+1. **Test-DC writes.** Everything in §7 that writes was compile- and mock-verified only:
+   `sendMessageAlbum`, `pinChatMessage`, `setUserNote`, `setMessageSenderBlockList`,
+   `reportChat`, `editMessageCaption`, `recognizeSpeech`, `addContact`, `removeContacts`,
+   `getGroupsInCommon`, plus `sendChatAction`/`resendMessages`/`deleteChatHistory`/
+   `toggleChatIsMarkedAsUnread`. `scripts/tdlib-test-dc.ts` has the probe steps; run it with
+   the app closed on an authorized test session. `inputMessageVoiceNote` is the one write
+   confirmed there.
+2. **The TDLib QR login with a real phone** — link mapping, encoding, QR-first UI and the
+   phone fallback are mock-verified; the `requestQrCodeAuthentication` → scan → ready / 2FA
+   chain and `auth:reset`'s rebuild need one real scan (design doc §14).
+3. **Windows toasts and the tray icon** on this machine (no Start-Menu shortcut for an
+   unpackaged build; `Shell_NotifyIcon` refused in the agent session). `createTray` logs and
+   carries on, so neither failure can stop the app.
+4. **The installer** — install / uninstall / per-user vs per-machine, code signing (currently
+   skipped, SmartScreen will complain), auto-update (no `publish` config, no
+   `electron-updater`), the sandboxed launch on a clean machine, and the inlined-credentials
+   path end to end (v0.1.0 predates it and still boots the mock).
+5. **Settings batch A against a real account**: profile photo, @username, 退出登录; and
+   `nativeTheme.on('updated')` with the OS theme actually switching; `pingProxy` against a
+   real proxy instead of the mock's fixed 3 ms.
+6. **The real-account pass for a 5 000-message-deep anchor** (the load-around path is
+   unit-tested only) and the 群二维码 window in its real Electron form.
+7. **A real microphone** for voice notes (only the fake device was measured), and Electron 45's
+   `AudioEncoder` opus support (measured on Edge 157 only).
+
+### 9.2 Functional gaps, in a sensible order
+
+| # | Gap | Notes |
+|---|---|---|
+| 1 | Virtualise the chat list | **526 rows** render at once on this account (measured). Smooth today, the next scaling risk; the avatar pool only prefetches what it is handed (100-chat first page + `emitChatUpsert`), so a row scrolled into view without an update keeps its initials |
+| 2 | Reactions picker | display is done; WeChat has no reactions, so it needs the owner's sign-off (§9.3) |
+| 3 | Settings batches B and C | B: 消息通知 scope, six 隐私 rules + 黑名单, 登录设备, 存储统计/清理, 自动下载, 消息字号, 开机自启. C: 两步验证, 本地锁, 全局快捷键, 检查更新, 保存目录, 贴纸管理, 恢复默认. Each adds panels to the same nav table; prefer per-domain channels over growing `settings:set`. 清理缓存 must invalidate `media/registry.ts` tokens or bubbles keep retrying deleted files |
+| 4 | Private-chat P2 list | translate (`translateText`), scheduled/silent send, shared-media tabs, draft cloud sync, multi-select forward, location/contact/poll sending, message effects, chat background, screenshot, 收藏 → Saved Messages |
+| 5 | Search depth | missing 应用/贴文/图片/视频/音频/链接 filters, 联系人 hits, archived chats (global search still reads `chatListMain`) |
+| 6 | Viewer breadth | no 编辑, no AI block, no 查看原视频, no pin button anywhere |
+| 7 | Composer parity | the 收藏 cube and 剪刀 (screenshot) still toast; the ＋ card's three entries are unwired; no drag & drop / paste; captions are supported by the adapter (`media:send` takes `caption`) but not surfaced at send time |
+| 8 | Chat info follow-ups | a member card on avatar click; a local 备注 (Telegram's is cloud-synced now); a chat-wide in-chat search view (the panel's 查找聊天内容 hosts it today) |
+| 9 | Storage bounds | downloads are TDLib's own cache; the `media_cache` LRU table is still unused, so nothing bounds disk usage |
+| 10 | Sticker breadth | panel lists regular installed sets only (no search/trending/recent); a set cover whose thumbnail is MPEG4 would render as a broken `<img>`; no premium mark in the picker; sending a premium pack without a subscription is left to TDLib's error |
+| 11 | WebM fixtures | `<video>` stickers are implemented but no fixture exercises them (no VP8 encoder here, ffmpeg absent) |
+| 12 | Preload size | 187 kB because it imports the protocol index (zod); splitting a channels-only entry point would fix it |
+| 13 | Popovers | modals, the forward list and the sticker grid still use native thin scrollbars; converting to `<OverlayScrollbar>` is mechanical |
+| 14 | `tdlib:smoke` coverage | it checks only the first channel for `messageSenderChat`; anonymous-admin groups have no fixture |
+
+### 9.3 Open product decisions
+
+1. **Scroll-position restore** — WeChat restores where you left; we do it when the reader was
+   not at the bottom. Confirm it stays.
+2. **Reactions** — display only, or let the user add them? (DTO work is needed either way.)
+3. **Online status placement** — WeChat has no slot; the header second line was chosen, confirm
+   it, or move it to the profile card only.
+4. **Notifications** — all messages or unmuted only? Sender + preview text (privacy) or just
+   新消息? Currently TDLib's stream with title + preview.
+5. **删除聊天** — confirm "local removal only" (`deleteChatHistory`), never "for everyone".
+6. **Pinned-message bar** — WeChat has none; the bar is built and unreviewed.
+7. **Calls / secret chats** — stay out of v1; only the wording of the reason changes (§7.4).
+8. **Multi-account** — v2; the session dir is already shaped `tdlib/<accountId>/`, and the
+   adapter does not model it (the login window has no account picker).
+
+### 9.4 Housekeeping
+
+- `AGENTS.md` is a **symlink** to `CLAUDE.md` stored as mode `120000`; this machine cannot
+  create symlinks without admin/Developer Mode, so `core.symlinks=false` is in effect — a
+  `git checkout`/`git restore` of that path would replace the link with a one-line text file
+  containing `CLAUDE.md`. Recreate it with `New-Item -ItemType SymbolicLink` from an elevated
+  shell.
+- The root commit (`262996a`) was made with `commit.gpgsign=false` because gpg could not reach
+  `keyboxd` from the agent shell; signing works in a normal terminal
+  (`git commit --amend -S --no-edit` if signed history matters).
+- `.gitignore` covers `.env*`, `node_modules`, `out`, `.cache`, `spikes/*/data`;
+  `.gitattributes` pins `eol=lf` so `core.autocrlf=true` cannot rewrite the tree.
+- `.cache/` keeps logs and throwaway CDP helpers (`cdp-eval.mjs`, `*-check.js`, `uitest.js`) —
+  recreate them from §3.5 if they are gone.
+- The root `package.json` is the only place a version is written; `pnpm sync-version` copies it
+  to `apps/desktop` and `packages/protocol`, and `check:version` is the first step of
+  `pnpm verify`.
+- **Release procedure**: bump the root version and `git push` to `main` — the workflow reads the
+  version, and if `v<version>` does not exist it builds the NSIS installer once, creates the tag
+  and publishes the Release (the same version pushed again is skipped). A `v*` tag push or a
+  manual run still works and refreshes that release's assets. Two repository secrets are
+  required (`TELEGRAM_API_ID`, `TELEGRAM_API_HASH`); `electron.vite.config.ts` inlines them into
+  the **main bundle only**.
+
+---
+
+## Appendix A — TDLib 1.8.70 signatures cited here
+
+```text
+sendMessage chat_id:int53 topic_id:MessageTopic reply_to:InputMessageReplyTo options:messageSendOptions reply_markup:ReplyMarkup input_message_content:InputMessageContent = Message;
+sendMessageAlbum chat_id:int53 topic_id:MessageTopic reply_to:InputMessageReplyTo options:messageSendOptions input_message_contents:vector<InputMessageContent> = Messages;
+forwardMessages chat_id:int53 topic_id:MessageTopic from_chat_id:int53 message_ids:vector<int53> options:messageSendOptions send_copy:Bool remove_caption:Bool = Messages;
+resendMessages chat_id:int53 message_ids:vector<int53> quote:inputTextQuote paid_message_star_count:int53 = Messages;
+updateMessageSendSucceeded message:message old_message_id:int53 = Update;
+updateMessageSendFailed message:message old_message_id:int53 error:error = Update;
+messageSendingStateFailed error:error can_retry:Bool need_another_sender:Bool need_another_reply_quote:Bool need_drop_reply:Bool required_paid_message_star_count:int53 retry_after:double = MessageSendingState;
+
+sendChatAction chat_id:int53 topic_id:MessageTopic business_connection_id:string action:ChatAction = Ok;
+chatActionTyping = ChatAction;
+chatActionRecordingVoiceNote = ChatAction;
+chatActionRecordingVideoNote = ChatAction;
+
+inputMessageVoiceNote voice_note:inputVoiceNote caption:formattedText self_destruct_type:MessageSelfDestructType = InputMessageContent;
+inputVoiceNote voice_note:InputFile duration:int32 waveform:bytes = InputVoiceNote;
+inputMessageVideoNote video_note:inputVideoNote self_destruct_type:MessageSelfDestructType = InputMessageContent;
+inputVideoNote video_note:InputFile thumbnail:inputThumbnail duration:int32 length:int32 = InputVideoNote;
+inputMessageLocation location:location = InputMessageContent;
+inputMessageLiveLocation location:liveLocation = InputMessageContent;
+inputMessageVenue venue:venue = InputMessageContent;
+inputMessageContact contact:contact = InputMessageContent;
+inputMessagePoll question:formattedText options:vector<inputPollOption> description:formattedText media:InputPollMedia is_anonymous:Bool allows_multiple_answers:Bool allows_revoting:Bool members_only:Bool country_codes:vector<string> shuffle_options:Bool hide_results_until_closes:Bool type:InputPollType open_period:int32 close_date:int32 is_closed:Bool = InputMessageContent;
+inputMessageDice emoji:string clear_draft:Bool = InputMessageContent;
+
+messageSendOptions suggested_post_info:inputSuggestedPostInfo disable_notification:Bool from_background:Bool protect_content:Bool allow_paid_broadcast:Bool paid_message_star_count:int53 update_order_of_installed_sticker_sets:Bool scheduling_state:MessageSchedulingState effect_id:int64 sending_id:int32 only_preview:Bool = MessageSendOptions;
+messageSchedulingStateSendAtDate send_date:int32 repeat_period:int32 = MessageSchedulingState;
+messageSchedulingStateSendWhenOnline = MessageSchedulingState;
+
+updateUserStatus user_id:int53 status:UserStatus = Update;
+userStatusOnline expires:int32 = UserStatus;
+userStatusOffline was_online:int32 = UserStatus;
+userStatusRecently by_my_privacy_settings:Bool = UserStatus;
+userStatusLastWeek by_my_privacy_settings:Bool = UserStatus;
+userStatusLastMonth by_my_privacy_settings:Bool = UserStatus;
+
+deleteChatHistory chat_id:int53 remove_from_chat_list:Bool revoke:Bool = Ok;
+deleteChat chat_id:int53 = Ok;
+toggleChatIsMarkedAsUnread chat_id:int53 is_marked_as_unread:Bool = Ok;
+updateChatIsMarkedAsUnread chat_id:int53 is_marked_as_unread:Bool = Update;
+pinChatMessage chat_id:int53 message_id:int53 disable_notification:Bool only_for_self:Bool = Ok;
+unpinChatMessage chat_id:int53 message_id:int53 = Ok;
+getChatPinnedMessage chat_id:int53 = Message;
+setChatDraftMessage chat_id:int53 topic_id:MessageTopic draft_message:draftMessage = Ok;
+updateChatDraftMessage chat_id:int53 draft_message:draftMessage positions:vector<chatPosition> = Update;
+
+addMessageReaction chat_id:int53 message_id:int53 reaction_type:ReactionType is_big:Bool update_recent_reactions:Bool = Ok;
+removeMessageReaction chat_id:int53 message_id:int53 reaction_type:ReactionType = Ok;
+setMessageReactions chat_id:int53 message_id:int53 reaction_types:vector<ReactionType> is_big:Bool = Ok;
+getMessageAvailableReactions chat_id:int53 message_id:int53 row_size:int32 = AvailableReactions;
+updateMessageReactions chat_id:int53 message_id:int53 date:int32 reactions:vector<messageReaction> = Update;
+
+getUserFullInfo user_id:int53 = UserFullInfo;
+getGroupsInCommon user_id:int53 offset_chat_id:int53 limit:int32 = Chats;
+setUserNote user_id:int53 note:formattedText = Ok;
+setMessageSenderBlockList sender_id:MessageSender block_list:BlockList = Ok;
+getBlockedMessageSenders block_list:BlockList offset:int32 limit:int32 = MessageSenders;
+reportChat chat_id:int53 option_id:bytes message_ids:vector<int53> text:string = ReportChatResult;
+addContact user_id:int53 contact:importedContact share_phone_number:Bool = Ok;
+removeContacts user_ids:vector<int53> = Ok;
+importedContact phone_number:string first_name:string last_name:string note:formattedText = ImportedContact;
+
+searchChatMessages chat_id:int53 topic_id:MessageTopic query:string sender_id:MessageSender from_message_id:int53 offset:int32 limit:int32 filter:SearchMessagesFilter = FoundChatMessages;
+editMessageCaption chat_id:int53 message_id:int53 reply_markup:ReplyMarkup caption:formattedText show_caption_above_media:Bool = Message;
+translateText text:formattedText to_language_code:string tone:string = FormattedText;
+recognizeSpeech chat_id:int53 message_id:int53 = Ok;
+getMessageEffect effect_id:int64 = MessageEffect;
+
+createCall user_id:int53 protocol:callProtocol is_video:Bool = CallId;
+acceptCall call_id:int32 protocol:callProtocol = Ok;
+discardCall call_id:int32 is_disconnected:Bool invite_link:string duration:int32 is_video:Bool connection_id:int64 = Ok;
+updateNewCallSignalingData call_id:int32 data:bytes = Update;
+createNewSecretChat user_id:int53 = Chat;
+```
+
+If a line here disagrees with `.cache/td_api.tl`, the scheme wins.
+
+---
+
+## Appendix B — dated history (what shipped when)
+
+The commit log is the source of truth; this is the short version, for judging how fresh a
+claim is. Nothing here replaces §1 (state) or §9 (gaps).
+
+**2026-11-17 — import and first design pass**
+- W1 (shell, protocol, mock, TDLib adapter, proxy, login page), W2 (virtualised list, anchored
+  paging, send/reply/edit/delete/forward, drafts, `ui.db`) and the W3 main body (media,
+  stickers, entity rendering, day/unread separators, read receipts, typing) were in.
+- Image viewer window (75 %×90 %, toolbar, 预览 column), titleBarOverlay theming, dark overlay
+  verified, `ui.db` scroll-anchor wiring + load-around, then the refactor batches 0–4
+  (`pnpm verify`, ESLint-enforced architecture, 132→322 tests).
+- Repository created; root commit `262996a`; `eol=lf` pinned.
+
+**2026-11-18 — WeChat 4.x UI pass**
+- Tokens and metrics measured with PIL, `TitleBar.tsx` deleted (native overlay), WeChat icons
+  extracted from `Weixin.dll`, rail/list/pane structure rebuilt.
+- Login became its own 280×373 window with the QR step; dark palette re-measured with
+  `PrintWindow`; load-around replaced the 6-page anchor budget.
+- Real-account pass behind the SOCKS proxy surfaced three defects (empty groups, lying
+  `hasMore`, frozen visibility gate) — all fixed; profile photos and overlay scrollbars landed.
+
+**2026-11-19 — refactor P0/P1, contacts, richer messages**
+- Viewer/picker/composer/login/message-list/chat-pane/mock splits; preview and styles splits;
+  `main/windows.ts`; `max-lines` enforced.
+- 通讯录 (address book, pinyin initials, contact card), sender photos (`evt:avatars`),
+  custom emoji, the `covers` tab-icon rule, older-page prefetch, the 5000-message fixture.
+
+**2026-11-20 — comments, packages, dedupe**
+- Message comments (bar → Telegram discussion view, join-to-send, per-thread anchor),
+  `@wegram/mock-adapter` + `@wegram/adapter-contract` extracted, dedupe and contract passes,
+  premium sticker effects, animated-emoji messages, custom emoji entities.
+- Test-DC account created through Telegram Desktop beta (the reserved numbers are dead);
+  send → edit → photo → delete proven; the send-id swap measured.
+
+**2026-11-21 — composer card, chat info, search, polls**
+- `ComposerCard` shared by the chat and the comment thread; 聊天信息 panel (overlay, private /
+  group / channel), 群二维码 window, 未加入频道的底栏.
+- Global search (聊天/频道, conversations + messages, cursor paging), polls, clickable
+  mentions, in-app `t.me`/`tg://` links, archive-less chat list.
+
+**2026-11-22 — settings, proxy, private chat**
+- 设置 batch A as its own window; HTTP CONNECT proxy; 跟随系统代理 as the default with probe +
+  retry.
+- Private-chat P0 (typing, mark-unread, delete chat + context menu, send failure/retry,
+  presence, notifications + tray) and P1 (albums, pinned bar, speech-to-text, reaction
+  display, block/report, profile card, caption edit, voice notes with an in-repo OGG muxer).
+- `max-lines` moved to 1100 with `skipBlankLines`/`skipComments`; measured 48 768 raw lines =
+  34 724 code + 8 184 comment + 3 902 blank + 1 958 import across 437 ts/tsx files.
+
+**2026-11-23 — archive, sticker budget, this consolidation**
+- Archived chats (`chats:list { list: 'archive' }`, `chats:setArchived`, the 已归档会话 row and
+  page).
+- The animated-cell budget (ThorVG canvas, 30 fps, savedFrame, two-screen parse window) and
+  the 贴纸包盒子 (464 × 558, 5-column grid).
+- The four handoff documents were consolidated into this one.
+
+
+
 

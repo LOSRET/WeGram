@@ -62,7 +62,7 @@
    an unread badge of at least "1" however often it was opened, while the official
    client cleared it on the first click. The first page must anchor on
    `last_message.id + 1`, and read marking must use `getChat`'s `last_message.id`
-   directly. See `docs/HANDOFF.md` → "Non-obvious facts".
+   directly. See `docs/HANDOFF.md` §6.1.
 
 ## 对项目的四个前置结论(打包阶段务必照做)
 

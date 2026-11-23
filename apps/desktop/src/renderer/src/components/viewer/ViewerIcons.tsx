@@ -6,7 +6,7 @@ import type { ReactNode, SVGProps } from 'react'
  * Eight of the nine toolbar glyphs are the client's own artwork: the payloads were
  * cut out of `Weixin.dll` with the §3 pipeline (byte-scan `<svg`, then match the
  * live window's glyphs against every payload). The component → payload table lives
- * in `docs/UI-HANDOFF.md` §3.1, so a client update only needs a re-run of that
+ * in `docs/HANDOFF.md` §5.12, so a client update only needs a re-run of that
  * table, not new tracing.
  *
  * Two groups are traces, because this build has no payload for them: 预览

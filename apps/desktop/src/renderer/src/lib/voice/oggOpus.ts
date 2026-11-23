@@ -3,7 +3,7 @@
  *
  * TDLib accepts a voice note only as Opus inside an OGG container, and Chromium
  * cannot record OGG (its `MediaRecorder` emits WebM or MP4 — see
- * `docs/PRIVATE-CHAT-HANDOFF.md` §10b). The way out without a new dependency is
+ * `docs/HANDOFF.md` §6.7). The way out without a new dependency is
  * WebCodecs: `AudioEncoder` hands over the raw Opus packets, and this module
  * writes the container around them — the two header pages (OpusHead, OpusTags)
  * and the audio pages with their granule positions.

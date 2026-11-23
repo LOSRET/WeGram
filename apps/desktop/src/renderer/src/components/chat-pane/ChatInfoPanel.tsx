@@ -44,7 +44,7 @@ interface ChatInfoPanelProps {
  * 群聊名称 / 群公告 (Telegram's pinned message), 群二维码 (the invite link),
  * 查找聊天内容, the mute/pin pair, 清空聊天记录 and 退出群聊. Rows WeChat has and
  * Telegram does not — 备注, 我在本群的昵称, 保存到通讯录, 显示群成员昵称 — are
- * deliberately absent (see docs/UI-HANDOFF.md §5).
+ * deliberately absent (see docs/HANDOFF.md §5.13).
  *
  * A channel reuses that layout. Its member grid is drawn only for an
  * administrator: TDLib hands a channel's subscriber list to nobody else, so the

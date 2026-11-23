@@ -10,7 +10,7 @@
 
 ## What this is
 
-WeGram is a personal Telegram desktop client: Telegram's official TDLib (`tdl` + `prebuilt-tdlib`) behind an Electron shell, dressed in the WeChat 4.x look. Every token and metric in the UI — rail and list widths, row height, bubble colours, radii, icons — was measured off the real WeChat client on this machine (see `docs/UI-HANDOFF.md`); none of it is guessed.
+WeGram is a personal Telegram desktop client: Telegram's official TDLib (`tdl` + `prebuilt-tdlib`) behind an Electron shell, dressed in the WeChat 4.x look. Every token and metric in the UI — rail and list widths, row height, bubble colours, radii, icons — was measured off the real WeChat client on this machine (see `docs/HANDOFF.md` §5); none of it is guessed.
 
 You sign in with your own account and see your real chats, groups and channels. It is not a demo shell.
 
@@ -171,9 +171,7 @@ Logs land in `.cache\app.log`.
 | File | Contents |
 | --- | --- |
 | `docs/技术方案.md` | Authoritative design (Chinese): choices, architecture, per-module decisions |
-| `docs/HANDOFF.md` | Current state, hard rules, measured surprises, next steps |
-| `docs/UI-HANDOFF.md` | WeChat 4.x tokens and metrics (measured), icon provenance, known deltas |
-| `docs/REFACTOR-HANDOFF.md` | File split, mechanically enforced conventions, pending batches |
+| `docs/HANDOFF.md` | The one handoff: current state, hard rules, environment and commands, architecture map, the measured WeChat 4.x tokens/metrics and icon provenance, measured pitfalls, the private-chat gap/API map, the code-split conventions, next steps |
 | `spikes/tdlib/RESULTS.md` | Measured TDLib behaviour on Windows (packaging constraints) |
 | `CLAUDE.md` / `AGENTS.md` | Coding standards and architecture red lines |
 

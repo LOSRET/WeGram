@@ -4,7 +4,7 @@
    The window is frameless and paints its own chrome: no card, no backdrop, no
    drop shadow (those belong to the window and the DWM). Both columns run the full
    height; the top 40 px is the grab strip. Every colour is a token — the measured
-   values live in docs/UI-HANDOFF.md §2.10.
+   values live in docs/HANDOFF.md §5.10.
    ========================================================================== */
 
 .wx-settings {

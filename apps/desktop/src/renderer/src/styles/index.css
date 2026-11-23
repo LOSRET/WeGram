@@ -10,7 +10,7 @@
    and nothing else.
 
    `wx-*` class names and `--wx-*` tokens are a measured contract (see the
-   tokens header and docs/UI-HANDOFF.md): do not rename one, do not hard-code a
+   tokens header and docs/HANDOFF.md §5.2): do not rename one, do not hard-code a
    colour.
    ========================================================================== */
 

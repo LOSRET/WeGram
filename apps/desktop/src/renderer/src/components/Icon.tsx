@@ -363,7 +363,7 @@ export function MomentsTabFilledIcon({ size = 24, ...rest }: IconProps) {
  * Transcript "跳转到最新消息" pill: the double chevron WeChat draws at its left.
  *
  * Hand-drawn (the Weixin.dll payload manifest has no recoverable name→glyph map,
- * see `docs/UI-HANDOFF.md` §3) from the client's own pill: two round-capped
+ * see `docs/HANDOFF.md` §5.12) from the client's own pill: two round-capped
  * chevrons, ~15 × 7 px each, ~3 px apart, stroke ≈ 1.7 px.
  */
 export function JumpToLatestIcon({ size = 14, ...rest }: IconProps) {
@@ -398,7 +398,7 @@ export function JumpToLatestIcon({ size = 14, ...rest }: IconProps) {
 /**
  * Login-window title strip: the gear that opens 设置 · 代理. The client's gear is a
  * thin 1.2 px cog; the embedded-payload manifest has no name→glyph mapping (see
- * `docs/UI-HANDOFF.md` §3), so this is a hand-drawn approximation — ring, eight
+ * `docs/HANDOFF.md` §5.12), so this is a hand-drawn approximation — ring, eight
  * teeth and the hub — at the same weight.
  */
 export function SettingsGearIcon({ size = 14, ...rest }: IconProps) {

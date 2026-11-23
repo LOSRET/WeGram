@@ -1,7 +1,8 @@
 # AGENTS.md — apps/desktop/src/renderer
 
 Scope: the React 19 + Tailwind v4 UI. Read the root `../../../../CLAUDE.md`, then
-`docs/UI-HANDOFF.md` for the WeChat metrics this UI was built against. This file
+`docs/HANDOFF.md` §5 for the WeChat metrics this UI was built against and §6 for the
+renderer pitfalls. This file
 only adds what is specific to this layer.
 
 ## Layering
@@ -102,8 +103,8 @@ components/Avatar.tsx    the ONE avatar box (photo or initials); the box class i
                         is the positioned element, which is the rule that once cost a session
 components/CustomEmoji.tsx  a Premium custom emoji in text: its sticker art at 20 px,
                         with the base glyph as the fallback
-components/ChatList.tsx  the conversation column: pill (server search panel, §2.9 of
-                        UI-HANDOFF), "+" and the virtualised rows; search results are a
+components/ChatList.tsx  the conversation column: pill (server search panel, §5.9 of
+                        HANDOFF), "+" and the virtualised rows; search results are a
                         plain face in the same scroller (tabs + message rows). 已归档会话
                         is a PAGE, not a third face: ArchiveEntry (the row above the
                         scroller, with the archive's unread total) mounts
@@ -336,7 +337,7 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   Chromium gives native bars a layout gutter, so rows re-flow when the bar
   appears. Popovers keep native thin bars on purpose.
 - **`wx-*` class names and the `--wx-*` tokens are a measured contract** (see
-  `styles/index.css` header and `docs/UI-HANDOFF.md`). Do not rename a class, and
+  `styles/index.css` header and `docs/HANDOFF.md` §5.2). Do not rename a class, and
   do not hard-code a colour — every colour comes from the `:root` block.
 - **Emoji are a font, not images, and its cmap is deliberately incomplete.**
   `--wx-font` starts with `WeGram Emoji` (CBDT, `styles/font.css`), so bubbles, the

@@ -171,7 +171,7 @@ export function ComposerCard({
             </button>
             {/*
               The client's cube is 收藏, not a second expression entry: the sticker
-              sets live as tabs inside the 表情 panel (docs/UI-HANDOFF.md, §5 delta 1).
+              sets live as tabs inside the 表情 panel (docs/HANDOFF.md §5.13, delta 1).
               Favourites have no protocol source yet, so this reports that like the
               other unwired toolbar entries do.
             */}
