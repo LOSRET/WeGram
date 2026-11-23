@@ -136,6 +136,19 @@ describe('mapContent', () => {
     })
   })
 
+  it("carries the pack's set id so a click can open its box", () => {
+    const mapped = mapContent({
+      _: 'messageSticker',
+      sticker: { sticker: { id: 41 }, set_id: '1366529573954559812' },
+    })
+    // TDLib sends int64 as a string; the box must use it verbatim.
+    expect(mapped.media).toMatchObject({ stickerSetId: '1366529573954559812' })
+    // "0" is TDLib's "this sticker has no set".
+    expect(
+      mapContent({ _: 'messageSticker', sticker: { sticker: { id: 41 }, set_id: '0' } }).media,
+    ).not.toHaveProperty('stickerSetId')
+  })
+
   it("carries a premium sticker's effect only when TDLib says to play it", () => {
     const premium = {
       _: 'messageSticker',

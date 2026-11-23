@@ -77,6 +77,8 @@ export interface MessageListProps {
   onResend: (message: Message) => void
   /** 转文字: ask for a voice note's transcript. */
   onTranscribe: (message: Message) => void
+  /** 贴纸: clicking a sticker opens the box of the pack it belongs to (§8.5). */
+  onOpenStickerSet: (setId: string) => void
   /** 置顶消息: the id this chat has pinned, so the menu can say 取消置顶. */
   pinnedMessageId: number | null
   onTogglePin: (message: Message) => void
@@ -136,6 +138,7 @@ export function MessageList({
   onOpenComments,
   onResend,
   onTranscribe,
+  onOpenStickerSet,
   pinnedMessageId,
   onTogglePin,
 }: MessageListProps) {
@@ -343,6 +346,7 @@ export function MessageList({
                   onOpenMenu={openMenu}
                   onOpenComments={onOpenComments}
                   onResend={onResend}
+                  onOpenStickerSet={onOpenStickerSet}
                 />
               </div>
             )

@@ -1,3 +1,4 @@
+import { DEMO_STICKER_SET_ID } from '@wegram/mock-fixtures'
 import type { FixtureSeed } from '@wegram/mock-fixtures'
 import type { Message, Self } from '@wegram/protocol'
 
@@ -11,7 +12,8 @@ export const ME: Self = {
 
 export const MOCK_CODE = '12345'
 export const MOCK_PASSWORD = 'wegram'
-export const MOCK_STICKER_SET_ID = 'mock-stickers'
+/** The fixture messages' sticker pack; the dataset names it. */
+export const MOCK_STICKER_SET_ID = DEMO_STICKER_SET_ID
 
 /** Gradient pairs for the generated chat photos, picked by chat id. */
 export const MOCK_AVATAR_COLORS: readonly (readonly [

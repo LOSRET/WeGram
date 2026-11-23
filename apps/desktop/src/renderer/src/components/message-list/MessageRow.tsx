@@ -63,6 +63,11 @@ export interface MessageRowProps {
    * cannot work must not be drawn.
    */
   onResend?: (message: Message) => void
+  /**
+   * A sticker opens the box of the set it belongs to (design doc §8.5). Optional
+   * like `onResend`: a row drawn outside the chat pane has no box to open.
+   */
+  onOpenStickerSet?: (setId: string) => void
 }
 
 /**
@@ -103,6 +108,7 @@ export const MessageRow = memo(
     onOpenMenu,
     onOpenComments,
     onResend,
+    onOpenStickerSet,
   }: MessageRowProps) {
     /**
      * A premium sticker's effect plays once; a tap on the sticker replays it, so
@@ -132,6 +138,8 @@ export const MessageRow = memo(
         ? first.kind
         : null
     const isSticker = !album && first.kind === 'sticker' && Boolean(media)
+    /** The pack a sticker message came from; a click opens that pack's box. */
+    const stickerSetId = isSticker ? media?.stickerSetId : undefined
     // Telegram's animated emoji: one emoji drawn as its sticker, no bubble.
     const animatedEmoji = !album && first.kind === 'emoji' ? media : undefined
     const bigEmoji = !album && first.kind === 'text' && !mediaKind && isEmojiOnly(first.text)
@@ -218,9 +226,11 @@ export const MessageRow = memo(
                 className="wx-sticker-wrap"
                 onContextMenu={openMenu}
                 onClick={
-                  media.premiumEffectFileId
-                    ? () => setPremiumReplay((count) => count + 1)
-                    : undefined
+                  stickerSetId && onOpenStickerSet
+                    ? () => onOpenStickerSet(stickerSetId)
+                    : media.premiumEffectFileId
+                      ? () => setPremiumReplay((count) => count + 1)
+                      : undefined
                 }
               >
                 <StickerRenderer media={media} size={STICKER_SIZE} />
@@ -425,5 +435,6 @@ export const MessageRow = memo(
     previous.onOpenMenu === next.onOpenMenu &&
     previous.onOpenComments === next.onOpenComments &&
     previous.onResend === next.onResend &&
+    previous.onOpenStickerSet === next.onOpenStickerSet &&
     sameRow(previous.messages, next.messages),
 )

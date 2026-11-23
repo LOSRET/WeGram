@@ -156,6 +156,11 @@ export const messageMediaSchema = z.object({
   /** Emoji the sticker matches, used as its alt text and in the picker. */
   stickerEmoji: z.string().optional(),
   /**
+   * The set this sticker belongs to (TDLib `sticker.set_id`, int64 → string).
+   * Clicking a sticker message opens that set's box (design doc §8.5).
+   */
+  stickerSetId: z.string().optional(),
+  /**
    * Click sound of an animated emoji (TDLib `animatedEmoji.sound`, OGG/Opus). It is
    * fetched on the first click, so an emoji the reader never taps costs no download.
    */

@@ -78,6 +78,14 @@ components/proxy/         ProxyForm: the one proxy form, shown by the login wind
                          deciding which proxy is in force (that is main's job)
 components/viewer/        the 图片和视频 window: MediaViewer shell + useViewerItem /
                          useViewerZoom + ViewerToolbar / ViewerGrid + viewerMenu / viewerActions
+components/StickerSetBox.tsx  贴纸包盒子 (§8.5): clicking a sticker message opens its
+                        set (title + ⋮ menu + grid + 移除/添加贴纸包); it fetches
+                        `stickers:set` by `MessageMedia.stickerSetId` and writes
+                        `stickers:changeSet` (remove / add / archive)
+components/StickerCanvasLayer.tsx  the shared ThorVG canvas over a TGS sticker grid
+                        (one WebGL scene, one render per frame, 30 fps); the grid
+                        keeps the cells for hover/click and hides their thumbnails
+                        once their animation is drawn
 components/ProfileCard.tsx  资料卡: the person sheet a private chat's title and the
                         通讯录 card's 更多资料 open (简介 / 备注 / 共同群聊 fetched on
                         demand / 添加或删除联系人 / 加入黑名单 / 举报 for a bot only —
@@ -159,6 +167,9 @@ lib/stickerMedia.ts   Sticker → MessageMedia (shared by the picker and the pre
 lib/customEmoji.ts    custom emoji ids → sticker art: one batched lookup per frame,
                       cached for the session (chunkIds is pure, tested)
 lib/stickerBox.ts     (pure, unit-tested) the on-screen sticker box + the 1.49× effect box
+lib/thorvg.ts         the one ThorVG WASM engine; the wasm arrives as a data: URL from
+                      the virtual:thorvg-wasm module (vite-thorvg-wasm.ts) so the
+                      packaged file:// renderer can load it
 lib/useInView.ts      the visibility gate a sticker and its effect share (geometry first)
 lib/preview-bridge.ts DEV-ONLY entry point (re-exports lib/preview)
 lib/preview/          browser-preview session + invoke switch (index.ts); fixtures.ts is a
@@ -373,6 +384,26 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   so the flag alone would offer 编辑 on a poll (where it means "stop it") or on a
   sticker (an emoji, not a caption). A caption row also saves through its own channel
   and may legitimately save an empty box — it removes the 说明.
+- **A sticker grid is one ThorVG canvas, never N lottie players.** A pack is ~120
+  TGS; lottie-web gives each playing sticker its own SVG tree, which is what used to
+  jank. The 表情 panel's set body and the 贴纸包盒子 render TGS cells through
+  `StickerCanvasLayer` + `@thorvg/webcanvas` (one WebGL scene, one `render()` per
+  frame, 30 fps); the cells stay in the DOM for hover/click and their thumbnails are
+  hidden only once their animation exists. A TGS cell under the canvas passes
+  `preview` so it never mounts a second lottie. WebM cells are the exception — ThorVG
+  does not decode video — so their `<video>` auto-plays while the cell is inside the
+  panel's scroller (a 0 px `useInView`, whose root is the nearest scroll container,
+  not the window). No looping `StickerRenderer` for TGS in a grid; the transcript is
+  the one place where per-sticker lottie-web is correct (a screenful is a handful of
+  stickers), with `setSubframe(false)` and a `once` animation staying mounted so
+  scrolling back does not replay it.
+- **The ThorVG wasm is a data: URL on purpose.** `vite-thorvg-wasm.ts` reads the
+  installed package's `thorvg.wasm` and emits it behind `virtual:thorvg-wasm`;
+  Electron's packaged renderer loads from `file://`, where Emscripten's fetch of a
+  sibling .wasm fails. That is also why the CSP carries `'wasm-unsafe-eval'`. A grid
+  that cannot initialise falls back to thumbnails + the per-cell hover animation
+  (`loadThorvg()` tries WebGL, then ThorVG's software renderer), so never let a failed
+  `loadThorvg()` break the panel.
 - User-facing copy is Chinese (`回复`/`复制`/`转发`…), code, identifiers and
   comments are English.
 

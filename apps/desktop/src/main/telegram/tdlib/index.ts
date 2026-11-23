@@ -449,6 +449,21 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     )
   }
 
+  async changeStickerSet(
+    setId: string,
+    change: { installed: boolean; archived?: boolean },
+  ): Promise<void> {
+    await stickers.changeStickerSet(
+      { invoke: (method) => this.invoke(method), mapper: this.mapper },
+      setId,
+      change,
+    )
+    // The panel refetches on this. TDLib's updateInstalledStickerSets may come a
+    // beat later; emitting here is what lets the pack page close with its tab
+    // already gone.
+    this.emit({ type: 'stickerSets' })
+  }
+
   async customEmojiStickers(ids: string[]): Promise<CustomEmojiSticker[]> {
     return stickers.listCustomEmojiStickers(
       { invoke: (method) => this.invoke(method), mapper: this.mapper },

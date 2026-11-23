@@ -12,7 +12,6 @@ import type {
   ProxyMode,
   ProxyState,
   ProxyTestResult,
-  StickerSetSummary,
   TgBridge,
   ViewerItem,
 } from '@wegram/protocol'
@@ -60,8 +59,10 @@ import {
   msg,
   now,
   previewCommonChatsFor,
+  previewChangeStickerSet,
   previewCustomEmoji,
   previewStickerSet,
+  previewStickerSets,
   channelNotJoined,
   channelPostRights,
 } from './fixtures'
@@ -388,14 +389,16 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'media:send':
     case 'media:sendAlbum':
       return handlePreviewMedia(channel, store, (url) => window.open(url, '_blank', 'noopener'))
-    case 'stickers:sets': {
-      const set = previewStickerSet()
-      return [
-        { id: set.id, title: set.title, ...(set.thumbnail ? { thumbnail: set.thumbnail } : {}) },
-      ] satisfies StickerSetSummary[]
-    }
+    case 'stickers:sets':
+      return previewStickerSets()
     case 'stickers:set':
       return previewStickerSet()
+    case 'stickers:changeSet':
+      previewChangeStickerSet(String(store.setId), {
+        installed: Boolean(store.installed),
+        ...(store.archived === undefined ? {} : { archived: Boolean(store.archived) }),
+      })
+      return undefined
     case 'stickers:customEmoji': {
       const ids: unknown = store.ids
       return previewCustomEmoji(
@@ -442,6 +445,9 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       return { ok: true, latencyMs: 3 } satisfies ProxyTestResult
     case 'network:get':
       return { preferIpv6 }
+    /** The preview has no protocol connection; the shell boots as online. */
+    case 'network:connection':
+      return 'online'
     case 'network:set':
       preferIpv6 = Boolean(store.preferIpv6)
       return undefined

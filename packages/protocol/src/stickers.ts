@@ -41,6 +41,18 @@ export const stickerSetSummarySchema = z.object({
 export type StickerSetSummary = z.infer<typeof stickerSetSummarySchema>
 
 export const stickerSetSchema = stickerSetSummarySchema.extend({
+  /**
+   * The set's short name, i.e. the `t.me/addstickers/<name>` share link. TDLib
+   * answers an empty string for a set that has none, which the adapter leaves off.
+   */
+  name: z.string().optional(),
+  /** TDLib's `is_installed`: the set sits in this account's 表情 panel. */
+  isInstalled: z.boolean(),
+  /**
+   * TDLib's `is_archived`: still installed but filed away, so it leaves the
+   * panel's tab strip until it is unarchived.
+   */
+  isArchived: z.boolean(),
   stickers: z.array(stickerSchema),
 })
 export type StickerSet = z.infer<typeof stickerSetSchema>

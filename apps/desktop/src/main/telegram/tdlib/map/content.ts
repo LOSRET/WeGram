@@ -113,6 +113,11 @@ export function mapContent(content: TdObject): {
           ...(sticker.thumbnail?.file?.id ? { thumbFileId: sticker.thumbnail.file.id } : {}),
           stickerFormat: mapStickerFormat(sticker.format?._),
           ...(sticker.emoji ? { stickerEmoji: sticker.emoji } : {}),
+          // The pack box needs the set id; TDLib sends it as an int64 string and
+          // uses "0" for a sticker with no set.
+          ...(sticker.set_id && String(sticker.set_id) !== '0'
+            ? { stickerSetId: String(sticker.set_id) }
+            : {}),
           ...(sticker.width ? { width: sticker.width } : {}),
           ...(sticker.height ? { height: sticker.height } : {}),
           ...(effectFileId > 0

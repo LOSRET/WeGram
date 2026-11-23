@@ -9,6 +9,13 @@ import { serviceMessages } from './services'
 import { buildCommentThread } from './threads'
 
 /**
+ * The one sticker set the fake account's sticker messages belong to. Both fakes
+ * publish it under this id, and `sticker.set_id` travels on every sticker row, so
+ * clicking a fixture sticker opens the same pack box the real adapter opens.
+ */
+export const DEMO_STICKER_SET_ID = 'mock-stickers'
+
+/**
  * The fake account both fakes serve: the Electron mock adapter
  * (`packages/mock-adapter`) and the browser preview (`renderer/lib/preview`).
  *
@@ -120,6 +127,7 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
         media: mediaOf(7001, {
           stickerFormat: 'webp',
           stickerEmoji: '😀',
+          stickerSetId: DEMO_STICKER_SET_ID,
           width: 128,
           height: 128,
         }),
@@ -228,6 +236,7 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
         media: mediaOf(7002, {
           stickerFormat: 'webp',
           stickerEmoji: '❤️',
+          stickerSetId: DEMO_STICKER_SET_ID,
           width: 128,
           height: 128,
         }),
@@ -244,6 +253,7 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
         media: mediaOf(7003, {
           stickerFormat: 'tgs',
           stickerEmoji: '✨',
+          stickerSetId: DEMO_STICKER_SET_ID,
           width: 128,
           height: 128,
           // A Telegram Premium sticker (§8.5): one more file, the effect that

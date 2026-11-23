@@ -1,4 +1,4 @@
-import { buildFixtureSeeds } from '@wegram/mock-fixtures'
+import { buildFixtureSeeds, DEMO_STICKER_SET_ID } from '@wegram/mock-fixtures'
 import { sortChatList } from '@wegram/mock-session'
 import type { FakeCommentFlags } from '@wegram/mock-session'
 import type {
@@ -11,6 +11,7 @@ import type {
   Self,
   Sticker,
   StickerSet,
+  StickerSetSummary,
 } from '@wegram/protocol'
 
 export const ME: Self = {
@@ -111,6 +112,8 @@ export function previewFiles(): Record<number, string> {
     7002: stickerSvg('❤️', '#FF9F43'),
     7003: PREVIEW_TGS,
     7004: beepWav(),
+    // The TGS sticker's still frame (its resting state in a grid).
+    7006: stickerSvg('✨', '#7ED6A5'),
     // The premium sticker's effect (§8.5): a second file, fetched lazily.
     7005: PREVIEW_PREMIUM_EFFECT,
     7101: svgUrl(1200, 800, '#22427c', '#eca860'),
@@ -265,7 +268,17 @@ function stickerSvg(emoji: string, background: string): string {
 export const PREVIEW_STICKERS: Sticker[] = [
   { fileId: 7001, format: 'webp', emoji: '😀', width: 128, height: 128, thumbFileId: 7001 },
   { fileId: 7002, format: 'webp', emoji: '❤️', width: 128, height: 128, thumbFileId: 7002 },
-  { fileId: 7003, format: 'tgs', emoji: '✨', width: 128, height: 128 },
+  {
+    fileId: 7003,
+    format: 'tgs',
+    emoji: '✨',
+    width: 128,
+    height: 128,
+    // TDLib always ships a static picture for an animated sticker; the fixture
+    // does too, so a grid cell has a still frame before it is hovered.
+    thumbFileId: 7006,
+    thumbFormat: 'webp',
+  },
 ]
 
 /**
@@ -279,13 +292,49 @@ export function previewCustomEmoji(ids: string[]): CustomEmojiSticker[] {
   })
 }
 
+/**
+ * The preview pack's install flags, so the pack page's 移除 / 归档 are clickable
+ * in the browser. Reset on reload, like the rest of the preview session.
+ */
+const stickerSetState = { installed: true, archived: false }
+// The shared dataset tags its sticker rows with this id, so the browser preview
+// resolves the same pack the clicks name.
+const PREVIEW_STICKER_SET_ID = DEMO_STICKER_SET_ID
+
 export function previewStickerSet(): StickerSet {
   return {
-    id: 'preview-stickers',
-    title: 'WeGram 贴纸',
+    id: PREVIEW_STICKER_SET_ID,
+    title: 'WeGram 贴纸 @preview',
+    name: 'wegram',
+    isInstalled: stickerSetState.installed,
+    isArchived: stickerSetState.archived,
     ...(PREVIEW_STICKERS[0] ? { thumbnail: PREVIEW_STICKERS[0] } : {}),
     stickers: PREVIEW_STICKERS,
   }
+}
+
+/** The installed list the tab strip draws; an archived or removed pack is gone. */
+export function previewStickerSets(): StickerSetSummary[] {
+  if (!stickerSetState.installed || stickerSetState.archived) return []
+  const set = previewStickerSet()
+  return [{ id: set.id, title: set.title, ...(set.thumbnail ? { thumbnail: set.thumbnail } : {}) }]
+}
+
+/** 移除贴纸包 / 归档贴纸 / 安装, the same flags the real adapter writes. */
+export function previewChangeStickerSet(
+  setId: string,
+  change: { installed: boolean; archived?: boolean },
+): void {
+  if (setId !== PREVIEW_STICKER_SET_ID) {
+    throw { code: 'internal', message: `Unknown sticker set ${setId}` }
+  }
+  if (!change.installed) {
+    stickerSetState.installed = false
+    stickerSetState.archived = false
+    return
+  }
+  stickerSetState.installed = true
+  stickerSetState.archived = change.archived === true
 }
 
 export const info: AppInfo = {

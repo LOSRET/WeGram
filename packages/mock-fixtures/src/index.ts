@@ -1,4 +1,4 @@
-export { buildFixtureSeeds } from './data'
+export { buildFixtureSeeds, DEMO_STICKER_SET_ID } from './data'
 export { pollMessage } from './polls'
 export type { PollMessageOptions } from './polls'
 export type { FixtureOptions, FixtureSeed, SeedMedia } from './seed'

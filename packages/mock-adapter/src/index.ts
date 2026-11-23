@@ -43,7 +43,13 @@ import {
 import { createMockPolls } from './polls'
 import { mockMessageProperties } from './properties'
 import { searchChats, searchMessages, searchMessagesInScope } from './search'
-import { getMockStickerSet, listMockCustomEmoji, listMockStickerSets } from './stickers'
+import {
+  changeMockStickerSet,
+  getMockStickerSet,
+  initialMockStickerSetState,
+  listMockCustomEmoji,
+  listMockStickerSets,
+} from './stickers'
 import { emitTraffic } from './traffic'
 
 export interface MockAdapterOptions {
@@ -94,6 +100,8 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   readonly sendComment = this.commentApi.send
   private readonly assets: MockAssets
   private readonly avatars: MockAvatars
+  /** The fixture pack's install flags, written by the pack page. */
+  private readonly stickerSetState = initialMockStickerSetState()
   private nextMessageId = 5000
   private nextFileId = 9000
   private timer: NodeJS.Timeout | null = null
@@ -350,11 +358,20 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   }
 
   async listStickerSets(): Promise<StickerSetSummary[]> {
-    return listMockStickerSets(this.assets)
+    return listMockStickerSets(this.assets, this.stickerSetState)
   }
 
   async getStickerSet(setId: string): Promise<StickerSet> {
-    return getMockStickerSet(this.assets, setId)
+    return getMockStickerSet(this.assets, this.stickerSetState, setId)
+  }
+
+  async changeStickerSet(
+    setId: string,
+    change: { installed: boolean; archived?: boolean },
+  ): Promise<void> {
+    changeMockStickerSet(this.stickerSetState, setId, change)
+    // The panel refetches on the same event the real adapter emits.
+    this.emit({ type: 'stickerSets' })
   }
 
   async customEmojiStickers(ids: string[]): Promise<CustomEmojiSticker[]> {

@@ -344,6 +344,13 @@ export interface TelegramAdapter {
   listStickerSets(): Promise<StickerSetSummary[]>
   getStickerSet(setId: string): Promise<StickerSet>
   /**
+   * Installs, removes or archives one sticker set (TDLib `changeStickerSet`).
+   * `installed: false` removes it from the account; `{ installed: true,
+   * archived: true }` files it away, which also takes it out of the installed
+   * list the panel reads. The adapter announces the reloaded list itself.
+   */
+  changeStickerSet(setId: string, change: { installed: boolean; archived?: boolean }): Promise<void>
+  /**
    * Custom emoji (Telegram Premium's inline sticker art) by the id its text
    * entity carries. Ids TDLib does not know are left out of the answer.
    */

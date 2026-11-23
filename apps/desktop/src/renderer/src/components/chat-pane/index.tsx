@@ -11,6 +11,7 @@ import { ConfirmDialog } from '../ConfirmDialog'
 import { ForwardDialog } from '../ForwardDialog'
 import { MessageList } from '../message-list'
 import { ProfileCard } from '../ProfileCard'
+import { StickerSetBox } from '../StickerSetBox'
 import { ChannelBar } from './ChannelBar'
 import { ChatHeader } from './ChatHeader'
 import { ChatInfoPanel } from './ChatInfoPanel'
@@ -88,6 +89,8 @@ export function ChatPane() {
   const [pinBusy, setPinBusy] = useState(false)
   /** 资料卡: the person this private chat is with, or null while it is closed. */
   const [profileUserId, setProfileUserId] = useState<number | null>(null)
+  /** 贴纸包: the set a clicked sticker message belongs to (design doc §8.5). */
+  const [stickerSetId, setStickerSetId] = useState<string | null>(null)
   /** 置顶消息: what this chat has pinned, and the pin / unpin calls. */
   const { pinned, setPinnedMessage } = usePinnedMessage(activeChatId)
 
@@ -162,6 +165,7 @@ export function ChatPane() {
   useEffect(() => {
     setComments(null)
     setInfo(null)
+    setStickerSetId(null)
     if (infoTimerRef.current !== null) {
       window.clearTimeout(infoTimerRef.current)
       infoTimerRef.current = null
@@ -415,6 +419,7 @@ export function ChatPane() {
           onForward={setForwarding}
           onCopy={actions.copy}
           onOpenComments={openComments}
+          onOpenStickerSet={setStickerSetId}
           onResend={(message) => {
             void actions.resend(message)
           }}
@@ -498,10 +503,14 @@ export function ChatPane() {
         <ProfileCard userId={profileUserId} onClose={() => setProfileUserId(null)} />
       ) : null}
 
+      {stickerSetId !== null ? (
+        <StickerSetBox setId={stickerSetId} onClose={() => setStickerSetId(null)} />
+      ) : null}
+
       {forwarding ? (
         <ForwardDialog
           chats={chats}
-          message={forwarding}
+          disabledChatId={forwarding.chatId}
           onForward={(toChatId) => {
             const message = forwarding
             setForwarding(null)

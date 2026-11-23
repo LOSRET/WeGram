@@ -1,21 +1,34 @@
-import type { ChatSummary, Message } from '@wegram/protocol'
+import type { ChatSummary } from '@wegram/protocol'
 
 import { Avatar } from './Avatar'
 
 interface ForwardDialogProps {
+  /** The sheet's heading; 分享表情包 reuses this picker for a pack's link. */
+  title?: string
   chats: ChatSummary[]
-  message: Message
+  /**
+   * A chat the action cannot target — 转发 disables the conversation the message
+   * came from and labels it 当前会话. 分享 a pack link may name any chat, so it
+   * leaves this out.
+   */
+  disabledChatId?: number
   onForward: (toChatId: number) => void
   onClose: () => void
 }
 
 /** WeChat's "转发到" sheet: a chat picker with a hairline footer. */
-export function ForwardDialog({ chats, message, onForward, onClose }: ForwardDialogProps) {
+export function ForwardDialog({
+  title = '转发到',
+  chats,
+  disabledChatId,
+  onForward,
+  onClose,
+}: ForwardDialogProps) {
   return (
     <div className="wx-modal-backdrop" onClick={onClose}>
       <div className="wx-modal wx-modal--forward" onClick={(event) => event.stopPropagation()}>
         <div className="wx-forward-head">
-          <span>转发到</span>
+          <span>{title}</span>
           <button className="wx-icon-button" onClick={onClose} title="关闭">
             ×
           </button>
@@ -27,11 +40,11 @@ export function ForwardDialog({ chats, message, onForward, onClose }: ForwardDia
               key={chat.id}
               className="wx-forward-item"
               onClick={() => onForward(chat.id)}
-              disabled={chat.id === message.chatId}
+              disabled={chat.id === disabledChatId}
             >
               <Avatar className="wx-avatar" name={chat.title} colorId={chat.id} />
               <span className="wx-forward-item__title">{chat.title}</span>
-              {chat.id === message.chatId ? <span className="wx-hint">当前会话</span> : null}
+              {chat.id === disabledChatId ? <span className="wx-hint">当前会话</span> : null}
             </button>
           ))}
         </div>

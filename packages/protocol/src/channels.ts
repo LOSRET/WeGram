@@ -155,6 +155,11 @@ export const invokeChannels = [
   'media:send',
   'stickers:sets',
   'stickers:set',
+  /**
+   * Installs, removes or archives one set (TDLib `changeStickerSet`); the
+   * adapter announces the reloaded list as `evt:stickerSets`.
+   */
+  'stickers:changeSet',
   /** Custom emoji art by entity id (Telegram Premium's inline stickers). */
   'stickers:customEmoji',
   'ui:saveDraft',
@@ -420,6 +425,18 @@ export const invokeSchemas = {
   },
   'stickers:sets': { request: noPayload, response: z.array(stickerSetSummarySchema) },
   'stickers:set': { request: z.object({ setId: z.string().min(1) }), response: stickerSetSchema },
+  /**
+   * `installed: false` removes the set from the account; `{ installed: true,
+   * archived: true }` files it away (it stays installed and leaves the panel).
+   */
+  'stickers:changeSet': {
+    request: z.object({
+      setId: z.string().min(1),
+      installed: z.boolean(),
+      archived: z.boolean().optional(),
+    }),
+    response: noPayload,
+  },
   /**
    * Up to 200 ids per call (TDLib's own limit). Unknown ids are simply absent from
    * the answer, which the renderer draws as the base glyph.

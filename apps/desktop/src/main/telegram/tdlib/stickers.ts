@@ -33,11 +33,35 @@ export async function getStickerSet(deps: StickerDeps, setId: string): Promise<S
   return {
     id: String(response.id),
     title: response.title ?? '',
+    // The short name is what t.me/addstickers/<name> carries; TDLib says '' for a
+    // set that has none (e.g. one built locally).
+    ...(response.name ? { name: String(response.name) } : {}),
+    isInstalled: response.is_installed === true,
+    isArchived: response.is_archived === true,
     ...(cover ? { thumbnail: cover } : {}),
     stickers: stickers
       .map((sticker) => toSticker(deps.mapper, sticker))
       .filter((item) => item.fileId > 0),
   }
+}
+
+/**
+ * Installs, removes or archives one set. TDLib answers `Ok`; the refreshed
+ * installed list arrives as `updateInstalledStickerSets`, and the adapter emits
+ * its own `stickerSets` event right after this call so the panel does not have to
+ * wait for the update to paint the pack away.
+ */
+export async function changeStickerSet(
+  deps: StickerDeps,
+  setId: string,
+  change: { installed: boolean; archived?: boolean },
+): Promise<void> {
+  await deps.invoke({
+    _: 'changeStickerSet',
+    set_id: setId,
+    is_installed: change.installed,
+    is_archived: change.archived === true,
+  })
 }
 
 /**

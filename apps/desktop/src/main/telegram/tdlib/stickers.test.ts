@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import type { MapperContext } from './map/context'
-import { getStickerSet, listCustomEmojiStickers, listStickerSets } from './stickers'
+import {
+  changeStickerSet,
+  getStickerSet,
+  listCustomEmojiStickers,
+  listStickerSets,
+} from './stickers'
 
 function mapper(): MapperContext {
   return {
@@ -149,5 +154,64 @@ describe('getStickerSet tab icon', () => {
     )
     expect(set.thumbnail).toEqual({ fileId: 80, format: 'webp', width: 64, height: 64 })
     expect(set.stickers).toHaveLength(1)
+  })
+
+  it('carries the t.me/addstickers name and the install flags', async () => {
+    const set = await getStickerSet(
+      deps({
+        id: 15,
+        title: 'Deepseek Chan @zhaxia_cn',
+        name: 'deepseek',
+        is_installed: true,
+        is_archived: false,
+        thumbnail: null,
+        stickers: [],
+      }),
+      '15',
+    )
+    // The pack page copies this name into https://t.me/addstickers/<name>.
+    expect(set).toMatchObject({ name: 'deepseek', isInstalled: true, isArchived: false })
+  })
+
+  it('leaves the name off when TDLib has none', async () => {
+    const set = await getStickerSet(
+      deps({ id: 16, title: '本地贴纸', name: '', stickers: [] }),
+      '16',
+    )
+    expect(set).not.toHaveProperty('name')
+    expect(set.isInstalled).toBe(false)
+    expect(set.isArchived).toBe(false)
+  })
+})
+
+describe('changeStickerSet', () => {
+  function recordingDeps() {
+    const calls: Array<Record<string, unknown>> = []
+    return {
+      calls,
+      deps: {
+        invoke: (method: Record<string, unknown>) => {
+          calls.push(method)
+          return Promise.resolve({ _: 'ok' })
+        },
+        mapper: mapper(),
+      },
+    }
+  }
+
+  it('files 归档贴纸 as installed + archived', async () => {
+    const { calls, deps: stickerDeps } = recordingDeps()
+    await changeStickerSet(stickerDeps, '15', { installed: true, archived: true })
+    expect(calls).toEqual([
+      { _: 'changeStickerSet', set_id: '15', is_installed: true, is_archived: true },
+    ])
+  })
+
+  it('removes 移除贴纸包 with is_installed false', async () => {
+    const { calls, deps: stickerDeps } = recordingDeps()
+    await changeStickerSet(stickerDeps, '15', { installed: false })
+    expect(calls).toEqual([
+      { _: 'changeStickerSet', set_id: '15', is_installed: false, is_archived: false },
+    ])
   })
 })

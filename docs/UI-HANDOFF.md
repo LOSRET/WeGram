@@ -243,14 +243,51 @@ emits `stickerSets`, which crosses IPC as `evt:stickerSets` and bumps
 the 14-set cache for the whole session, which looked like "one page and the end".
 
 A set's body leads with the pack's own name in the 最近使用 label style (the strip only
-shows two characters of it) and its cells **play**: TGS through lottie-web, WebM through
-`<video>`. The static thumbnail is the first paint — a still frame while the animation
-downloads — never the artwork, because TDLib serves a WebP for an animated sticker's
-thumbnail. Only cells that are on (or within 200 px of) the screen start downloading:
-measured 24 of 120 cells on open, 40 after scrolling one screen. That gate measures
-geometry directly as well as with `IntersectionObserver`, since Electron throttles
-frame delivery while the window is occluded — the panel would otherwise sit on
-spinners forever.
+shows two characters of it). Its **TGS cells are drawn by one ThorVG canvas** over the
+grid, all of them at once (see the budget note below); WebP cells are plain images and
+**WebM cells auto-play while visible** through `<video>` (unmounted as soon as they
+scroll out of the panel). The static thumbnail is the first
+paint — a still frame while the animation loads — never the artwork, because TDLib
+serves a WebP for an animated sticker's thumbnail. Only cells that are on (or within
+200 px of) the screen start downloading: measured 24 of 120 cells on open, 40 after
+scrolling one screen. That gate measures geometry directly as well as with
+`IntersectionObserver`, since Electron throttles frame delivery while the window is
+occluded — the panel would otherwise sit on spinners forever.
+
+**Animated-cell budget (added 2026-11-23).** A 120-sticker pack is 120 TGS/WebM files.
+Telegram Desktop animates the painted rows with `lib_lottie`'s MultiPlayer: one shared
+render pass, a 30 fps repaint cap (`kMinRepaintDelay = 33ms`), objects dropped two
+screens away, and rendered-frame caches capped at 10 MB. lottie-web cannot do that —
+each playing sticker is its own SVG tree — so the grids (the 表情 panel's set body and
+the 贴纸包盒子) use **`@thorvg/webcanvas`** for TGS instead: one WebGL canvas with
+every TGS cell as a `TVG.Animation`, one `canvas.render()` per frame, capped at 30 fps.
+WebM cells cannot go through ThorVG; they mount a `<video>` only while the cell is
+inside its panel's scroller (a 0 px margin; the visibility gate uses the nearest
+scroll container, not the window, or a clipped row would keep decoding). The
+canvas layer sits above the cells with `pointer-events: none`; the cells keep their
+hover/title/click, and a cell whose animation is ready hides its thumbnail. The wasm is
+inlined as a `data:` URL (the packaged renderer is `file://`), the CSP carries
+`'wasm-unsafe-eval'`, and an init failure falls back to the per-cell hover animation.
+Measured on the Chromium preview with 120 copies of one TGS on a 464 × 1968 canvas:
+**56.5 fps, `render()` 1.83 ms average** (the fixture is simple; real packs cost more,
+but still one render call). The transcript keeps lottie-web, where a screenful is a
+handful of stickers, with `setSubframe(false)` so only whole frames are evaluated.
+
+**贴纸包盒子 (added 2026-11-23).** **Clicking a sticker in a message** opens the box
+of the pack it belongs to — the 表情 panel itself is unchanged. The box is
+**464 × 558** (the client's box measured 462 × 558), floating **un-dimmed** over the
+conversation in a transparent full-window layer (click outside or Esc closes it): a
+**52 px** title row (title, ⋮, ×), the pack's stickers in a **5-column grid at 82 px
+cells** (TGS cells on the shared ThorVG canvas, WebP cells as pictures), and a **58 px**
+footer with **移除贴纸包** in `--wx-danger` — or **添加贴纸包**
+in `--wx-brand` for a pack this account has not installed — beside a count pill.
+Title → ⋮ → **分享表情包 / 复制链接 / 归档贴纸** in that order (归档 only while
+installed); 分享 reuses the 转发到 sheet with a 分享表情包 heading, and the link is
+`https://t.me/addstickers/<name>` built from TDLib's `stickerSet.name`
+(`lib/stickerSetLink.ts`). The grid is display-only: sending stays the 表情 panel's
+job. The click needs `MessageMedia.stickerSetId` (TDLib `sticker.set_id`), which is
+why a message can open the box in one `stickers:set` call; removing or archiving
+closes the box and main emits `evt:stickerSets` as the write lands.
 
 Missing against the client, on purpose: the **自定义表情** (heart) tab. Favourites are
 TDLib custom-emoji sets, whose messages are custom-emoji *entities* rather than
