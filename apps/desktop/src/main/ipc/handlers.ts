@@ -26,7 +26,14 @@ import {
   viewerState,
 } from '../viewer'
 import { closeSettingsWindow, openSettingsWindow } from '../settings-window'
-import { getCloseBehavior, getSendKey, setCloseBehavior, setSendKey } from '../store/prefs'
+import {
+  getCloseBehavior,
+  getDesktopNotifications,
+  getSendKey,
+  setCloseBehavior,
+  setDesktopNotifications,
+  setSendKey,
+} from '../store/prefs'
 import { resolveTheme, storedTheme, themePreference } from '../windows'
 import type { IpcHandlerMap } from './router'
 
@@ -442,6 +449,26 @@ export function createHandlers({
      */
     'settings:open': () => openSettingsWindow(storedTheme(uiDb), BrowserWindow.getFocusedWindow()),
     'settings:close': () => closeSettingsWindow(),
+
+    /**
+     * 消息通知 (design doc §9.11.3): the local 桌面通知 switch plus the account's
+     * per-scope defaults. One read for the whole panel, so the three scopes it
+     * paints cannot disagree with each other.
+     */
+    'notifications:get': async () => ({
+      desktop: getDesktopNotifications(uiDb),
+      scopes: await adapter.notificationScopes(),
+    }),
+    /** The panel sends the whole triple it shows; the adapter preserves TDLib's rest. */
+    'notifications:setScope': (payload) =>
+      adapter.setNotificationScope(payload.scope, payload.settings),
+    /**
+     * Local state (§9.11.3): notifications.ts reads it back on every delivery, so
+     * this write has no cache to invalidate.
+     */
+    'notifications:setDesktop': (payload) => {
+      setDesktopNotifications(uiDb, payload.desktop)
+    },
 
     'proxy:get': async () => proxyController.state() ?? proxyController.resolve({ apply: false }),
     /**

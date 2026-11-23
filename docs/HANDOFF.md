@@ -84,7 +84,7 @@ pnpm workspace, W1 + W2 + the W3 main body implemented, plus the private-chat P0
 | Comments | 评论 N 条 handle on channel posts, Telegram discussion view panel (paged, anchored, joins to send), the full composer card as its input |
 | 聊天信息 | overlaying 314 px sheet: private/group/channel layouts, member search, rename, pinned announcement, invite QR in its own 360×560 window, clear, leave |
 | Channels | 服务号 bottom card, 加入/申请加入 for an unjoined channel, keyboard switch for admins |
-| Settings | batch A: 账号与安全 / 通用 (外观 with 跟随系统, 关闭主窗口, 发送消息 key) / 网络与代理 / 关于; B and C pending (§9) |
+| Settings | batch A (账号与安全 / 通用 / 网络与代理 / 关于) + batch B's first group 消息通知 (桌面通知 + 私聊/群聊/频道的 免打扰 / 提示音 / 预览); the rest of B and C pending (§9) |
 | Private chat P0/P1 | send failure + 重试, outgoing typing, online/last-seen, delete chat / mark unread, notifications + tray, voice notes (recorded in-renderer, OGG/Opus muxed in-repo), albums, pinned bar, speech-to-text, reactions (display only), block/report, profile card with 备注 + 共同群聊, caption edit, add/remove contact |
 | Proxy | 跟随系统代理 by default, `proxy:refresh` / `evt:proxy`, probe + 30 s retry, DPAPI-sealed secrets |
 | Packaging | `.github/workflows/release.yml`: version bump on `main` → NSIS installer → GitHub Release (proven by v0.1.0–v0.1.2); the installer has never been installed or signed |
@@ -713,6 +713,17 @@ native title strip, the viewer, the settings window and both renderers through `
 `light`/`dark`; `themePreference` is what is stored, and `nativeTheme.on('updated')` only acts
 while the preference is `system`. 关闭主窗口 defaults to **quit**, not tray. 发送消息 is read
 **at keydown time** (`useComposerInput` reads the store), never captured in a render.
+
+**消息通知 (batch B's first group, 2026-11-23)**: 桌面通知 is the only local switch on
+that panel — it belongs to this installation (`ui.db`, key `notifications.desktop`, default
+on), and `NotificationCenter` reads it at delivery time, so turning it off stops the next
+toast without a restart. The three scope groups are the account's state
+(`getScopeNotificationSettings` / `setScopeNotificationSettings`), one per chat kind, and they
+are **defaults**: a chat's own 免打扰 wins, which is what the panel's note says. 消息免打扰
+is written as `mute_for = 2^31-1` (TDLib counts down to unmute; a flag would expire), and the
+adapter reads the scope first because the setter **replaces the whole struct** — the story
+and mention fields the panel does not show are copied back, not reset. 声音 is `sound_id`
+(`'-1'` default, `'0'` off) and 预览 is `show_preview`.
 
 ### 5.11 How a channel post is composed
 
@@ -1506,7 +1517,7 @@ One-off duplication audits merged the real duplicates and left the look-alikes a
 |---|---|---|
 | 1 | Search-face virtualisation | The conversation list is virtualised (2026-11-18) and, since 2026-11-23, pages on approach and prefetches the visible window's photos — measured on this account: 321 chats, 100/100/100/21 with no overlap. What is left is the search face: conversation hits and message hits still `.map` their page instead of virtualising it (they are paged, so the count is bounded — mechanical, not urgent) |
 | 2 | Reactions picker | display is done; WeChat has no reactions, so it needs the owner's sign-off (§9.3) |
-| 3 | Settings batches B and C | B: 消息通知 scope, six 隐私 rules + 黑名单, 登录设备, 存储统计/清理, 自动下载, 消息字号, 开机自启. C: 两步验证, 本地锁, 全局快捷键, 检查更新, 保存目录, 贴纸管理, 恢复默认. Each adds panels to the same nav table; prefer per-domain channels over growing `settings:set`. 清理缓存 must invalidate `media/registry.ts` tokens or bubbles keep retrying deleted files |
+| 3 | Settings batches B and C | **B1 消息通知 landed 2026-11-23** (desktop switch + three scopes). B still open: six 隐私 rules + 黑名单, 登录设备, 存储统计/清理, 自动下载, 消息字号, 开机自启. C: 两步验证, 本地锁, 全局快捷键, 检查更新, 保存目录, 贴纸管理, 恢复默认. Each adds panels to the same nav table; prefer per-domain channels over growing `settings:set` (消息通知's are `notifications:get` / `setScope` / `setDesktop` in `packages/protocol/src/notification.ts`). 清理缓存 must invalidate `media/registry.ts` tokens or bubbles keep retrying deleted files |
 | 4 | Private-chat P2 list | translate (`translateText`), scheduled/silent send, shared-media tabs, draft cloud sync, multi-select forward, location/contact/poll sending, message effects, chat background, screenshot, 收藏 → Saved Messages |
 | 5 | Search depth | missing 应用/贴文/图片/视频/音频/链接 filters, 联系人 hits, archived chats (global search still reads `chatListMain`) |
 | 6 | Viewer breadth | no 编辑, no AI block, no 查看原视频, no pin button anywhere |
@@ -1796,6 +1807,16 @@ claim is. Nothing here replaces §1 (state) or §9 (gaps).
   `addContact`'s flag lagging ~1.2 s, 备注 offered to a non-contact — all fixed with tests;
   举报 was filed end to end against a bot (two phases) and 删除聊天 proven with its own
   disposable chat.
+
+**2026-11-23 (evening) — 设置 B 批第一组:消息通知**
+- `notifications:get` / `notifications:setScope` / `notifications:setDesktop` over TDLib's
+  `scopeNotificationSettings`, with the local 桌面通知 switch in `ui.db`
+  (`notifications.desktop`) read by `NotificationCenter` on every delivery. The adapter
+  reads a scope before writing it (the setter replaces the whole struct, story/mention
+  fields included) and mute is `mute_for = 2^31-1`.
+- Panel: `components/settings/NotificationPanel.tsx`; nav order follows §9.11.3 (消息通知
+  after 通用). The mock adapter and the browser preview implement the same three channels.
+- `pnpm verify` green.
 
 
 

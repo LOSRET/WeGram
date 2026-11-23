@@ -33,6 +33,12 @@ const ICONS: Record<string, ReactNode> = {
       <circle cx="10.5" cy="11.4" r="1.5" />
     </svg>
   ),
+  notifications: (
+    <svg {...iconProps}>
+      <path d="M8 2.6a3.4 3.4 0 0 1 3.4 3.4v2.2c0 .8.25 1.5.7 2.1l.8 1.1H2.9l.8-1.1c.45-.6.7-1.3.7-2.1V6A3.4 3.4 0 0 1 8 2.6z" />
+      <path d="M6.6 13.2a1.5 1.5 0 0 0 2.8 0" />
+    </svg>
+  ),
   network: (
     <svg {...iconProps}>
       <circle cx="8" cy="8" r="5.9" />

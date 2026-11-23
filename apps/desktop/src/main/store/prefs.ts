@@ -12,6 +12,8 @@ import type { UiDatabase } from './ui-db'
 const CLOSE_BEHAVIOR_KEY = 'closeBehavior'
 /** ui.db key holding the send rule; its value is a {@link SendKey}. */
 const SEND_KEY = 'sendKey'
+/** ui.db key holding 桌面通知; 'off' means the OS shows no toast at all. */
+const DESKTOP_NOTIFICATIONS = 'notifications.desktop'
 
 export type CloseBehavior = 'tray' | 'quit'
 export type SendKey = 'enter' | 'ctrlEnter'
@@ -36,4 +38,20 @@ export function getSendKey(uiDb: UiDatabase | null): SendKey {
 
 export function setSendKey(uiDb: UiDatabase, value: SendKey): void {
   uiDb.setSetting(SEND_KEY, value)
+}
+
+/**
+ * 桌面通知: whether this installation pops OS toasts. Local rather than account
+ * state (§9.11.3's 归属规则): the same account may want toasts on a desktop and none
+ * on a laptop. Default on, like the client; an absent row is therefore "on".
+ *
+ * Read at notification time, not cached — turning it off must stop the next toast,
+ * not the one after a restart.
+ */
+export function getDesktopNotifications(uiDb: UiDatabase | null): boolean {
+  return uiDb?.getSetting(DESKTOP_NOTIFICATIONS) !== 'off'
+}
+
+export function setDesktopNotifications(uiDb: UiDatabase, enabled: boolean): void {
+  uiDb.setSetting(DESKTOP_NOTIFICATIONS, enabled ? 'on' : 'off')
 }

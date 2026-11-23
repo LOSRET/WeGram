@@ -18,6 +18,9 @@ import type {
   Message,
   MessageOp,
   MessageProperties,
+  NotificationScope,
+  NotificationScopes,
+  ScopeNotificationSettings,
   PeerStatus,
   ProxyConfig,
   ProxyTestResult,
@@ -458,6 +461,19 @@ export interface TelegramAdapter {
    * value is remembered and applied when one is created.
    */
   setPreferIpv6(prefer: boolean): Promise<void>
+
+  /**
+   * 消息通知's per-scope defaults (design doc §9.11.3), read from TDLib's
+   * `getScopeNotificationSettings`. They live on the account, so a change on another
+   * device shows up here too.
+   */
+  notificationScopes(): Promise<NotificationScopes>
+  /**
+   * Writes one scope's defaults. The adapter reads TDLib's current struct first:
+   * `setScopeNotificationSettings` replaces the whole object, and the story / mention
+   * fields it does not show must keep their values.
+   */
+  setNotificationScope(scope: NotificationScope, settings: ScopeNotificationSettings): Promise<void>
 }
 
 /** Shared emitter plumbing for the concrete adapters. */

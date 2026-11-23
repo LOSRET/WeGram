@@ -14,6 +14,7 @@ import { chatInvokeChannels, chatInvokeSchemas } from './chats'
 import { qrInvokeChannels, qrInvokeSchemas } from './qr'
 import { pollInvokeChannels, pollInvokeSchemas } from './poll'
 import { networkInvokeChannels, networkInvokeSchemas } from './network'
+import { notificationInvokeChannels, notificationInvokeSchemas } from './notification'
 import { customEmojiStickerSchema, stickerSetSchema, stickerSetSummarySchema } from './stickers'
 import {
   appInfoSchema,
@@ -175,6 +176,12 @@ export const invokeChannels = [
   /** Emoji the reader picked recently, newest first (the picker's 最近使用 row). */
   'ui:getRecentEmoji',
   'ui:saveRecentEmoji',
+  /**
+   * The 图片和视频 window's 音量 (design doc §9.5): one level for the whole app, the
+   * way the client's player remembers it. 静音 is a view toggle and is not stored.
+   */
+  'ui:getViewerVolume',
+  'ui:setViewerVolume',
   'settings:get',
   'settings:set',
   /** Opens (or focuses) the standalone settings window (design doc §9.11). */
@@ -186,6 +193,8 @@ export const invokeChannels = [
   'proxy:test',
   'proxy:refresh',
   ...networkInvokeChannels,
+  /** 消息通知: the local desktop switch and the per-scope defaults; ./notification.ts. */
+  ...notificationInvokeChannels,
   'app:info',
   /** The login window's 进入 button: main swaps it for the shell window. */
   'login:enter',
@@ -534,6 +543,15 @@ export const invokeSchemas = {
     request: z.object({ emoji: z.array(z.string().min(1).max(32)).max(RECENT_EMOJI_LIMIT) }),
     response: noPayload,
   },
+  /**
+   * The player's own level, 0…1. `null` is "never stored" and plays at full volume —
+   * the same value a broken row falls back to, so a lost row can never silence a clip.
+   */
+  'ui:getViewerVolume': { request: noPayload, response: z.number().min(0).max(1).nullable() },
+  'ui:setViewerVolume': {
+    request: z.object({ volume: z.number().min(0).max(1) }),
+    response: noPayload,
+  },
   'settings:get': { request: noPayload, response: appSettingsSchema },
   'settings:set': {
     request: z.object({ patch: appSettingsSchema.partial() }),
@@ -561,6 +579,7 @@ export const invokeSchemas = {
   /** Re-reads the operating system proxy and applies it (design doc §6.4, 重新检测). */
   'proxy:refresh': { request: noPayload, response: proxyStateSchema },
   ...networkInvokeSchemas,
+  ...notificationInvokeSchemas,
   'app:info': { request: noPayload, response: appInfoSchema },
   'login:enter': { request: noPayload, response: noPayload },
   'login:close': { request: noPayload, response: noPayload },

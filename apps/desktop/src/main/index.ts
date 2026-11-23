@@ -16,7 +16,7 @@ import { ProxyController } from './proxy-controller'
 import { describeProxy, parseProxyUrl } from './proxy-url'
 import { reachableOverTcp, readSystemProxy } from './system-proxy'
 import { SettingsStore } from './store/settings'
-import { getCloseBehavior } from './store/prefs'
+import { getCloseBehavior, getDesktopNotifications } from './store/prefs'
 import { UiDatabase } from './store/ui-db'
 import { createAdapter } from './telegram'
 import type { TelegramAdapter } from './telegram/adapter'
@@ -244,6 +244,8 @@ async function bootstrap(): Promise<void> {
   notifications = new NotificationCenter({
     getShellWindow: () => mainWindow,
     onOpen: openChatAt,
+    // 设置 → 消息通知's master switch, read per delivery (it is local, ui.db state).
+    enabled: () => getDesktopNotifications(db),
   })
 
   /** The shell seeds its header from this once (`network:connection`, §7.1). */

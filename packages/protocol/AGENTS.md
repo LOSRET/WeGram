@@ -10,7 +10,8 @@ schemas + inferred types), `channels.ts` (channel tables and their request/respo
 schemas), `errors.ts` (`AppError`) and the modules split out as those two files grew — `stickers.ts` (formats, `Sticker`, sticker sets, custom emoji),
 `contact.ts` (the 通讯录 `Contact` row), `settings.ts` (proxy,
 app settings, `app:info`), `network.ts` (the TDLib network-option channels —
-`prefer_ipv6`), `viewer.ts` (the 图片和视频 window's payloads),
+`prefer_ipv6`), `notification.ts` (消息通知: the three scope DTOs + the local 桌面通知
+switch, and their `notifications:*` channel table), `viewer.ts` (the 图片和视频 window's payloads),
 `chat.ts` (the chat DTOs: kind/summary/member/pinned message/invite link/chat ops),
 `chats.ts` (the chat domain's channel keys and schemas), `qr.ts` (the 群二维码
 window's channels), `poll.ts` (the poll DTO + the vote/add-option channels),

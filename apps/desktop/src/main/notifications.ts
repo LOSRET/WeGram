@@ -20,6 +20,11 @@ export interface NotificationCenterOptions {
   getShellWindow: () => BrowserWindow | null
   /** Raise the shell and open the chat at the message the reader clicked. */
   onOpen: (target: { chatId: number; messageId: number; topicId?: number }) => void
+  /**
+   * 桌面通知's local switch (设置 → 消息通知). Read at delivery time, so turning it
+   * off takes effect on the next message instead of the next restart.
+   */
+  enabled: () => boolean
 }
 
 /** Newest-first cap: a burst must not leave a stack of stale toasts behind. */
@@ -50,6 +55,7 @@ export class NotificationCenter {
   }
 
   notify(target: NotificationTarget): void {
+    if (!this.options.enabled()) return
     if (!target.title && !target.text) return
     const shell = this.options.getShellWindow()
     const shellReady = shell !== null && !shell.isDestroyed()

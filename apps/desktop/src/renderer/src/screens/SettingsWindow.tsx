@@ -5,20 +5,22 @@ import { AccountPanel } from '@renderer/components/settings/AccountPanel'
 import { AboutPanel } from '@renderer/components/settings/AboutPanel'
 import { GeneralPanel } from '@renderer/components/settings/GeneralPanel'
 import { NetworkPanel } from '@renderer/components/settings/NetworkPanel'
+import { NotificationPanel } from '@renderer/components/settings/NotificationPanel'
 import { SettingsNav } from '@renderer/components/settings/SettingsNav'
 import type { SettingsSection } from '@renderer/components/settings/SettingsNav'
 import { errorMessage, invoke } from '@renderer/lib/ipc'
 
-type SectionKey = 'account' | 'general' | 'network' | 'about'
+type SectionKey = 'account' | 'general' | 'notifications' | 'network' | 'about'
 
 /**
- * Batch A's four groups. The remaining four (消息通知 / 快捷键 / 数据与存储 /
- * 隐私与安全) are specified in design doc §9.11.3 and land with their own writes;
- * they are not drawn as dead rows here on purpose.
+ * The groups that exist, in design doc §9.11.3's order. Batch A shipped the four
+ * around 消息通知; 消息通知 itself is batch B's first group. The remaining three
+ * (快捷键 / 数据与存储 / 隐私与安全) are not drawn as dead rows on purpose.
  */
 const SECTIONS: readonly (SettingsSection & { key: SectionKey })[] = [
   { key: 'account', label: '账号与安全' },
   { key: 'general', label: '通用' },
+  { key: 'notifications', label: '消息通知' },
   { key: 'network', label: '网络与代理' },
   { key: 'about', label: '关于' },
 ]
@@ -112,6 +114,7 @@ export function SettingsWindow() {
         {section === 'general' && settings ? (
           <GeneralPanel settings={settings} onChange={(next) => void patch(next)} />
         ) : null}
+        {section === 'notifications' ? <NotificationPanel /> : null}
         {section === 'network' ? <NetworkPanel onError={setError} /> : null}
         {section === 'about' ? <AboutPanel /> : null}
       </div>

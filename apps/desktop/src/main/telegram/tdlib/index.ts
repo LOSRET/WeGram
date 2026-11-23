@@ -10,8 +10,11 @@ import type {
   InvokeResponse,
   Message,
   MessageProperties,
+  NotificationScope,
+  NotificationScopes,
   ProxyConfig,
   ProxyTestResult,
+  ScopeNotificationSettings,
   Self,
   StickerSet,
   StickerSetSummary,
@@ -519,6 +522,17 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
       name: 'prefer_ipv6',
       value: { _: 'optionValueBoolean', value: prefer },
     })
+  }
+
+  async notificationScopes(): Promise<NotificationScopes> {
+    return actions.notificationScopes(this.actionDeps)
+  }
+
+  async setNotificationScope(
+    scope: NotificationScope,
+    settings: ScopeNotificationSettings,
+  ): Promise<void> {
+    return actions.setNotificationScope(this.actionDeps, scope, settings)
   }
 
   /**

@@ -8,10 +8,13 @@ import type {
   InvokeChannel,
   InvokeRequest,
   InvokeResponse,
+  NotificationScope,
+  NotificationScopes,
   ProxyConfig,
   ProxyMode,
   ProxyState,
   ProxyTestResult,
+  ScopeNotificationSettings,
   TgBridge,
   ViewerItem,
 } from '@wegram/protocol'
@@ -153,6 +156,31 @@ let proxy: ProxyConfig | null = null
 /** The preview has no operating system to read, so 跟随系统代理 resolves to direct. */
 let proxyMode: ProxyMode = 'system'
 let preferIpv6 = false
+/**
+ * 消息通知 in the preview: the same three scopes, in memory. There is no account to
+ * sync with, so they start at the client's defaults and 桌面通知 starts on.
+ */
+const previewNotificationScopes: NotificationScopes = {
+  private: { muted: false, sound: true, showPreview: true },
+  group: { muted: false, sound: true, showPreview: true },
+  channel: { muted: false, sound: true, showPreview: true },
+}
+let previewDesktopNotifications = true
+
+/** The preview validates what its own switches send, like the IPC router would. */
+function isScopeNotificationSettings(value: unknown): value is ScopeNotificationSettings {
+  if (typeof value !== 'object' || value === null) return false
+  const record: Record<string, unknown> = { ...value }
+  return (
+    typeof record['muted'] === 'boolean' &&
+    typeof record['sound'] === 'boolean' &&
+    typeof record['showPreview'] === 'boolean'
+  )
+}
+
+function isNotificationScope(value: unknown): value is NotificationScope {
+  return value === 'private' || value === 'group' || value === 'channel'
+}
 
 function previewProxyState(): ProxyState {
   const active = proxyMode === 'manual' && proxy ? proxy : null
@@ -515,6 +543,8 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'ui:saveCommentAnchor':
     case 'ui:getRecentEmoji':
     case 'ui:saveRecentEmoji':
+    case 'ui:getViewerVolume':
+    case 'ui:setViewerVolume':
       return handlePreviewUi(channel, store)
     case 'settings:get':
       return settings
@@ -553,6 +583,19 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'network:set':
       preferIpv6 = Boolean(store.preferIpv6)
       return undefined
+    case 'notifications:get':
+      return { desktop: previewDesktopNotifications, scopes: previewNotificationScopes }
+    case 'notifications:setDesktop':
+      previewDesktopNotifications = Boolean(store.desktop)
+      return undefined
+    case 'notifications:setScope': {
+      const scope: unknown = store.scope
+      const settings: unknown = store.settings
+      if (isNotificationScope(scope) && isScopeNotificationSettings(settings)) {
+        previewNotificationScopes[scope] = { ...settings }
+      }
+      return undefined
+    }
     /**
      * The viewer is its own Electron window, so the browser preview can only
      * record the request (a photo or video click is a no-op there).

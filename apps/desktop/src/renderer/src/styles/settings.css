@@ -373,6 +373,14 @@
   color: var(--wx-text-secondary);
 }
 
+/* A sentence between groups: 消息通知's "these are the defaults" line. */
+.wx-set-note {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--wx-text-secondary);
+}
+
 .wx-set-disclaimer {
   margin: 28px 0 0;
   font-size: 12px;

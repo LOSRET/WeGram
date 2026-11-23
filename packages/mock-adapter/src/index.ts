@@ -10,8 +10,11 @@ import type {
   CustomEmojiSticker,
   Message,
   MessageProperties,
+  NotificationScope,
+  NotificationScopes,
   ProxyConfig,
   ProxyTestResult,
+  ScopeNotificationSettings,
   SearchMessagesCursor,
   Self,
   StickerSet,
@@ -41,6 +44,7 @@ import {
   type MockHistoryQuery,
   type MockNewerQuery,
 } from './history'
+import { createMockNotifications } from './notifications'
 import { createMockPolls } from './polls'
 import { mockMessageProperties } from './properties'
 import { searchChats, searchMessages, searchMessagesInScope } from './search'
@@ -103,6 +107,8 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   private readonly avatars: MockAvatars
   /** The fixture pack's install flags, written by the pack page. */
   private readonly stickerSetState = initialMockStickerSetState()
+  /** 消息通知's scope defaults; in memory, like every other fixture write. */
+  private readonly mockNotifications = createMockNotifications()
   private nextMessageId = 5000
   private nextFileId = 9000
   private timer: NodeJS.Timeout | null = null
@@ -521,6 +527,17 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
 
   async setPreferIpv6(_prefer: boolean): Promise<void> {
     // Fixtures never leave the machine: there is no address family to prefer.
+  }
+
+  async notificationScopes(): Promise<NotificationScopes> {
+    return this.mockNotifications.all()
+  }
+
+  async setNotificationScope(
+    scope: NotificationScope,
+    settings: ScopeNotificationSettings,
+  ): Promise<void> {
+    this.mockNotifications.set(scope, settings)
   }
 
   /* ---------- fixture plumbing ---------- */

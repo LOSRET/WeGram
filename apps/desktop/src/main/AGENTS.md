@@ -19,7 +19,9 @@ settings-window.ts  the 设置 window: frameless 640×558, NOT parented (design 
 qr-window.ts        the 群二维码 window: frameless 360×560, parented to the shell (closes
                     with it), owns the chat it draws for qr:info and the window's ×
 notifications.ts    desktop toasts from TDLib's notification stream; suppresses the chat
-                    the focused shell shows (ui:setActiveChat), flashes the task bar
+                    the focused shell shows (ui:setActiveChat), flashes the task bar, and
+                    stops at once when 设置 → 消息通知's 桌面通知 switch is off (read per
+                    delivery through store/prefs.ts)
 tray.ts / tray-icon.ts  the Windows notification-area icon (best-effort: logs and carries
                     on when the session has no notification area)
 ipc/router.ts       per-channel zod validation, typed handler map, Result envelope
@@ -36,7 +38,8 @@ telegram/tdlib/     lifecycle.ts (create / crash / restart the client, reports B
                     service-copy table and is max-lines exempt, see docs/技术方案.md §8.3;
                     rich, poll, media.ts holds the one media field table)
 telegram/tdlib/actions/  TDLib requests as functions over ActionDeps, grouped into
-                    chats / pins / history / files / send / comments / poll / users
+                    chats / pins / history / files / send / comments / poll / users /
+                    notification-settings (消息通知's per-scope defaults)
                     (index.ts re-exports); message-input.ts holds the one send
                     envelope. pins.ts owns 群公告 + 置顶消息 (one pinned message per
                     chat, and an unpin has to resolve the current id)
@@ -58,7 +61,8 @@ media/              registry.ts (token → path | fileId) / protocol.ts (wx-medi
                     (the byte pump, pure) / leases.ts (per-file download holders, pure) /
                     image-size.ts / voice-file.ts (a recorded 语音消息's temporary OGG:
                     written by the handler, pruned at startup once stale)
-store/              ui-db.ts (all SQL) / settings.ts (proxy + TDLib network options)
+store/              ui-db.ts (all SQL) / settings.ts (proxy + TDLib network options) /
+                    prefs.ts (ui.db-backed 关闭主窗口 · 发送消息 · 桌面通知, read on demand)
 proxy*.ts           proxy DTO ↔ stored config
 proxy-controller.ts the ONE place that decides the proxy in force (§6.4): manual →
                     WEGRAM_PROXY (dev) → system → direct, plus the 30 s retry that
