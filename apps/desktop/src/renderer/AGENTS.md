@@ -135,6 +135,9 @@ lib/albumSend.ts      (pure, unit-tested) when a multi-select becomes ONE Telegr
 lib/useComposerInput.ts  composition ref + textarea props, shared by both composers
 lib/contacts.ts       通讯录 initial/grouping, pinyin via ICU (pure, unit-tested)
 lib/entities.ts       TL entity → text segments (pure, unit-tested)
+lib/mentionText.ts    (pure, unit-tested) the @usernames a plain string carries — a
+                      sticker pack's title is parsed like message text, the one
+                      non-message surface the official client also links
 lib/useAnchoredScroll.ts  ready gate, stick-to-bottom, resize compensation
 lib/scrollGeometry.ts (pure, unit-tested) the ONE "is the reader at the bottom" rule
 lib/jumpSettle.ts    (pure, unit-tested) "has the jump to the newest message landed?"

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { chatSummarySchema } from './chat'
+import { messageEntitySchema } from './dto'
 
 /**
  * 资料卡 (the person card) and the writes it offers.
@@ -25,6 +26,12 @@ export const userProfileSchema = z.object({
   avatarUrl: z.string().optional(),
   /** 简介 (TDLib `userFullInfo.bio`), plain text; absent when empty. */
   bio: z.string().optional(),
+  /**
+   * 简介's TL entities (TDLib `userFullInfo.bio.entities`). A bio may carry links
+   * and @mentions, and the official client makes them clickable — the one
+   * non-message surface besides a sticker pack's title (design doc §8.3).
+   */
+  bioEntities: z.array(messageEntitySchema).optional(),
   /** 备注 (TDLib `userFullInfo.note`), plain text; absent when empty. */
   note: z.string().optional(),
   /** 共同群聊: TDLib `group_in_common_count`. 0 when there are none. */

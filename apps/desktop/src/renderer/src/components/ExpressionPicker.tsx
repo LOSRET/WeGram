@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { searchEmoji } from '../lib/emoji'
+import { openMention } from '../lib/openMention'
 import { pageForIndex } from '../lib/pickerTabs'
 import { containsText, normalizeQuery } from '../lib/search'
 import { EmojiBody } from './picker/EmojiBody'
@@ -100,6 +101,12 @@ export function ExpressionPicker({ onPickEmoji, onSendSticker, onClose }: Expres
             error={setError}
             set={activeSet}
             onSend={onSendSticker}
+            onMention={(target) => {
+              // The panel floats over the conversation, so it closes before the
+              // mention's chat takes over the pane.
+              onClose()
+              openMention(target)
+            }}
           />
         )}
       </div>

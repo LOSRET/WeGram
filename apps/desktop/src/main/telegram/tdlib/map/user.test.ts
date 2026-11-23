@@ -75,6 +75,47 @@ describe('mapUserProfile', () => {
     expect(profile.commonChats).toBe(0)
   })
 
+  it('keeps the entities a bio carries, rebased after trimming', () => {
+    const profile = mapUserProfile(
+      ctx(),
+      user(),
+      {
+        bio: {
+          _: 'formattedText',
+          text: '  @ada_lovelace 写的历史',
+          entities: [{ _: 'textEntity', type: { _: 'textEntityTypeMention' }, offset: 2, length: 13 }],
+        },
+        group_in_common_count: 0,
+        block_list: null,
+      },
+      false,
+    )
+
+    // The card trims, so the mention's offset moves with the text.
+    expect(profile.bio).toBe('@ada_lovelace 写的历史')
+    expect(profile.bioEntities).toEqual([{ type: 'mention', offset: 0, length: 13 }])
+  })
+
+  it('drops a bio entity the trimmed text no longer covers', () => {
+    const profile = mapUserProfile(
+      ctx(),
+      user(),
+      {
+        bio: {
+          _: 'formattedText',
+          text: 'hi   ',
+          entities: [{ _: 'textEntity', type: { _: 'textEntityTypeBold' }, offset: 4, length: 3 }],
+        },
+        group_in_common_count: 0,
+        block_list: null,
+      },
+      false,
+    )
+
+    expect(profile.bio).toBe('hi')
+    expect(profile.bioEntities).toBeUndefined()
+  })
+
   it("carries TDLib's reportability for the private chat", () => {
     const bot = mapUserProfile(ctx(), user({ is_bot: true }), undefined, true)
     expect(bot.canBeReported).toBe(true)

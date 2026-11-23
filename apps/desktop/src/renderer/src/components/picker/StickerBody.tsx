@@ -1,6 +1,9 @@
 import type { Sticker, StickerSet } from '@wegram/protocol'
 
+import type { MentionTarget } from '../../lib/mention'
+import { mentionEntitiesOf } from '../../lib/mentionText'
 import { stickerMedia } from '../../lib/stickerMedia'
+import { RichText } from '../RichText'
 import { StickerRenderer } from '../StickerRenderer'
 
 /**
@@ -13,16 +16,23 @@ export function StickerBody({
   error,
   set,
   onSend,
+  onMention,
 }: {
   title: string
   loading: boolean
   error: string | null
   set: StickerSet | null
   onSend: (sticker: Sticker) => void
+  /** A pack name advertises its author: the @username opens that account (§8.3). */
+  onMention: (target: MentionTarget) => void
 }) {
   return (
     <>
-      {title ? <div className="wx-picker__label wx-picker__label--set">{title}</div> : null}
+      {title ? (
+        <div className="wx-picker__label wx-picker__label--set">
+          <RichText text={title} entities={mentionEntitiesOf(title)} onMention={onMention} />
+        </div>
+      ) : null}
       {loading ? (
         <div className="wx-picker__state">
           <span className="wx-spinner" />

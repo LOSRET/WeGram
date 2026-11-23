@@ -2,7 +2,7 @@ import type { MessageEntity } from '@wegram/protocol'
 import { Fragment, useState, type ReactNode } from 'react'
 
 import { segmentText, type EntityAttributes } from '../lib/entities'
-import { mentionTarget } from '../lib/mention'
+import { mentionTarget, type MentionTarget } from '../lib/mention'
 import { openMention } from '../lib/openMention'
 import { CustomEmoji } from './CustomEmoji'
 import { TelegramLink } from './TelegramLink'
@@ -10,6 +10,12 @@ import { TelegramLink } from './TelegramLink'
 interface RichTextProps {
   text: string
   entities?: MessageEntity[] | undefined
+  /**
+   * Where a mention leads. The transcript keeps the default (`openMention`); the
+   * expression picker closes itself first, so the panel does not keep floating
+   * over the conversation one of its titles just opened.
+   */
+  onMention?: (target: MentionTarget) => void
 }
 
 /**
@@ -17,12 +23,14 @@ interface RichTextProps {
  * `segmentText` turns them into pieces that know every entity covering them, and
  * each piece is wrapped inside-out in a fixed order so nesting is stable.
  */
-export function RichText({ text, entities }: RichTextProps) {
+export function RichText({ text, entities, onMention }: RichTextProps) {
   const segments = segmentText(text, entities)
   return (
     <>
       {segments.map((segment, index) => (
-        <Fragment key={index}>{wrapSegment(text, segment.text, segment.entities)}</Fragment>
+        <Fragment key={index}>
+          {wrapSegment(text, segment.text, segment.entities, onMention)}
+        </Fragment>
       ))}
     </>
   )
@@ -45,16 +53,26 @@ const WRAP_ORDER: Array<MessageEntity['type']> = [
   'textUrl',
 ]
 
-function wrapSegment(fullText: string, text: string, entities: EntityAttributes[]): ReactNode {
+function wrapSegment(
+  fullText: string,
+  text: string,
+  entities: EntityAttributes[],
+  onMention: ((target: MentionTarget) => void) | undefined,
+): ReactNode {
   let node: ReactNode = text
   const ordered = [...entities].sort(
     (a, b) => WRAP_ORDER.indexOf(a.type) - WRAP_ORDER.indexOf(b.type),
   )
-  for (const entity of ordered) node = wrap(entity, node, fullText)
+  for (const entity of ordered) node = wrap(entity, node, fullText, onMention)
   return node
 }
 
-function wrap(entity: EntityAttributes, children: ReactNode, fullText: string): ReactNode {
+function wrap(
+  entity: EntityAttributes,
+  children: ReactNode,
+  fullText: string,
+  onMention: ((target: MentionTarget) => void) | undefined,
+): ReactNode {
   switch (entity.type) {
     case 'bold':
       return <strong>{children}</strong>
@@ -85,6 +103,7 @@ function wrap(entity: EntityAttributes, children: ReactNode, fullText: string): 
       const covered = fullText.slice(entity.offset, entity.offset + entity.length)
       const target = mentionTarget(covered, entity)
       if (!target) return <span className="wx-entity-mention">{children}</span>
+      const open = onMention ?? openMention
       return (
         <span
           className="wx-entity-mention wx-entity-mention--link"
@@ -96,10 +115,10 @@ function wrap(entity: EntityAttributes, children: ReactNode, fullText: string): 
             // open the chat and the URL in a browser window.
             event.preventDefault()
             event.stopPropagation()
-            openMention(target)
+            open(target)
           }}
           onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') openMention(target)
+            if (event.key === 'Enter' || event.key === ' ') open(target)
           }}
         >
           {children}

@@ -4,9 +4,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { formatPhone } from '../lib/format'
 import { errorMessage, invoke } from '../lib/ipc'
 import { activateChat } from '../lib/openChat'
+import { openMention } from '../lib/openMention'
 import { useAppStore } from '../store/useAppStore'
 import { Avatar } from './Avatar'
 import { ReportDialog } from './ReportDialog'
+import { RichText } from './RichText'
 
 interface ProfileCardProps {
   userId: number
@@ -199,7 +201,22 @@ export function ProfileCard({ userId, onOpenChat, onClose }: ProfileCardProps) {
               {profile.bio ? (
                 <div className="wx-profile__row">
                   <span className="wx-profile__label">简介</span>
-                  <span className="wx-profile__value">{profile.bio}</span>
+                  {/*
+                    简介 keeps its TL entities: a bio carries links and @mentions,
+                    and the official client opens them (§8.3). The card closes
+                    first so it does not float over the conversation a mention
+                    just opened.
+                  */}
+                  <span className="wx-profile__value">
+                    <RichText
+                      text={profile.bio}
+                      entities={profile.bioEntities}
+                      onMention={(target) => {
+                        onClose()
+                        openMention(target)
+                      }}
+                    />
+                  </span>
                 </div>
               ) : null}
 
