@@ -174,6 +174,12 @@ export interface TelegramAdapter {
   /** 置顶聊天 / 取消置顶; answers the refreshed summary. */
   setChatPinned(chatId: number, pinned: boolean): Promise<ChatSummary>
   /**
+   * 归档聊天 / 取消归档. The Archive is TDLib's second chat list, so this moves
+   * the chat between `chatListMain` and `chatListArchive`; the refreshed summary
+   * carries the `archived` flag the renderer routes the row by.
+   */
+  setChatArchived(chatId: number, archived: boolean): Promise<ChatSummary>
+  /**
    * 清空聊天记录: TDLib deletes this account's copy of the history
    * (`revoke: false`), which is what WeChat's own clear does — the peers keep
    * theirs.

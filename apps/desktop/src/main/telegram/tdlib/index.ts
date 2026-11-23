@@ -296,6 +296,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   readonly joinChannel = this.chatApi.joinChannel
   readonly setChatMuted = this.chatApi.setChatMuted
   readonly setChatPinned = this.chatApi.setChatPinned
+  readonly setChatArchived = this.chatApi.setChatArchived
   readonly clearHistory = this.chatApi.clearHistory
   readonly deleteChat = this.chatApi.deleteChat
   readonly setChatUnread = this.chatApi.setChatUnread

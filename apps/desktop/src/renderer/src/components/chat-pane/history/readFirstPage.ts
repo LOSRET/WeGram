@@ -61,7 +61,9 @@ export async function readFirstPage(
    * messages at all; `emptyPageIsHistory` owns the rule for using that knowledge.
    * A genuinely empty chat has no `lastMessageAt`, so its empty page is still real.
    */
-  const chat = useAppStore.getState().chats.find((item) => item.id === chatId)
+  // Either list: an archived chat's first page follows the same empty-page rule.
+  const state = useAppStore.getState()
+  const chat = [...state.chats, ...state.archivedChats].find((item) => item.id === chatId)
   if (first.messages.length === 0 && !emptyPageIsHistory(first, chat)) throw new ColdCacheError()
 
   let messages = first.messages

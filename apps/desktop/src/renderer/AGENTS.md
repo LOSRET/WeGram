@@ -104,7 +104,16 @@ components/CustomEmoji.tsx  a Premium custom emoji in text: its sticker art at 2
                         with the base glyph as the fallback
 components/ChatList.tsx  the conversation column: pill (server search panel, §2.9 of
                         UI-HANDOFF), "+" and the virtualised rows; search results are a
-                        plain face in the same scroller (tabs + message rows)
+                        plain face in the same scroller (tabs + message rows). 已归档会话
+                        is a PAGE, not a third face: ArchiveEntry (the row above the
+                        scroller, with the archive's unread total) mounts
+                        `chat-list/ArchivePage.tsx`, an overlay inside this column that
+                        slides in from the right over the rows (transform only — the list
+                        keeps its rows and scroll position underneath) with its own
+                        scroller + virtualiser, header ArchiveBar and the shared
+                        `chat-list/ChatRow.tsx`; its menu item is 取消归档, and the slide
+                        length is `ARCHIVE_PAGE_ANIM_MS` (`lib/archivePage.ts`, pinned by
+                        `style-contract.test.ts`)
 components/chat-search/ SearchTabs (聊天 / 频道) and SearchHitRow (one message hit:
                         chat face, chat title, message preview, time)
 components/SearchField.tsx  the ONE search pill (label + input + optional trailing control)
@@ -208,7 +217,9 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   unmount.** `CommentPanel` renders at `translateX(100%)` and flips `is-open` on the
   next tick (a 20 ms timeout, since rAF is throttled while occluded); on close the
   pane keeps it mounted for `COMMENT_PANEL_ANIM_MS` (250 ms) or the panel vanishes
-  mid-slide. `ChatInfoPanel` follows the same two rules, and it is an **overlay**:
+  mid-slide. `ArchivePage` is the same pattern inside the conversation column
+  (`ARCHIVE_PAGE_ANIM_MS`), including the auto-close when the archive empties.
+  `ChatInfoPanel` follows the same two rules, and it is an **overlay**:
   `translateX(100% → 0)` only. Never give it a width animation to "push" the chat — the
   owner's reference presses the sheet on top of the messages, and a width animation
   re-lays-out every virtualised row on every frame (an earlier version did, and was

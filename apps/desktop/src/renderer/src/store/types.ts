@@ -70,6 +70,12 @@ export interface AppData {
   /** 发送消息's rule; the composer reads it when an Enter lands (evt:settings). */
   sendKey: SendKey
   chats: ChatSummary[]
+  /**
+   * 已归档会话, TDLib's second chat list. It is a list of its own rather than a
+   * filter over `chats`: an archived chat is not in the main list at all, and the
+   * entry row above the conversation list reads its unread total from here.
+   */
+  archivedChats: ChatSummary[]
   activeChatId: number | null
   messagesByChat: Record<number, Message[]>
   /** Ops that arrived before a chat's first page did; replayed by setHistory. */
@@ -137,6 +143,7 @@ export interface AuthActions {
 
 export interface ChatActions {
   setChats: (chats: ChatSummary[]) => void
+  setArchivedChats: (chats: ChatSummary[]) => void
   applyChatOps: (ops: ChatOp[]) => void
   setActiveChat: (chatId: number | null) => void
 }

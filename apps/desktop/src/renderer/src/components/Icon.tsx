@@ -134,6 +134,73 @@ export function ChevronRightIcon({ size = 12, ...rest }: IconProps) {
 }
 
 /**
+ * 已归档会话's back chevron: the client has no archive page, so this is the mirror
+ * of `ChevronRightIcon` at the same weight — the archive is a page you can leave.
+ */
+export function ChevronLeftIcon({ size = 12, ...rest }: IconProps) {
+  return (
+    <svg
+      width={(size * 8) / 14}
+      height={size}
+      viewBox="0 0 8 14"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+      {...rest}
+    >
+      <path
+        d="M6 1.5 1.8 7 6 12.5"
+        stroke="currentColor"
+        strokeWidth={1.3}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+/**
+ * 已归档会话's tile glyph: Telegram's archive box (a lid, a body, a handle).
+ * WeChat has no archive row, so the tile is drawn at the same 1.4 px weight as
+ * the hand-drawn chrome around it rather than borrowed from the payload set.
+ */
+export function ArchiveIcon({ size = 22, ...rest }: IconProps) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+      {...rest}
+    >
+      <rect
+        x="3.4"
+        y="4.4"
+        width="17.2"
+        height="4.6"
+        rx="1.1"
+        stroke="currentColor"
+        strokeWidth={1.4}
+      />
+      <path
+        d="M4.9 9v8.4a1.8 1.8 0 0 0 1.8 1.8h10.6a1.8 1.8 0 0 0 1.8-1.8V9"
+        stroke="currentColor"
+        strokeWidth={1.4}
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9.7 12.3h4.6"
+        stroke="currentColor"
+        strokeWidth={1.4}
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+/**
  * 群二维码's trailing mark: WeChat draws a small QR pictogram next to the chevron.
  * Hand-drawn — three finder squares and four modules, at the same 1.2 px weight as
  * the surrounding chrome.

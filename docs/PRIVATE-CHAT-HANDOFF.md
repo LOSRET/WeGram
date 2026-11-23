@@ -163,7 +163,7 @@ person-days, for this repo's conventions.
 | P2 | Message effects | None | `getMessageEffect` + `messageSendOptions.effect_id` (private chats only) | 1–2 |
 | P2 | Scheduled / silent send | None | `messageSchedulingStateSendAtDate`, `messageSchedulingStateSendWhenOnline`, `disable_notification` | 1–2 |
 | P2 | Shared media / search filters | Text search only | `searchChatMessages(filter: searchMessagesFilterPhoto/Video/Document/Url)` | 1–2 |
-| P2 | Archived chats | `listChats` asks `chatListMain` only; search too | `chatListArchive`, `getArchiveChatListSettings` | 2–3 |
+| P2 | Archived chats | ~~`listChats` asks `chatListMain` only~~ — **done** (2026-11-23): `chats:list { list: 'archive' }`, `chats:setArchived` (`addChatToList`), the 已归档会话 entry row + archive page; global search still reads the main list only | `chatListArchive`, `addChatToList`, `chat.action_bar.can_unarchive` | — |
 | P2 | More 举报 entry points | `reportChat` (chat + message) is wired; 举报垃圾信息 banners, chat-photo and reaction reports are not | `chatActionBarReportSpam` / `chatActionBarReportAddBlock` (`chat.action_bar`), `reportChatPhoto`, `reportMessageReactions` | 2–3 |
 | P2 | Draft cloud sync | Local `ui.db` only | `setChatDraftMessage` + `updateChatDraftMessage` | 1–2 |
 | P2 | Multi-select / batch forward / forward-as-copy | One message at a time | `forwardMessages` array + `messageCopyOptions` | 2–3 |

@@ -36,9 +36,15 @@ function requireFixture(store: MockChatStore, chatId: number): Fixture {
 
 export function listMockChats(
   store: MockChatStore,
-  input: { limit: number; offset: number },
+  input: { limit: number; offset: number; list?: 'main' | 'archive' },
 ): ChatSummary[] {
-  const all = sortChatList([...store.fixtures.values()].map((fixture) => fixture.chat))
+  // Main and Archive are two lists, like TDLib's chatListMain / chatListArchive.
+  const wantArchive = input.list === 'archive'
+  const all = sortChatList(
+    [...store.fixtures.values()]
+      .map((fixture) => fixture.chat)
+      .filter((chat) => (chat.archived === true) === wantArchive),
+  )
   return all.slice(input.offset, input.offset + input.limit)
 }
 
@@ -113,6 +119,21 @@ export function setMockMuted(store: MockChatStore, chatId: number, muted: boolea
 export function setMockPinned(store: MockChatStore, chatId: number, pinned: boolean): ChatSummary {
   const fixture = requireFixture(store, chatId)
   fixture.chat.pinned = pinned
+  store.emit({ type: 'chats', ops: [{ op: 'upsert', chat: { ...fixture.chat } }] })
+  return { ...fixture.chat }
+}
+
+/**
+ * 归档 / 取消归档: the fixture keeps the flag and the renderer routes the upsert
+ * into the archive list, exactly like TDLib's `addChatToList` move.
+ */
+export function setMockArchived(
+  store: MockChatStore,
+  chatId: number,
+  archived: boolean,
+): ChatSummary {
+  const fixture = requireFixture(store, chatId)
+  fixture.chat.archived = archived
   store.emit({ type: 'chats', ops: [{ op: 'upsert', chat: { ...fixture.chat } }] })
   return { ...fixture.chat }
 }
@@ -234,7 +255,7 @@ export function mockInviteLink(chatId: number, temporary = false): ChatInviteLin
  * straight onto its methods, which keeps its class body inside the line budget.
  */
 export interface MockChatApi {
-  listChats(input: { limit: number; offset: number }): Promise<ChatSummary[]>
+  listChats(input: { limit: number; offset: number; list?: 'main' | 'archive' }): Promise<ChatSummary[]>
   getChat(chatId: number): Promise<ChatSummary>
   openChat(chatId: number): Promise<void>
   openPrivateChat(userId: number): Promise<ChatSummary>
@@ -245,6 +266,7 @@ export interface MockChatApi {
   join(chatId: number): Promise<ChatJoinResult>
   setMuted(chatId: number, muted: boolean): Promise<ChatSummary>
   setPinned(chatId: number, pinned: boolean): Promise<ChatSummary>
+  setArchived(chatId: number, archived: boolean): Promise<ChatSummary>
   clearHistory(chatId: number): Promise<void>
   deleteChat(chatId: number): Promise<void>
   setChatUnread(chatId: number, unread: boolean): Promise<ChatSummary>
@@ -276,6 +298,7 @@ export function createMockChats(
     join: async (chatId) => joinMockChannel(store, chatId),
     setMuted: async (chatId, muted) => setMockMuted(store, chatId, muted),
     setPinned: async (chatId, pinned) => setMockPinned(store, chatId, pinned),
+    setArchived: async (chatId, archived) => setMockArchived(store, chatId, archived),
     clearHistory: async (chatId) => clearMockHistory(store, chatId),
     deleteChat: async (chatId) => deleteMockChat(store, chatId),
     setChatUnread: async (chatId, unread) => setMockChatUnread(store, chatId, unread),

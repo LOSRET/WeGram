@@ -1,4 +1,4 @@
-import type { ChatSummary, Message, MessageOp } from '@wegram/protocol'
+import type { ChatOp, ChatSummary, Message, MessageOp } from '@wegram/protocol'
 
 /**
  * Pure state transitions of the message/chats store.
@@ -20,6 +20,49 @@ export function sortChats(chats: ChatSummary[]): ChatSummary[] {
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
     return (b.lastMessageAt ?? 0) - (a.lastMessageAt ?? 0)
   })
+}
+
+/** The renderer's two conversation lists (Main and 已归档). */
+export interface ChatLists {
+  chats: ChatSummary[]
+  archivedChats: ChatSummary[]
+}
+
+/**
+ * Route chat ops into the two lists.
+ *
+ * An upsert is also a move: 归档 is not a deletion — a `remove` op would drop the
+ * transcript with the row — so the summary's `archived` flag decides which list
+ * holds the chat. That one rule covers archiving from the menu, unarchiving, and
+ * TDLib moving a chat by itself when it is unarchived on another device.
+ *
+ * Returns the ids that a `remove` op deleted separately: the caller has to drop
+ * their transcripts and paging state too.
+ */
+export function routeChatOps(
+  current: ChatLists,
+  ops: ChatOp[],
+): ChatLists & { removed: number[] } {
+  const main = new Map(current.chats.map((chat) => [chat.id, chat]))
+  const archive = new Map(current.archivedChats.map((chat) => [chat.id, chat]))
+  const removed: number[] = []
+  for (const op of ops) {
+    if (op.op === 'upsert') {
+      main.delete(op.chat.id)
+      archive.delete(op.chat.id)
+      const target = op.chat.archived === true ? archive : main
+      target.set(op.chat.id, op.chat)
+      continue
+    }
+    main.delete(op.chatId)
+    archive.delete(op.chatId)
+    removed.push(op.chatId)
+  }
+  return {
+    chats: sortChats([...main.values()]),
+    archivedChats: sortChats([...archive.values()]),
+    removed,
+  }
 }
 
 export function upsertMessage(list: Message[], message: Message): Message[] {

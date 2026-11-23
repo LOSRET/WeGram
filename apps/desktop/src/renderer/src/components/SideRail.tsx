@@ -38,13 +38,17 @@ export function SideRail({ section, onSectionChange, onOpenMenu, onUnavailable }
   const auth = useAppStore((state) => state.auth)
   const connection = useAppStore((state) => state.connection)
   const chats = useAppStore((state) => state.chats)
+  const archivedChats = useAppStore((state) => state.archivedChats)
 
   const me = auth.kind === 'ready' ? auth.me : null
   const name = me ? [me.firstName, me.lastName].filter(Boolean).join('') : '我'
   // The profile photo arrives from `getMe` → `downloadFile` once TDLib has it;
   // until then the rail keeps the initial like a freshly added contact.
   const avatarUrl = me?.avatarUrl ?? null
-  const unread = chats.reduce((total, chat) => total + chat.unread, 0)
+  // Both lists count: 已归档会话 is still unread messages, and Telegram's app icon
+  // adds the archive in too — the archive row's own badge is just the part of it
+  // that lives behind that row.
+  const unread = [...chats, ...archivedChats].reduce((total, chat) => total + chat.unread, 0)
 
   const openMenu = (event: MouseEvent<HTMLButtonElement>): void => {
     const rect = event.currentTarget.getBoundingClientRect()

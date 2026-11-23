@@ -21,6 +21,14 @@ export const chatSummarySchema = z.object({
   pinned: z.boolean(),
   muted: z.boolean(),
   /**
+   * 已归档会话: TDLib keeps the Archive as a chat list of its own
+   * (`chatListArchive`), not as a flag on the row, and a chat belongs to exactly
+   * one of Main / Archive. The renderer routes an upsert by this field, so
+   * archiving moves the row between two lists instead of sending a `remove` op
+   * (which would drop the transcript with it).
+   */
+  archived: z.boolean().optional(),
+  /**
    * 标为未读 (TDLib `chat.is_marked_as_unread`): a flag the reader sets by hand,
    * independent of the unread counter. The row draws a dot, not a count, and the
    * flag is cleared when the chat is opened.

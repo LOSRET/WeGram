@@ -72,6 +72,18 @@ export function setPreviewPinned(
   return { ...chat }
 }
 
+/** 归档 / 取消归档: the preview keeps the flag; the shell routes the upsert. */
+export function setPreviewArchived(
+  store: PreviewChatStore,
+  chatId: number,
+  archived: boolean,
+): ChatSummary {
+  const chat = findChat(store, chatId)
+  chat.archived = archived
+  announce(store, chat)
+  return { ...chat }
+}
+
 /** 清空聊天记录: this account's copy only, exactly like the mock adapter. */
 export function clearPreviewHistory(store: PreviewChatStore, chatId: number): void {
   const chat = findChat(store, chatId)

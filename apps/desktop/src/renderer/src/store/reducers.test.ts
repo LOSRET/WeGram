@@ -1,4 +1,4 @@
-import type { Message, MessageOp } from '@wegram/protocol'
+import type { ChatSummary, Message, MessageOp } from '@wegram/protocol'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -7,6 +7,7 @@ import {
   appendNewerMessages,
   hasReplayableOps,
   reduceOps,
+  routeChatOps,
   sortChats,
   splitOpsForWindow,
 } from './reducers'
@@ -56,6 +57,56 @@ describe('sortChats', () => {
       { id: 2, title: 'b', kind: 'private', unread: 0, pinned: false, lastMessageAt: 5 },
     ]
     expect(sortChats(chats as never).map((chat) => chat.id)).toEqual([2, 1])
+  })
+})
+
+describe('routeChatOps', () => {
+  const chat = (id: number, overrides: Partial<ChatSummary> = {}): ChatSummary => ({
+    id,
+    title: `c${id}`,
+    kind: 'private',
+    unread: 0,
+    pinned: false,
+    muted: false,
+    lastMessageAt: 1_700_000_000 - id,
+    ...overrides,
+  })
+
+  it('moves an archived row out of the main list without a remove op', () => {
+    const lists = routeChatOps({ chats: [chat(1), chat(2)], archivedChats: [] }, [
+      { op: 'upsert', chat: chat(1, { archived: true }) },
+    ])
+    expect(lists.chats.map((item) => item.id)).toEqual([2])
+    expect(lists.archivedChats.map((item) => item.id)).toEqual([1])
+    // Nothing was deleted: the transcript has to survive the move.
+    expect(lists.removed).toEqual([])
+  })
+
+  it('moves an unarchived row back and keeps one copy of it', () => {
+    const lists = routeChatOps({ chats: [], archivedChats: [chat(1, { archived: true })] }, [
+      { op: 'upsert', chat: chat(1) },
+    ])
+    expect(lists.chats.map((item) => item.id)).toEqual([1])
+    expect(lists.archivedChats).toEqual([])
+  })
+
+  it('keeps the archive in the same order as the main list', () => {
+    const lists = routeChatOps({ chats: [], archivedChats: [] }, [
+      { op: 'upsert', chat: chat(1, { archived: true }) },
+      { op: 'upsert', chat: chat(2, { archived: true, pinned: true }) },
+      { op: 'upsert', chat: chat(3, { archived: true, lastMessageAt: 1_700_000_100 }) },
+    ])
+    expect(lists.archivedChats.map((item) => item.id)).toEqual([2, 3, 1])
+  })
+
+  it('drops a deleted chat from both lists and reports it', () => {
+    const lists = routeChatOps(
+      { chats: [chat(1)], archivedChats: [chat(2, { archived: true })] },
+      [{ op: 'remove', chatId: 2 }],
+    )
+    expect(lists.chats.map((item) => item.id)).toEqual([1])
+    expect(lists.archivedChats).toEqual([])
+    expect(lists.removed).toEqual([2])
   })
 })
 

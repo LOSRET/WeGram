@@ -44,6 +44,7 @@ import {
   searchPreviewAllMessages,
   searchPreviewChats,
   searchPreviewMessages,
+  setPreviewArchived,
   setPreviewMuted,
   setPreviewPinned,
   setPreviewUnread,
@@ -220,8 +221,11 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       return undefined
     case 'auth:me':
       return ME
-    case 'chats:list':
-      return chats
+    case 'chats:list': {
+      // The Archive is the second list, exactly like TDLib's chatListArchive.
+      const wantArchive = store.list === 'archive'
+      return chats.filter((chat) => (chat.archived === true) === wantArchive)
+    }
     case 'chats:get': {
       const chat = chats.find((item) => item.id === store.chatId)
       if (!chat) throw { code: 'invalid_payload', message: `找不到会话 ${String(store.chatId)}` }
@@ -259,6 +263,8 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       return setPreviewMuted(previewChats, Number(store.chatId), Boolean(store.muted))
     case 'chats:setPinned':
       return setPreviewPinned(previewChats, Number(store.chatId), Boolean(store.pinned))
+    case 'chats:setArchived':
+      return setPreviewArchived(previewChats, Number(store.chatId), Boolean(store.archived))
     case 'chats:clearHistory':
       return clearPreviewHistory(previewChats, Number(store.chatId))
     case 'chats:delete':

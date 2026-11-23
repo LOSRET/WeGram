@@ -261,6 +261,15 @@ export function createUpdateHandler(deps: UpdateDeps): (update: TdObject) => Pro
       case 'updateNewChat':
         await emitChatUpsert(deps, update.chat?.id ?? update.chat_id)
         return
+      /**
+       * Archiving is a list move, not a chat field: TDLib announces it with these
+       * two updates (a position update follows), and the refreshed summary is what
+       * tells the renderer which list now holds the row.
+       */
+      case 'updateChatAddedToList':
+      case 'updateChatRemovedFromList':
+        await emitChatUpsert(deps, update.chat_id)
+        return
       case 'updateChatTitle':
         if (typeof update.title === 'string') {
           deps.mapper.chatTitles.set(update.chat_id, update.title)

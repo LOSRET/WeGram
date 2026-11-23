@@ -61,8 +61,12 @@ export function App() {
       if (useAppStore.getState().auth.kind !== 'ready' || resyncing) return
       resyncing = true
       try {
-        const chats = await invoke('chats:list', { limit: RESYNC_CHAT_LIMIT, offset: 0 })
+        const [chats, archivedChats] = await Promise.all([
+          invoke('chats:list', { limit: RESYNC_CHAT_LIMIT, offset: 0 }),
+          invoke('chats:list', { limit: RESYNC_CHAT_LIMIT, offset: 0, list: 'archive' }),
+        ])
         useAppStore.getState().setChats(chats)
+        useAppStore.getState().setArchivedChats(archivedChats)
 
         const activeChatId = useAppStore.getState().activeChatId
         if (activeChatId !== null) {
@@ -181,7 +185,9 @@ export function App() {
         track(event.seq)
         const { chatId, messageId } = event.payload
         const state = useAppStore.getState()
-        const chat = state.chats.find((item) => item.id === chatId)
+        const chat =
+          state.chats.find((item) => item.id === chatId) ??
+          state.archivedChats.find((item) => item.id === chatId)
         if (chat) {
           state.requestLocate(chatId, messageId)
           if (state.activeChatId !== chatId) activateChat(chat)
@@ -241,8 +247,15 @@ export function App() {
     if (!ready) return
     void (async () => {
       try {
-        const chats = await invoke('chats:list', { limit: 100, offset: 0 })
-        useAppStore.getState().setChats(chats)
+        // Both lists, because 已归档会话 is a row above the conversation list and
+        // has to be there on the first paint. `Promise.all` keeps one error path.
+        const [chats, archivedChats] = await Promise.all([
+          invoke('chats:list', { limit: 100, offset: 0 }),
+          invoke('chats:list', { limit: 100, offset: 0, list: 'archive' }),
+        ])
+        const store = useAppStore.getState()
+        store.setChats(chats)
+        store.setArchivedChats(archivedChats)
       } catch (error) {
         useAppStore.getState().setError(errorMessage(error))
       }

@@ -21,6 +21,7 @@ interface Anchor {
 
 export function MainShell() {
   const chats = useAppStore((state) => state.chats)
+  const archivedChats = useAppStore((state) => state.archivedChats)
   const activeChatId = useAppStore((state) => state.activeChatId)
   const error = useAppStore((state) => state.error)
   const setError = useAppStore((state) => state.setError)
@@ -216,6 +217,7 @@ export function MainShell() {
           <>
             <ChatList
               chats={chats}
+              archivedChats={archivedChats}
               activeChatId={activeChatId}
               query={query}
               onQueryChange={setQuery}

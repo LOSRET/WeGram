@@ -183,6 +183,7 @@ export function createHandlers({
     'chats:join': (payload) => adapter.joinChannel(payload.chatId),
     'chats:setMuted': (payload) => adapter.setChatMuted(payload.chatId, payload.muted),
     'chats:setPinned': (payload) => adapter.setChatPinned(payload.chatId, payload.pinned),
+    'chats:setArchived': (payload) => adapter.setChatArchived(payload.chatId, payload.archived),
     'chats:clearHistory': (payload) => adapter.clearHistory(payload.chatId),
     'chats:delete': (payload) => adapter.deleteChat(payload.chatId),
     'chats:setUnread': (payload) => adapter.setChatUnread(payload.chatId, payload.unread),

@@ -1,6 +1,12 @@
 /* ---------- Conversation list ---------- */
 
 .wx-list {
+  position: relative;
+  /* The archived-chats page slides in from `translateX(100%)`, which is outside
+     this column: without the clip it is painted over the transcript and the
+     composer for the length of the slide. Menus are portalled to `<body>`, so
+     they are not affected. */
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   width: var(--wx-sidebar-w);
@@ -70,15 +76,20 @@
 
 .wx-list__body {
   position: relative;
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
 }
 
 /* The scroller is its own layer so the overlay bar can float above it without
-   being part of the scrolling content. */
+   being part of the scrolling content. It is the body's flex child, so the
+   已归档会话 entry can sit above it without being scrolled away; the overlay bar
+   measures the scroller's own rect, so the offset costs nothing. */
 .wx-list__view {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -263,6 +274,99 @@
 
 .wx-chat-item--active .wx-badge--dot {
   background: rgba(255, 255, 255, 0.8);
+}
+
+/* ---------- 已归档会话 ---------- */
+
+/* The archive row above the conversation list: a door to the second chat list,
+   not a collapsible header. Same 65 px rhythm as a conversation row, so the two
+   read as one column. */
+.wx-archive-entry {
+  flex: 0 0 var(--wx-list-item-h);
+  width: 100%;
+  border: none;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+}
+
+.wx-archive-entry__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--wx-avatar);
+  height: var(--wx-avatar);
+  flex: 0 0 var(--wx-avatar);
+  border-radius: 6px;
+  background: var(--wx-field);
+  color: var(--wx-icon-strong);
+}
+
+/* The archived-chats page: an overlay inside the column that slides in from the
+   right, over the entry row and the rows — the list underneath keeps its rows and
+   its scroll position, so coming back needs no reload. Mounted closed, flipped
+   open on the next tick; the 0.2s slide is ARCHIVE_PAGE_ANIM_MS and
+   style-contract.test.ts pins the two together. */
+.wx-archive-page {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  background: var(--wx-list);
+  transform: translateX(100%);
+  transition: transform 0.2s cubic-bezier(0.22, 0.8, 0.2, 1);
+}
+
+.wx-archive-page.is-open {
+  transform: translateX(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wx-archive-page {
+    transition: none;
+  }
+}
+
+/* The archive page's header takes the conversation head's slot (search + "+"). */
+.wx-archive-bar {
+  gap: 8px;
+  padding: 0 11px;
+}
+
+.wx-archive-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--wx-icon-strong);
+}
+
+.wx-archive-back:hover {
+  color: var(--wx-text);
+}
+
+.wx-archive-bar__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--wx-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wx-archive-bar__count {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--wx-text-tertiary);
 }
 
 /* ---------- Global search results ---------- */

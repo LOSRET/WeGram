@@ -1,30 +1,34 @@
-import { sortChats } from '../reducers'
+import { routeChatOps, sortChats } from '../reducers'
 import type { ChatActions, SliceCreator } from '../types'
 
 /**
- * The conversation list.
+ * The conversation list and the archive.
  *
  * A `remove` op is 删除聊天 and must take the transcript with it: leaving
  * `messagesByChat[chatId]` behind would make the next TDLib id collision draw an
  * old row, and an open pane would keep rendering a chat that no longer exists.
  * The same op arrives for 退出群聊, so the cleanup is not optional.
+ *
+ * 归档 is the other direction: the adapter answers with a summary whose
+ * `archived` flag moved, and `routeChatOps` puts the row in the other list. No
+ * `remove` op is sent for it, which is exactly why the transcript stays loaded.
  */
 export const createChatsSlice: SliceCreator<ChatActions> = (set, get) => ({
   setChats: (chats) => set({ chats: sortChats(chats) }),
 
-  /** Live chat updates: upsert by id, delete on a delete op, keep the order. */
+  setArchivedChats: (chats) => set({ archivedChats: sortChats(chats) }),
+
+  /** Live chat updates: upsert by id (moving between Main and Archive), delete on a delete op. */
   applyChatOps: (ops) => {
     const state = get()
-    const byId = new Map(state.chats.map((chat) => [chat.id, chat]))
-    const removed: number[] = []
-    for (const op of ops) {
-      if (op.op === 'upsert') byId.set(op.chat.id, op.chat)
-      else {
-        byId.delete(op.chatId)
-        removed.push(op.chatId)
-      }
+    const routed = routeChatOps(
+      { chats: state.chats, archivedChats: state.archivedChats },
+      ops,
+    )
+    if (routed.removed.length === 0) {
+      set({ chats: routed.chats, archivedChats: routed.archivedChats })
+      return
     }
-    if (removed.length === 0) return set({ chats: sortChats([...byId.values()]) })
 
     const messagesByChat = { ...state.messagesByChat }
     const pendingOps = { ...state.pendingOps }
@@ -32,7 +36,7 @@ export const createChatsSlice: SliceCreator<ChatActions> = (set, get) => ({
     const hasNewerByChat = { ...state.hasNewerByChat }
     const olderPagesByChat = { ...state.olderPagesByChat }
     const unreadMarkers = { ...state.unreadMarkers }
-    for (const chatId of removed) {
+    for (const chatId of routed.removed) {
       delete messagesByChat[chatId]
       delete pendingOps[chatId]
       delete hasMoreByChat[chatId]
@@ -41,11 +45,12 @@ export const createChatsSlice: SliceCreator<ChatActions> = (set, get) => ({
       delete unreadMarkers[chatId]
     }
     const activeChatId =
-      state.activeChatId !== null && removed.includes(state.activeChatId)
+      state.activeChatId !== null && routed.removed.includes(state.activeChatId)
         ? null
         : state.activeChatId
     set({
-      chats: sortChats([...byId.values()]),
+      chats: routed.chats,
+      archivedChats: routed.archivedChats,
       messagesByChat,
       pendingOps,
       hasMoreByChat,

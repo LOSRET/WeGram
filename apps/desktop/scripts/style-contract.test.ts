@@ -3,6 +3,7 @@ import { join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
+import { ARCHIVE_PAGE_ANIM_MS } from '../src/renderer/src/lib/archivePage'
 import { INFO_PANEL_ANIM_MS } from '../src/renderer/src/lib/chatInfo'
 import { COMMENT_PANEL_ANIM_MS } from '../src/renderer/src/lib/comments'
 import { CHAT_ROW_H } from '../src/renderer/src/lib/listMetrics'
@@ -74,5 +75,11 @@ describe('style contract', () => {
 
   it('keeps the 聊天信息 slide equal to INFO_PANEL_ANIM_MS', () => {
     expect(propertyMs(read('chat-info.css'), '.wx-info {', 'transform')).toBe(INFO_PANEL_ANIM_MS)
+  })
+
+  it('keeps the 已归档会话 slide equal to ARCHIVE_PAGE_ANIM_MS', () => {
+    expect(propertyMs(read('chat-list.css'), '.wx-archive-page {', 'transform')).toBe(
+      ARCHIVE_PAGE_ANIM_MS,
+    )
   })
 })

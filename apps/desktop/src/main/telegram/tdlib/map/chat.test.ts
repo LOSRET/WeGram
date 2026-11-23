@@ -23,7 +23,10 @@ describe('mapChat', () => {
       title: 'Team',
       type: { _: 'chatTypeSupergroup', is_channel: false },
       unread_count: 3,
-      positions: [{ list: { _: 'chatListMain' }, is_pinned: true }],
+      // Membership comes from `chat_lists`, the pinned flag from the position in
+      // that list; a position with order 0 means "not in the list".
+      chat_lists: [{ _: 'chatListMain' }],
+      positions: [{ list: { _: 'chatListMain' }, order: '100', is_pinned: true }],
       // TDLib has no `is_muted`: a chat mute is a countdown, and the scope
       // default only applies while `use_default_mute_for` is set.
       notification_settings: {
@@ -47,6 +50,7 @@ describe('mapChat', () => {
       unread: 3,
       pinned: true,
       muted: true,
+      archived: false,
       lastReadInboxMessageId: 10,
       lastReadOutboxMessageId: 12,
       lastMessageText: 'last words',

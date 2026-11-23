@@ -28,7 +28,7 @@ export interface ChatApiDeps {
 }
 
 export interface TdlibChatApi {
-  listChats(input: { limit: number; offset: number }): Promise<ChatSummary[]>
+  listChats(input: { limit: number; offset: number; list?: 'main' | 'archive' }): Promise<ChatSummary[]>
   getChat(chatId: number): Promise<ChatSummary>
   openChat(chatId: number): Promise<void>
   openPrivateChat(userId: number): Promise<ChatSummary>
@@ -39,6 +39,7 @@ export interface TdlibChatApi {
   joinChannel(chatId: number): Promise<ChatJoinResult>
   setChatMuted(chatId: number, muted: boolean): Promise<ChatSummary>
   setChatPinned(chatId: number, pinned: boolean): Promise<ChatSummary>
+  setChatArchived(chatId: number, archived: boolean): Promise<ChatSummary>
   clearHistory(chatId: number): Promise<void>
   deleteChat(chatId: number): Promise<void>
   setChatUnread(chatId: number, unread: boolean): Promise<ChatSummary>
@@ -68,6 +69,7 @@ export function createChatApi(getDeps: () => ChatApiDeps): TdlibChatApi {
     joinChannel: (chatId) => actions.joinChannel(actionDeps(), chatId),
     setChatMuted: (chatId, muted) => actions.setChatMuted(actionDeps(), chatId, muted),
     setChatPinned: (chatId, pinned) => actions.setChatPinned(actionDeps(), chatId, pinned),
+    setChatArchived: (chatId, archived) => actions.setChatArchived(actionDeps(), chatId, archived),
     clearHistory: (chatId) => actions.clearHistory(actionDeps(), chatId),
     deleteChat: (chatId) => actions.deleteChat(actionDeps(), chatId),
     setChatUnread: (chatId, unread) => actions.setChatUnread(actionDeps(), chatId, unread),

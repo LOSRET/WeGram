@@ -54,6 +54,12 @@ export const chatInvokeChannels = [
   'chats:setMuted',
   /** 置顶聊天 / 取消置顶; answers the refreshed summary (sorted by the renderer). */
   'chats:setPinned',
+  /**
+   * 归档聊天 / 取消归档: TDLib moves the chat between `chatListArchive` and
+   * `chatListMain` (`addChatToList`); the answer is the refreshed summary, whose
+   * `archived` flag tells the renderer which list holds the row.
+   */
+  'chats:setArchived',
   /** 清空聊天记录: removes this account's copy of the history, not the peers'. */
   'chats:clearHistory',
   /**
@@ -86,6 +92,11 @@ export const chatInvokeSchemas = {
     request: z.object({
       limit: z.number().int().positive().max(200),
       offset: z.number().int().nonnegative(),
+      /**
+       * `archive` is TDLib's second chat list. The entry row above the
+       * conversation list is fed from it, so the shell loads both lists at start-up.
+       */
+      list: z.enum(['main', 'archive']).optional(),
     }),
     response: z.array(chatSummarySchema),
   },
@@ -119,6 +130,10 @@ export const chatInvokeSchemas = {
   },
   'chats:setPinned': {
     request: z.object({ chatId: z.number().int(), pinned: z.boolean() }),
+    response: chatSummarySchema,
+  },
+  'chats:setArchived': {
+    request: z.object({ chatId: z.number().int(), archived: z.boolean() }),
     response: chatSummarySchema,
   },
   /** `revoke: false` on purpose — WeChat's 清空聊天记录 clears this account's copy. */

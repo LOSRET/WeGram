@@ -10,6 +10,7 @@ import type {
 import type { TdObject } from '../client'
 import { asArray } from '../json'
 import { mapChat } from '../map/chat'
+import { chatPlacement } from '../map/placement'
 import type { ActionDeps, PostPermissionDeps } from './deps'
 
 export async function fetchChatSummary(deps: ActionDeps, chatId: number): Promise<ChatSummary> {
@@ -23,12 +24,13 @@ export async function getChat(deps: ActionDeps, chatId: number): Promise<ChatSum
 
 export async function listChats(
   deps: ActionDeps,
-  input: { limit: number; offset: number },
+  input: { limit: number; offset: number; list?: 'main' | 'archive' },
 ): Promise<ChatSummary[]> {
-  // TDLib has no offset for getChats: fetch enough ids and slice (§6.3).
+  // TDLib has no offset for getChats: fetch enough ids and slice (§6.3). The
+  // Archive is a chat list of its own, so one rule pages both lists.
   const response = await deps.invoke({
     _: 'getChats',
-    chat_list: { _: 'chatListMain' },
+    chat_list: { _: input.list === 'archive' ? 'chatListArchive' : 'chatListMain' },
     limit: input.offset + input.limit,
   })
   const ids: number[] = asArray<number>(response.chat_ids)
@@ -270,20 +272,63 @@ export async function setChatMuted(
  * 置顶聊天 / 取消置顶 (design doc §9.9).
  *
  * TDLib keeps the pinned flag on the chat's *position* in a chat list, not on the
- * chat itself, so the call names the main list and the refreshed summary carries
- * the new flag. Telegram caps the pinned count; the refusal crosses IPC as an
- * `AppError` and the switch stays where it was.
+ * chat itself, and each list keeps its own pin — so the call has to name the list
+ * the chat is actually in, or pinning an archived chat would do nothing.
+ * Telegram caps the pinned count; the refusal crosses IPC as an `AppError` and
+ * the switch stays where it was.
  */
 export async function setChatPinned(
   deps: ActionDeps,
   chatId: number,
   pinned: boolean,
 ): Promise<ChatSummary> {
+  const chat = await deps.invoke({ _: 'getChat', chat_id: chatId })
+  const { archived } = chatPlacement(chat)
   await deps.invoke({
     _: 'toggleChatIsPinned',
-    chat_list: { _: 'chatListMain' },
+    chat_list: { _: archived ? 'chatListArchive' : 'chatListMain' },
     chat_id: chatId,
     is_pinned: pinned,
+  })
+  const summary = await fetchChatSummary(deps, chatId)
+  deps.emit({ type: 'chats', ops: [{ op: 'upsert', chat: summary }] })
+  return summary
+}
+
+/**
+ * 归档聊天 / 取消归档 (design doc §9.2).
+ *
+ * TDLib has no archive flag: the Archive is a chat list, and `addChatToList`
+ * moves the chat between Main and Archive — a chat cannot be in both, and TDLib
+ * removes it from the other list itself.
+ *
+ * One case needs a companion call: a chat TDLib archived by itself (a message
+ * from a non-contact) carries `can_unarchive` on its action bar, and moving it
+ * back to Main without resetting its notification settings would let the server
+ * file it away again.
+ */
+export async function setChatArchived(
+  deps: ActionDeps,
+  chatId: number,
+  archived: boolean,
+): Promise<ChatSummary> {
+  if (!archived) {
+    const chat = await deps.invoke({ _: 'getChat', chat_id: chatId })
+    if (chat?.action_bar?.can_unarchive === true) {
+      const settings = chat.notification_settings
+      if (settings) {
+        await deps.invoke({
+          _: 'setChatNotificationSettings',
+          chat_id: chatId,
+          notification_settings: { ...settings, use_default_mute_for: true, mute_for: 0 },
+        })
+      }
+    }
+  }
+  await deps.invoke({
+    _: 'addChatToList',
+    chat_id: chatId,
+    chat_list: { _: archived ? 'chatListArchive' : 'chatListMain' },
   })
   const summary = await fetchChatSummary(deps, chatId)
   deps.emit({ type: 'chats', ops: [{ op: 'upsert', chat: summary }] })

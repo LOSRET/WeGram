@@ -44,6 +44,7 @@ import { usePeerStatus } from './usePeerStatus'
 export function ChatPane() {
   const activeChatId = useAppStore((state) => state.activeChatId)
   const chats = useAppStore((state) => state.chats)
+  const archivedChats = useAppStore((state) => state.archivedChats)
   const messagesByChat = useAppStore((state) => state.messagesByChat)
   const hasMoreByChat = useAppStore((state) => state.hasMoreByChat)
   const replyToByChat = useAppStore((state) => state.replyToByChat)
@@ -186,7 +187,15 @@ export function ChatPane() {
     loadNewer,
   } = useChatHistory(activeChatId)
 
-  const chat = chats.find((item) => item.id === activeChatId) ?? null
+  /**
+   * The open row can be in either list. Reading only `chats` made an archived chat
+   * click open an empty pane: `activeChatId` was set, the summary was not found,
+   * and the pane fell back to the placeholder.
+   */
+  const chat =
+    chats.find((item) => item.id === activeChatId) ??
+    archivedChats.find((item) => item.id === activeChatId) ??
+    null
   const messages = activeChatId ? (messagesByChat[activeChatId] ?? []) : []
 
   /**

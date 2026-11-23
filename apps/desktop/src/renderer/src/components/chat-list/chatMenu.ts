@@ -14,9 +14,13 @@ import type { MenuItem } from '../ContextMenu'
  * Delete is the one row that changes the list itself: the adapter sends
  * `deleteChatHistory` with `remove_from_chat_list: true` and the `remove` op
  * drops the row and its transcript (see `store/slices/chats.ts`).
+ *
+ * 归档聊天 moves the row instead: the adapter answers the refreshed summary and
+ * the store routes it into the archive list by its `archived` flag, so the
+ * transcript is kept.
  */
 
-export type ChatMenuAction = 'pin' | 'mute' | 'unread' | 'delete'
+export type ChatMenuAction = 'pin' | 'mute' | 'unread' | 'archive' | 'delete'
 
 export function buildChatMenuItems(
   chat: ChatSummary,
@@ -34,6 +38,10 @@ export function buildChatMenuItems(
     {
       label: chat.markedUnread ? '标为已读' : '标为未读',
       onSelect: () => run('unread'),
+    },
+    {
+      label: chat.archived === true ? '取消归档' : '归档聊天',
+      onSelect: () => run('archive'),
     },
     {
       label: '删除聊天',
@@ -67,6 +75,13 @@ export async function runChatMenuAction(
           unread: !chat.markedUnread,
         })
         store.applyChatOps([{ op: 'upsert', chat: updated }])
+        return
+      }
+      case 'archive': {
+        const archived = chat.archived !== true
+        const updated = await invoke('chats:setArchived', { chatId: chat.id, archived })
+        store.applyChatOps([{ op: 'upsert', chat: updated }])
+        store.setToast(archived ? '已归档聊天' : '已取消归档')
         return
       }
       case 'delete': {

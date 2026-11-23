@@ -1,13 +1,12 @@
 import type { BootState, ChatSummary, ConnectionState } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
-import { asArray } from '../json'
 import { previewContent, previewSpoilers } from './content'
 import type { MapperContext } from './context'
+import { chatPlacement } from './placement'
 
 export function mapChat(ctx: MapperContext, chat: TdObject): ChatSummary {
-  const positions: TdObject[] = asArray(chat.positions)
-  const mainPosition = positions.find((position) => position.list?._ === 'chatListMain')
+  const placement = chatPlacement(chat)
   const lastMessage = chat.last_message
   // 0 means "nothing read yet", not message 0: the unread divider must then fall
   // back to the unread counter instead of being pinned above the first row of the
@@ -29,8 +28,9 @@ export function mapChat(ctx: MapperContext, chat: TdObject): ChatSummary {
     kind: mapChatKind(chat.type),
     ...(Number.isFinite(peerUserId) && peerUserId > 0 ? { userId: peerUserId } : {}),
     unread: chat.unread_count ?? 0,
-    pinned: Boolean(mainPosition?.is_pinned),
+    pinned: placement.pinned,
     muted: isMuted(chat.notification_settings),
+    archived: placement.archived,
     ...(lastReadInbox > 0 ? { lastReadInboxMessageId: lastReadInbox } : {}),
     lastReadOutboxMessageId: Number(chat.last_read_outbox_message_id ?? 0),
     ...(lastMessage ? { lastMessageText: previewContent(lastMessage.content) } : {}),

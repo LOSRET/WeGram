@@ -1,7 +1,6 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { ChatSummary } from '@wegram/protocol'
 import {
-  memo,
   useCallback,
   useEffect,
   useRef,
@@ -10,7 +9,9 @@ import {
   type MouseEvent,
 } from 'react'
 
-import { Avatar } from './Avatar'
+import { ArchiveEntry } from './chat-list/ArchiveEntry'
+import { ArchivePage } from './chat-list/ArchivePage'
+import { ChatRow } from './chat-list/ChatRow'
 import { buildChatMenuItems, runChatMenuAction } from './chat-list/chatMenu'
 import { SearchHitRow } from './chat-search/SearchHitRow'
 import { ContextMenu } from './ContextMenu'
@@ -18,108 +19,17 @@ import { SearchTabs } from './chat-search/SearchTabs'
 import { OverlayScrollbar } from './OverlayScrollbar'
 import { PlusIcon } from './Icon'
 import { SearchField } from './SearchField'
-import { formatChatTime, previewSegments } from '../lib/format'
+import { ARCHIVE_PAGE_ANIM_MS } from '../lib/archivePage'
 import { CHAT_ROW_H, LIST_OVERSCAN } from '../lib/listMetrics'
 import type { MessageHit, SearchScope } from '../lib/messageSearch'
-import { matchSegments, normalizeQuery } from '../lib/search'
+import { normalizeQuery } from '../lib/search'
 import { useGlobalSearch } from '../lib/useGlobalSearch'
 import { useMessageSearch } from '../lib/useMessageSearch'
 
-interface ChatRowProps {
-  chat: ChatSummary
-  active: boolean
-  onSelect: (chat: ChatSummary) => void
-  /** Right-click / long-press: the chat list's own menu (置顶/免打扰/未读/删除). */
-  onContextMenu: (chat: ChatSummary, x: number, y: number) => void
-  /**
-   * The normalised query while this row is a global-search hit: the matched run of
-   * the title turns green. Undefined for a normal conversation row, which also
-   * means a pinned chat keeps its tint (search hits never show one).
-   */
-  highlight?: string
-}
-
-/**
- * One conversation row.
- *
- * Memoised, like `MessageRow`: the list re-renders on every keystroke in the search
- * field and on every incoming `evt:chats` batch, and most of those touches one chat
- * or none. The props are kept referentially stable by the caller for this to bite.
- */
-const ChatRow = memo(function ChatRow({
-  chat,
-  active,
-  onSelect,
-  onContextMenu,
-  highlight,
-}: ChatRowProps) {
-  return (
-    <div
-      className={`wx-chat-item${active ? ' wx-chat-item--active' : ''}${
-        !active && !highlight && chat.pinned ? ' wx-chat-item--pinned' : ''
-      }`}
-      onClick={() => onSelect(chat)}
-      onContextMenu={(event) => {
-        event.preventDefault()
-        onContextMenu(chat, event.clientX, event.clientY)
-      }}
-      role="button"
-      tabIndex={0}
-      aria-pressed={active}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') onSelect(chat)
-      }}
-    >
-      <Avatar className="wx-avatar" url={chat.avatarUrl} name={chat.title} colorId={chat.id} />
-      <div className="wx-chat-item__main">
-        <div className="wx-chat-item__row">
-          <span className="wx-chat-item__title">
-            {highlight === undefined
-              ? chat.title
-              : matchSegments(chat.title, highlight).map((segment, index) =>
-                  segment.hit ? (
-                    <mark key={index} className="wx-chat-item__hit">
-                      {segment.text}
-                    </mark>
-                  ) : (
-                    <span key={index}>{segment.text}</span>
-                  ),
-                )}
-          </span>
-          <span className="wx-chat-item__time">{formatChatTime(chat.lastMessageAt)}</span>
-        </div>
-        <div className="wx-chat-item__row">
-          <span className="wx-chat-item__preview">
-            {previewSegments(chat.lastMessageText ?? '', chat.lastMessageSpoilers).map(
-              (segment, index) =>
-                segment.spoiler ? (
-                  <span key={index} className="wx-spoiler wx-spoiler--preview">
-                    {segment.text}
-                  </span>
-                ) : (
-                  <span key={index}>{segment.text}</span>
-                ),
-            )}
-          </span>
-          {chat.unread > 0 ? (
-            <span className={`wx-badge${chat.muted ? ' wx-badge--muted' : ''}`}>
-              {chat.unread > 99 ? '99+' : chat.unread}
-            </span>
-          ) : chat.markedUnread ? (
-            // 标为未读: a flag, not a count — WeChat draws a bare dot for it.
-            <span
-              className={`wx-badge--dot${chat.muted ? ' wx-badge--dot--muted' : ''}`}
-              title="标为未读"
-            />
-          ) : null}
-        </div>
-      </div>
-    </div>
-  )
-})
-
 interface ChatListProps {
   chats: ChatSummary[]
+  /** 已归档会话: the second list, opened as a page over this column. */
+  archivedChats: ChatSummary[]
   activeChatId: number | null
   query: string
   onQueryChange: (value: string) => void
@@ -145,9 +55,15 @@ interface ChatListProps {
  * messages those chats contain (`search:messages`, TDLib `searchMessages` with
  * a chat-type filter). Results are drawn plainly and pages load as the reader
  * reaches the end; Esc or the pill's × brings the conversations back.
+ *
+ * 已归档会话 is a second page rather than a third face: `ArchiveEntry` (the row
+ * above the scroller) opens `ArchivePage`, which slides in from the right over
+ * the column. The list below keeps its rows and its scroll position, so coming
+ * back needs no reload — see `chat-list/ArchivePage.tsx`.
  */
 export function ChatList({
   chats,
+  archivedChats,
   activeChatId,
   query,
   onQueryChange,
@@ -163,6 +79,49 @@ export function ChatList({
 
   /** The row whose right-click menu is open, with the point it opened at. */
   const [menu, setMenu] = useState<{ chat: ChatSummary; x: number; y: number } | null>(null)
+
+  /**
+   * 已归档会话's page. `open` drives the slide and the page stays mounted until it
+   * has slid out (`ARCHIVE_PAGE_ANIM_MS`); the timer is the parent's job because
+   * only the parent can decide when the page leaves the tree.
+   */
+  const [archive, setArchive] = useState<{ open: boolean } | null>(null)
+  const archiveTimerRef = useRef<number | null>(null)
+  const archiveOpen = archive?.open === true
+
+  const openArchive = useCallback(() => {
+    if (archiveTimerRef.current !== null) {
+      window.clearTimeout(archiveTimerRef.current)
+      archiveTimerRef.current = null
+    }
+    setArchive({ open: true })
+  }, [])
+
+  const closeArchive = useCallback(() => {
+    setArchive((current) => (current ? { ...current, open: false } : null))
+    if (archiveTimerRef.current !== null) window.clearTimeout(archiveTimerRef.current)
+    archiveTimerRef.current = window.setTimeout(() => {
+      archiveTimerRef.current = null
+      // A reopen during the slide-out cleared the flag already; only a closed
+      // page is dropped here.
+      setArchive((current) => (current !== null && !current.open ? null : current))
+    }, ARCHIVE_PAGE_ANIM_MS)
+  }, [])
+
+  useEffect(
+    () => () => {
+      if (archiveTimerRef.current !== null) window.clearTimeout(archiveTimerRef.current)
+    },
+    [],
+  )
+
+  /**
+   * An empty archive is not somewhere to sit: unarchiving its last chat returns
+   * to the conversation list, like the client.
+   */
+  useEffect(() => {
+    if (archiveOpen && archivedChats.length === 0) closeArchive()
+  }, [archiveOpen, archivedChats.length, closeArchive])
 
   const openMenu = useCallback((chat: ChatSummary, x: number, y: number) => {
     setMenu({ chat, x, y })
@@ -206,9 +165,15 @@ export function ChatList({
     onOpenPlus({ x: rect.left + rect.width / 2, y: rect.bottom + 12 })
   }
 
-  /** Esc clears the box before any window-level handler (the chat-info panel) sees it. */
+  /** Esc leaves the archive, then clears the box — before any window-level handler sees it. */
   const onKeyDown = (event: KeyboardEvent<HTMLElement>): void => {
-    if (event.key !== 'Escape' || !searching) return
+    if (event.key !== 'Escape') return
+    if (archiveOpen) {
+      event.stopPropagation()
+      closeArchive()
+      return
+    }
+    if (!searching) return
     event.stopPropagation()
     onQueryChange('')
   }
@@ -254,6 +219,9 @@ export function ChatList({
       </div>
 
       <div className="wx-list__body" ref={bodyRef}>
+        {!searching && archivedChats.length > 0 ? (
+          <ArchiveEntry chats={archivedChats} onOpen={openArchive} />
+        ) : null}
         <div
           className="wx-list__view"
           ref={scrollRef}
@@ -326,6 +294,17 @@ export function ChatList({
         </div>
         <OverlayScrollbar scrollerRef={scrollRef} hostRef={bodyRef} />
       </div>
+
+      {archive !== null ? (
+        <ArchivePage
+          chats={archivedChats}
+          activeChatId={activeChatId}
+          open={archive.open}
+          onSelect={onSelect}
+          onContextMenu={openMenu}
+          onBack={closeArchive}
+        />
+      ) : null}
 
       {menu ? (
         <ContextMenu

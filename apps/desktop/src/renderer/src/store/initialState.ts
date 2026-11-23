@@ -14,6 +14,7 @@ export const DATA_DEFAULTS: AppData = {
   theme: 'light',
   sendKey: 'enter',
   chats: [],
+  archivedChats: [],
   activeChatId: null,
   messagesByChat: {},
   pendingOps: {},
