@@ -13,6 +13,7 @@ import { messagePreview } from '../../lib/format'
 import { selfIdentity } from '../../lib/self'
 import { errorMessage, invoke } from '../../lib/ipc'
 import { ViewerSource } from '../../lib/viewerSource'
+import { reduceLoadedOps } from '../../store/reducers'
 import { useAppStore } from '../../store/useAppStore'
 import { Avatar } from '../Avatar'
 import { MessageRow } from '../message-list/MessageRow'
@@ -250,6 +251,25 @@ export function CommentPanel({
   useEffect(() => {
     if (page === null && !loadingRef.current && error === null) void load()
   }, [error, load, page])
+
+  // The panel's rows never enter `messagesByChat`, so a vote in a comment's poll
+  // reaches this card only here; without it the next tap was refused as a revote.
+  useEffect(() => {
+    return window.tg.on('evt:messages', (event) => {
+      const { chatId, ops } = event.payload
+      setPage((current) => {
+        if (!current) return current
+        const patched = reduceLoadedOps(current.messages, chatId, ops)
+        if (patched === current.messages) return current
+        const next: ThreadPage = {
+          messages: patched.map(withoutCommentBar),
+          hasMore: current.hasMore,
+        }
+        threadCache.set(key, next)
+        return next
+      })
+    })
+  }, [key])
 
   // Slide in: mount closed (translateX(100 %)), open on the next paint. The
   // timeout is the fallback for an occluded window, where rAF is throttled.

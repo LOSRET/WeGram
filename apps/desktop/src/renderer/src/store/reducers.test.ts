@@ -7,6 +7,7 @@ import {
   appendNewerMessages,
   hasReplayableOps,
   mergeChatList,
+  reduceLoadedOps,
   reduceOps,
   routeChatOps,
   sortChats,
@@ -171,6 +172,50 @@ describe('hasReplayableOps', () => {
   it('keeps a batch that carries anything else', () => {
     expect(hasReplayableOps([readOp(), newOp(9)])).toBe(true)
     expect(hasReplayableOps([deleteOp(1)])).toBe(true)
+  })
+})
+
+describe('reduceLoadedOps', () => {
+  const thread = [message(10, { chatId: 500 }), message(11, { chatId: 500 })]
+
+  it('follows a replace for a row the thread holds', () => {
+    // Stands for the poll a vote changes: any content replacement behaves alike.
+    const voted = message(11, { chatId: 500, text: 'voted' })
+    const next = reduceLoadedOps(thread, 500, [{ op: 'replace', message: voted }])
+    expect(next[1]).toBe(voted)
+    expect(next[0]).toBe(thread[0])
+    // The row is patched in place: a vote is not an arrival.
+    expect(next.map((item) => item.id)).toEqual([10, 11])
+  })
+
+  it('ignores a replace for another chat or for a row it does not hold', () => {
+    const elsewhere = message(11, { chatId: 501 })
+    const missing = message(12, { chatId: 500 })
+    expect(
+      reduceLoadedOps(thread, 500, [
+        { op: 'replace', message: elsewhere },
+        { op: 'replace', message: missing },
+      ]),
+    ).toBe(thread)
+  })
+
+  it('patches edits, reactions and deletes of held rows', () => {
+    const edited = reduceLoadedOps(thread, 500, [
+      { op: 'edit', chatId: 500, messageId: 10, text: 'changed' },
+      { op: 'reactions', chatId: 500, messageId: 11, reactions: [] },
+    ])
+    expect(edited[0]?.text).toBe('changed')
+    expect(edited).toHaveLength(2)
+
+    const deleted = reduceLoadedOps(thread, 500, [
+      { op: 'delete', chatId: 500, messageIds: [10, 99] },
+    ])
+    expect(deleted.map((item) => item.id)).toEqual([11])
+  })
+
+  it('never splices an arrival into a window that stops short', () => {
+    expect(reduceLoadedOps(thread, 500, [newOp(12), readOp()])).toBe(thread)
+    expect(reduceLoadedOps([], 500, [newOp(12)])).toEqual([])
   })
 })
 

@@ -251,3 +251,46 @@ export function appendNewerMessages(list: Message[], messages: Message[]): Messa
     .sort((a, b) => a.id - b.id)
   return added.length > 0 ? [...list, ...added] : list
 }
+
+/**
+ * Apply live ops to a transcript a component owns.
+ *
+ * The discussion view (design doc §9.8) keeps a thread of its own: those rows
+ * never enter `messagesByChat`, so the store's op stream is the only way a vote,
+ * an edit or a deletion inside it can reach the card the reader is looking at.
+ * Without it a poll vote landed on the server while the card kept its old counts,
+ * and the next tap was refused as a revote (design doc §9.10).
+ *
+ * Only ops that name a row the window already holds apply. A live arrival is the
+ * newest page's job: splicing one into a list that stops short would draw it under
+ * a row it does not follow.
+ */
+export function reduceLoadedOps(
+  list: Message[],
+  chatId: number,
+  ops: MessageOp[],
+): Message[] {
+  if (list.length === 0) return list
+  const held = new Set(list.map((message) => message.id))
+  const applicable = ops.filter((op) => {
+    switch (op.op) {
+      case 'new':
+      case 'read':
+        return false
+      case 'replace':
+        return op.message.chatId === chatId && held.has(op.message.id)
+      case 'edit':
+      case 'sendState':
+      case 'reactions':
+      case 'interaction':
+        return held.has(op.messageId)
+      case 'replaceId':
+        return held.has(op.oldId)
+      case 'delete':
+        return op.messageIds.some((id) => held.has(id))
+    }
+  })
+  if (applicable.length === 0) return list
+  return reduceOps(list, applicable).list
+}
+

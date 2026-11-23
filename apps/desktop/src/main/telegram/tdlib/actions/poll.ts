@@ -23,12 +23,19 @@ export async function votePoll(
   deps: ActionDeps,
   input: InvokeRequest<'messages:vote'>,
 ): Promise<void> {
-  await answer(deps, {
-    _: 'setPollAnswer',
-    chat_id: input.chatId,
-    message_id: input.messageId,
-    option_ids: input.optionIds,
-  })
+  try {
+    await answer(deps, {
+      _: 'setPollAnswer',
+      chat_id: input.chatId,
+      message_id: input.messageId,
+      option_ids: input.optionIds,
+    })
+  } catch (error) {
+    // A refusal means this copy is stale (voted elsewhere, quiz settled): re-read
+    // it before reporting, so the card cannot stay votable after the server said no.
+    await refreshPoll(deps, input.chatId, input.messageId)
+    throw error
+  }
   await refreshPoll(deps, input.chatId, input.messageId)
 }
 
