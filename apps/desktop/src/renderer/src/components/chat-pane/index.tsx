@@ -2,6 +2,7 @@ import type { ChatJoinState, Message } from '@wegram/protocol'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { loadLatestWindow } from '../../lib/anchoredWindow'
+import { topicUnreadMarker } from '../../lib/topics'
 import { INFO_PANEL_ANIM_MS } from '../../lib/chatInfo'
 import { editTargetOf } from '../../lib/editTarget'
 import { errorMessage, invoke } from '../../lib/ipc'
@@ -29,6 +30,8 @@ import { createMessageActions, type PendingDelete } from './messageActions'
 import { useChatHistory } from './useChatHistory'
 import { useMarkRead } from './useMarkRead'
 import { usePeerStatus } from './usePeerStatus'
+import { TopicsTabs } from './topics/TopicsTabs'
+
 
 /**
  * The conversation pane: header, transcript, composer and the modals they open.
@@ -51,6 +54,15 @@ export function ChatPane() {
   const editing = useAppStore((state) => state.editing)
   const typingByChat = useAppStore((state) => state.typingByChat)
   const unreadMarkers = useAppStore((state) => state.unreadMarkers)
+  /** 话题 (design doc §9.12): which topic the reader is in, and its cached rows. */
+  const activeTopicId = useAppStore((state) => state.activeTopicId)
+  const topicsByChat = useAppStore((state) => state.topicsByChat)
+  /** Which topic the transcript in memory belongs to (`null` = flat transcript). */
+  const historyTopicByChat = useAppStore((state) => state.historyTopicByChat)
+  /** 论坛展示方式 (design doc §9.12): tabs strip or the conversation-column sidebar. */
+  const forumLayout = useAppStore((state) =>
+    activeChatId === null ? undefined : state.forumLayoutByChat[activeChatId],
+  )
 
   /**
    * Reported by the transcript: the newest message that has actually been on
@@ -92,8 +104,7 @@ export function ChatPane() {
   const [profileUserId, setProfileUserId] = useState<number | null>(null)
   /** 贴纸包: the set a clicked sticker message belongs to (design doc §8.5). */
   const [stickerSetId, setStickerSetId] = useState<string | null>(null)
-  /** 置顶消息: what this chat has pinned, and the pin / unpin calls. */
-  const { pinned, setPinnedMessage } = usePinnedMessage(activeChatId)
+
 
   /**
    * The full-pane discussion view (design doc §9.8). It stays mounted while it
@@ -173,6 +184,70 @@ export function ChatPane() {
     }
   }, [activeChatId])
 
+  /**
+   * The open row can be in either list. Reading only `chats` made an archived chat
+   * click open an empty pane: `activeChatId` was set, the summary was not found,
+   * and the pane fell back to the placeholder.
+   */
+  const chat =
+    chats.find((item) => item.id === activeChatId) ??
+    archivedChats.find((item) => item.id === activeChatId) ??
+    null
+
+  /**
+   * 话题 (design doc §9.12). A forum opens on its topic list: `topicId` is null
+   * until the reader picks one, and only then is a transcript fetched at all.
+   */
+  const isForum = chat?.forum === true
+  const topicId = isForum ? activeTopicId : null
+  const topic =
+    topicId === null
+      ? null
+      : ((activeChatId === null ? undefined : topicsByChat[activeChatId]) ?? []).find(
+          (item) => item.id === topicId,
+        ) ?? null
+  const topicsOpen = isForum && topicId === null
+  /** 论坛展示方式: one call per forum open, learned from `supergroupFullInfo`. */
+  useEffect(() => {
+    if (!isForum || activeChatId === null || forumLayout !== undefined) return
+    let cancelled = false
+    void invoke('chats:forumLayout', { chatId: activeChatId })
+      .then(({ layout }) => {
+        if (!cancelled) useAppStore.getState().setForumLayout(activeChatId, layout)
+      })
+      .catch(() => {
+        // A failed probe keeps the sidebar: it is the layout this client owns.
+        if (!cancelled) useAppStore.getState().setForumLayout(activeChatId, 'sidebar')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isForum, activeChatId, forumLayout])
+
+  /** 置顶消息: the chat's pin, or the open forum topic's own (design doc §9.12). */
+  const { pinned, setPinnedMessage } = usePinnedMessage(activeChatId, topicId)
+  /**
+   * The cached page belongs to another topic: the pane shows a loading state until
+   * `setHistory` replaces it. Rendering those rows would put one topic's messages
+   * under another topic's title.
+   */
+  const transcriptStale =
+    !topicsOpen &&
+    activeChatId !== null &&
+    (historyTopicByChat[activeChatId] ?? null) !== topicId
+
+  /**
+   * A forum opens on a topic (design doc §9.12): the conversation column is showing
+   * its topic list, so the pane has to draw something. General (id 1) is the
+   * official client's default; otherwise the first row the server returned.
+   */
+  useEffect(() => {
+    if (!isForum || activeTopicId !== null || activeChatId === null) return
+    const list = topicsByChat[activeChatId] ?? []
+    const first = list.find((item) => item.isGeneral) ?? list[0]
+    if (first) useAppStore.getState().setActiveTopic(first.id)
+  }, [isForum, activeTopicId, activeChatId, topicsByChat])
+
   const {
     pendingLanding,
     anchorKnown,
@@ -185,17 +260,7 @@ export function ChatPane() {
     reload,
     loadOlder,
     loadNewer,
-  } = useChatHistory(activeChatId)
-
-  /**
-   * The open row can be in either list. Reading only `chats` made an archived chat
-   * click open an empty pane: `activeChatId` was set, the summary was not found,
-   * and the pane fell back to the placeholder.
-   */
-  const chat =
-    chats.find((item) => item.id === activeChatId) ??
-    archivedChats.find((item) => item.id === activeChatId) ??
-    null
+  } = useChatHistory(topicsOpen ? null : activeChatId, topicId)
   const messages = activeChatId ? (messagesByChat[activeChatId] ?? []) : []
 
   /**
@@ -205,8 +270,16 @@ export function ChatPane() {
   const peerStatus = usePeerStatus(chat?.kind === 'private' ? (chat.userId ?? null) : null)
   const seenUpToMessageId = seen && seen.chatId === activeChatId ? seen.messageId : null
 
+  /**
+   * A topic switch invalidates the "seen" report: the id belongs to the topic that
+   * was on screen, and reporting it for the new one would mark the wrong rows read.
+   */
+  useEffect(() => {
+    setSeen(null)
+  }, [activeChatId, topicId])
+
   /** 已读上报 lives in its own hook (see `useMarkRead`). */
-  useMarkRead(activeChatId, seenUpToMessageId)
+  useMarkRead(activeChatId, topicId, seenUpToMessageId)
 
   /**
    * "跳转到最新消息": replace an anchored window with the newest page (a no-op
@@ -217,13 +290,13 @@ export function ChatPane() {
   const returnToLatest = useCallback(async (): Promise<void> => {
     if (activeChatId === null) return
     try {
-      await loadLatestWindow(activeChatId)
+      await loadLatestWindow(activeChatId, topicId)
     } catch (error) {
       useAppStore.getState().setError(errorMessage(error))
       return
     }
     useAppStore.getState().requestJumpToLatest(activeChatId)
-  }, [activeChatId])
+  }, [activeChatId, topicId])
 
   const replyToId = activeChatId ? (replyToByChat[activeChatId] ?? null) : null
   const replyTo = replyToId ? (messages.find((item) => item.id === replyToId) ?? null) : null
@@ -356,12 +429,13 @@ export function ChatPane() {
 
   if (!chat || !activeChatId) return <NoChatPlaceholder />
 
-  const actions = createMessageActions(activeChatId)
+  const actions = createMessageActions(activeChatId, topicId)
 
   return (
     <main className={`wx-chat${comments ? ' wx-chat--comments' : ''}`}>
       <ChatHeader
-        title={chat.title}
+        title={topic !== null ? topic.title : chat.title}
+        {...(topic !== null ? { subtitle: chat.title } : {})}
         typing={typing}
         peerStatus={peerStatus}
         infoOpen={infoOpen}
@@ -370,6 +444,8 @@ export function ChatPane() {
           ? { onOpenProfile: () => setProfileUserId(chat.userId ?? null) }
           : {})}
       />
+
+      {isForum && forumLayout === 'tabs' ? <TopicsTabs chat={chat} /> : null}
 
       {pinned ? (
         <PinnedBar
@@ -381,15 +457,25 @@ export function ChatPane() {
         />
       ) : null}
 
-      {loadingHistory && messages.length === 0 ? (
+      {topicsOpen ? (
+        // No topic chosen yet (the conversation column is loading the list).
+        <div className="wx-chat__topics-veil" />
+      ) : transcriptStale ? (
+        <LoadingPlaceholder restoring={false} />
+      ) : loadingHistory && messages.length === 0 ? (
         <LoadingPlaceholder restoring={restoring} />
       ) : !anchorKnown ? (
         <AnchorPendingPlaceholder />
       ) : messages.length === 0 ? (
-        <EmptyTranscriptPlaceholder onReload={reload} unsynced={chat.lastMessageAt !== undefined} />
+        <EmptyTranscriptPlaceholder
+          onReload={reload}
+          // A topic's emptiness is its own: a brand-new one is empty while the
+          // chat around it has messages.
+          unsynced={(topic !== null ? topic.lastMessageAt : chat.lastMessageAt) !== undefined}
+        />
       ) : (
         <MessageList
-          key={activeChatId}
+          key={`${activeChatId}:${topicId ?? 0}`}
           chat={chat}
           messages={messages}
           hasMore={Boolean(hasMoreByChat[activeChatId])}
@@ -402,7 +488,11 @@ export function ChatPane() {
           landing={pendingLanding?.chatId === activeChatId ? pendingLanding.position : null}
           located={located?.chatId === activeChatId ? located.messageId : null}
           unreadMarker={
-            unreadMarkers[activeChatId]?.unread ? (unreadMarkers[activeChatId] ?? null) : null
+            topic !== null
+              ? topicUnreadMarker(topic)
+              : unreadMarkers[activeChatId]?.unread
+                ? (unreadMarkers[activeChatId] ?? null)
+                : null
           }
           onSeenUpToChange={(messageId) =>
             setSeen(messageId === null ? null : { chatId: activeChatId, messageId })
@@ -442,9 +532,14 @@ export function ChatPane() {
         />
       )}
 
-      {!isChannel || (canPost && channelInputOpen) ? (
+      {topic?.isClosed ? (
+        // 已关闭话题 keeps its transcript but takes the composer's slot: only the
+        // topic's creator and the group's administrators may still post.
+        <div className="wx-chat__topic-closed">此话题已关闭，只有创建者和管理员可以继续发言</div>
+      ) : !topicsOpen && (!isChannel || (canPost && channelInputOpen)) ? (
         <Composer
           chatId={activeChatId}
+          topicId={topicId}
           replyTo={replyTo}
           editing={editingForChat}
           onSend={actions.send}
@@ -475,6 +570,7 @@ export function ChatPane() {
           onOpenInput={() => setChannelInputChatId(activeChatId)}
         />
       )}
+
 
       {info ? (
         <ChatInfoPanel

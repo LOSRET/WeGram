@@ -23,6 +23,7 @@ import { MockAssets } from './assets'
 import { MockAvatars } from './avatars'
 import { createMockChats } from './chats'
 import { createMockComments } from './comments'
+import { createMockTopics } from './topics'
 import { listMockContacts } from './contacts'
 import { ME, MOCK_CODE, MOCK_PASSWORD, type Fixture } from './constants'
 import { createMockEdits } from './edits'
@@ -287,6 +288,26 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   readonly pinnedMessage = this.chatApi.pinnedMessage
   readonly setPinnedMessage = this.chatApi.setPinnedMessage
   readonly inviteLink = this.chatApi.inviteLink
+
+  /** 话题 (design doc §9.12); their rules live in ./topics.ts. */
+  private readonly topicApi = createMockTopics({
+    fixtures: this.fixtures,
+    emit: (event) => this.emit(event),
+  })
+  readonly topics = this.topicApi.list
+  readonly createTopic = this.topicApi.create
+  readonly editTopic = this.topicApi.edit
+  readonly setTopicPinned = this.topicApi.setPinned
+  readonly setTopicClosed = this.topicApi.setClosed
+  readonly setTopicMuted = this.topicApi.setMuted
+  readonly topicIcons = this.topicApi.icons
+  /** The fixture is a sidebar forum; the tabs layout is a real-TDLib concern. */
+  async forumLayout(): Promise<'tabs' | 'sidebar'> {
+    return 'sidebar'
+  }
+  readonly deleteTopic = this.topicApi.remove
+  readonly topicLink = this.topicApi.link
+  readonly setViewAsTopics = this.topicApi.setViewAsTopics
   readonly userStatus = this.chatApi.userStatus
 
   /** 资料卡's data and its two writes; the rules live in ./users.ts. */
@@ -403,13 +424,21 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     fromChatId: number
     messageIds: number[]
     toChatId: number
+    toTopicId?: number
   }): Promise<void> {
     const source = this.requireFixture(input.fromChatId)
     const target = this.requireFixture(input.toChatId)
     for (const id of input.messageIds) {
       const original = source.messages.find((m) => m.id === id)
       if (!original) continue
-      target.messages.push({ ...original, id: this.nextMessageId++, chatId: input.toChatId })
+      target.messages.push({
+        ...original,
+        id: this.nextMessageId++,
+        chatId: input.toChatId,
+        ...(input.toTopicId === undefined
+          ? { topicId: undefined }
+          : { topicId: input.toTopicId }),
+      })
     }
     this.emit({ type: 'chats', ops: [{ op: 'upsert', chat: { ...target.chat } }] })
   }
@@ -419,7 +448,12 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     // Nothing to tell a fake peer.
   }
 
-  async markRead(input: { chatId: number; upToMessageId: number }): Promise<void> {
+  async markRead(input: { chatId: number; topicId?: number; upToMessageId: number }): Promise<void> {
+    if (input.topicId !== undefined) {
+      // 话题内已读: one topic's counter and the chat's sum, not the whole chat's.
+      await this.topicApi.markRead(input.chatId, input.topicId, input.upToMessageId)
+      return
+    }
     applyRead(
       { fixtures: this.fixtures, emit: (event) => this.emit(event) },
       input.chatId,
@@ -433,10 +467,14 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
 
   async searchInChat(input: {
     chatId: number
+    topicId?: number
     q: string
     fromMessageId?: number
   }): Promise<Message[]> {
-    return searchMessages(this.fixtures, input)
+    const found = searchMessages(this.fixtures, input)
+    return input.topicId === undefined
+      ? found
+      : found.filter((message) => message.topicId === input.topicId)
   }
 
   async searchMessages(input: {

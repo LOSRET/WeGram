@@ -14,6 +14,7 @@
     "tdlib:smoke": "tsx scripts/tdlib-smoke.ts",
     "tdlib:test-dc": "tsx scripts/tdlib-test-dc.ts",
     "tdlib:test-dc:writes": "tsx scripts/tdlib-test-dc-writes.ts",
+    "tdlib:test-dc:topics": "tsx scripts/tdlib-test-dc-topics.ts",
     "ui:db-check": "tsx scripts/ui-db-check.ts",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json"
   },

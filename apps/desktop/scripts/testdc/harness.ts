@@ -190,11 +190,13 @@ export async function settledMessage(
   match: (message: Message) => boolean,
   label: string,
   timeoutMs = 30_000,
+  /** 话题 (design doc §9.12): look inside one topic instead of the flat chat. */
+  topicId?: number,
 ): Promise<Message> {
   const deadline = Date.now() + timeoutMs
   let previousId = 0
   while (Date.now() < deadline) {
-    const page = await adapter.history({ chatId, limit: 20 })
+    const page = await adapter.history({ chatId, ...(topicId === undefined ? {} : { topicId }), limit: 20 })
     const found = page.messages.find(match)
     if (found && found.id === previousId) return found
     previousId = found?.id ?? 0

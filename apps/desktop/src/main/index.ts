@@ -221,11 +221,24 @@ async function bootstrap(): Promise<void> {
    * Raise the shell and hand it a chat + message. Used by the viewer's 定位 and by
    * a notification click: both mean "show me this conversation, now".
    */
-  const openChatAt = ({ chatId, messageId }: { chatId: number; messageId: number }): void => {
+  const openChatAt = ({
+    chatId,
+    messageId,
+    topicId,
+  }: {
+    chatId: number
+    messageId: number
+    /** 话题 (design doc §9.12): a forum hit opens its topic first. */
+    topicId?: number
+  }): void => {
     const win = mainWindow
     if (!win || win.isDestroyed()) return
     raiseShellAboveViewer(win)
-    bus?.publish('evt:locate', { chatId, messageId })
+    bus?.publish('evt:locate', {
+      chatId,
+      messageId,
+      ...(topicId === undefined ? {} : { topicId }),
+    })
   }
 
   notifications = new NotificationCenter({

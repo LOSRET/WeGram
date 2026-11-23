@@ -17,7 +17,11 @@ import { useAppStore } from '../../../store/useAppStore'
  * Failures and empty answers stay silent: this is speculative work, and the
  * real load reports its own error when the reader gets there.
  */
-export function usePrefetchOlder(activeChatId: number | null): () => void {
+export function usePrefetchOlder(
+  activeChatId: number | null,
+  /** 话题 (design doc §9.12); `null` is a flat transcript. */
+  activeTopicId: number | null,
+): () => void {
   /** The chat whose prefetch is in flight: one speculative request at a time. */
   const prefetchingChatRef = useRef<number | null>(null)
 
@@ -36,6 +40,7 @@ export function usePrefetchOlder(activeChatId: number | null): () => void {
     prefetchingChatRef.current = chatId
     void invoke('messages:history', {
       chatId,
+      ...(activeTopicId === null ? {} : { topicId: activeTopicId }),
       fromMessageId: oldest.id,
       limit: HISTORY_PAGE_SIZE,
     })
@@ -49,5 +54,5 @@ export function usePrefetchOlder(activeChatId: number | null): () => void {
       .finally(() => {
         if (prefetchingChatRef.current === chatId) prefetchingChatRef.current = null
       })
-  }, [activeChatId])
+  }, [activeChatId, activeTopicId])
 }

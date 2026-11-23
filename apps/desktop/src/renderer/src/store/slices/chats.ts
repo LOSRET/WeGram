@@ -69,5 +69,9 @@ export const createChatsSlice: SliceCreator<ChatActions> = (set, get) => ({
     })
   },
 
-  setActiveChat: (activeChatId) => set({ activeChatId }),
+  /**
+   * A chat switch also leaves any topic behind: a forum opens on its topic list
+   * (design doc §9.12), never on the last topic of another chat.
+   */
+  setActiveChat: (activeChatId) => set({ activeChatId, activeTopicId: null }),
 })

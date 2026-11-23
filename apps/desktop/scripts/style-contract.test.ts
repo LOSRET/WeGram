@@ -7,6 +7,7 @@ import { ARCHIVE_PAGE_ANIM_MS } from '../src/renderer/src/lib/archivePage'
 import { INFO_PANEL_ANIM_MS } from '../src/renderer/src/lib/chatInfo'
 import { COMMENT_PANEL_ANIM_MS } from '../src/renderer/src/lib/comments'
 import { CHAT_ROW_H } from '../src/renderer/src/lib/listMetrics'
+import { TOPICS_PAGE_ANIM_MS } from '../src/renderer/src/lib/topics'
 
 /**
  * Two numbers live twice: once in TypeScript (the virtualiser and the unmount
@@ -80,6 +81,12 @@ describe('style contract', () => {
   it('keeps the 已归档会话 slide equal to ARCHIVE_PAGE_ANIM_MS', () => {
     expect(propertyMs(read('chat-list.css'), '.wx-archive-page {', 'transform')).toBe(
       ARCHIVE_PAGE_ANIM_MS,
+    )
+  })
+
+  it('keeps the 话题 slide equal to TOPICS_PAGE_ANIM_MS', () => {
+    expect(propertyMs(read('topics.css'), '.wx-topics-page {', 'transform')).toBe(
+      TOPICS_PAGE_ANIM_MS,
     )
   })
 })

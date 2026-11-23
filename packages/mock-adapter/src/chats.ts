@@ -274,8 +274,12 @@ export interface MockChatApi {
   members(chatId: number, limit: number, query?: string): Promise<ChatMember[]>
   setTitle(chatId: number, title: string): Promise<ChatSummary>
   leave(chatId: number): Promise<void>
-  pinnedMessage(chatId: number): Promise<ChatPinnedMessage | null>
-  setPinnedMessage(chatId: number, messageId: number | null): Promise<ChatPinnedMessage | null>
+  pinnedMessage(chatId: number, topicId?: number): Promise<ChatPinnedMessage | null>
+  setPinnedMessage(
+    chatId: number,
+    messageId: number | null,
+    topicId?: number,
+  ): Promise<ChatPinnedMessage | null>
   inviteLink(chatId: number, temporary?: boolean): Promise<ChatInviteLink | null>
   userStatus(userId: number): Promise<PeerStatus | null>
 }
@@ -285,8 +289,13 @@ export function createMockChats(
   emit: (event: AdapterEvent) => void,
 ): MockChatApi {
   const store: MockChatStore = { fixtures, emit }
-  /** chatId → the one message this chat has pinned (the fixture pins nothing). */
-  const pins = new Map<number, ChatPinnedMessage>()
+  /**
+   * `chatId` or `chatId:topicId` → the one message that place has pinned (the
+   * fixture pins nothing). A forum topic keeps its own pin, like TDLib.
+   */
+  const pins = new Map<string, ChatPinnedMessage>()
+  const pinKey = (chatId: number, topicId: number | undefined): string =>
+    topicId === undefined ? String(chatId) : `${chatId}:${topicId}`
   return {
     listChats: async (input) => listMockChats(store, input),
     /**
@@ -312,11 +321,13 @@ export function createMockChats(
     members: async (chatId, limit, query) => mockChatMembers(store, chatId, limit, query),
     setTitle: async (chatId, title) => setMockTitle(store, chatId, title),
     leave: async (chatId) => leaveMockChat(store, chatId),
-    pinnedMessage: async (chatId) => pins.get(chatId) ?? mockPinnedMessage(),
-    setPinnedMessage: async (chatId, messageId) => {
+    pinnedMessage: async (chatId, topicId) =>
+      pins.get(pinKey(chatId, topicId)) ??
+      (topicId === undefined ? mockPinnedMessage() : null),
+    setPinnedMessage: async (chatId, messageId, topicId) => {
       const fixture = requireFixture(store, chatId)
       if (messageId === null) {
-        pins.delete(chatId)
+        pins.delete(pinKey(chatId, topicId))
         return null
       }
       const message = fixture.messages.find((item) => item.id === messageId)
@@ -325,7 +336,7 @@ export function createMockChats(
         messageId,
         text: message.text || `[${message.kind}]`,
       }
-      pins.set(chatId, pinned)
+      pins.set(pinKey(chatId, topicId), pinned)
       return pinned
     },
     inviteLink: async (chatId, temporary) => mockInviteLink(chatId, temporary),

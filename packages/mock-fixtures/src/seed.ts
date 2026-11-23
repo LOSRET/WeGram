@@ -1,4 +1,4 @@
-import type { ChatSummary, Message, MessageMedia } from '@wegram/protocol'
+import type { ChatSummary, ChatTopic, Message, MessageMedia } from '@wegram/protocol'
 
 /**
  * The shape of the fake account's data (design doc §9.8–9.9), split out of
@@ -51,6 +51,11 @@ export interface FixtureSeed {
    * message thread — a channel's linked discussion group — not in the transcript.
    */
   comments?: Record<number, Message[]>
+  /**
+   * 话题 (design doc §9.12): a forum chat's topic list. Messages carry their
+   * `topicId`; a forum fixture without one shows its flat transcript instead.
+   */
+  topics?: ChatTopic[]
   /** Comment permissions for the fake discussion groups; defaults to joined. */
   commentAccess?: {
     joined?: boolean

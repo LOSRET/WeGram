@@ -10,8 +10,19 @@ const seeds = buildFixtureSeeds({ selfId: 1000, mediaOf, now: () => NOW })
 
 describe('the fake account', () => {
   it('holds the conversations the UI is built against', () => {
-    expect([...seeds.keys()].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 99])
+    expect([...seeds.keys()].sort((a, b) => a - b)).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 99,
+    ])
     expect(seeds.get(99)?.messages).toHaveLength(5000)
+  })
+
+  it('carries a forum whose messages all name their topic', () => {
+    const forum = seeds.get(12)
+    expect(forum?.chat.forum).toBe(true)
+    expect(forum?.topics?.map((topic) => topic.id)).toEqual([1, 11, 12])
+    expect(forum?.topics?.some((topic) => topic.isGeneral)).toBe(true)
+    expect(forum?.topics?.some((topic) => topic.isClosed)).toBe(true)
+    expect(forum?.messages.every((message) => typeof message.topicId === 'number')).toBe(true)
   })
 
   it('keeps the album as two messages sharing one album id', () => {

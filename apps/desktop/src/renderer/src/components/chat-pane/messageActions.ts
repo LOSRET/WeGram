@@ -38,7 +38,12 @@ export interface PendingDelete {
  * the store optimistically-enough by applying the op it just performed, so the UI
  * does not wait for the server echo (`applyMessageOps` also handles the echo).
  */
-export function createMessageActions(activeChatId: number): MessageActions {
+export function createMessageActions(
+  activeChatId: number,
+  /** 话题 (design doc §9.12): every send and forward lands in this topic. */
+  activeTopicId: number | null,
+): MessageActions {
+  const topicParam = activeTopicId === null ? {} : { topicId: activeTopicId }
   return {
     send: async (text, replyToMessageId) => {
       /**
@@ -47,9 +52,10 @@ export function createMessageActions(activeChatId: number): MessageActions {
        * send; the jump is requested after the message is in the store so the
        * scroll lands on it rather than on the previous tail.
        */
-      const wasAnchored = await loadLatestWindow(activeChatId)
+      const wasAnchored = await loadLatestWindow(activeChatId, activeTopicId)
       const result = await invoke('messages:send', {
         chatId: activeChatId,
+        ...topicParam,
         text,
         ...(replyToMessageId === undefined ? {} : { replyTo: replyToMessageId }),
       })
@@ -102,6 +108,12 @@ export function createMessageActions(activeChatId: number): MessageActions {
           fromChatId: message.chatId,
           messageIds: [message.id],
           toChatId,
+          // 转发 into a forum lands in General unless a topic is named; the
+          // official client keeps the reader's current topic when it forwards
+          // back into the same forum, which is the only case that matters here.
+          ...(toChatId === activeChatId && activeTopicId !== null
+            ? { toTopicId: activeTopicId }
+            : {}),
         })
         useAppStore.getState().setToast('已转发')
       } catch (error) {

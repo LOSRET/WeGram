@@ -177,23 +177,30 @@ export function leavePreviewChat(store: PreviewChatStore, chatId: number): void 
   store.emit('evt:chats', { ops: [{ op: 'remove', chatId }] })
 }
 
+/** 话题 (design doc §9.12): a forum topic keeps its own pin, like TDLib. */
+function pinKey(chatId: number, topicId: number | undefined): string {
+  return topicId === undefined ? String(chatId) : `${chatId}:${topicId}`
+}
+
 /** The fixture pins nothing until this session pins one (see previewPinMessage). */
 export function previewPinnedMessage(
-  pins: Map<number, ChatPinnedMessage>,
+  pins: Map<string, ChatPinnedMessage>,
   chatId: number,
+  topicId?: number,
 ): ChatPinnedMessage | null {
-  return pins.get(chatId) ?? null
+  return pins.get(pinKey(chatId, topicId)) ?? null
 }
 
 /** 置顶消息 / 取消置顶: `null` removes the chat's pin, like the real channel. */
 export function previewPinMessage(
   store: PreviewChatStore,
-  pins: Map<number, ChatPinnedMessage>,
+  pins: Map<string, ChatPinnedMessage>,
   chatId: number,
   messageId: number | null,
+  topicId?: number,
 ): ChatPinnedMessage | null {
   if (messageId === null) {
-    pins.delete(chatId)
+    pins.delete(pinKey(chatId, topicId))
     return null
   }
   const message = (store.messagesByChat[chatId] ?? []).find((item) => item.id === messageId)
@@ -201,7 +208,7 @@ export function previewPinMessage(
     messageId,
     text: message?.text || `[${message?.kind ?? '消息'}]`,
   }
-  pins.set(chatId, pinned)
+  pins.set(pinKey(chatId, topicId), pinned)
   return pinned
 }
 
@@ -288,16 +295,18 @@ export function searchPreviewMessages(
 export function handlePreviewPins(
   channel: 'chats:pinned' | 'chats:setPinnedMessage',
   store: PreviewChatStore,
-  pins: Map<number, ChatPinnedMessage>,
+  pins: Map<string, ChatPinnedMessage>,
   payload: Record<string, unknown>,
 ): ChatPinnedMessage | null {
   const chatId = Number(payload['chatId'])
-  if (channel === 'chats:pinned') return previewPinnedMessage(pins, chatId)
+  const topicId = payload['topicId'] === undefined ? undefined : Number(payload['topicId'])
+  if (channel === 'chats:pinned') return previewPinnedMessage(pins, chatId, topicId)
   const messageId = payload['messageId']
   return previewPinMessage(
     store,
     pins,
     chatId,
     messageId === null || messageId === undefined ? null : Number(messageId),
+    topicId,
   )
 }

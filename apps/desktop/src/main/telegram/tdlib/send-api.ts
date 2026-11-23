@@ -19,6 +19,8 @@ export function createSendApi(getDeps: () => ActionDeps) {
   return {
     sendText: async (input: {
       chatId: number
+      /** 话题内发送; absent means the chat's General topic. */
+      topicId?: number
       text: string
       replyTo?: number
     }): Promise<{ localId: string; message: Message }> => actions.sendText(getDeps(), input),
@@ -46,22 +48,29 @@ export function createSendApi(getDeps: () => ActionDeps) {
       fromChatId: number
       messageIds: number[]
       toChatId: number
+      /** The destination forum's topic; absent lands in its General topic. */
+      toTopicId?: number
     }): Promise<void> => actions.forwardMessages(getDeps(), input),
 
-    markRead: async (input: { chatId: number; upToMessageId: number }): Promise<void> =>
-      actions.markRead(getDeps(), input),
+    markRead: async (input: {
+      chatId: number
+      topicId?: number
+      upToMessageId: number
+    }): Promise<void> => actions.markRead(getDeps(), input),
 
     sendTyping: async (
       chatId: number,
       typing: boolean,
       action?: 'typing' | 'recording',
-    ): Promise<void> => actions.sendTyping(getDeps(), chatId, typing, action),
+      topicId?: number,
+    ): Promise<void> => actions.sendTyping(getDeps(), chatId, typing, action, topicId),
 
     resendMessages: async (chatId: number, messageIds: number[]): Promise<void> =>
       actions.resendMessages(getDeps(), chatId, messageIds),
 
     sendMedia: async (input: {
       chatId: number
+      topicId?: number
       filePath: string
       kind: MediaKind
       caption?: string
@@ -71,12 +80,14 @@ export function createSendApi(getDeps: () => ActionDeps) {
     /** 相册: several photos in one album; see `actions/send.ts sendAlbum`. */
     sendAlbum: async (input: {
       chatId: number
+      topicId?: number
       items: Array<{ filePath: string; kind: MediaKind; caption?: string }>
       replyTo?: number
     }): Promise<{ localIds: string[]; messages: Message[] }> => actions.sendAlbum(getDeps(), input),
 
     sendSticker: async (input: {
       chatId: number
+      topicId?: number
       fileId: number
       replyTo?: number
     }): Promise<{ localId: string; message: Message }> => actions.sendSticker(getDeps(), input),
@@ -84,6 +95,7 @@ export function createSendApi(getDeps: () => ActionDeps) {
     /** 语音消息: one recorded OGG/Opus clip; see `actions/send.ts sendVoice`. */
     sendVoiceNote: async (input: {
       chatId: number
+      topicId?: number
       filePath: string
       duration: number
       replyTo?: number

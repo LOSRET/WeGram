@@ -8,6 +8,7 @@ import {
   chatPinnedMessageSchema,
   chatSummarySchema,
 } from './chat'
+import { chatTopicSchema, topicCursorSchema, topicIconSchema, topicPageSchema } from './topic'
 
 /**
  * The chat domain's IPC surface (design doc §6; the 聊天信息 rows are §9.9).
@@ -92,6 +93,39 @@ export const chatInvokeChannels = [
   'chats:setPinnedMessage',
   /** 群二维码: a public t.me link or a link this account may create. */
   'chats:inviteLink',
+  /**
+   * 话题列表 (design doc §9.12): one page of a forum's topics, newest activity
+   * first, with TDLib's own cursor (date + last message + topic id). `query`
+   * searches the topic names on the server.
+   */
+  'chats:topics',
+  /** 新建话题: name + icon colour, permission-gated by `chats:canCreateTopic`. */
+  'chats:topicCreate',
+  /** 编辑话题: title and/or icon; answers nothing, the list refreshes on evt:topics. */
+  'chats:topicEdit',
+  /** 置顶话题 / 取消置顶. */
+  'chats:topicSetPinned',
+  /** 关闭话题 / 重新打开: a closed topic stays readable, only its creator may post. */
+  'chats:topicSetClosed',
+  /** 话题免打扰: TDLib's per-topic notification settings. */
+  'chats:topicSetMuted',
+  /** 话题图标: the custom emoji this account may use (getForumTopicDefaultIcons). */
+  'chats:topicIcons',
+  /**
+   * 论坛的展示方式 (design doc §9.12): Telegram lets administrators show a forum's
+   * topics as a sidebar (our default) or as tabs above the messages. TDLib keeps
+   * the choice on `supergroupFullInfo`, not on the chat object.
+   */
+  'chats:forumLayout',
+  /** 删除话题 (TDLib `deleteForumTopic`). */
+  'chats:topicDelete',
+  /** 复制话题链接: TDLib `getForumTopicLink`, `null` when it has none. */
+  'chats:topicLink',
+  /**
+   * 以聊天方式查看 (TDLib `toggleChatViewAsTopics`): flips the forum's own view
+   * setting, exactly like the official client's menu item. Answers the summary.
+   */
+  'chats:setViewAsTopics',
 ] as const
 
 export const chatInvokeSchemas = {
@@ -171,11 +205,19 @@ export const chatInvokeSchemas = {
   },
   'chats:leave': { request: z.object({ chatId: z.number().int() }), response: noPayload },
   'chats:pinned': {
-    request: z.object({ chatId: z.number().int() }),
+    request: z.object({
+      chatId: z.number().int(),
+      /** 话题 (design doc §9.12): a forum topic's own pin, when the pane is inside one. */
+      topicId: z.number().int().positive().optional(),
+    }),
     response: chatPinnedMessageSchema.nullable(),
   },
   'chats:setPinnedMessage': {
-    request: z.object({ chatId: z.number().int(), messageId: z.number().int().nullable() }),
+    request: z.object({
+      chatId: z.number().int(),
+      topicId: z.number().int().positive().optional(),
+      messageId: z.number().int().nullable(),
+    }),
     response: chatPinnedMessageSchema.nullable(),
   },
   'chats:inviteLink': {
@@ -186,5 +228,85 @@ export const chatInvokeSchemas = {
     }),
     /** `null` when this account may neither see nor create one. */
     response: chatInviteLinkSchema.nullable(),
+  },
+  'chats:topics': {
+    request: z.object({
+      chatId: z.number().int(),
+      /** 搜索话题: TDLib searches the names, the page is then the first hit window. */
+      query: z.string().max(128).optional(),
+      /** The previous page's `next`; omitted for the first one. */
+      cursor: topicCursorSchema.optional(),
+      limit: z.number().int().positive().max(100).optional(),
+    }),
+    response: topicPageSchema,
+  },
+  'chats:topicCreate': {
+    request: z.object({
+      chatId: z.number().int(),
+      title: z.string().trim().min(1).max(128),
+      /** 0xRRGGBB; TDLib accepts the six colours of `TOPIC_ICON_COLORS`. */
+      iconColor: z.number().int().nonnegative().max(0xffffff),
+      iconEmojiId: z.string().optional(),
+    }),
+    response: chatTopicSchema,
+  },
+  'chats:topicEdit': {
+    request: z.object({
+      chatId: z.number().int(),
+      topicId: z.number().int().positive(),
+      /** Absent keeps the current name; an empty string is rejected (TDLib keeps it). */
+      title: z.string().trim().min(1).max(128).optional(),
+      /**
+       * The icon's custom emoji; `'0'` removes it. TDLib's `editForumTopic` can
+       * only change this — the icon colour is fixed when the topic is created,
+       * exactly like the official client's editor.
+       */
+      iconEmojiId: z.string().optional(),
+    }),
+    response: noPayload,
+  },
+  'chats:topicSetPinned': {
+    request: z.object({
+      chatId: z.number().int(),
+      topicId: z.number().int().positive(),
+      pinned: z.boolean(),
+    }),
+    response: noPayload,
+  },
+  'chats:topicSetClosed': {
+    request: z.object({
+      chatId: z.number().int(),
+      topicId: z.number().int().positive(),
+      closed: z.boolean(),
+    }),
+    response: noPayload,
+  },
+  'chats:topicSetMuted': {
+    request: z.object({
+      chatId: z.number().int(),
+      topicId: z.number().int().positive(),
+      muted: z.boolean(),
+    }),
+    response: noPayload,
+  },
+  'chats:topicIcons': {
+    request: noPayload,
+    response: z.object({ icons: z.array(topicIconSchema) }),
+  },
+  'chats:forumLayout': {
+    request: z.object({ chatId: z.number().int() }),
+    response: z.object({ layout: z.enum(['tabs', 'sidebar']) }),
+  },
+  'chats:topicDelete': {
+    request: z.object({ chatId: z.number().int(), topicId: z.number().int().positive() }),
+    response: noPayload,
+  },
+  'chats:topicLink': {
+    request: z.object({ chatId: z.number().int(), topicId: z.number().int().positive() }),
+    response: z.object({ link: z.string() }).nullable(),
+  },
+  'chats:setViewAsTopics': {
+    request: z.object({ chatId: z.number().int(), viewAsTopics: z.boolean() }),
+    response: chatSummarySchema,
   },
 }

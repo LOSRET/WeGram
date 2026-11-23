@@ -20,6 +20,8 @@ export interface ComposerEditing {
 
 interface ComposerProps {
   chatId: number
+  /** 话题 (design doc §9.12); `null` posts into the chat itself. */
+  topicId: number | null
   replyTo: Message | null
   editing: ComposerEditing | null
   onSend: (text: string, replyTo: number | undefined) => Promise<void>
@@ -43,6 +45,7 @@ interface ComposerProps {
  */
 export function Composer({
   chatId,
+  topicId,
   replyTo,
   editing,
   onSend,
@@ -65,21 +68,28 @@ export function Composer({
   // Drafts are stored by the main process (§5.1) and restored per chat.
   useEffect(() => {
     const pinger = new TypingPing((typing) => {
-      void invoke('messages:typing', { chatId, typing }).catch(() => undefined)
+      void invoke('messages:typing', {
+        chatId,
+        ...(topicId === null ? {} : { topicId }),
+        typing,
+      }).catch(() => undefined)
     })
     pingerRef.current = pinger
     return () => {
       pingerRef.current = null
       pinger.stop()
     }
-  }, [chatId])
+  }, [chatId, topicId])
 
   useEffect(() => {
     let cancelled = false
     setText('')
     void (async () => {
       try {
-        const draft = await invoke('ui:getDraft', { chatId })
+        const draft = await invoke('ui:getDraft', {
+          chatId,
+          ...(topicId === null ? {} : { topicId }),
+        })
         if (!cancelled && draft) setText(draft.text)
       } catch {
         // A missing draft is not worth surfacing.
@@ -89,7 +99,7 @@ export function Composer({
     return () => {
       cancelled = true
     }
-  }, [chatId])
+  }, [chatId, topicId])
 
   useEffect(() => {
     if (!editing) return
@@ -106,12 +116,16 @@ export function Composer({
     if (editing) return
     if (draftTimer.current) window.clearTimeout(draftTimer.current)
     draftTimer.current = window.setTimeout(() => {
-      void invoke('ui:saveDraft', { chatId, text }).catch(() => undefined)
+      void invoke('ui:saveDraft', {
+        chatId,
+        ...(topicId === null ? {} : { topicId }),
+        text,
+      }).catch(() => undefined)
     }, 400)
     return () => {
       if (draftTimer.current) window.clearTimeout(draftTimer.current)
     }
-  }, [text, chatId, editing])
+  }, [text, chatId, topicId, editing])
 
   /** Every keystroke also pings (throttled); emptying the box cancels at once. */
   const changeText = (next: string): void => {
@@ -167,12 +181,13 @@ export function Composer({
       const picked = await invoke('media:pick', { kind })
       if (picked.paths.length === 0) return
       setBusy(true)
-      const wasAnchored = await loadLatestWindow(chatId)
+      const wasAnchored = await loadLatestWindow(chatId, topicId)
       const replyToId = replyTo?.id
       const album = albumSendOf(picked.paths, kind)
       if (album) {
         const result = await invoke('media:sendAlbum', {
           chatId,
+          ...(topicId === null ? {} : { topicId }),
           items: album,
           ...(replyToId === undefined ? {} : { replyTo: replyToId }),
         })
@@ -184,6 +199,7 @@ export function Composer({
         for (const filePath of picked.paths) {
           const result = await invoke('media:send', {
             chatId,
+            ...(topicId === null ? {} : { topicId }),
             filePath,
             kind,
             ...(replyToId === undefined ? {} : { replyTo: replyToId }),
@@ -214,10 +230,11 @@ export function Composer({
     if (busy) return
     setBusy(true)
     try {
-      const wasAnchored = await loadLatestWindow(chatId)
+      const wasAnchored = await loadLatestWindow(chatId, topicId)
       const replyToId = replyTo?.id
       const result = await invoke('messages:sendVoice', {
         chatId,
+        ...(topicId === null ? {} : { topicId }),
         audio: voice.audio,
         duration: voice.duration,
         ...(replyToId === undefined ? {} : { replyTo: replyToId }),
@@ -239,7 +256,12 @@ export function Composer({
    * release sends `typing: false` to end either indicator.
    */
   const recordingAction = (recording: boolean): void => {
-    void invoke('messages:typing', { chatId, typing: recording, action: 'recording' }).catch(
+    void invoke('messages:typing', {
+      chatId,
+      ...(topicId === null ? {} : { topicId }),
+      typing: recording,
+      action: 'recording',
+    }).catch(
       () => undefined,
     )
   }
@@ -251,8 +273,12 @@ export function Composer({
    */
   const sendSticker = async (sticker: Sticker): Promise<void> => {
     try {
-      const wasAnchored = await loadLatestWindow(chatId)
-      const result = await invoke('messages:sendSticker', { chatId, fileId: sticker.fileId })
+      const wasAnchored = await loadLatestWindow(chatId, topicId)
+      const result = await invoke('messages:sendSticker', {
+        chatId,
+        ...(topicId === null ? {} : { topicId }),
+        fileId: sticker.fileId,
+      })
       useAppStore.getState().applyMessageOps(chatId, [{ op: 'new', message: result.message }])
       if (wasAnchored) useAppStore.getState().requestJumpToLatest(chatId)
       if (replyTo) onCancelReply()

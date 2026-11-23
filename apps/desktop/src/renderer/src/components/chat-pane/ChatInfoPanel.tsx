@@ -82,6 +82,12 @@ export function ChatInfoPanel({
   /** 资料卡: a private chat's own face opens the peer's card (the header does too). */
   const [profileOpen, setProfileOpen] = useState(false)
   const userAvatars = useAppStore((state) => state.userAvatars)
+  /**
+   * 以话题方式查看: a forum the reader switched to a flat transcript with
+   * "view as chats" has to be switchable back, or the choice is one-way. The
+   * topic rows cached this session are what tells us this group is a forum.
+   */
+  const knownTopics = useAppStore((state) => state.topicsByChat[chat.id]?.length ?? 0)
   const panelRef = useRef<HTMLElement | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
@@ -218,6 +224,18 @@ export function ChatInfoPanel({
     }
   }
 
+  /** 以话题方式查看 (`toggleChatViewAsTopics`), the official client's menu item. */
+  const switchToTopics = async (): Promise<void> => {
+    try {
+      const updated = await invoke('chats:setViewAsTopics', { chatId: chat.id, viewAsTopics: true })
+      useAppStore.getState().applyChatOps([{ op: 'upsert', chat: updated }])
+      useAppStore.getState().setToast('以话题方式查看')
+      onClose()
+    } catch (error) {
+      useAppStore.getState().setError(errorMessage(error))
+    }
+  }
+
   const leaveGroup = async (): Promise<void> => {
     setLeaving(false)
     try {
@@ -344,6 +362,13 @@ export function ChatInfoPanel({
 
           <LinkRow label="查找聊天内容" onClick={() => setSearching(true)} />
           <div className="wx-info__rule" />
+
+          {isGroup && chat.forum !== true && knownTopics > 0 ? (
+            <>
+              <LinkRow label="以话题方式查看" onClick={() => void switchToTopics()} />
+              <div className="wx-info__rule" />
+            </>
+          ) : null}
 
           <div className="wx-info__toggles">
             <ToggleRow

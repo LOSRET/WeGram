@@ -19,9 +19,16 @@ import type { ActionDeps } from './deps'
  * The old `hasMore: rawMessages.length >= limit` read every short answer as
  * "no more history", which stopped MessageList from paging at all.
  */
+/** A transcript target: the whole chat, or one of its topics (design doc §9.12). */
+export interface HistoryTarget {
+  chatId: number
+  /** TDLib `forum_topic_id`; absent reads the whole chat. */
+  topicId?: number
+}
+
 export async function history(
   deps: ActionDeps,
-  input: { chatId: number; fromMessageId?: number; limit: number },
+  input: { chatId: number; topicId?: number; fromMessageId?: number; limit: number },
 ): Promise<{ messages: Message[]; hasMore: boolean }> {
   const limit = Math.min(Math.max(input.limit, 1), 100)
 
@@ -31,16 +38,13 @@ export async function history(
   // anchors on chat.last_message.
   let anchor = input.fromMessageId
   if (anchor === undefined) {
-    const chat = await deps.invoke({ _: 'getChat', chat_id: input.chatId })
-    const lastId: number | undefined = chat.last_message?.id
+    const lastId = await newestMessageId(deps, input)
     if (!lastId) {
       // The whole conversation renders empty when this happens, and the
       // renderer caches the empty page, so it never retries — log which half
       // of the chain produced it.
       deps.logger.warn(
-        `history: chat ${input.chatId} has no last_message (${
-          chat.last_message === null ? 'null' : typeof chat.last_message
-        }) — returning an empty first page`,
+        `history: chat ${input.chatId} topic ${input.topicId ?? 0} has no last_message`,
       )
       return { messages: [], hasMore: false }
     }
@@ -65,15 +69,7 @@ export async function history(
   const MAX_ROUNDS = 3
 
   for (let round = 0; round < MAX_ROUNDS && collected.length < limit; round += 1) {
-    const response = await deps.invoke({
-      _: 'getChatHistory',
-      chat_id: input.chatId,
-      from_message_id: cursor,
-      offset: 0,
-      limit: limit - collected.length,
-      only_local: false,
-    })
-    const rawMessages: TdObject[] = asArray(response.messages)
+    const rawMessages = await fetchHistoryRaw(deps, input, cursor, 0, limit - collected.length)
     const fresh = rawMessages.filter((raw) => {
       const id = Number(raw.id)
       if (!Number.isFinite(id) || seen.has(id)) return false
@@ -113,10 +109,59 @@ export async function history(
 /** One side of an around window; the protocol caps it at 50 as well. */
 const AROUND_LIMIT = 50
 
-/** Newest message id the chat knows about, or 0 when it has no messages yet. */
-async function newestMessageId(deps: Pick<ActionDeps, 'invoke'>, chatId: number): Promise<number> {
-  const chat = await deps.invoke({ _: 'getChat', chat_id: chatId })
-  return Number(chat?.last_message?.id ?? 0)
+/**
+ * The one history call, switched by target: `getChatHistory` has no topic
+ * parameter in TDLib 1.8.70 — a topic's messages come from
+ * `getForumTopicHistory`, and their ids stay unique inside the chat, so every
+ * other rule (anchoring, dedupe, ordering) is shared.
+ */
+async function fetchHistoryRaw(
+  deps: Pick<ActionDeps, 'invoke'>,
+  target: HistoryTarget,
+  fromMessageId: number,
+  offset: number,
+  limit: number,
+): Promise<TdObject[]> {
+  const response = await deps.invoke(
+    target.topicId
+      ? {
+          _: 'getForumTopicHistory',
+          chat_id: target.chatId,
+          forum_topic_id: target.topicId,
+          from_message_id: fromMessageId,
+          offset,
+          limit,
+        }
+      : {
+          _: 'getChatHistory',
+          chat_id: target.chatId,
+          from_message_id: fromMessageId,
+          offset,
+          limit,
+          only_local: false,
+        },
+  )
+  return asArray(response.messages)
+}
+
+/**
+ * Newest message id of the target, or 0 when it has none yet. A topic's newest
+ * message is not the chat's: `getChat` answers the chat's last message, which
+ * usually belongs to some other topic, so the first page would anchor in the
+ * wrong place.
+ */
+async function newestMessageId(
+  deps: Pick<ActionDeps, 'invoke'>,
+  target: HistoryTarget,
+): Promise<number> {
+  const raw = target.topicId
+    ? await deps.invoke({
+        _: 'getForumTopic',
+        chat_id: target.chatId,
+        forum_topic_id: target.topicId,
+      })
+    : await deps.invoke({ _: 'getChat', chat_id: target.chatId })
+  return Number(raw?.last_message?.id ?? 0)
 }
 
 /** Raw messages -> mapped, ascending, de-duplicated by id. */
@@ -144,22 +189,13 @@ async function mapRawPage(
  */
 async function fetchNewerThan(
   deps: Pick<ActionDeps, 'invoke' | 'mapper'>,
-  chatId: number,
+  target: HistoryTarget,
   fromMessageId: number,
   size: number,
 ): Promise<Message[]> {
-  const response = await deps.invoke({
-    _: 'getChatHistory',
-    chat_id: chatId,
-    from_message_id: fromMessageId,
-    offset: -size,
-    limit: size,
-    only_local: false,
-  })
-  const rawNewer = asArray(response.messages).filter(
-    (raw: TdObject) => Number(raw.id) > fromMessageId,
-  )
-  return mapRawPage(deps, chatId, rawNewer)
+  const rawMessages = await fetchHistoryRaw(deps, target, fromMessageId, -size, size)
+  const rawNewer = rawMessages.filter((raw: TdObject) => Number(raw.id) > fromMessageId)
+  return mapRawPage(deps, target.chatId, rawNewer)
 }
 
 /**
@@ -182,19 +218,20 @@ async function fetchNewerThan(
  */
 export async function historyAround(
   deps: ActionDeps,
-  input: { chatId: number; messageId: number; limit: number },
+  input: { chatId: number; topicId?: number; messageId: number; limit: number },
 ): Promise<{ messages: Message[]; hasMore: boolean; hasNewer: boolean }> {
   const size = Math.min(Math.max(input.limit, 1), AROUND_LIMIT)
   const [lastId, older] = await Promise.all([
-    newestMessageId(deps, input.chatId),
+    newestMessageId(deps, input),
     history(deps, {
       chatId: input.chatId,
+      topicId: input.topicId,
       fromMessageId: input.messageId,
       limit: size,
     }),
   ])
 
-  const newer = await fetchNewerThan(deps, input.chatId, input.messageId, size)
+  const newer = await fetchNewerThan(deps, input, input.messageId, size)
 
   let anchor: Message | null = null
   try {
@@ -230,11 +267,11 @@ export async function historyAround(
  */
 export async function historyNewer(
   deps: ActionDeps,
-  input: { chatId: number; fromMessageId: number; limit: number },
+  input: { chatId: number; topicId?: number; fromMessageId: number; limit: number },
 ): Promise<{ messages: Message[]; hasNewer: boolean }> {
   const size = Math.min(Math.max(input.limit, 1), 100)
-  const lastId = await newestMessageId(deps, input.chatId)
-  const messages = await fetchNewerThan(deps, input.chatId, input.fromMessageId, size)
+  const lastId = await newestMessageId(deps, input)
+  const messages = await fetchNewerThan(deps, input, input.fromMessageId, size)
   const newest = messages.at(-1)?.id ?? input.fromMessageId
   return { messages, hasNewer: lastId > 0 && newest < lastId }
 }

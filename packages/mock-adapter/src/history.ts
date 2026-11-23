@@ -19,26 +19,31 @@ export interface MockHistoryStore {
 
 export interface MockHistoryQuery {
   chatId: number
+  /** 话题 (design doc §9.12): the page is one topic's slice of the transcript. */
+  topicId?: number
   fromMessageId?: number
   limit: number
 }
 
 export interface MockAroundQuery {
   chatId: number
+  topicId?: number
   messageId: number
   limit: number
 }
 
 export interface MockNewerQuery {
   chatId: number
+  topicId?: number
   fromMessageId: number
   limit: number
 }
 
-function messagesOf(store: MockHistoryStore, chatId: number): Message[] {
+function messagesOf(store: MockHistoryStore, chatId: number, topicId?: number): Message[] {
   const fixture = store.fixtures.get(chatId)
   if (!fixture) throw new AppError('internal', `Unknown mock chat ${chatId}`)
-  return fixture.messages
+  if (topicId === undefined) return fixture.messages
+  return fixture.messages.filter((message) => message.topicId === topicId)
 }
 
 function copy(messages: Message[]): Message[] {
@@ -49,7 +54,11 @@ export function mockHistory(
   store: MockHistoryStore,
   input: MockHistoryQuery,
 ): { messages: Message[]; hasMore: boolean } {
-  const page = pageOlder(messagesOf(store, input.chatId), input.fromMessageId, input.limit)
+  const page = pageOlder(
+    messagesOf(store, input.chatId, input.topicId),
+    input.fromMessageId,
+    input.limit,
+  )
   return { messages: copy(page.messages), hasMore: page.hasMore }
 }
 
@@ -58,7 +67,7 @@ export function mockHistoryAround(
   input: MockAroundQuery,
 ): { messages: Message[]; hasMore: boolean; hasNewer: boolean } {
   const { messages, hasMore, hasNewer } = pageAround(
-    messagesOf(store, input.chatId),
+    messagesOf(store, input.chatId, input.topicId),
     input.messageId,
     input.limit,
   )
@@ -70,7 +79,7 @@ export function mockHistoryNewer(
   input: MockNewerQuery,
 ): { messages: Message[]; hasNewer: boolean } {
   const { messages, hasNewer } = pageNewer(
-    messagesOf(store, input.chatId),
+    messagesOf(store, input.chatId, input.topicId),
     input.fromMessageId,
     input.limit,
   )

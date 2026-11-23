@@ -36,6 +36,9 @@ export function publishAdapterEvent(bus: EventBus, event: AdapterEvent): void {
     case 'stickerSets':
       bus.publish('evt:stickerSets', {})
       return
+    case 'topics':
+      bus.publish('evt:topics', { chatId: event.chatId })
+      return
     case 'file':
       bus.publish('evt:file', {
         fileId: event.fileId,

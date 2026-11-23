@@ -276,6 +276,21 @@ export function createUpdateHandler(deps: UpdateDeps): (update: TdObject) => Pro
         }
         await emitChatUpsert(deps, update.chat_id)
         return
+      /**
+       * 话题 (design doc §9.12). TDLib splits a topic's state across two updates:
+       * `updateForumTopicInfo` carries name/icon/closed, `updateForumTopic` the
+       * pin, the read markers and the unread counters. Neither carries a whole
+       * topic, so the list re-reads its page (`evt:topics`) instead of patching a
+       * row from half an update.
+       */
+      case 'updateForumTopicInfo':
+      case 'updateForumTopic':
+        if (Number(update.chat_id) > 0) deps.emit({ type: 'topics', chatId: Number(update.chat_id) })
+        return
+      /** 以聊天方式查看 / 以话题方式查看 flips the summary's `forum` flag. */
+      case 'updateChatViewAsTopics':
+        await emitChatUpsert(deps, update.chat_id)
+        return
       case 'updateChatPhoto': {
         // A new photo replaces the old one; drop the cache and refetch.
         const chatId: number = update.chat_id
@@ -457,10 +472,17 @@ async function emitNotification(
   } catch {
     return
   }
+  // 话题 (design doc §9.12): a forum notification names its topic, and clicking
+  // the toast must open that topic before showing the message.
+  const topicId =
+    message.topic_id?._ === 'messageTopicForum'
+      ? Number(message.topic_id.forum_topic_id)
+      : undefined
   deps.emit({
     type: 'notification',
     chatId,
     messageId: Number(message.id),
+    ...(topicId !== undefined && Number.isFinite(topicId) && topicId > 0 ? { topicId } : {}),
     title,
     text: previewContent(message.content),
     isSilent: Boolean(notification.is_silent),

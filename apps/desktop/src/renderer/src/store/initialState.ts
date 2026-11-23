@@ -34,4 +34,9 @@ export const DATA_DEFAULTS: AppData = {
   userAvatars: {},
   unreadMarkers: {},
   stickerSetsVersion: 0,
+  topicsByChat: {},
+  activeTopicId: null,
+  historyTopicByChat: {},
+  topicsVersion: 0,
+  forumLayoutByChat: {},
 }

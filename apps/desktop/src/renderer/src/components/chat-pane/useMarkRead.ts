@@ -26,7 +26,12 @@ const MARK_READ_DELAY_MS = 350
  * The gate is `mayMarkRead` (`lib/readGate.ts`): a message that never appeared on
  * screen must not be reported as read, however far the marker could move.
  */
-export function useMarkRead(chatId: number | null, seenUpToMessageId: number | null): void {
+export function useMarkRead(
+  chatId: number | null,
+  /** 话题 (design doc §9.12): the report clears that topic, not the whole chat. */
+  topicId: number | null,
+  seenUpToMessageId: number | null,
+): void {
   useEffect(() => {
     if (chatId === null || seenUpToMessageId === null) return
     const markRead = (): void => {
@@ -36,9 +41,11 @@ export function useMarkRead(chatId: number | null, seenUpToMessageId: number | n
         focused: document.hasFocus(),
       })
       if (!allowed) return
-      void invoke('messages:read', { chatId, upToMessageId: seenUpToMessageId }).catch(
-        () => undefined,
-      )
+      void invoke('messages:read', {
+        chatId,
+        ...(topicId === null ? {} : { topicId }),
+        upToMessageId: seenUpToMessageId,
+      }).catch(() => undefined)
     }
     const timer = window.setTimeout(markRead, MARK_READ_DELAY_MS)
     // Reopening the window (or the pane) re-checks: the reader may have been
@@ -50,5 +57,5 @@ export function useMarkRead(chatId: number | null, seenUpToMessageId: number | n
       window.removeEventListener('focus', markRead)
       document.removeEventListener('visibilitychange', markRead)
     }
-  }, [chatId, seenUpToMessageId])
+  }, [chatId, topicId, seenUpToMessageId])
 }

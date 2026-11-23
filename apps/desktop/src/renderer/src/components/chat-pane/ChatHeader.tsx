@@ -1,10 +1,17 @@
 import type { PeerStatus } from '@wegram/protocol'
 
 import { formatPeerStatus } from '../../lib/presence'
-import { CallIcon, CallMenuIcon, MoreIcon } from '../Icon'
+import { CallIcon, CallMenuIcon, ChevronLeftIcon, MoreIcon } from '../Icon'
 
 interface ChatHeaderProps {
   title: string
+  /**
+   * 话题 (design doc §9.12): the group's name, shown under the topic's title so the
+   * reader still knows where they are. Absent outside a topic.
+   */
+  subtitle?: string
+  /** Inside a topic: back to the topic list. Absent for a flat chat. */
+  onBack?: () => void
   /** The peer is typing right now (the store expires the flag itself). */
   typing: boolean
   /**
@@ -35,6 +42,8 @@ interface ChatHeaderProps {
  */
 export function ChatHeader({
   title,
+  subtitle,
+  onBack,
   typing,
   peerStatus,
   infoOpen,
@@ -44,6 +53,7 @@ export function ChatHeader({
   const faces = (
     <>
       <span className="wx-chat__name">{title}</span>
+      {subtitle ? <span className="wx-chat__status">{subtitle}</span> : null}
       {typing ? (
         <span className="wx-chat__typing">对方正在输入…</span>
       ) : peerStatus ? (
@@ -53,6 +63,17 @@ export function ChatHeader({
   )
   return (
     <header className="wx-chat__header">
+      {onBack ? (
+        <button
+          type="button"
+          className="wx-ghost-btn"
+          title="返回话题列表"
+          aria-label="返回话题列表"
+          onClick={onBack}
+        >
+          <ChevronLeftIcon size={16} />
+        </button>
+      ) : null}
       {onOpenProfile ? (
         <button
           type="button"

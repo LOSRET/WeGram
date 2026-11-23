@@ -141,6 +141,7 @@ cd apps\desktop; pnpm web       # renderer-only preview at http://localhost:5174
 cd apps\desktop; pnpm tdlib:smoke   # headless real-TDLib check (see below)
 cd apps\desktop; pnpm tdlib:test-dc # READ/WRITE check against Telegram's test data centers
 cd apps\desktop; pnpm tdlib:test-dc:writes # the §9.1 write matrix on the same test session
+cd apps\desktop; pnpm tdlib:test-dc:topics # 话题 end-to-end on a disposable forum (test DC)
 cd apps\desktop; pnpm ui:db-check   # headless ui.db check (node:sqlite)
 cd apps\desktop; pwsh scripts\launch-detached.ps1 -NoSandbox   # only way Electron starts here (-Mock for the fake adapter, -RemoteDebugPort 9224 for CDP checks)
 ```

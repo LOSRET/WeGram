@@ -235,6 +235,8 @@ export const invokeSchemas = {
   'messages:history': {
     request: z.object({
       chatId: z.number().int(),
+      /** 话题内的历史 (design doc §9.12); absent reads the whole chat. */
+      topicId: z.number().int().positive().optional(),
       fromMessageId: z.number().int().optional(),
       limit: z.number().int().positive().max(100),
     }),
@@ -243,6 +245,7 @@ export const invokeSchemas = {
   'messages:around': {
     request: z.object({
       chatId: z.number().int(),
+      topicId: z.number().int().positive().optional(),
       messageId: z.number().int(),
       /** Messages kept on each side of `messageId`; the window is at most twice this. */
       limit: z.number().int().positive().max(50),
@@ -261,6 +264,7 @@ export const invokeSchemas = {
   'messages:newer': {
     request: z.object({
       chatId: z.number().int(),
+      topicId: z.number().int().positive().optional(),
       fromMessageId: z.number().int(),
       limit: z.number().int().positive().max(100),
     }),
@@ -276,6 +280,8 @@ export const invokeSchemas = {
   'messages:send': {
     request: z.object({
       chatId: z.number().int(),
+      /** The forum topic to post into; absent means the chat's General topic. */
+      topicId: z.number().int().positive().optional(),
       text: z.string().min(1),
       replyTo: z.number().int().optional(),
     }),
@@ -319,16 +325,28 @@ export const invokeSchemas = {
       fromChatId: z.number().int(),
       messageIds: z.array(z.number().int()).min(1),
       toChatId: z.number().int(),
+      /** The destination forum's topic; absent lands in its General topic. */
+      toTopicId: z.number().int().positive().optional(),
     }),
     response: noPayload,
   },
   'messages:read': {
-    request: z.object({ chatId: z.number().int(), upToMessageId: z.number().int() }),
+    request: z.object({
+      chatId: z.number().int(),
+      /**
+       * The topic whose history is on screen. TDLib's viewMessages takes no
+       * topic, but message ids are unique per chat; this only picks the read
+       * source (messageSourceForumTopicHistory).
+       */
+      topicId: z.number().int().positive().optional(),
+      upToMessageId: z.number().int(),
+    }),
     response: noPayload,
   },
   'messages:sendSticker': {
     request: z.object({
       chatId: z.number().int(),
+      topicId: z.number().int().positive().optional(),
       fileId: z.number().int(),
       replyTo: z.number().int().optional(),
     }),
@@ -346,6 +364,8 @@ export const invokeSchemas = {
   'search:inChat': {
     request: z.object({
       chatId: z.number().int(),
+      /** 搜索话题内消息: passes TDLib's topic_id to searchChatMessages. */
+      topicId: z.number().int().positive().optional(),
       q: z.string().min(1),
       fromMessageId: z.number().int().optional(),
     }),
@@ -395,6 +415,7 @@ export const invokeSchemas = {
   'media:sendAlbum': {
     request: z.object({
       chatId: z.number().int(),
+      topicId: z.number().int().positive().optional(),
       items: z
         .array(
           z.object({
@@ -416,6 +437,7 @@ export const invokeSchemas = {
   'media:send': {
     request: z.object({
       chatId: z.number().int(),
+      topicId: z.number().int().positive().optional(),
       filePath: z.string().min(1),
       kind: z.enum(['photo', 'file']),
       caption: z.string().optional(),
@@ -454,13 +476,18 @@ export const invokeSchemas = {
   'ui:saveDraft': {
     request: z.object({
       chatId: z.number().int(),
+      /** 话题内草稿 (design doc §9.12); absent is the chat's own draft. */
+      topicId: z.number().int().positive().optional(),
       text: z.string(),
       replyTo: z.number().int().optional(),
     }),
     response: noPayload,
   },
   'ui:getDraft': {
-    request: z.object({ chatId: z.number().int() }),
+    request: z.object({
+      chatId: z.number().int(),
+      topicId: z.number().int().positive().optional(),
+    }),
     response: z.object({ text: z.string(), replyTo: z.number().int().optional() }).nullable(),
   },
   /**
@@ -470,13 +497,18 @@ export const invokeSchemas = {
   'ui:saveAnchor': {
     request: z.object({
       chatId: z.number().int(),
+      /** The topic whose reading position this is; absent is the chat's own. */
+      topicId: z.number().int().positive().optional(),
       messageId: z.number().int().nullable(),
       offset: z.number().int(),
     }),
     response: noPayload,
   },
   'ui:getAnchor': {
-    request: z.object({ chatId: z.number().int() }),
+    request: z.object({
+      chatId: z.number().int(),
+      topicId: z.number().int().positive().optional(),
+    }),
     response: scrollAnchorSchema.nullable(),
   },
   /**

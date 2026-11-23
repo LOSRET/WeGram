@@ -1,5 +1,5 @@
 import { threadInteraction } from '@wegram/mock-session'
-import type { Message } from '@wegram/protocol'
+import type { ChatTopic, Message } from '@wegram/protocol'
 
 import { addContactFixtures } from './contacts'
 import type { FixtureOptions, FixtureSeed } from './seed'
@@ -472,6 +472,92 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
         kind: 'text',
         text: '其余频道只显示静音和只读提示',
       },
+    ],
+  })
+
+  /**
+   * 论坛群 (design doc §9.12): one forum with General, a pinned topic and a closed
+   * one, so the topic list, the unread badges, the lock and the create path can all
+   * be exercised without a real account.
+   */
+  const forumTopics: ChatTopic[] = [
+    {
+      id: 1,
+      title: '综合',
+      isGeneral: true,
+      isClosed: false,
+      isPinned: false,
+      muted: false,
+      iconColor: 0x6fb9f0,
+      unread: 2,
+      lastReadInboxMessageId: 1201,
+      lastMessageId: 1202,
+      lastMessageText: '收到，我下午看一下',
+      lastMessageAt: at(30),
+    },
+    {
+      id: 11,
+      title: '版本发布',
+      isGeneral: false,
+      isClosed: false,
+      isPinned: true,
+      muted: false,
+      iconColor: 0xffd67e,
+      unread: 0,
+      lastReadInboxMessageId: 1211,
+      lastMessageId: 1211,
+      lastMessageText: 'v0.3.0 已发布，安装包在 Release 里',
+      lastMessageAt: at(120),
+    },
+    {
+      id: 12,
+      title: '闲聊',
+      isGeneral: false,
+      isClosed: true,
+      isPinned: false,
+      muted: false,
+      iconColor: 0x8eee98,
+      unread: 1,
+      lastReadInboxMessageId: 1220,
+      lastMessageId: 1221,
+      lastMessageText: '这个话题昨天被管理员关闭了',
+      lastMessageAt: at(240),
+    },
+  ]
+  const forumMessage = (
+    id: number,
+    topicId: number,
+    minutesAgo: number,
+    body: string,
+    outgoing: boolean,
+  ): Message => ({
+    ...text(12, id, minutesAgo, body, outgoing),
+    topicId,
+  })
+  fixtures.set(12, {
+    chat: {
+      id: 12,
+      title: 'WeGram 开发组',
+      kind: 'group',
+      unread: 3,
+      pinned: false,
+      muted: false,
+      forum: true,
+      canCreateTopic: true,
+      lastMessageText: '收到，我下午看一下',
+      lastMessageAt: at(30),
+      lastReadInboxMessageId: 1201,
+      lastReadOutboxMessageId: 0,
+    },
+    topics: forumTopics,
+    messages: [
+      forumMessage(1200, 1, 60, '今天开始接话题了，按主题聊。', false),
+      forumMessage(1201, 1, 45, '好，我先把发布相关都放到「版本发布」。', true),
+      forumMessage(1202, 1, 30, '收到，我下午看一下', false),
+      forumMessage(1210, 11, 150, 'v0.2.9 的会话列表分页修好了。', true),
+      forumMessage(1211, 11, 120, 'v0.3.0 已发布，安装包在 Release 里', false),
+      forumMessage(1220, 12, 260, '周五团建有人去吗？', false),
+      forumMessage(1221, 12, 240, '这个话题昨天被管理员关闭了', false),
     ],
   })
 

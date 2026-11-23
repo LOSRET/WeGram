@@ -52,6 +52,7 @@ export function handlePreviewSend(
       const list = ctx.messagesByChat[chatId] ?? []
       const message = msg(chatId, ctx.takeId(), String(store.text), true, 0)
       if (typeof store.replyTo === 'number') message.replyToId = store.replyTo
+      if (typeof store.topicId === 'number') message.topicId = store.topicId
       list.push(message)
       ctx.messagesByChat[chatId] = list
       const chat = ctx.chats.find((item) => item.id === chatId)
@@ -97,7 +98,16 @@ export function handlePreviewSend(
       const target = ctx.messagesByChat[Number(store.toChatId)] ?? []
       for (const id of ids) {
         const original = source.find((item) => item.id === id)
-        if (original) target.push({ ...original, id: ctx.takeId(), chatId: Number(store.toChatId) })
+        if (original) {
+          target.push({
+            ...original,
+            id: ctx.takeId(),
+            chatId: Number(store.toChatId),
+            ...(typeof store.toTopicId === 'number'
+              ? { topicId: store.toTopicId }
+              : { topicId: undefined }),
+          })
+        }
       }
       ctx.messagesByChat[Number(store.toChatId)] = target
       return undefined
@@ -117,6 +127,7 @@ export function handlePreviewSend(
         kind: 'sticker',
         text: '',
         media: media(sticker.fileId, stickerMedia(sticker)),
+        ...(typeof store.topicId === 'number' ? { topicId: store.topicId } : {}),
       }
       list.push(message)
       ctx.messagesByChat[chatId] = list
@@ -151,6 +162,7 @@ export function handlePreviewSend(
         },
       }
       if (typeof store.replyTo === 'number') message.replyToId = store.replyTo
+      if (typeof store.topicId === 'number') message.topicId = store.topicId
       list.push(message)
       ctx.messagesByChat[chatId] = list
       const chat = ctx.chats.find((item) => item.id === chatId)

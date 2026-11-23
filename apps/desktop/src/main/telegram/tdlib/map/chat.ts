@@ -18,6 +18,11 @@ export function mapChat(ctx: MapperContext, chat: TdObject): ChatSummary {
   // The 通讯录 hides our own Saved Messages by comparing this with `Self.id`.
   // TDLib always sends it for private/secret chats, but a partial object must not
   // leak NaN into a DTO the zod boundary validates.
+  // 论坛群 (design doc §9.12). `view_as_topics` is the per-user view setting the
+  // official client's "view as chats" flips; a forum with it off arrives flat, and
+  // honouring it is what keeps the two clients showing the same thing.
+  const isForum = chat.view_as_topics === true && mapChatKind(chat.type) === 'group'
+  const canCreateTopic = chat.permissions?.can_create_topics === true
   const peerUserId =
     chat.type?._ === 'chatTypePrivate' || chat.type?._ === 'chatTypeSecret'
       ? Number(chat.type.user_id)
@@ -41,6 +46,8 @@ export function mapChat(ctx: MapperContext, chat: TdObject): ChatSummary {
     ...(lastSpoilers.length > 0 ? { lastMessageSpoilers: lastSpoilers } : {}),
     ...(lastMessage ? { lastMessageAt: Number(lastMessage.date) } : {}),
     ...(avatarUrl ? { avatarUrl } : {}),
+    ...(isForum ? { forum: true } : {}),
+    ...(canCreateTopic ? { canCreateTopic: true } : {}),
   }
 }
 
@@ -50,7 +57,7 @@ export function mapChat(ctx: MapperContext, chat: TdObject): ChatSummary {
  * applies instead. The scope default is not fetched here (it would cost one call
  * per row); a chat muted through this client always writes its own `mute_for`.
  */
-function isMuted(settings: TdObject | undefined): boolean {
+export function isMuted(settings: TdObject | undefined): boolean {
   if (!settings || settings.use_default_mute_for) return false
   return Number(settings.mute_for ?? 0) > 0
 }

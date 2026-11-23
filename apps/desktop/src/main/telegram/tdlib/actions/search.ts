@@ -5,6 +5,7 @@ import { asArray } from '../json'
 import { mapMessage } from '../map/message'
 import { fetchChatSummary } from './chats'
 import type { ActionDeps } from './deps'
+import { topicRef } from './message-input'
 
 export async function searchGlobal(
   deps: ActionDeps,
@@ -17,11 +18,13 @@ export async function searchGlobal(
 
 export async function searchInChat(
   deps: ActionDeps,
-  input: { chatId: number; q: string; fromMessageId?: number },
+  input: { chatId: number; topicId?: number; q: string; fromMessageId?: number },
 ): Promise<Message[]> {
   const response = await deps.invoke({
     _: 'searchChatMessages',
     chat_id: input.chatId,
+    // 搜索话题内消息 (design doc §9.12): TDLib takes the topic as a filter.
+    topic_id: topicRef(input.topicId),
     query: input.q,
     sender_id: null,
     from_message_id: input.fromMessageId ?? 0,

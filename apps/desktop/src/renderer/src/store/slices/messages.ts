@@ -4,6 +4,7 @@ import {
   EMPTY_MESSAGES,
   PENDING_OPS_LIMIT,
   appendNewerMessages,
+  filterOpsForTopic,
   hasReplayableOps,
   reduceOps,
   splitOpsForWindow,
@@ -45,7 +46,7 @@ function bufferStillUsable(page: OlderPage, ops: MessageOp[]): boolean {
  * latest message.
  */
 export const createMessagesSlice: SliceCreator<MessageActions> = (set) => ({
-  setHistory: (chatId, messages, hasMore, hasNewer = false) =>
+  setHistory: (chatId, messages, hasMore, hasNewer = false, topicId = null) =>
     set((state) => {
       // The page snapshot was fetched before the queued events arrived: replay
       // them onto it (upsertMessage dedupes by id) and drop the queue. Without
@@ -76,6 +77,8 @@ export const createMessagesSlice: SliceCreator<MessageActions> = (set) => ({
         olderPagesByChat,
         hasNewerByChat: { ...state.hasNewerByChat, [chatId]: hasNewer },
         pendingOps,
+        // The page (and any op replayed onto it) belongs to this topic now.
+        historyTopicByChat: { ...state.historyTopicByChat, [chatId]: topicId },
       }
     }),
 
@@ -135,8 +138,24 @@ export const createMessagesSlice: SliceCreator<MessageActions> = (set) => ({
       }
     }),
 
-  applyMessageOps: (chatId, ops) =>
+  applyMessageOps: (chatId, incoming) =>
     set((state) => {
+      /**
+       * 话题 (design doc §9.12): a forum's live ops are filtered to the topic the
+       * transcript belongs to. When the reader is on the topic list (no topic
+       * selected) nothing is on screen to patch: dropping them is right, and the
+       * first page is fetched again when a topic is opened.
+       */
+      const chat =
+        state.chats.find((item) => item.id === chatId) ??
+        state.archivedChats.find((item) => item.id === chatId)
+      let ops = incoming
+      if (chat?.forum === true) {
+        const topic = state.historyTopicByChat[chatId]
+        if (topic === undefined || topic === null) return {}
+        ops = filterOpsForTopic(incoming, topic)
+        if (ops.length === 0) return {}
+      }
       // Only a chat whose first page is already in memory may be patched here.
       // See the note above: creating an entry for a chat we never opened is what
       // made groups open empty and never page back.

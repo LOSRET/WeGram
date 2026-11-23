@@ -6,7 +6,8 @@ Scope: the demo account both fakes serve — the Electron mock adapter
 
 ## What belongs here
 
-- `data.ts` — `buildFixtureSeeds`: chats 1–11, their messages (albums, stickers,
+- `data.ts` — `buildFixtureSeeds`: chats 1–12 (12 is the 论坛群 fixture: General, a pinned
+  topic and a closed one, every message carrying its `topicId`), their messages (albums, stickers,
   one premium sticker, one custom emoji, a channel post, the 通讯录 people), comment
   threads on the posts that own one, and the contact fields the address book reads.
 - `seed.ts` — the dataset's shape (`FixtureSeed`, `FixtureOptions`, `SeedMedia`).

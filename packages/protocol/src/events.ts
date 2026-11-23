@@ -47,6 +47,13 @@ export const eventChannels = [
   /** TDLib reloaded the installed sticker sets; the picker refetches them. */
   'evt:stickerSets',
   /**
+   * A forum's topic list changed (TDLib updateForumTopicInfo / updateForumTopic):
+   * a rename, an icon, a pin, a close, unread counters or a deletion. The list
+   * re-reads its page instead of patching a row, because TDLib's update carries
+   * only part of a topic's state.
+   */
+  'evt:topics',
+  /**
    * The viewer asked the shell to show a message (定位到聊天位置). Main raises the
    * shell window first, then publishes this; the viewer window stays open.
    */
@@ -93,7 +100,15 @@ export const eventSchemas = {
     }),
   ),
   'evt:stickerSets': envelope(z.object({})),
-  'evt:locate': envelope(z.object({ chatId: z.number().int(), messageId: z.number().int() })),
+  'evt:topics': envelope(z.object({ chatId: z.number().int() })),
+  'evt:locate': envelope(
+    z.object({
+      chatId: z.number().int(),
+      messageId: z.number().int(),
+      /** 话题 (design doc §9.12): a hit inside a forum opens that topic first. */
+      topicId: z.number().int().positive().optional(),
+    }),
+  ),
   'evt:error': envelope(appErrorSchema),
   'evt:proxy': envelope(proxyStateSchema),
 } satisfies Record<EventChannel, z.ZodType>

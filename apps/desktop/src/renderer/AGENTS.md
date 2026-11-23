@@ -48,7 +48,10 @@ lib/voice/            语音消息's audio path: oggOpus.ts (pure, unit-tested �
                       AudioEncoder → muxed OGG bytes).
 components/chat-pane/     render tree + useChatHistory (history/ modules) + messageActions +
                          useMarkRead (已读上报 effect) + usePeerStatus (在线/最后上线 for a
-                         private chat's header) +
+                         private chat's header) + topics/useChatTopics (话题 cursor paging,
+                         搜索话题, evt:topics debounced re-read) + chat-list/TopicDialog (the
+                         shared 新建/编辑话题 sheet) + topics/TopicsTabs (the chips layout a
+                         has_forum_tabs forum draws above the transcript) +
                          CommentPanel (full-pane discussion view, slides in from the right;
                          chat-style rows + CommentComposer, the shared composer card posting
                          text / sticker / photo-file through messages:sendComment; non-members
@@ -109,15 +112,20 @@ components/ChatList.tsx  the conversation column: pill (server search panel, §5
                         HANDOFF), "+" and the virtualised rows (which also page the list on
                         approach and ask for the visible rows' photos); search results are a
                         plain face in the same scroller (tabs + message rows). 已归档会话
-                        is a PAGE, not a third face: ArchiveEntry (the row above the
-                        scroller, with the archive's unread total) mounts
+                        is a PAGE, not a third face: ArchiveEntry (the list's own first
+                        row — inside the scroller so it scrolls away with the rows, and
+                        with the archive's unread total) mounts
                         `chat-list/ArchivePage.tsx`, an overlay inside this column that
                         slides in from the right over the rows (transform only — the list
                         keeps its rows and scroll position underneath) with its own
                         scroller + virtualiser, header ArchiveBar and the shared
                         `chat-list/ChatRow.tsx`; its menu item is 取消归档, and the slide
                         length is `ARCHIVE_PAGE_ANIM_MS` (`lib/archivePage.ts`, pinned by
-                        `style-contract.test.ts`)
+                        `style-contract.test.ts`). 话题 (§9.12) uses the same gesture one
+                        page further: while a forum is open `chat-list/TopicsSidebar.tsx`
+                        covers this column with the topic list (back / search / 新建话题 /
+                        row menu / flat-view toggle, `TOPICS_PAGE_ANIM_MS`), and the
+                        message pane keeps showing the chosen topic
 components/chat-search/ SearchTabs (聊天 / 频道) and SearchHitRow (one message hit:
                         chat face, chat title, message preview, time)
 components/SearchField.tsx  the ONE search pill (label + input + optional trailing control)
@@ -446,6 +454,14 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   that cannot initialise falls back to thumbnails + the per-cell hover animation
   (`loadThorvg()` tries WebGL, then ThorVG's software renderer), so never let a failed
   `loadThorvg()` break the panel.
+- **话题的 transcript 属于一个 chat + topic 对,不是属于 chat.** `historyTopicByChat`
+  says which topic `messagesByChat[chatId]` holds; the pane draws a loading state
+  while it does not match the selected topic. Do not "fix" a stale transcript by
+  deleting the rows in `setActiveTopic` — that left the store empty while the query
+  cache still had a page, and a reopened forum sat on "not synced". And remember
+  `lib/query.ts` is `staleTime: Infinity`: a query that reuses its key for another
+  topic needs `staleTime: 0` (focus/reconnect refetch off) or it will never fetch
+  again after `enabled` flips back on.
 - User-facing copy is Chinese (`回复`/`复制`/`转发`…), code, identifiers and
   comments are English.
 

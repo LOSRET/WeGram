@@ -36,20 +36,33 @@ export function previewMarkRead(
   store.emit('evt:chats', { ops: [{ op: 'upsert', chat: { ...chat } }] })
 }
 
+/** 话题 (design doc §9.12): a page is one topic's slice of the transcript. */
+function messagesOf(
+  store: PreviewMessagesStore,
+  chatId: number,
+  topicId?: number,
+): Message[] {
+  const all = store.messagesByChat[chatId] ?? []
+  return topicId === undefined ? all : all.filter((message) => message.topicId === topicId)
+}
+
 export interface PreviewHistoryQuery {
   chatId: number
+  topicId?: number
   fromMessageId?: number
   limit: number
 }
 
 export interface PreviewAroundQuery {
   chatId: number
+  topicId?: number
   messageId: number
   limit: number
 }
 
 export interface PreviewNewerQuery {
   chatId: number
+  topicId?: number
   fromMessageId: number
   limit: number
 }
@@ -58,21 +71,21 @@ export function previewHistory(
   store: PreviewMessagesStore,
   input: PreviewHistoryQuery,
 ): ReturnType<typeof pageOlder> {
-  return pageOlder(store.messagesByChat[input.chatId] ?? [], input.fromMessageId, input.limit)
+  return pageOlder(messagesOf(store, input.chatId, input.topicId), input.fromMessageId, input.limit)
 }
 
 export function previewAround(
   store: PreviewMessagesStore,
   input: PreviewAroundQuery,
 ): ReturnType<typeof pageAround> {
-  return pageAround(store.messagesByChat[input.chatId] ?? [], input.messageId, input.limit)
+  return pageAround(messagesOf(store, input.chatId, input.topicId), input.messageId, input.limit)
 }
 
 export function previewNewer(
   store: PreviewMessagesStore,
   input: PreviewNewerQuery,
 ): ReturnType<typeof pageNewer> {
-  return pageNewer(store.messagesByChat[input.chatId] ?? [], input.fromMessageId, input.limit)
+  return pageNewer(messagesOf(store, input.chatId, input.topicId), input.fromMessageId, input.limit)
 }
 
 /**

@@ -463,6 +463,12 @@ export const messageSchema = z.object({
    * consecutive ones back into one bubble (design doc §8.6).
    */
   albumId: z.string().optional(),
+  /**
+   * 话题 the message belongs to (design doc §9.12). Absent in a non-forum chat and
+   * for a forum's General topic, which TDLib may report as no topic at all; the
+   * reader treats both as General (id 1).
+   */
+  topicId: z.number().int().positive().optional(),
   replyToId: z.number().int().optional(),
   edited: z.boolean().optional(),
   /**

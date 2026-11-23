@@ -51,6 +51,7 @@ export async function mapMessage(
   const sending = mapSendingState(raw.sending_state)
   const buttons = mapReplyMarkup(raw.reply_markup)
   const albumId = albumIdOf(raw)
+  const topicId = topicIdOf(raw)
   const interaction = mapInteraction(raw)
   const reactions = mapReactions(raw)
   let text = mapped.text
@@ -85,6 +86,7 @@ export async function mapMessage(
     ...(mapped.poll ? { poll: mapped.poll } : {}),
     ...(buttons ? { buttons } : {}),
     ...(albumId ? { albumId } : {}),
+    ...(topicId ? { topicId } : {}),
     ...(raw.reply_to?.message_id ? { replyToId: raw.reply_to.message_id } : {}),
     ...(raw.edit_date ? { edited: true } : {}),
     ...sending,
@@ -174,6 +176,21 @@ export function mapInteraction(raw: TdObject): MessageInteraction | null {
     ...(forwards > 0 ? { forwards } : {}),
     ...(hasThread ? { canOpen: true } : {}),
   }
+}
+
+/**
+ * 话题 the message belongs to (TDLib 1.8.70 `message.topic_id`).
+ *
+ * Only a forum topic is a topic id the client can navigate to: the same field
+ * also carries a message-thread id in an ordinary supergroup and Saved-Messages
+ * topics, which look identical in JSON and mean something else. A forum topic
+ * arrives as `messageTopicForum`; anything else is left out.
+ */
+function topicIdOf(raw: TdObject): number | undefined {
+  const topic = raw.topic_id
+  if (topic?._ !== 'messageTopicForum') return undefined
+  const id = Number(topic.forum_topic_id ?? 0)
+  return Number.isFinite(id) && id > 0 ? id : undefined
 }
 
 /**

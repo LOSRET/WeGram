@@ -18,6 +18,8 @@ import { messageSchema } from './dto'
  */
 export const voiceSendSchema = z.object({
   chatId: z.number().int(),
+  /** The topic the clip is sent into; absent means the chat's General topic. */
+  topicId: z.number().int().positive().optional(),
   /** base64 of the whole OGG file, ~4 KB per second at the recorder's bitrate. */
   audio: z.string().min(1).max(6_000_000),
   /** Whole seconds (TDLib `duration`); the recorder rounds up, never sends 0. */

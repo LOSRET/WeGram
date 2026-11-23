@@ -8,13 +8,16 @@ import { asArray } from '../json'
 import { mapMessage } from '../map/message'
 import type { ActionDeps } from './deps'
 import { history } from './history'
-import { formattedText, inputText, replyTo, sendAndMap } from './message-input'
+import { formattedText, inputText, replyTo, sendAndMap, topicRef } from './message-input'
 
 export async function sendText(
   deps: ActionDeps,
-  input: { chatId: number; text: string; replyTo?: number },
+  input: { chatId: number; topicId?: number; text: string; replyTo?: number },
 ): Promise<{ localId: string; message: Message }> {
-  return sendAndMap(deps, input.chatId, inputText(input.text, true), { replyTo: input.replyTo })
+  return sendAndMap(deps, input.chatId, inputText(input.text, true), {
+    replyTo: input.replyTo,
+    topicId: input.topicId,
+  })
 }
 
 export async function editText(
@@ -83,11 +86,12 @@ export async function deleteMessages(
 
 export async function forwardMessages(
   deps: ActionDeps,
-  input: { fromChatId: number; messageIds: number[]; toChatId: number },
+  input: { fromChatId: number; messageIds: number[]; toChatId: number; toTopicId?: number },
 ): Promise<void> {
   await deps.invoke({
     _: 'forwardMessages',
     chat_id: input.toChatId,
+    topic_id: topicRef(input.toTopicId),
     from_chat_id: input.fromChatId,
     message_ids: input.messageIds,
     options: null,
@@ -96,12 +100,17 @@ export async function forwardMessages(
 
 export async function markRead(
   deps: ActionDeps,
-  input: { chatId: number; upToMessageId: number },
+  input: { chatId: number; topicId?: number; upToMessageId: number },
 ): Promise<void> {
   await deps.invoke({
     _: 'viewMessages',
     chat_id: input.chatId,
     message_ids: [input.upToMessageId],
+    // 话题内已读 (design doc §9.12): `viewMessages` has no topic field in TDLib
+    // 1.8.70; the read *source* is what tells it the ids belong to a topic.
+    ...(input.topicId
+      ? { source: { _: 'messageSourceForumTopicHistory' } }
+      : {}),
     force_read: true,
   })
 }
@@ -121,12 +130,14 @@ export async function sendTyping(
   // A voice note is a different chat action ("recording a voice message"); the
   // renderer asks for it while the hold-to-record gesture is live.
   action: 'typing' | 'recording' = 'typing',
+  /** The topic the reader is composing in; absent means the chat's General. */
+  topicId?: number,
 ): Promise<void> {
   try {
     await deps.invoke({
       _: 'sendChatAction',
       chat_id: chatId,
-      topic_id: null,
+      topic_id: topicRef(topicId),
       business_connection_id: '',
       action: {
         _: !typing
@@ -266,10 +277,17 @@ export function voiceContent(input: { filePath: string; duration: number }): TdO
 /** Sends one recorded voice note; the row comes back mapped like any other send. */
 export async function sendVoice(
   deps: ActionDeps,
-  input: { chatId: number; filePath: string; duration: number; replyTo?: number },
+  input: {
+    chatId: number
+    topicId?: number
+    filePath: string
+    duration: number
+    replyTo?: number
+  },
 ): Promise<{ localId: string; message: Message }> {
   return sendAndMap(deps, input.chatId, voiceContent(input), {
     replyTo: input.replyTo,
+    topicId: input.topicId,
     options: null,
   })
 }
@@ -279,6 +297,7 @@ export async function sendMedia(
   deps: ActionDeps,
   input: {
     chatId: number
+    topicId?: number
     filePath: string
     kind: MediaKind
     caption?: string
@@ -287,6 +306,7 @@ export async function sendMedia(
 ): Promise<{ localId: string; message: Message }> {
   return sendAndMap(deps, input.chatId, await mediaContent(input), {
     replyTo: input.replyTo,
+    topicId: input.topicId,
     options: null,
   })
 }
@@ -308,6 +328,7 @@ export async function sendAlbum(
   deps: ActionDeps,
   input: {
     chatId: number
+    topicId?: number
     items: Array<{ filePath: string; kind: MediaKind; caption?: string }>
     replyTo?: number
   },
@@ -317,7 +338,7 @@ export async function sendAlbum(
   const response = await deps.invoke({
     _: 'sendMessageAlbum',
     chat_id: input.chatId,
-    topic_id: null,
+    topic_id: topicRef(input.topicId),
     reply_to: replyTo(input.replyTo),
     options: null,
     input_message_contents: contents,
@@ -352,10 +373,11 @@ export function stickerContent(deps: Pick<ActionDeps, 'mapper'>, fileId: number)
 /** Sends an existing sticker by file id, as the picker does (design doc §9.4). */
 export async function sendSticker(
   deps: ActionDeps,
-  input: { chatId: number; fileId: number; replyTo?: number },
+  input: { chatId: number; topicId?: number; fileId: number; replyTo?: number },
 ): Promise<{ localId: string; message: Message }> {
   return sendAndMap(deps, input.chatId, stickerContent(deps, input.fileId), {
     replyTo: input.replyTo,
+    topicId: input.topicId,
     options: null,
   })
 }

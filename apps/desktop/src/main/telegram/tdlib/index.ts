@@ -35,6 +35,7 @@ import type { ProxyDeps } from './proxy'
 import * as stickers from './stickers'
 import { createChatApi } from './chat-api'
 import { createSendApi } from './send-api'
+import { createTopicApi } from './topic-api'
 import { createUserApi } from './user-api'
 import { createUpdateHandler } from './updates'
 
@@ -315,6 +316,23 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   readonly setPinnedMessage = this.chatApi.setPinnedMessage
   readonly inviteLink = this.chatApi.inviteLink
 
+  /** 话题 (design doc §9.12); `topic-api.ts`, deps read lazily. */
+  private readonly topicApi = createTopicApi(() => ({
+    actionDeps: this.actionDeps,
+    fetchChatSummary: (chatId) => actions.fetchChatSummary(this.actionDeps, chatId),
+  }))
+  readonly topics = this.topicApi.topics
+  readonly createTopic = this.topicApi.createTopic
+  readonly editTopic = this.topicApi.editTopic
+  readonly setTopicPinned = this.topicApi.setTopicPinned
+  readonly setTopicClosed = this.topicApi.setTopicClosed
+  readonly setTopicMuted = this.topicApi.setTopicMuted
+  readonly topicIcons = this.topicApi.topicIcons
+  readonly forumLayout = this.topicApi.forumLayout
+  readonly deleteTopic = this.topicApi.deleteTopic
+  readonly topicLink = this.topicApi.topicLink
+  readonly setViewAsTopics = this.topicApi.setViewAsTopics
+
   /** The account's Telegram address book (通讯录); see `actions.listContacts`. */
   async listContacts(): Promise<Contact[]> {
     return actions.listContacts(this.actionDeps)
@@ -322,6 +340,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
 
   async history(input: {
     chatId: number
+    topicId?: number
     fromMessageId?: number
     limit: number
   }): Promise<{ messages: Message[]; hasMore: boolean }> {
@@ -330,6 +349,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
 
   async historyAround(input: {
     chatId: number
+    topicId?: number
     messageId: number
     limit: number
   }): Promise<{ messages: Message[]; hasMore: boolean; hasNewer: boolean }> {
@@ -338,6 +358,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
 
   async historyNewer(input: {
     chatId: number
+    topicId?: number
     fromMessageId: number
     limit: number
   }): Promise<{ messages: Message[]; hasNewer: boolean }> {
@@ -413,6 +434,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
 
   async searchInChat(input: {
     chatId: number
+    topicId?: number
     q: string
     fromMessageId?: number
   }): Promise<Message[]> {
@@ -497,6 +519,15 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
       name: 'prefer_ipv6',
       value: { _: 'optionValueBoolean', value: prefer },
     })
+  }
+
+  /**
+   * Test-DC scripts only: one TDLib method that has no seam method (a forum
+   * created for the probe, its tabs/sidebar switch). Production code goes through
+   * the interface; this exists so the write matrix can be exercised headlessly.
+   */
+  async rawInvoke(method: TdObject): Promise<any> {
+    return this.invoke(method)
   }
 
   private async invoke(method: TdObject): Promise<any> {

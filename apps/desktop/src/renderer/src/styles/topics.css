@@ -1,0 +1,415 @@
+/* ---------- 话题 (design doc §9.12) ---------- */
+
+/* The pane's own background while the topic list covers it: the reader has not
+   chosen a topic yet, so there is no transcript to mount (nothing to fetch). */
+.wx-chat__topics-veil {
+  flex: 1;
+  min-height: 0;
+  background: var(--wx-pane);
+}
+
+/* 已关闭话题: readable, but only its creator / admins may post (TDLib
+   `forumTopicInfo.is_closed`). It takes the composer's slot, like 频道底栏 does. */
+.wx-chat__topic-closed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 56px;
+  flex: 0 0 56px;
+  border-top: 1px solid var(--wx-pane-line);
+  background: var(--wx-pane);
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+}
+
+/* The topic list: an overlay inside the CONVERSATION column, the same mechanics
+   as 已归档会话 (chat-list.css) one column to the left. Mounted closed, flipped
+   open on the next tick; the 0.2 s slide is TOPICS_PAGE_ANIM_MS and
+   style-contract.test.ts pins the two together. The message pane keeps the
+   transcript, so picking a topic swaps it instead of covering it. */
+.wx-topics-page {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  background: var(--wx-list);
+  transform: translateX(100%);
+  transition: transform 0.2s cubic-bezier(0.22, 0.8, 0.2, 1);
+}
+
+.wx-topics-page.is-open {
+  transform: translateX(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wx-topics-page {
+    transition: none;
+  }
+}
+
+/* Takes the conversation head's slot (search + "+"), like 已归档会话's bar. */
+.wx-topics-bar {
+  gap: 8px;
+  padding: 0 10px 0 9px;
+  user-select: none;
+}
+
+.wx-topics-bar__spacer {
+  width: 22px;
+  flex: 0 0 22px;
+}
+
+.wx-topics-bar__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--wx-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wx-topics-bar__count {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--wx-text-tertiary);
+}
+
+.wx-topics-search {
+  padding: 8px 12px;
+}
+
+.wx-topics-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.wx-topics-view {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+}
+
+.wx-topics-sizer {
+  position: relative;
+  width: 100%;
+}
+
+.wx-topics-slot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 64px;
+}
+
+.wx-topic {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 64px;
+  padding: 0 14px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: default;
+}
+
+.wx-topic:hover {
+  background: var(--wx-row-hover);
+}
+
+/* The topic whose transcript is on the right: the same green row an open
+   conversation gets in the list. */
+.wx-topic.is-active,
+.wx-topic.is-active:hover {
+  background: var(--wx-row-active);
+}
+
+.wx-topic.is-active .wx-topic__name {
+  color: var(--wx-text-on-active);
+}
+
+.wx-topic.is-active .wx-topic__time,
+.wx-topic.is-active .wx-topic__preview {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.wx-topic.is-active .wx-topic__pin,
+.wx-topic.is-active .wx-topic__lock {
+  background: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.wx-topic.is-active .wx-badge {
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.wx-topic__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.wx-topic__body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.wx-topic__line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.wx-topic__name {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--wx-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wx-topic__pin,
+.wx-topic__lock {
+  flex: 0 0 auto;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--wx-field);
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--wx-text-tertiary);
+}
+
+.wx-topic__time {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: var(--wx-text-tertiary);
+}
+
+.wx-topic__preview {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The create / delete sheet, in the pane's own colours. */
+.wx-topics-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 85;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.wx-topics-dialog {
+  width: 320px;
+  padding: 18px;
+  border-radius: 8px;
+  background: var(--wx-pane);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.22);
+}
+
+.wx-topics-dialog h2 {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--wx-text);
+}
+
+.wx-topics-dialog p {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 19px;
+  color: var(--wx-text-secondary);
+}
+
+.wx-topics-dialog__field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  margin-bottom: 12px;
+  border-radius: 6px;
+  background: var(--wx-field);
+  color: var(--wx-text-tertiary);
+}
+
+.wx-topics-dialog__field input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--wx-text);
+}
+
+.wx-topics-swatches {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.wx-topics-swatch {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+}
+
+.wx-topics-swatch.is-active {
+  border-color: var(--wx-text);
+}
+
+/* 话题图标: the custom emoji the server offers, plus "none". */
+.wx-topics-emoji-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 16px;
+}
+
+.wx-topics-emoji-label {
+  margin-right: 2px;
+  font-size: 12px;
+  color: var(--wx-text-tertiary);
+}
+
+.wx-topics-emoji {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--wx-field);
+  font: inherit;
+  font-size: 13px;
+  color: var(--wx-text);
+}
+
+.wx-topics-emoji.is-active {
+  border-color: var(--wx-brand);
+}
+
+.wx-topics-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.wx-topics-dialog__actions button {
+  height: 28px;
+  padding: 0 14px;
+  border: 1px solid var(--wx-line);
+  border-radius: 4px;
+  background: var(--wx-pane);
+  font: inherit;
+  font-size: 13px;
+  color: var(--wx-text);
+}
+
+.wx-topics-dialog__actions button:disabled {
+  opacity: 0.5;
+}
+
+.wx-topics-dialog__danger {
+  border-color: var(--wx-danger) !important;
+  color: var(--wx-danger) !important;
+}
+
+/* ---------- 话题 tabs (a forum whose admins chose tabs) ---------- */
+.wx-topic-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 38px;
+  height: 38px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--wx-pane-line);
+  background: var(--wx-pane);
+}
+
+.wx-topic-tabs__scroll {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.wx-topic-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 13px;
+  background: var(--wx-field);
+  font: inherit;
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.wx-topic-tab.is-active {
+  background: var(--wx-row-active);
+  color: var(--wx-text-on-active);
+}
+
+.wx-topic-tab__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 8px;
+}
+
+.wx-topic-tab__badge {
+  min-width: 14px;
+  padding: 0 4px;
+  border-radius: 7px;
+  background: var(--wx-badge);
+  color: #fff;
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
+}

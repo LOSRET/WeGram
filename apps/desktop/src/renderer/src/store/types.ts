@@ -1,6 +1,7 @@
 import type {
   ChatOp,
   ChatSummary,
+  ChatTopic,
   AppInfo,
   AuthState,
   ConnectionState,
@@ -74,7 +75,7 @@ export interface AppData {
   /**
    * 已归档会话, TDLib's second chat list. It is a list of its own rather than a
    * filter over `chats`: an archived chat is not in the main list at all, and the
-   * entry row above the conversation list reads its unread total from here.
+   * entry row that leads the conversation list reads its unread total from here.
    */
   archivedChats: ChatSummary[]
   activeChatId: number | null
@@ -130,6 +131,30 @@ export interface AppData {
    * on the change because the first answer can be the pre-sync local cache.
    */
   stickerSetsVersion: number
+  /**
+   * 话题 (design doc §9.12): a forum chat's topic list, as last read. Kept beside
+   * the chat rather than on it because it is paged and refreshed on its own.
+   */
+  topicsByChat: Record<number, ChatTopic[]>
+  /**
+   * The topic the reader is inside, for the active chat; `null` means the topic
+   * list is what the pane shows (a forum) or the chat has no topics at all.
+   */
+  activeTopicId: number | null
+  /**
+   * Which topic `messagesByChat[chatId]` belongs to — `null` for a flat transcript.
+   * A cached page may only be reused for the topic it was fetched for; reusing it
+   * for another would show one topic's rows under another's name (the same trap
+   * as the "empty group" bug, one level down).
+   */
+  historyTopicByChat: Record<number, number | null>
+  /** Bumped by `evt:topics`; the topic list refetches when it moves. */
+  topicsVersion: number
+  /**
+   * 论坛展示方式 per forum (design doc §9.12): `tabs` puts the topic strip above the
+   * messages, `sidebar` is this client's column. Unknown until the chat opened.
+   */
+  forumLayoutByChat: Record<number, 'tabs' | 'sidebar'>
 }
 
 export interface AuthActions {
@@ -140,6 +165,22 @@ export interface AuthActions {
   setSendKey: (sendKey: SendKey) => void
   /** Clears every chat/message/media field, used on logout. */
   reset: () => void
+}
+
+export interface TopicActions {
+  /** The list a page (or a refresh) produced; replaces the chat's cached topics. */
+  setTopics: (chatId: number, topics: ChatTopic[]) => void
+  /** Append one page (the list's cursor paging). */
+  mergeTopics: (chatId: number, topics: ChatTopic[]) => void
+  /**
+   * `evt:topics` said this forum changed. The hook bumps a version instead of
+   * patching rows: TDLib's update carries only part of a topic's state.
+   */
+  noteTopicsChanged: () => void
+  /** Enter a topic, or (`null`) go back to the topic list. */
+  setActiveTopic: (topicId: number | null) => void
+  /** 论坛展示方式, learned when the chat opens. */
+  setForumLayout: (chatId: number, layout: 'tabs' | 'sidebar') => void
 }
 
 export interface ChatActions {
@@ -156,7 +197,14 @@ export interface ChatActions {
 }
 
 export interface MessageActions {
-  setHistory: (chatId: number, messages: Message[], hasMore: boolean, hasNewer?: boolean) => void
+  setHistory: (
+    chatId: number,
+    messages: Message[],
+    hasMore: boolean,
+    hasNewer?: boolean,
+    /** 话题 the page belongs to; `null`/absent is a flat transcript. */
+    topicId?: number | null,
+  ) => void
   prependHistory: (chatId: number, messages: Message[], hasMore: boolean) => void
   /** Extends an anchored window downward, keeping any ops that are still ahead. */
   appendNewer: (chatId: number, messages: Message[], hasNewer: boolean) => void
@@ -200,6 +248,7 @@ export interface AppState
     AppData,
     AuthActions,
     ChatActions,
+    TopicActions,
     MessageActions,
     AvatarActions,
     MediaActions,

@@ -27,6 +27,8 @@ export const sendInvokeSchemas = {
   'messages:typing': {
     request: z.object({
       chatId: z.number().int(),
+      /** 话题内的输入状态; absent means the chat's General topic. */
+      topicId: z.number().int().positive().optional(),
       typing: z.boolean(),
       /**
        * What the peer sees while the box is busy. `recording` is a voice note

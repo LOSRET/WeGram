@@ -61,7 +61,7 @@ export interface HandlerDeps {
    * 定位到聊天位置: raises the shell above the viewer (which stays open) and tells
    * the renderer to open that conversation on that message.
    */
-  onLocate: (target: { chatId: number; messageId: number }) => void
+  onLocate: (target: { chatId: number; messageId: number; topicId?: number }) => void
   /**
    * Which conversation the shell shows (or null). Main uses it to suppress a
    * desktop notification for the chat the reader is already looking at.
@@ -192,10 +192,29 @@ export function createHandlers({
       adapter.chatMembers(payload.chatId, payload.limit ?? 12, payload.query),
     'chats:setTitle': (payload) => adapter.setChatTitle(payload.chatId, payload.title),
     'chats:leave': (payload) => adapter.leaveChat(payload.chatId),
-    'chats:pinned': (payload) => adapter.pinnedMessage(payload.chatId),
+    'chats:pinned': (payload) => adapter.pinnedMessage(payload.chatId, payload.topicId),
     'chats:setPinnedMessage': (payload) =>
-      adapter.setPinnedMessage(payload.chatId, payload.messageId),
+      adapter.setPinnedMessage(payload.chatId, payload.messageId, payload.topicId),
     'chats:inviteLink': (payload) => adapter.inviteLink(payload.chatId, payload.temporary),
+    /** 话题 (design doc §9.12): the list, its cursor and the management calls. */
+    'chats:topics': (payload) => adapter.topics(payload),
+    'chats:topicCreate': (payload) => adapter.createTopic(payload),
+    'chats:topicEdit': (payload) => adapter.editTopic(payload),
+    'chats:topicSetPinned': (payload) =>
+      adapter.setTopicPinned(payload.chatId, payload.topicId, payload.pinned),
+    'chats:topicSetClosed': (payload) =>
+      adapter.setTopicClosed(payload.chatId, payload.topicId, payload.closed),
+    'chats:topicSetMuted': (payload) =>
+      adapter.setTopicMuted(payload.chatId, payload.topicId, payload.muted),
+    /** 话题图标: the same set every client offers (Premium may use any emoji). */
+    'chats:topicIcons': async () => ({ icons: await adapter.topicIcons() }),
+    'chats:forumLayout': async (payload) => ({
+      layout: await adapter.forumLayout(payload.chatId),
+    }),
+    'chats:topicDelete': (payload) => adapter.deleteTopic(payload.chatId, payload.topicId),
+    'chats:topicLink': (payload) => adapter.topicLink(payload.chatId, payload.topicId),
+    'chats:setViewAsTopics': (payload) =>
+      adapter.setViewAsTopics(payload.chatId, payload.viewAsTopics),
     'contacts:list': () => adapter.listContacts(),
     'users:status': (payload) => adapter.userStatus(payload.userId),
     'users:profile': (payload) => adapter.userProfile(payload.userId),
@@ -227,7 +246,8 @@ export function createHandlers({
     'messages:report': (payload) => adapter.reportMessage(payload),
     'messages:forward': (payload) => adapter.forwardMessages(payload),
     'messages:read': (payload) => adapter.markRead(payload),
-    'messages:typing': (payload) => adapter.sendTyping(payload.chatId, payload.typing),
+    'messages:typing': (payload) =>
+      adapter.sendTyping(payload.chatId, payload.typing, payload.action, payload.topicId),
     'messages:resend': (payload) => adapter.resendMessages(payload.chatId, payload.messageIds),
     'messages:vote': (payload) => adapter.votePoll(payload),
     'messages:addPollOption': (payload) => adapter.addPollOption(payload),
@@ -318,6 +338,7 @@ export function createHandlers({
           filePath,
           duration: payload.duration,
           ...(payload.replyTo === undefined ? {} : { replyTo: payload.replyTo }),
+          ...(payload.topicId === undefined ? {} : { topicId: payload.topicId }),
         })
       } catch (error) {
         // Nothing will ever read this recording; a failed send must not leave it.
@@ -330,6 +351,19 @@ export function createHandlers({
     'stickers:customEmoji': (payload) => adapter.customEmojiStickers(payload.ids),
 
     'ui:saveDraft': (payload) => {
+      if (payload.topicId !== undefined) {
+        uiDb.saveTopicDraft(
+          payload.chatId,
+          payload.topicId,
+          payload.text.trim().length
+            ? {
+                text: payload.text,
+                ...(payload.replyTo === undefined ? {} : { replyTo: payload.replyTo }),
+              }
+            : null,
+        )
+        return
+      }
       uiDb.saveDraft(
         payload.chatId,
         payload.text.trim().length
@@ -340,15 +374,30 @@ export function createHandlers({
           : null,
       )
     },
-    'ui:getDraft': (payload) => uiDb.getDraft(payload.chatId),
+    'ui:getDraft': (payload) =>
+      payload.topicId === undefined
+        ? uiDb.getDraft(payload.chatId)
+        : uiDb.getTopicDraft(payload.chatId, payload.topicId),
     'ui:saveAnchor': (payload) => {
+      if (payload.topicId !== undefined) {
+        uiDb.saveTopicAnchor(
+          payload.chatId,
+          payload.topicId,
+          payload.messageId,
+          payload.messageId === null ? 0 : payload.offset,
+        )
+        return
+      }
       uiDb.saveScrollAnchor(
         payload.chatId,
         payload.messageId,
         payload.messageId === null ? 0 : payload.offset,
       )
     },
-    'ui:getAnchor': (payload) => uiDb.getScrollAnchor(payload.chatId),
+    'ui:getAnchor': (payload) =>
+      payload.topicId === undefined
+        ? uiDb.getScrollAnchor(payload.chatId)
+        : uiDb.getTopicAnchor(payload.chatId, payload.topicId),
     'ui:saveCommentAnchor': (payload) => {
       uiDb.saveCommentAnchor(
         payload.chatId,

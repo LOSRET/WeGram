@@ -9,6 +9,9 @@ import type {
   ChatOp,
   ChatPinnedMessage,
   ChatSummary,
+  ChatTopic,
+  TopicIcon,
+  TopicPage,
   ConnectionState,
   Contact,
   CustomEmojiSticker,
@@ -84,10 +87,18 @@ export type AdapterEvent =
       text: string
       isSilent: boolean
       date: number
+      /** 话题 a forum notification belongs to; absent outside a topic. */
+      topicId?: number
     }
   | { type: 'typing'; chatId: number; userId: number; action: string; until: number }
   /** TDLib reloaded the installed sticker sets (cache first, then server). */
   | { type: 'stickerSets' }
+  /**
+   * A forum's topic list changed: a rename/icon/close/pin, unread counters or a
+   * deletion (TDLib `updateForumTopicInfo` / `updateForumTopic`). The renderer
+   * re-reads the page it is showing; TDLib's update carries only part of a topic.
+   */
+  | { type: 'topics'; chatId: number }
   | {
       type: 'file'
       fileId: number
@@ -213,18 +224,52 @@ export interface TelegramAdapter {
   /** 退出群聊: removes this account from the group and drops the chat. */
   leaveChat(chatId: number): Promise<void>
   /** 群公告: the newest pinned message, or `null` when the group has none. */
-  pinnedMessage(chatId: number): Promise<ChatPinnedMessage | null>
+  pinnedMessage(chatId: number, topicId?: number): Promise<ChatPinnedMessage | null>
   /**
    * 置顶消息 / 取消置顶: pins one message, or (`null`) removes the chat's pinned
    * one. Answers the chat's pin afterwards.
    */
-  setPinnedMessage(chatId: number, messageId: number | null): Promise<ChatPinnedMessage | null>
+  setPinnedMessage(
+    chatId: number,
+    messageId: number | null,
+    /** A forum topic's own pin (design doc §9.12); absent is the chat's pin. */
+    topicId?: number,
+  ): Promise<ChatPinnedMessage | null>
   /**
    * 群二维码: a link a phone can open. `temporary` asks for the client's
    * short-lived code (a fresh 7-day link, where the account may create one);
    * otherwise a public username — or an existing permanent link — is reused.
    */
   inviteLink(chatId: number, temporary?: boolean): Promise<ChatInviteLink | null>
+  /**
+   * 话题列表 (design doc §9.12): one page of a forum's topics with TDLib's own
+   * cursor (date + last message + topic id). `query` searches the names on the
+   * server. A non-forum chat answers an empty page.
+   */
+  topics(input: InvokeRequest<'chats:topics'>): Promise<TopicPage>
+  /** 新建话题: requires can_manage_topics / can_create_topics; see ChatSummary. */
+  createTopic(input: InvokeRequest<'chats:topicCreate'>): Promise<ChatTopic>
+  /** 编辑话题: name and/or icon; the refreshed row arrives through evt:topics. */
+  editTopic(input: InvokeRequest<'chats:topicEdit'>): Promise<void>
+  /** 置顶话题 / 取消置顶. */
+  setTopicPinned(chatId: number, topicId: number, pinned: boolean): Promise<void>
+  /** 关闭话题 / 重新打开: a closed topic stays readable, only its creator may post. */
+  setTopicClosed(chatId: number, topicId: number, closed: boolean): Promise<void>
+  /** 话题免打扰 (`setForumTopicNotificationSettings`). */
+  setTopicMuted(chatId: number, topicId: number, muted: boolean): Promise<void>
+  /** 话题图标: the custom emoji this account may pick (Premium gets any of them). */
+  topicIcons(): Promise<TopicIcon[]>
+  /** 论坛展示方式: a sidebar of topics (default) or tabs above the messages. */
+  forumLayout(chatId: number): Promise<'tabs' | 'sidebar'>
+  /** 删除话题: removes every message of it (`deleteForumTopic`). */
+  deleteTopic(chatId: number, topicId: number): Promise<void>
+  /** 复制话题链接 (`getForumTopicLink`); `null` when the topic has none. */
+  topicLink(chatId: number, topicId: number): Promise<{ link: string } | null>
+  /**
+   * 以聊天方式查看 / 以话题方式查看: flips `view_as_topics` exactly like the
+   * official client's menu item, and answers the refreshed summary.
+   */
+  setViewAsTopics(chatId: number, viewAsTopics: boolean): Promise<ChatSummary>
   /**
    * The account's Telegram address book (`getContacts`), one row per person.
    *
@@ -309,7 +354,13 @@ export interface TelegramAdapter {
    * purpose — a typing ping must never raise the error bar. `action` picks the
    * indicator the peer sees (`recording` = a voice note is being held down).
    */
-  sendTyping(chatId: number, typing: boolean, action?: 'typing' | 'recording'): Promise<void>
+  sendTyping(
+    chatId: number,
+    typing: boolean,
+    action?: 'typing' | 'recording',
+    /** The topic the reader is composing in; absent means General. */
+    topicId?: number,
+  ): Promise<void>
   /**
    * 重试 a failed message (`messages:resend` → TDLib `resendMessages`). The new
    * states arrive as message ops; the answer carries nothing else.
@@ -352,6 +403,8 @@ export interface TelegramAdapter {
     filePath: string
     duration: number
     replyTo?: number
+    /** The forum topic the clip belongs to; absent means General. */
+    topicId?: number
   }): Promise<{ localId: string; message: Message }>
 
   listStickerSets(): Promise<StickerSetSummary[]>

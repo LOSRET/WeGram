@@ -7,6 +7,8 @@ const logger = createLogger('notifications')
 export interface NotificationTarget {
   chatId: number
   messageId: number
+  /** 话题 the message belongs to; the click opens it first. */
+  topicId?: number
   title: string
   text: string
   isSilent: boolean
@@ -17,7 +19,7 @@ export interface NotificationCenterOptions {
   /** The shell window, if it currently exists. */
   getShellWindow: () => BrowserWindow | null
   /** Raise the shell and open the chat at the message the reader clicked. */
-  onOpen: (target: { chatId: number; messageId: number }) => void
+  onOpen: (target: { chatId: number; messageId: number; topicId?: number }) => void
 }
 
 /** Newest-first cap: a burst must not leave a stack of stale toasts behind. */
@@ -73,7 +75,11 @@ export class NotificationCenter {
     }
     notification.on('click', () => {
       this.live.delete(notification)
-      this.options.onOpen({ chatId: target.chatId, messageId: target.messageId })
+      this.options.onOpen({
+        chatId: target.chatId,
+        messageId: target.messageId,
+        ...(target.topicId === undefined ? {} : { topicId: target.topicId }),
+      })
     })
     notification.on('close', () => this.live.delete(notification))
     notification.on('failed', (_event, error) => {

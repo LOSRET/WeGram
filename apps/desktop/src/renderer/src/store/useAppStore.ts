@@ -6,6 +6,7 @@ import { createAvatarsSlice } from './slices/avatars'
 import { createChatsSlice } from './slices/chats'
 import { createMediaSlice } from './slices/media'
 import { createMessagesSlice } from './slices/messages'
+import { createTopicsSlice } from './slices/topics'
 import { createUiSlice } from './slices/ui'
 import type { AppState } from './types'
 
@@ -25,6 +26,7 @@ export const useAppStore = create<AppState>()((set, get, api) => ({
 
   ...createAuthSlice(set, get, api),
   ...createChatsSlice(set, get, api),
+  ...createTopicsSlice(set, get, api),
   ...createMessagesSlice(set, get, api),
   ...createAvatarsSlice(set, get, api),
   ...createMediaSlice(set, get, api),

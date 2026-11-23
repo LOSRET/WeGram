@@ -1,3 +1,4 @@
+import { GENERAL_TOPIC_ID } from '@wegram/protocol'
 import type { ChatOp, ChatSummary, Message, MessageOp } from '@wegram/protocol'
 
 /**
@@ -7,6 +8,22 @@ import type { ChatOp, ChatSummary, Message, MessageOp } from '@wegram/protocol'
  * store an agent can change and verify without a browser (`reducers.test.ts`),
  * and they carry the invariants that are easy to break silently.
  */
+
+/**
+ * 话题 (design doc §9.12): a live message op belongs to exactly one topic, and the
+ * transcript in memory holds one topic's rows. Applying another topic's `new` or
+ * `replace` would put a message under the wrong heading; edits and deletions only
+ * name ids, so they pass through and are no-ops for rows that are not loaded.
+ *
+ * A message without a topic is General (id 1) — TDLib leaves the field out for the
+ * General topic, and a fixture may do the same.
+ */
+export function filterOpsForTopic(ops: MessageOp[], topicId: number): MessageOp[] {
+  return ops.filter((op) => {
+    if (op.op !== 'new' && op.op !== 'replace') return true
+    return (op.message.topicId ?? GENERAL_TOPIC_ID) === topicId
+  })
+}
 
 /** Ops queued for a chat whose first page has not landed yet. */
 export const PENDING_OPS_LIMIT = 200

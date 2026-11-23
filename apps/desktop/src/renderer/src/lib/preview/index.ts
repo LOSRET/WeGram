@@ -30,6 +30,20 @@ import { handlePreviewSend, type PreviewSendContext } from './sends'
 import { handlePreviewPoll } from './polls'
 import { createPreviewProfileState, handlePreviewProfile, isProfileChannel } from './profile'
 import { handlePreviewUi } from './ui'
+import {
+  previewSetViewAsTopics,
+  previewTopicCreate,
+  previewTopicDelete,
+  previewTopicEdit,
+  previewTopicLink,
+  previewTopicMarkRead,
+  previewTopicIcons,
+  previewTopicSetClosed,
+  previewTopicSetMuted,
+  previewTopicSetPinned,
+  previewTopicsList,
+  type PreviewTopicStore,
+} from './topics'
 import { handlePreviewQr, type PreviewQrStore } from './qr'
 import {
   clearPreviewHistory,
@@ -66,6 +80,7 @@ import {
   previewStickerSets,
   channelNotJoined,
   channelPostRights,
+  topicsByChat,
 } from './fixtures'
 
 /**
@@ -116,6 +131,8 @@ function clearQrTimer(): void {
 
 /** The message rules' view of this session; see ./messages.ts. */
 const previewMessagesStore: PreviewMessagesStore = { chats, messagesByChat, emit }
+/** 话题 (design doc §9.12); their rules live in ./topics.ts. */
+const previewTopicsStore: PreviewTopicStore = { chats, topicsByChat, messagesByChat, emit }
 
 let nextId = 9000
 /** The sends' view of this session; their rules live in ./sends.ts. */
@@ -129,7 +146,7 @@ const previewSendContext: PreviewSendContext = {
 /** 资料卡's in-session 备注 / 联系人 overrides (the preview has no store to write). */
 const previewProfile = createPreviewProfileState()
 /** chatId → the one message this session pinned (the fixture ships none). */
-const previewPins = new Map<number, ChatPinnedMessage>()
+const previewPins = new Map<string, ChatPinnedMessage>()
 /** The chat the UI last opened; the dev injector below delivers arrivals into it. */
 let openChatId: number | null = null
 let proxy: ProxyConfig | null = null
@@ -291,6 +308,64 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       return handlePreviewPins(channel, previewChats, previewPins, store)
     case 'chats:inviteLink':
       return previewInviteLink(Number(store.chatId), Boolean(store.temporary))
+    /** 话题: the list, its management calls and 以聊天方式查看 (design doc §9.12). */
+    case 'chats:topics':
+      return previewTopicsList(previewTopicsStore, {
+        chatId: Number(store.chatId),
+        ...(store.query === undefined ? {} : { query: String(store.query) }),
+        ...(store.cursor === undefined ? {} : { cursor: store.cursor }),
+        ...(store.limit === undefined ? {} : { limit: Number(store.limit) }),
+      })
+    case 'chats:topicCreate':
+      return previewTopicCreate(previewTopicsStore, {
+        chatId: Number(store.chatId),
+        title: String(store.title ?? ''),
+        iconColor: Number(store.iconColor ?? 0x6fb9f0),
+        ...(store.iconEmojiId === undefined ? {} : { iconEmojiId: String(store.iconEmojiId) }),
+      })
+    case 'chats:topicEdit':
+      return previewTopicEdit(previewTopicsStore, {
+        chatId: Number(store.chatId),
+        topicId: Number(store.topicId),
+        ...(store.title === undefined ? {} : { title: String(store.title) }),
+        ...(store.iconEmojiId === undefined ? {} : { iconEmojiId: String(store.iconEmojiId) }),
+      })
+    case 'chats:topicSetPinned':
+      return previewTopicSetPinned(
+        previewTopicsStore,
+        Number(store.chatId),
+        Number(store.topicId),
+        Boolean(store.pinned),
+      )
+    case 'chats:topicSetClosed':
+      return previewTopicSetClosed(
+        previewTopicsStore,
+        Number(store.chatId),
+        Number(store.topicId),
+        Boolean(store.closed),
+      )
+    case 'chats:topicSetMuted':
+      return previewTopicSetMuted(
+        previewTopicsStore,
+        Number(store.chatId),
+        Number(store.topicId),
+        Boolean(store.muted),
+      )
+    case 'chats:topicIcons':
+      return { icons: previewTopicIcons() }
+    case 'chats:forumLayout':
+      // The preview draws the sidebar variant; tabs come from real supergroup info.
+      return { layout: 'sidebar' as const }
+    case 'chats:topicDelete':
+      return previewTopicDelete(previewTopicsStore, Number(store.chatId), Number(store.topicId))
+    case 'chats:topicLink':
+      return previewTopicLink(Number(store.chatId), Number(store.topicId))
+    case 'chats:setViewAsTopics':
+      return previewSetViewAsTopics(
+        previewTopicsStore,
+        Number(store.chatId),
+        Boolean(store.viewAsTopics),
+      )
     /** 群二维码: the preview boots the same renderer on `#qr` (see ./qr.ts). */
     case 'qr:open':
     case 'qr:info':
@@ -301,8 +376,13 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       return handlePreviewQr(channel, store, previewQrStore)
     case 'search:global':
       return searchPreviewChats(chats, String(store.q ?? ''), Number(store.limit ?? 20))
-    case 'search:inChat':
-      return searchPreviewMessages(previewChats, Number(store.chatId), String(store.q ?? ''))
+    case 'search:inChat': {
+      const hits = searchPreviewMessages(previewChats, Number(store.chatId), String(store.q ?? ''))
+      // 搜索话题内消息: the composer's search is scoped to the open topic.
+      return store.topicId === undefined
+        ? hits
+        : hits.filter((message) => message.topicId === Number(store.topicId))
+    }
     case 'search:messages':
       return searchPreviewAllMessages(previewChats, {
         q: String(store.q ?? ''),
@@ -348,6 +428,15 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     }
     case 'messages:read': {
       const upTo = Number(store.upToMessageId)
+      if (store.topicId !== undefined) {
+        // 话题内已读: one topic's counter and the chat's sum, not the whole chat.
+        return previewTopicMarkRead(
+          previewTopicsStore,
+          Number(store.chatId),
+          Number(store.topicId),
+          Number.isFinite(upTo) ? upTo : 0,
+        )
+      }
       return previewMarkRead(
         previewMessagesStore,
         Number(store.chatId),
@@ -357,6 +446,7 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'messages:history':
       return previewHistory(previewMessagesStore, {
         chatId: Number(store.chatId),
+        ...(store.topicId === undefined ? {} : { topicId: Number(store.topicId) }),
         ...(store.fromMessageId === undefined
           ? {}
           : { fromMessageId: Number(store.fromMessageId) }),
@@ -365,12 +455,14 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'messages:around':
       return previewAround(previewMessagesStore, {
         chatId: Number(store.chatId),
+        ...(store.topicId === undefined ? {} : { topicId: Number(store.topicId) }),
         messageId: Number(store.messageId),
         limit: Number(store.limit ?? 25),
       })
     case 'messages:newer':
       return previewNewer(previewMessagesStore, {
         chatId: Number(store.chatId),
+        ...(store.topicId === undefined ? {} : { topicId: Number(store.topicId) }),
         fromMessageId: Number(store.fromMessageId),
         limit: Number(store.limit ?? 50),
       })

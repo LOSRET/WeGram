@@ -1,6 +1,7 @@
 import type { Message } from '@wegram/protocol'
 
 import { HISTORY_PAGE_SIZE, emptyPageIsHistory } from '../../../lib/history'
+import { topicUnreadMarker } from '../../../lib/topics'
 import { invoke } from '../../../lib/ipc'
 import { useAppStore } from '../../../store/useAppStore'
 import {
@@ -29,10 +30,13 @@ import { AROUND_CONTEXT, ColdCacheError, type FirstPage } from './types'
  */
 export async function readFirstPage(
   chatId: number,
+  /** 话题 (design doc §9.12); `null` reads the chat's flat transcript. */
+  topicId: number | null,
   signal: AbortSignal,
   onRestoring: () => void,
 ): Promise<FirstPage> {
-  const anchor = await invoke('ui:getAnchor', { chatId }).catch(() => null)
+  const topicParam = topicId === null ? {} : { topicId }
+  const anchor = await invoke('ui:getAnchor', { chatId, ...topicParam }).catch(() => null)
   signal.throwIfAborted()
 
   /**
@@ -40,7 +44,14 @@ export async function readFirstPage(
    * any `messages:read` could move the marker. It is the only source of the read
    * boundary.
    */
-  const marker = useAppStore.getState().unreadMarkers[chatId] ?? null
+  const stateAtOpen = useAppStore.getState()
+  // A forum's divider belongs to the topic (its own read marker), not to the chat.
+  const marker =
+    topicId === null
+      ? (stateAtOpen.unreadMarkers[chatId] ?? null)
+      : topicUnreadMarker(
+          stateAtOpen.topicsByChat[chatId]?.find((topic) => topic.id === topicId),
+        )
   /**
    * Where the first page has to reach back to. A chat opened with unread messages
    * needs the row the divider goes above; the newest page does not contain it once
@@ -53,7 +64,11 @@ export async function readFirstPage(
   const target: PagingTarget | null =
     locating !== null ? { kind: 'locate', messageId: locating } : pickPagingTarget(anchor, marker)
 
-  const first = await invoke('messages:history', { chatId, limit: HISTORY_PAGE_SIZE })
+  const first = await invoke('messages:history', {
+    chatId,
+    ...topicParam,
+    limit: HISTORY_PAGE_SIZE,
+  })
   signal.throwIfAborted()
 
   /**
@@ -64,7 +79,18 @@ export async function readFirstPage(
   // Either list: an archived chat's first page follows the same empty-page rule.
   const state = useAppStore.getState()
   const chat = [...state.chats, ...state.archivedChats].find((item) => item.id === chatId)
-  if (first.messages.length === 0 && !emptyPageIsHistory(first, chat)) throw new ColdCacheError()
+  /**
+   * The rule asks "does the thing being opened know a last message". For a topic
+   * that is the topic row, not the chat: a brand-new topic is legitimately empty
+   * while the chat around it is full, and treating that as a cold cache made the
+   * pane retry, then report a sync failure, on a topic that had just been created.
+   */
+  const scope =
+    topicId === null
+      ? chat
+      : (state.topicsByChat[chatId]?.find((item) => item.id === topicId) ??
+        ({ lastMessageAt: undefined } as const))
+  if (first.messages.length === 0 && !emptyPageIsHistory(first, scope)) throw new ColdCacheError()
 
   let messages = first.messages
   let hasMore = first.hasMore
@@ -78,6 +104,7 @@ export async function readFirstPage(
     try {
       around = await invoke('messages:around', {
         chatId,
+        ...topicParam,
         messageId: target.messageId,
         limit: AROUND_CONTEXT,
       })
@@ -112,7 +139,7 @@ export async function readFirstPage(
 
   // Past this line the fetch is committed: an aborted query must not leave a page
   // in the store that nobody asked for any more.
-  useAppStore.getState().setHistory(chatId, messages, hasMore, hasNewer)
+  useAppStore.getState().setHistory(chatId, messages, hasMore, hasNewer, topicId)
   /**
    * A saved position we actually paged for and still could not reach (deleted):
    * drop it, so the next open stays instant instead of paging back again for
@@ -125,7 +152,9 @@ export async function readFirstPage(
   // next open can try again. Only a window that came back without it (deleted)
   // justifies dropping the saved position.
   if (target?.kind === 'anchor' && !anchorFound && !aroundFailed) {
-    void invoke('ui:saveAnchor', { chatId, messageId: null, offset: 0 }).catch(() => undefined)
+    void invoke('ui:saveAnchor', { chatId, ...topicParam, messageId: null, offset: 0 }).catch(
+      () => undefined,
+    )
   }
 
   return { chatId, messages, hasMore, hasNewer, landing }

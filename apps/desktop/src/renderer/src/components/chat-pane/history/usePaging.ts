@@ -8,7 +8,11 @@ import { useAppStore } from '../../../store/useAppStore'
  * Older and newer pages of the loaded window, including the buffered page
  * `usePrefetchOlder` kept in hand.
  */
-export function usePaging(activeChatId: number | null): {
+export function usePaging(
+  activeChatId: number | null,
+  /** 话题 (design doc §9.12); `null` is a flat transcript. */
+  activeTopicId: number | null,
+): {
   loadingOlder: boolean
   loadOlder: () => Promise<void>
   loadNewer: () => Promise<void>
@@ -37,6 +41,7 @@ export function usePaging(activeChatId: number | null): {
     try {
       const older = await invoke('messages:history', {
         chatId: activeChatId,
+        ...(activeTopicId === null ? {} : { topicId: activeTopicId }),
         fromMessageId: oldest.id,
         limit: HISTORY_PAGE_SIZE,
       })
@@ -46,7 +51,7 @@ export function usePaging(activeChatId: number | null): {
     } finally {
       setLoadingOlder(false)
     }
-  }, [activeChatId])
+  }, [activeChatId, activeTopicId])
 
   /** One ref at a time: the scroll handler can fire many times at the edge. */
   const loadingNewerRef = useRef(false)
@@ -61,6 +66,7 @@ export function usePaging(activeChatId: number | null): {
     try {
       const newer = await invoke('messages:newer', {
         chatId: activeChatId,
+        ...(activeTopicId === null ? {} : { topicId: activeTopicId }),
         fromMessageId: last.id,
         limit: HISTORY_PAGE_SIZE,
       })
@@ -70,7 +76,7 @@ export function usePaging(activeChatId: number | null): {
     } finally {
       loadingNewerRef.current = false
     }
-  }, [activeChatId])
+  }, [activeChatId, activeTopicId])
 
   return { loadingOlder, loadOlder, loadNewer }
 }

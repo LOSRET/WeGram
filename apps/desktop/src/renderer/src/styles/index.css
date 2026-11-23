@@ -22,6 +22,8 @@
 @import './chat-list.css';
 @import './chat-pane.css';
 @import './chat-info.css';
+/* 话题: the forum page the message pane opens on (design doc §9.12). */
+@import './topics.css';
 @import './contacts.css';
 @import './message-rows.css';
 @import './comments.css';

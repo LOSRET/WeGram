@@ -14,7 +14,11 @@ import { useAppStore } from '../../store/useAppStore'
  *
  * `setPinnedMessage(null)` unpins whatever is pinned (the adapter resolves the id).
  */
-export function usePinnedMessage(chatId: number | null): {
+export function usePinnedMessage(
+  chatId: number | null,
+  /** 话题 (design doc §9.12): a forum topic keeps its own pin. */
+  topicId: number | null = null,
+): {
   pinned: ChatPinnedMessage | null
   setPinnedMessage: (messageId: number | null) => Promise<void>
 } {
@@ -25,7 +29,7 @@ export function usePinnedMessage(chatId: number | null): {
     setPinned(null)
     if (chatId === null) return
     let cancelled = false
-    void invoke('chats:pinned', { chatId })
+    void invoke('chats:pinned', { chatId, ...(topicId === null ? {} : { topicId }) })
       .then((answer) => {
         if (!cancelled) setPinned(answer)
       })
@@ -35,14 +39,18 @@ export function usePinnedMessage(chatId: number | null): {
     return () => {
       cancelled = true
     }
-  }, [chatId])
+  }, [chatId, topicId])
 
   const setPinnedMessage = useCallback(
     async (messageId: number | null): Promise<void> => {
       if (chatId === null || busy) return
       setBusy(true)
       try {
-        const answer = await invoke('chats:setPinnedMessage', { chatId, messageId })
+        const answer = await invoke('chats:setPinnedMessage', {
+          chatId,
+          ...(topicId === null ? {} : { topicId }),
+          messageId,
+        })
         setPinned(answer)
         useAppStore.getState().setToast(messageId === null ? '已取消置顶' : '已置顶消息')
       } catch (error) {
@@ -51,7 +59,7 @@ export function usePinnedMessage(chatId: number | null): {
         setBusy(false)
       }
     },
-    [chatId, busy],
+    [chatId, topicId, busy],
   )
 
   return { pinned, setPinnedMessage }

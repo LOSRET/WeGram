@@ -14,9 +14,17 @@ import { useAppStore } from '../store/useAppStore'
  * Returns false when the window already reaches the newest message (nothing to
  * do), true when a reload happened.
  */
-export async function loadLatestWindow(chatId: number): Promise<boolean> {
+export async function loadLatestWindow(
+  chatId: number,
+  /** 话题 (design doc §9.12); `null` is a flat transcript. */
+  topicId: number | null = null,
+): Promise<boolean> {
   if (useAppStore.getState().hasNewerByChat[chatId] !== true) return false
-  const page = await invoke('messages:history', { chatId, limit: HISTORY_PAGE_SIZE })
-  useAppStore.getState().setHistory(chatId, page.messages, page.hasMore, false)
+  const page = await invoke('messages:history', {
+    chatId,
+    ...(topicId === null ? {} : { topicId }),
+    limit: HISTORY_PAGE_SIZE,
+  })
+  useAppStore.getState().setHistory(chatId, page.messages, page.hasMore, false, topicId)
   return true
 }

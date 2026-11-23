@@ -43,6 +43,10 @@ telegram/tdlib/actions/  TDLib requests as functions over ActionDeps, grouped in
 telegram/tdlib/chat-api.ts  createChatApi: the chat seam methods (list/open/mute/pin/
                     members/title/join) as one object the adapter class binds; split
                     out of index.ts when the 频道底栏 methods hit its line budget
+telegram/tdlib/topic-api.ts  createTopicApi: 话题 (design doc §9.12) — list, create/edit,
+                    pin/close/delete, mute, icons, forum layout and 以聊天方式查看 — bound
+                    the way chat-api does. `TdlibAdapter.rawInvoke` exists for the test-DC
+                    probes only (createNewBasicGroupChat / toggleSupergroupIsForum)
 telegram/tdlib/send-api.ts  createSendApi: the message seam methods (send/edit/delete/
                     forward/read/typing/retry/media/album/sticker/voice), split out of
                     index.ts at the same budget when 语音消息's send landed
@@ -173,6 +177,7 @@ cd apps\desktop; pnpm ui:db-check     # headless ui.db check (node:sqlite)
 cd apps\desktop; pnpm tdlib:smoke     # READ-ONLY real TDLib: getMe/getChats/history
 cd apps\desktop; pnpm tdlib:test-dc   # test data centers: send/edit/upload/delete
 cd apps\desktop; pnpm tdlib:test-dc:writes  # the §9.1 write matrix (album/pin/note/contacts/…)
+cd apps\desktop; pnpm tdlib:test-dc:topics  # 话题: creates a disposable forum and walks the feature
 pwsh apps\desktop\scripts\launch-detached.ps1 -Mock   # Electron + mock adapter
 ```
 

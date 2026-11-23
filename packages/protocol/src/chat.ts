@@ -44,6 +44,18 @@ export const chatSummarySchema = z.object({
   lastReadOutboxMessageId: z.number().int().optional(),
   /** `wx-media://` URL of the chat photo; filled in after it is downloaded. */
   avatarUrl: z.string().optional(),
+  /**
+   * 论坛群 (design doc §9.12): TDLib `chat.view_as_topics`. The client then shows
+   * the topic list instead of one flat transcript, and every message carries the
+   * topic it belongs to. A forum switched to "view as chats" on another device
+   * arrives as `false`, which is honoured: the transcript is flat again.
+   */
+  forum: z.boolean().optional(),
+  /**
+   * 新建话题: TDLib `chat.permissions.can_create_topics`. The topic list's "+" is
+   * drawn only when it holds (admins keep it through `can_manage_topics`).
+   */
+  canCreateTopic: z.boolean().optional(),
 })
 export type ChatSummary = z.infer<typeof chatSummarySchema>
 

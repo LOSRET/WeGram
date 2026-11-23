@@ -1532,6 +1532,61 @@ One-off duplication audits merged the real duplicates and left the look-alikes a
 8. **Multi-account** — v2; the session dir is already shaped `tdlib/<accountId>/`, and the
    adapter does not model it (the login window has no account picker).
 
+### 9.3 话题(论坛群): protocol + adapter landed, UI pending
+
+**Done (2026-11-23):** `packages/protocol/src/topic.ts`, `Message.topicId`,
+`ChatSummary.forum` / `canCreateTopic`, the eight `chats:topic*` channels, `topicId` on the
+message/media/voice/typing/search channels, `evt:topics`; the TDLib side (`map/topic.ts`,
+`actions/topics.ts`, `topic-api.ts`, topic-aware `getForumTopicHistory`, `topic_id` on every
+send, `messageSourceForumTopicHistory` reads, `searchChatMessages.topic_id`, both topic
+updates); main handlers; `ui.db`'s `topic_ui_state`; the mock (`topics.ts`, a forum fixture
+chat 12, topic-aware history/sends/read/search). Design: 技术方案 §9.12.
+
+**Renderer (also landed):** `chat-list/TopicsSidebar.tsx` — the 已归档会话 gesture one
+column to the left: while a forum is open the CONVERSATION column shows its topics
+(same 20 ms mount / 200 ms slide, `TOPICS_PAGE_ANIM_MS` pinned by `style-contract.test.ts`)
+and the message pane keeps the chosen topic's transcript,
+`useChatTopics` (cursor paging + 搜索话题 + `evt:topics` debounced re-read), the store's
+`activeTopicId` / `historyTopicByChat` / `topicsByChat` (`setActiveTopic` drops the cached
+transcript, so a page is never reused for another topic), header back + group subtitle,
+per-topic drafts / anchors / read marker, the topic context menu (pin, close, mark read,
+copy link, delete), 新建话题 (name + six icon colours), 以聊天方式查看 both ways (topics ⋮ and
+the 聊天信息 row), and the browser-preview bridge. Verified visually in `pnpm web` (forum
+fixture chat 12): list order, topic switching with the row highlighted, back to the
+conversations, empty new topic, closed topic bar, flat view round-trip, search.
+
+**Two traps that cost a debugging pass here:** (1) `setActiveTopic` must NOT drop the cached
+transcript — `historyTopicByChat` says which topic the page belongs to, and the pane draws a
+loading state while it does not match the selection; clearing the rows instead made a reopened
+forum sit on "not synced". (2) The query client is `staleTime: Infinity` (the store is the
+source of truth), so a topic that reuses a query key with a store that now holds another topic
+would never refetch; the history query sets `staleTime: 0` (with focus/reconnect refetch off)
+so `enabled: false → true` fetches again.
+
+**Now also in:** per-topic mute (`setForumTopicNotificationSettings`), the notification and
+`evt:locate` paths carrying `topicId` (a toast opens its topic first), the icon-emoji picker
+(`getForumTopicDefaultIcons` + the shared `TopicDialog`), a per-topic pinned bar
+(`searchChatMessages` + `searchMessagesFilterPinned`), and the `has_forum_tabs` chips layout
+(`chats:forumLayout` + `TopicsTabs`). Still open: the finer per-topic notification switches
+(sound / stories / mentions) and the viewer's 定位, which knows the chat but not the topic.
+
+**Test DC (2026-11-23), `pnpm tdlib:test-dc:topics`:** 15 checks passed, 2 warnings. Passed:
+group→forum, `forumLayout` sidebar, topic create/list, send with `topic_id` (the row came back with
+topicId 2), `getForumTopicHistory`, the around window, rename, mute read-back, topic link
+(`https://t.me/c/…/2`), topic pin read-back, mark-read, delete. Warnings: `toggleForumTopicIsClosed`
+and `has_forum_tabs` returned `ok` but the list/full-info kept the old state (test-DC sync lag).
+`getForumTopicDefaultIcons` is empty there, so the icon picker is hidden on the test DC only.
+Two traps measured: `createNewSupergroupChat{is_forum:true}` builds a **channel** there (a channel
+can never become a forum) — use createNewBasicGroupChat → upgrade → toggleSupergroupIsForum; and
+repeated group creation trips a 429 (`retry after 243/297`), which the probe now waits out. The
+proxy is mandatory on this machine: `TDLIB_PROXY=http://127.0.0.1:7892`.
+
+**Measured caveats to keep:** `chat.view_as_topics` (not `chat.is_forum`) is what picks the
+view; General is id 1 and may be hidden/closed so the list can lack it; `getChatPinnedMessage`
+and `pinChatMessage` have no topic parameter (pins stay chat-level); `editForumTopic` cannot
+change the icon colour; a short `getForumTopics` page is normal and `next_offset_date == 0`
+means "end".
+
 ### 9.4 Housekeeping
 
 - `AGENTS.md` is a **symlink** to `CLAUDE.md` stored as mode `120000`; this machine cannot
@@ -1573,6 +1628,34 @@ sendChatAction chat_id:int53 topic_id:MessageTopic business_connection_id:string
 chatActionTyping = ChatAction;
 chatActionRecordingVoiceNote = ChatAction;
 chatActionRecordingVideoNote = ChatAction;
+
+getForumTopics chat_id:int53 query:string offset_date:int32 offset_message_id:int53 offset_forum_topic_id:int53 limit:int32 = ForumTopics;
+getForumTopicHistory chat_id:int53 forum_topic_id:int53 from_message_id:int53 offset:int32 limit:int32 = Messages;
+getForumTopic chat_id:int53 forum_topic_id:int53 = ForumTopic;
+createForumTopic chat_id:int53 name:string is_name_implicit:Bool icon:forumTopicIcon = ForumTopicInfo;
+editForumTopic chat_id:int53 forum_topic_id:int53 name:string edit_icon_custom_emoji:Bool icon_custom_emoji_id:int64 = Ok;
+toggleForumTopicIsPinned chat_id:int53 forum_topic_id:int53 is_pinned:Bool = Ok;
+toggleForumTopicIsClosed chat_id:int53 forum_topic_id:int53 is_closed:Bool = Ok;
+deleteForumTopic chat_id:int53 forum_topic_id:int53 = Ok;
+getForumTopicLink chat_id:int53 forum_topic_id:int53 = MessageLink;
+toggleChatViewAsTopics chat_id:int53 view_as_topics:Bool = Ok;
+setForumTopicNotificationSettings chat_id:int53 forum_topic_id:int53 notification_settings:chatNotificationSettings = Ok;
+getForumTopicDefaultIcons = Stickers;
+getSupergroupFullInfo supergroup_id:int53 = SupergroupFullInfo;  // has_forum_tabs / has_forum_sidebar / is_forum
+toggleSupergroupIsForum supergroup_id:int53 is_forum:Bool has_forum_tabs:Bool has_forum_sidebar:Bool = Ok;
+createNewSupergroupChat title:string is_forum:Bool is_channel:Bool description:string = Chat;
+createNewBasicGroupChat user_ids:vector<int53> title:string = CreatedBasicGroupChat;
+upgradeBasicGroupChatToSupergroupChat chat_id:int53 = Chat;
+searchChatMessages chat_id:int53 topic_id:MessageTopic … filter:SearchMessagesFilter = Messages;  // filter: searchMessagesFilterPinned reads a topic's pin
+viewMessages chat_id:int53 message_ids:vector<int53> source:MessageSource force_read:Bool = Ok;
+message.topic_id:MessageTopic; messageTopicForum forum_topic_id:int53 = MessageTopic;
+chat.view_as_topics:Bool; chat.permissions.can_create_topics:Bool; supergroupFullInfo.is_forum:Bool;
+forumTopicInfo{chat_id, forum_topic_id, name, icon{color, custom_emoji_id}, creation_date, creator_id, is_general, is_outgoing, is_closed, is_hidden, is_name_implicit};
+forumTopic{info, last_message, order, is_pinned, unread_count, last_read_inbox_message_id, last_read_outbox_message_id, unread_mention_count, unread_reaction_count, unread_poll_vote_count, notification_settings, draft_message};
+forumTopics{total_count, topics, next_offset_date, next_offset_message_id, next_offset_forum_topic_id};
+updateForumTopicInfo info:forumTopicInfo = Update;
+updateForumTopic chat_id:int53 forum_topic_id:int53 is_pinned:Bool last_read_inbox_message_id:int53 last_read_outbox_message_id:int53 unread_mention_count:int32 unread_reaction_count:int32 unread_poll_vote_count:int32 notification_settings:chatNotificationSettings draft_message:draftMessage = Update;
+updateChatViewAsTopics chat_id:int53 view_as_topics:Bool = Update;
 
 inputMessageVoiceNote voice_note:inputVoiceNote caption:formattedText self_destruct_type:MessageSelfDestructType = InputMessageContent;
 inputVoiceNote voice_note:InputFile duration:int32 waveform:bytes = InputVoiceNote;
@@ -1691,7 +1774,9 @@ claim is. Nothing here replaces §1 (state) or §9 (gaps).
 
 **2026-11-23 — archive, sticker budget, this consolidation**
 - Archived chats (`chats:list { list: 'archive' }`, `chats:setArchived`, the 已归档会话 row and
-  page).
+  page). The row is the conversation list's own first row — inside the scroller, so it
+  scrolls away — and the list rests one row further down (`scrollMargin` on the
+  virtualiser), which is why it starts out of view and the reader scrolls up to find it.
 - The animated-cell budget (ThorVG canvas, 30 fps, savedFrame, two-screen parse window) and
   the 贴纸包盒子 (464 × 558, 5-column grid).
 - The four handoff documents were consolidated into this one.

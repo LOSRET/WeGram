@@ -59,6 +59,8 @@ export function createMockSends(store: MockSendStore) {
 
   const sendText = async (input: {
     chatId: number
+    /** 话题 (design doc §9.12); absent posts into the chat's General topic. */
+    topicId?: number
     text: string
     replyTo?: number
   }): Promise<{ localId: string; message: Message }> => {
@@ -68,6 +70,7 @@ export function createMockSends(store: MockSendStore) {
       chatId: input.chatId,
       kind: 'text',
       text: input.text,
+      ...(input.topicId === undefined ? {} : { topicId: input.topicId }),
       ...(input.replyTo === undefined ? {} : { replyTo: input.replyTo }),
     })
     if (store.failNextSend()) {
@@ -82,6 +85,7 @@ export function createMockSends(store: MockSendStore) {
 
   const sendMedia = async (input: {
     chatId: number
+    topicId?: number
     filePath: string
     kind: MediaKind
     caption?: string
@@ -92,6 +96,8 @@ export function createMockSends(store: MockSendStore) {
       ...input,
       id: store.takeMessageId(),
     })
+    // The builder only knows a media row; the topic is the send's own fact.
+    if (input.topicId !== undefined) built.message.topicId = input.topicId
     append(fixture, built.message, built.preview)
     upload(built.fileId, built.size)
     return { localId: `mock-${built.message.id}`, message: built.message }
@@ -103,6 +109,7 @@ export function createMockSends(store: MockSendStore) {
    */
   const sendAlbum = async (input: {
     chatId: number
+    topicId?: number
     items: Array<{ filePath: string; kind: MediaKind; caption?: string }>
     replyTo?: number
   }): Promise<{ localIds: string[]; messages: Message[] }> => {
@@ -115,6 +122,9 @@ export function createMockSends(store: MockSendStore) {
       takeId: () => store.takeMessageId(),
       ...(input.replyTo === undefined ? {} : { replyTo: input.replyTo }),
     })
+    if (input.topicId !== undefined) {
+      for (const item of built) item.message.topicId = input.topicId
+    }
     for (const item of built) {
       append(fixture, item.message, item.preview)
       upload(item.fileId, item.size)
@@ -132,6 +142,7 @@ export function createMockSends(store: MockSendStore) {
    */
   const sendVoice = async (input: {
     chatId: number
+    topicId?: number
     filePath: string
     duration: number
     replyTo?: number
@@ -141,6 +152,7 @@ export function createMockSends(store: MockSendStore) {
       ...input,
       id: store.takeMessageId(),
     })
+    if (input.topicId !== undefined) built.message.topicId = input.topicId
     append(fixture, built.message, built.preview)
     upload(built.fileId, built.size)
     return { localId: `mock-${built.message.id}`, message: built.message }
@@ -148,6 +160,7 @@ export function createMockSends(store: MockSendStore) {
 
   const sendSticker = async (input: {
     chatId: number
+    topicId?: number
     fileId: number
     replyTo?: number
   }): Promise<{ localId: string; message: Message }> => {
@@ -156,6 +169,7 @@ export function createMockSends(store: MockSendStore) {
       ...input,
       id: store.takeMessageId(),
     })
+    if (input.topicId !== undefined) built.message.topicId = input.topicId
     append(fixture, built.message, built.preview)
     return { localId: `mock-${built.message.id}`, message: built.message }
   }

@@ -14,6 +14,8 @@ const LOCATED_CLEAR_MS = 1600
  */
 export function useLocateRequest(
   activeChatId: number | null,
+  /** 话题 (design doc §9.12); `null` is a flat transcript. */
+  activeTopicId: number | null,
   anchorKnown: boolean,
 ): { located: { chatId: number; messageId: number } | null } {
   const [located, setLocated] = useState<{ chatId: number; messageId: number } | null>(null)
@@ -52,6 +54,7 @@ export function useLocateRequest(
     let cancelled = false
     void invoke('messages:around', {
       chatId: activeChatId,
+      ...(activeTopicId === null ? {} : { topicId: activeTopicId }),
       messageId: locate.messageId,
       limit: AROUND_CONTEXT,
     })
@@ -61,7 +64,13 @@ export function useLocateRequest(
         // the list lands there instead of paging towards it.
         useAppStore
           .getState()
-          .setHistory(activeChatId, around.messages, around.hasMore, around.hasNewer)
+          .setHistory(
+            activeChatId,
+            around.messages,
+            around.hasMore,
+            around.hasNewer,
+            activeTopicId,
+          )
       })
       .catch((error: unknown) => {
         if (cancelled) return
@@ -71,7 +80,7 @@ export function useLocateRequest(
     return () => {
       cancelled = true
     }
-  }, [locate, activeChatId, anchorKnown, locatedMessages])
+  }, [locate, activeChatId, activeTopicId, anchorKnown, locatedMessages])
 
   /** The flash is one shot: a remount of the list must not replay it. */
   useEffect(() => {

@@ -4,6 +4,7 @@ import type { FakeCommentFlags } from '@wegram/mock-session'
 import type {
   AppInfo,
   ChatSummary,
+  ChatTopic,
   Contact,
   CustomEmojiSticker,
   Message,
@@ -153,6 +154,8 @@ export const chats: ChatSummary[] = sortChatList(
 )
 
 export const messagesByChat: Record<number, Message[]> = {}
+/** 话题 (design doc §9.12): the shared seed's forum topics, mutable per session. */
+export const topicsByChat: Record<number, ChatTopic[]> = {}
 export const previewThreads: Record<string, Message[]> = {}
 export const previewCommentAccess: Record<string, FakeCommentFlags> = {}
 
@@ -167,6 +170,7 @@ export const channelNotJoined = new Set<number>()
 
 for (const seed of seeds.values()) {
   messagesByChat[seed.chat.id] = seed.messages.map(decorate)
+  if (seed.topics) topicsByChat[seed.chat.id] = seed.topics.map((topic) => ({ ...topic }))
   if (seed.canPost) channelPostRights[seed.chat.id] = true
   if (seed.chat.kind === 'channel' && seed.joined === false) channelNotJoined.add(seed.chat.id)
   for (const [messageId, thread] of Object.entries(seed.comments ?? {})) {

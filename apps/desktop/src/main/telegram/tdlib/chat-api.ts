@@ -46,8 +46,12 @@ export interface TdlibChatApi {
   chatMembers(chatId: number, limit: number, query?: string): Promise<ChatMember[]>
   setChatTitle(chatId: number, title: string): Promise<ChatSummary>
   leaveChat(chatId: number): Promise<void>
-  pinnedMessage(chatId: number): Promise<ChatPinnedMessage | null>
-  setPinnedMessage(chatId: number, messageId: number | null): Promise<ChatPinnedMessage | null>
+  pinnedMessage(chatId: number, topicId?: number): Promise<ChatPinnedMessage | null>
+  setPinnedMessage(
+    chatId: number,
+    messageId: number | null,
+    topicId?: number,
+  ): Promise<ChatPinnedMessage | null>
   inviteLink(chatId: number, temporary?: boolean): Promise<ChatInviteLink | null>
 }
 
@@ -76,9 +80,9 @@ export function createChatApi(getDeps: () => ChatApiDeps): TdlibChatApi {
     chatMembers: (chatId, limit, query) => actions.listMembers(actionDeps(), chatId, limit, query),
     setChatTitle: (chatId, title) => actions.setChatTitle(actionDeps(), chatId, title),
     leaveChat: (chatId) => actions.leaveChat(actionDeps(), chatId),
-    pinnedMessage: (chatId) => actions.pinnedMessage(actionDeps(), chatId),
-    setPinnedMessage: (chatId, messageId) =>
-      actions.setPinnedMessage(actionDeps(), chatId, messageId),
+    pinnedMessage: (chatId, topicId) => actions.pinnedMessage(actionDeps(), chatId, topicId),
+    setPinnedMessage: (chatId, messageId, topicId) =>
+      actions.setPinnedMessage(actionDeps(), chatId, messageId, topicId),
     inviteLink: (chatId, temporary) =>
       actions.inviteLink(
         { ...actionDeps(), getSelfUserId: getDeps().getSelfUserId },

@@ -31,7 +31,11 @@ const FAILED_FETCH_RETRY_DELAY_MS = 1500
  * speculative older page (`usePrefetchOlder`) and the two page loads
  * (`usePaging`).
  */
-export function useChatHistory(activeChatId: number | null): ChatHistoryState {
+export function useChatHistory(
+  activeChatId: number | null,
+  /** 话题 (design doc §9.12); `null` is a flat transcript. */
+  activeTopicId: number | null,
+): ChatHistoryState {
   const [pendingLanding, setPendingLanding] = useState<PendingLanding | null>(null)
   const [anchorKnown, setAnchorKnown] = useState(false)
   const [restoring, setRestoring] = useState(false)
@@ -47,7 +51,9 @@ export function useChatHistory(activeChatId: number | null): ChatHistoryState {
    * reopened at the bottom instead of at its saved position. React re-renders before
    * committing children, so with the reset here no frame ever sees the stale flag.
    */
-  const [stateChatId, setStateChatId] = useState<number | null>(null)
+  const [stateKey, setStateKey] = useState<string | null>(null)
+  /** A chat + topic pair: the transcript in memory belongs to exactly one. */
+  const activeKey = activeChatId === null ? null : `${activeChatId}:${activeTopicId ?? 0}`
   /**
    * Whether the active chat needs its first page. Sampled once per chat, together
    * with the reset above, because it also decides whether the list has to wait for
@@ -57,22 +63,27 @@ export function useChatHistory(activeChatId: number | null): ChatHistoryState {
    * into the store itself, and a reactive `enabled` would flip to false mid-flight.
    */
   const [needsFetch, setNeedsFetch] = useState(false)
-  if (stateChatId !== activeChatId) {
-    setStateChatId(activeChatId)
+  if (stateKey !== activeKey) {
+    setStateKey(activeKey)
     setPendingLanding(null)
     setAnchorKnown(false)
     setRestoring(false)
+    const store = useAppStore.getState()
+    // "Cached" means cached *for this topic*: a page left over from another topic
+    // would otherwise be reused and never refetched (the empty-group trap, one
+    // level down).
     setNeedsFetch(
       activeChatId !== null &&
-        (useAppStore.getState().messagesByChat[activeChatId]?.length ?? 0) === 0,
+        ((store.messagesByChat[activeChatId]?.length ?? 0) === 0 ||
+          (store.historyTopicByChat[activeChatId] ?? null) !== activeTopicId),
     )
   }
 
   const history = useQuery({
-    queryKey: ['history', activeChatId],
+    queryKey: ['history', activeChatId, activeTopicId],
     queryFn: ({ signal }) => {
       if (activeChatId === null) throw new Error('useChatHistory: no active chat')
-      return readFirstPage(activeChatId, signal, () => {
+      return readFirstPage(activeChatId, activeTopicId, signal, () => {
         if (!signal.aborted) setRestoring(true)
       })
     },
@@ -86,6 +97,18 @@ export function useChatHistory(activeChatId: number | null): ChatHistoryState {
       error instanceof ColdCacheError ? failureCount < EMPTY_PAGE_RETRIES : failureCount < 1,
     retryDelay: (failureCount, error) =>
       error instanceof ColdCacheError ? EMPTY_PAGE_RETRY_DELAY_MS : FAILED_FETCH_RETRY_DELAY_MS,
+    /**
+     * The query client never fetches stale data by itself (`lib/query.ts` sets
+     * `staleTime: Infinity`, because the store is the source of truth). That is
+     * right for a chat, whose entry exists exactly when its page is cached — but a
+     * topic switch re-uses the same query key with a store that now holds another
+     * topic, so "enabled" has to be able to fetch again for the same key.
+     * `staleTime: 0` makes `enabled: false → true` a fetch; the two focus/reconnect
+     * triggers stay off so a background refetch can never replace a paged window.
+     */
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   })
 
   const page = history.data
@@ -104,7 +127,10 @@ export function useChatHistory(activeChatId: number | null): ChatHistoryState {
     // No fetch on this path, so the unread divider can only be honoured if its row
     // is already cached; otherwise `resolveLanding` falls back to the oldest loaded
     // row, which is the documented deep-unread behaviour.
-    void invoke('ui:getAnchor', { chatId: activeChatId })
+    void invoke('ui:getAnchor', {
+      chatId: activeChatId,
+      ...(activeTopicId === null ? {} : { topicId: activeTopicId }),
+    })
       .catch(() => null)
       .then((anchor) => {
         if (cancelled) return
@@ -115,7 +141,7 @@ export function useChatHistory(activeChatId: number | null): ChatHistoryState {
     return () => {
       cancelled = true
     }
-  }, [activeChatId, needsFetch])
+  }, [activeChatId, activeTopicId, needsFetch])
 
   // The first page landed: hand the landing over, then open the mount gate.
   useEffect(() => {
@@ -146,9 +172,9 @@ export function useChatHistory(activeChatId: number | null): ChatHistoryState {
     activeChatId === null ? false : state.hasNewerByChat[activeChatId] === true,
   )
 
-  const { located } = useLocateRequest(activeChatId, anchorKnown)
-  const prefetchOlder = usePrefetchOlder(activeChatId)
-  const { loadingOlder, loadOlder, loadNewer } = usePaging(activeChatId)
+  const { located } = useLocateRequest(activeChatId, activeTopicId, anchorKnown)
+  const prefetchOlder = usePrefetchOlder(activeChatId, activeTopicId)
+  const { loadingOlder, loadOlder, loadNewer } = usePaging(activeChatId, activeTopicId)
 
   const hadRowsFor = useRef<number | null>(null)
   /**

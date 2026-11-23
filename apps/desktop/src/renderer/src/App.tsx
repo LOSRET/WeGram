@@ -181,6 +181,15 @@ export function App() {
         store.noteStickerSetsChanged()
       }),
       /**
+       * 话题 (design doc §9.12): a rename, a pin, a close or a deletion. TDLib's
+       * update carries only part of a topic, so the open list re-reads its page
+       * instead of patching a row — one version bump drives that.
+       */
+      window.tg.on('evt:topics', (event) => {
+        track(event.seq)
+        store.noteTopicsChanged()
+      }),
+      /**
        * 定位到聊天位置: the viewer hands one message back, main has already raised
        * the shell above it. The request goes into the store *before* the
        * conversation activates, because the first-page fetch reads it to page
@@ -188,14 +197,17 @@ export function App() {
        */
       window.tg.on('evt:locate', (event) => {
         track(event.seq)
-        const { chatId, messageId } = event.payload
+        const { chatId, messageId, topicId } = event.payload
         const state = useAppStore.getState()
         const chat =
           state.chats.find((item) => item.id === chatId) ??
           state.archivedChats.find((item) => item.id === chatId)
         if (chat) {
           state.requestLocate(chatId, messageId)
+          // A forum hit (a notification or the viewer's 定位) names its topic:
+          // opening the chat must land in that topic, not in whatever was open.
           if (state.activeChatId !== chatId) activateChat(chat)
+          if (topicId !== undefined) useAppStore.getState().setActiveTopic(topicId)
           return
         }
         // A notification can name a chat the list has not paged in yet: ask for
@@ -206,6 +218,7 @@ export function App() {
             next.applyChatOps([{ op: 'upsert', chat: fresh }])
             next.requestLocate(chatId, messageId)
             activateChat(fresh)
+            if (topicId !== undefined) useAppStore.getState().setActiveTopic(topicId)
           })
           .catch((cause) => useAppStore.getState().setError(errorMessage(cause)))
       }),
@@ -252,7 +265,7 @@ export function App() {
     if (!ready) return
     void (async () => {
       try {
-        // Both lists, because 已归档会话 is a row above the conversation list and
+        // Both lists, because 已归档会话 is the conversation list's first row and
         // has to be there on the first paint. `Promise.all` keeps one error path.
         const [chats, archivedChats] = await Promise.all([
           invoke('chats:list', { limit: 100, offset: 0 }),
