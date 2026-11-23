@@ -13,6 +13,8 @@ export const appErrorCodeSchema = z.enum([
   'invalid_payload',
   /** The account may not do this to the content (protected media, etc.). */
   'forbidden',
+  /** The account already answered this poll; a quiz is final, so this is no error. */
+  'poll_answered',
   'not_implemented',
   'tdlib_error',
   'rate_limited',

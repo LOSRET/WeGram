@@ -82,7 +82,7 @@ function rejectionError(rejection: PollVoteRejection): AppError {
     case 'restricted':
       return new AppError('forbidden', '当前账号不能参与这个投票')
     case 'quiz-locked':
-      return new AppError('forbidden', '这道题已经答过了')
+      return new AppError('poll_answered', '这道题已经答过了')
     case 'single-answer':
       return new AppError('invalid_payload', '这个投票只能选一项')
     case 'invalid-option':

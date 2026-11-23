@@ -96,6 +96,19 @@ describe('mock polls', () => {
     ).rejects.toMatchObject({ code: 'forbidden' })
   })
 
+  it('reports an already answered quiz as poll_answered, not forbidden', async () => {
+    const { fixture } = setup()
+    const message = fixture.messages[0]
+    if (!message?.poll) throw new Error('missing poll')
+    message.poll.quiz = true
+    message.poll.answered = true
+    message.poll.options[0]!.chosen = true
+    const polls = createMockPolls(new Map([[1, fixture]]), () => {})
+    await expect(
+      polls.votePoll({ chatId: 1, messageId: 10, optionIds: [1] }),
+    ).rejects.toMatchObject({ code: 'poll_answered' })
+  })
+
   it('refuses a row that is not a poll', async () => {
     const fixture: Fixture = {
       chat: { ...CHAT },

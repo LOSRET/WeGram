@@ -1,3 +1,4 @@
+import { AppError } from '@wegram/protocol'
 import type { InvokeRequest } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
@@ -34,6 +35,7 @@ export async function votePoll(
     // A refusal means this copy is stale (voted elsewhere, quiz settled): re-read
     // it before reporting, so the card cannot stay votable after the server said no.
     await refreshPoll(deps, input.chatId, input.messageId)
+    if (isRevoteRefusal(error)) throw new AppError('poll_answered', '这道题已经答过了')
     throw error
   }
   await refreshPoll(deps, input.chatId, input.messageId)
@@ -68,6 +70,12 @@ async function answer(deps: ActionDeps, method: TdObject): Promise<void> {
     deps.logger.warn(`poll: ${String(method._)} was refused`, error)
     throw error
   }
+}
+
+/** TDLib's refusal for an answer this account already gave: a quiz is final. */
+function isRevoteRefusal(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return /can't revote/i.test(message)
 }
 
 /** Replaces the row with the server's copy, so the card never waits for an update. */

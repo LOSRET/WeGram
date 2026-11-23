@@ -1,7 +1,7 @@
 import type { Poll } from '@wegram/protocol'
 import { useState, type FormEvent } from 'react'
 
-import { errorMessage, invoke } from '../../lib/ipc'
+import { errorMessage, invoke, isAppErrorShape } from '../../lib/ipc'
 import {
   pollCanAddOption,
   pollChosen,
@@ -40,12 +40,16 @@ export function PollBubble({
 }) {
   const [busy, setBusy] = useState(false)
   const [draft, setDraft] = useState<{ poll: Poll; selection: number[] } | null>(null)
+  /** The poll the server refused an answer for: this account already answered it. */
+  const [lockedFor, setLockedFor] = useState<Poll | null>(null)
   const [adding, setAdding] = useState(false)
   const [optionText, setOptionText] = useState('')
 
   const selection = draft?.poll === poll ? draft.selection : pollChosen(poll)
   const results = pollResultsVisible(poll)
-  const votable = pollVotable(poll) && !busy
+  // A refreshed poll arrives as a new object, which releases the lock by itself.
+  const locked = lockedFor === poll
+  const votable = pollVotable(poll) && !busy && !locked
   const solution = pollCorrectAnswer(poll)
   const canAddOption = pollCanAddOption(poll)
   const restriction = pollRestrictionText(poll)
@@ -58,7 +62,15 @@ export function PollBubble({
     if (busy) return
     setBusy(true)
     void invoke('messages:vote', { chatId, messageId, optionIds })
-      .catch(fail)
+      .catch((cause) => {
+        // Already answered (possibly on another client): lock the card instead of
+        // raising the banner, which would only invite another tap (§9.10).
+        if (isAppErrorShape(cause) && cause.code === 'poll_answered') {
+          setLockedFor(poll)
+          return
+        }
+        fail(cause)
+      })
       .finally(() => setBusy(false))
   }
 
@@ -137,6 +149,7 @@ export function PollBubble({
         })}
       </div>
       {restriction ? <div className="wx-poll__hint">{restriction}</div> : null}
+      {locked ? <div className="wx-poll__hint">你的答案已经提交，不能修改</div> : null}
       {staged ? (
         <div className="wx-poll__actions">
           <button type="button" className="wx-poll__submit" onClick={() => vote(selection)}>
