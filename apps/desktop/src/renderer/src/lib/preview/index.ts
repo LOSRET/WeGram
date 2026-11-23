@@ -198,6 +198,11 @@ let settings: AppSettings = {
   themePreference: 'light',
   closeBehavior: 'quit',
   sendKey: 'enter',
+  messageTextSize: 'standard',
+  // The preview has no OS login item to write. Claiming the capability keeps the
+  // row usable there; `launchAtLogin` then only lives in this module.
+  launchAtLogin: false,
+  canLaunchAtLogin: true,
 }
 
 /** What the 群二维码 handlers read; their rules live in ./qr.ts. */
@@ -555,6 +560,12 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       if (patch.themePreference) {
         settings.theme = patch.themePreference === 'dark' ? 'dark' : 'light'
       }
+      // main publishes this after a settings write; the preview must do the same
+      // or the shell keeps the old 发送消息 / 消息字号 until it is reloaded.
+      emit('evt:settings', {
+        sendKey: settings.sendKey,
+        messageTextSize: settings.messageTextSize,
+      })
       return undefined
     }
     case 'settings:open':

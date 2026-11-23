@@ -82,6 +82,11 @@
   --wx-fs-body: 14px;
   --wx-lh-body: 1.45;
   --wx-fs-caption: 12px;
+  /* 消息字号 (设置 → 通用, design doc §9.11.3): one multiplier the transcript's
+     text reads. The shell sets `data-msg-size` on <html> and the steps below pick
+     the value; unset (login / 群二维码 / settings windows) means 标准, the measured
+     14 px body, so those windows keep the client's own metrics. */
+  --wx-msg-scale: 1;
 
   /* Sizes (WeChat 4.x metrics) */
   --wx-titlebar-h: 32px;
@@ -159,6 +164,27 @@
      would not scan, so both themes keep it near-black on white. */
   --wx-login-qr-light: #ffffff;
   --wx-login-qr-dark: #2d2d2d;
+}
+
+/* 消息字号's steps, in the client's order (设置 → 通用). Only the transcript's
+   text reads this: scaling the root font instead would also grow the chat list,
+   the timestamps and the composer, which the client does not do. 标准 is spelled
+   out even though it matches the default above, so the four steps are one table
+   and a missing step cannot hide behind "the default happens to be right". */
+:root[data-msg-size='standard'] {
+  --wx-msg-scale: 1;
+}
+
+:root[data-msg-size='small'] {
+  --wx-msg-scale: 0.93;
+}
+
+:root[data-msg-size='large'] {
+  --wx-msg-scale: 1.11;
+}
+
+:root[data-msg-size='xlarge'] {
+  --wx-msg-scale: 1.25;
 }
 
 [data-theme='dark'] {

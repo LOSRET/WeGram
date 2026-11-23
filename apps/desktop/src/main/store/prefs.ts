@@ -1,3 +1,6 @@
+import { messageTextSizeSchema } from '@wegram/protocol'
+import type { MessageTextSize } from '@wegram/protocol'
+
 import type { UiDatabase } from './ui-db'
 
 /**
@@ -14,6 +17,8 @@ const CLOSE_BEHAVIOR_KEY = 'closeBehavior'
 const SEND_KEY = 'sendKey'
 /** ui.db key holding 桌面通知; 'off' means the OS shows no toast at all. */
 const DESKTOP_NOTIFICATIONS = 'notifications.desktop'
+/** ui.db key holding 消息字号; its value is a {@link MessageTextSize}. */
+const MESSAGE_TEXT_SIZE = 'messageTextSize'
 
 export type CloseBehavior = 'tray' | 'quit'
 export type SendKey = 'enter' | 'ctrlEnter'
@@ -54,4 +59,21 @@ export function getDesktopNotifications(uiDb: UiDatabase | null): boolean {
 
 export function setDesktopNotifications(uiDb: UiDatabase, enabled: boolean): void {
   uiDb.setSetting(DESKTOP_NOTIFICATIONS, enabled ? 'on' : 'off')
+}
+
+/**
+ * 消息字号: four steps, and an absent row means 标准 — the size every existing
+ * install already had, so an update never changes a transcript's metrics.
+ *
+ * The row is parsed rather than trusted: it is a string from a file another
+ * build may have written, and an unknown step would otherwise reach the shell as
+ * a `data-msg-size` value the stylesheet does not know.
+ */
+export function getMessageTextSize(uiDb: UiDatabase | null): MessageTextSize {
+  const parsed = messageTextSizeSchema.safeParse(uiDb?.getSetting(MESSAGE_TEXT_SIZE))
+  return parsed.success ? parsed.data : 'standard'
+}
+
+export function setMessageTextSize(uiDb: UiDatabase, value: MessageTextSize): void {
+  uiDb.setSetting(MESSAGE_TEXT_SIZE, value)
 }

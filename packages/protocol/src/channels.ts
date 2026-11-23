@@ -18,6 +18,7 @@ import { notificationInvokeChannels, notificationInvokeSchemas } from './notific
 import { customEmojiStickerSchema, stickerSetSchema, stickerSetSummarySchema } from './stickers'
 import {
   appInfoSchema,
+  appSettingsPatchSchema,
   appSettingsSchema,
   proxyConfigSchema,
   proxyModeSchema,
@@ -554,7 +555,7 @@ export const invokeSchemas = {
   },
   'settings:get': { request: noPayload, response: appSettingsSchema },
   'settings:set': {
-    request: z.object({ patch: appSettingsSchema.partial() }),
+    request: z.object({ patch: appSettingsPatchSchema }),
     response: noPayload,
   },
   'settings:open': { request: noPayload, response: noPayload },

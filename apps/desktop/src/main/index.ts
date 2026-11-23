@@ -284,10 +284,10 @@ async function bootstrap(): Promise<void> {
       // "I switched to dark and this window stayed light" happens (design doc §9.11.4).
       onThemeChange: applyTheme,
       /**
-       * 发送消息 changed in the settings window: the shell's composers read the
-       * rule from the store, so it is delivered like any other state change.
+       * 发送消息 or 消息字号 changed in the settings window: the shell reads both
+       * from its store, so they are delivered like any other state change.
        */
-      onSendKeyChange: (sendKey) => bus?.publish('evt:settings', { sendKey }),
+      onSettingsChange: (settings) => bus?.publish('evt:settings', settings),
       // The login window's 进入 button: the shell takes over, the login window goes.
       onLoginEnter: () => showMainWindow(storedTheme(db), 'after-ready'),
       onAuthInteraction: () => {

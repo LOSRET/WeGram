@@ -113,14 +113,20 @@ function Block({ block, chatId, messageId }: BlockProps) {
   }
 }
 
-/** TDLib's section headings are 1 (largest) to 6 (smallest). */
+/**
+ * TDLib's section headings are 1 (largest) to 6 (smallest).
+ *
+ * em rather than px so the heading follows the bubble, which is what carries
+ * 消息字号 (§9.11.3); the stylesheet's `.wx-rich__text` is the 14 px base they
+ * are relative to.
+ */
 const SECTION_SIZE: Record<number, string> = {
-  1: '17px',
-  2: '16px',
-  3: '15px',
-  4: '14px',
-  5: '13px',
-  6: '12px',
+  1: '1.214em',
+  2: '1.143em',
+  3: '1.071em',
+  4: '1em',
+  5: '0.929em',
+  6: '0.857em',
 }
 
 function TextBlock({

@@ -13,6 +13,7 @@ export const DATA_DEFAULTS: AppData = {
   info: null,
   theme: 'light',
   sendKey: 'enter',
+  messageTextSize: 'standard',
   chats: [],
   archivedChats: [],
   activeChatId: null,

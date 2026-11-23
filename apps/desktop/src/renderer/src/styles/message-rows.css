@@ -41,7 +41,8 @@
   border-radius: var(--wx-bubble-radius);
   background: var(--wx-bubble-other);
   color: var(--wx-text);
-  font-size: 14px;
+  /* 消息字号 (§9.11.3): the bubble's own text is the one thing the step scales. */
+  font-size: calc(14px * var(--wx-msg-scale));
   line-height: var(--wx-lh-body);
   word-break: break-word;
   white-space: pre-wrap;

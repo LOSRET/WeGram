@@ -119,6 +119,16 @@ export type CloseBehavior = z.infer<typeof closeBehaviorSchema>
 export const sendKeySchema = z.enum(['enter', 'ctrlEnter'])
 export type SendKey = z.infer<typeof sendKeySchema>
 
+/**
+ * 消息字号 (§9.11.3 通用): four steps, and only the transcript reads them.
+ *
+ * The stored value is the step, not a pixel size — the scale lives in the
+ * stylesheet (`--wx-msg-scale`, driven by `data-msg-size` on <html>), so
+ * retuning 标准 is not a data migration.
+ */
+export const messageTextSizeSchema = z.enum(['small', 'standard', 'large', 'xlarge'])
+export type MessageTextSize = z.infer<typeof messageTextSizeSchema>
+
 export const appSettingsSchema = z.object({
   /** The theme every window should paint with — always resolved, never 'system'. */
   theme: z.enum(['light', 'dark']),
@@ -126,8 +136,30 @@ export const appSettingsSchema = z.object({
   themePreference: themePreferenceSchema,
   closeBehavior: closeBehaviorSchema,
   sendKey: sendKeySchema,
+  /** 消息字号: the transcript's text step (see {@link messageTextSizeSchema}). */
+  messageTextSize: messageTextSizeSchema,
+  /**
+   * 开机自启: the login item belongs to the operating system, so `settings:get`
+   * reads it back from there on every call instead of keeping a second copy.
+   */
+  launchAtLogin: z.boolean(),
+  /**
+   * Whether this build may write that login item at all. A development run's
+   * `process.execPath` is Electron's own binary, so the panel disables the row
+   * instead of registering a startup entry that opens nothing (§9.11.3).
+   */
+  canLaunchAtLogin: z.boolean(),
 })
 export type AppSettings = z.infer<typeof appSettingsSchema>
+
+/**
+ * What `settings:set` accepts: the writable half of {@link appSettingsSchema}.
+ * A capability flag is an answer, never something a renderer may set.
+ */
+export const appSettingsPatchSchema = appSettingsSchema
+  .omit({ canLaunchAtLogin: true })
+  .partial()
+export type AppSettingsPatch = z.infer<typeof appSettingsPatchSchema>
 
 export const appInfoSchema = z.object({
   version: z.string(),

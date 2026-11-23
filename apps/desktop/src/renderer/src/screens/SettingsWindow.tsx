@@ -1,4 +1,4 @@
-import type { AppSettings } from '@wegram/protocol'
+import type { AppSettings, AppSettingsPatch } from '@wegram/protocol'
 import { useCallback, useEffect, useState } from 'react'
 
 import { AccountPanel } from '@renderer/components/settings/AccountPanel'
@@ -74,7 +74,9 @@ export function SettingsWindow() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const patch = useCallback(async (next: Partial<AppSettings>): Promise<void> => {
+  // The writable half only: `canLaunchAtLogin` is an answer from main, never
+  // something this window sends back (design doc §9.11.4).
+  const patch = useCallback(async (next: AppSettingsPatch): Promise<void> => {
     setSettings((current) => (current ? { ...current, ...next } : current))
     try {
       await invoke('settings:set', { patch: next })

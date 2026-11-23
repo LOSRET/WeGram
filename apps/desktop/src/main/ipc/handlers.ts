@@ -2,9 +2,10 @@ import { copyFile, rm, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 
 import { AppError, RECENT_EMOJI_LIMIT } from '@wegram/protocol'
-import type { AppInfo, ConnectionState } from '@wegram/protocol'
+import type { AppInfo, ConnectionState, MessageTextSize, SendKey } from '@wegram/protocol'
 import { app, BrowserWindow, clipboard, ClipboardItem, dialog, nativeImage, shell } from 'electron'
 
+import { canLaunchAtLogin, getLaunchAtLogin, setLaunchAtLogin } from '../autostart'
 import { closeLoginWindow } from '../login-window'
 import { drop, hold } from '../media/leases'
 import { registerStreamFile } from '../media/registry'
@@ -29,9 +30,11 @@ import { closeSettingsWindow, openSettingsWindow } from '../settings-window'
 import {
   getCloseBehavior,
   getDesktopNotifications,
+  getMessageTextSize,
   getSendKey,
   setCloseBehavior,
   setDesktopNotifications,
+  setMessageTextSize,
   setSendKey,
 } from '../store/prefs'
 import { resolveTheme, storedTheme, themePreference } from '../windows'
@@ -49,10 +52,10 @@ export interface HandlerDeps {
   /** Lets the shell repaint the native window-controls overlay on theme change. */
   onThemeChange?: (theme: 'light' | 'dark') => void
   /**
-   * 发送消息's rule changed: the shell's composers follow it through evt:settings,
-   * so the change applies without a restart.
+   * 发送消息 or 消息字号 changed: the shell follows them through evt:settings, so
+   * the change applies to the open transcript without a restart.
    */
-  onSendKeyChange?: (sendKey: 'enter' | 'ctrlEnter') => void
+  onSettingsChange?: (settings: { sendKey: SendKey; messageTextSize: MessageTextSize }) => void
   /**
    * Opens the shell window and dismisses the login window. Called by the login
    * window's 进入 button; the caller guards that authorization finished.
@@ -90,7 +93,7 @@ export function createHandlers({
   proxyController,
   connection,
   onThemeChange,
-  onSendKeyChange,
+  onSettingsChange,
   onLoginEnter,
   onAuthInteraction,
   onLocate,
@@ -428,6 +431,11 @@ export function createHandlers({
       themePreference: themePreference(uiDb),
       closeBehavior: getCloseBehavior(uiDb),
       sendKey: getSendKey(uiDb),
+      messageTextSize: getMessageTextSize(uiDb),
+      // Read from the operating system every time: the login item is its state,
+      // and a second copy here is how the switch starts lying after a reinstall.
+      launchAtLogin: getLaunchAtLogin(),
+      canLaunchAtLogin: canLaunchAtLogin(),
     }),
     'settings:set': (payload) => {
       // A patch that names `theme` is an explicit choice (the rail menu's 深色模式
@@ -438,9 +446,18 @@ export function createHandlers({
         onThemeChange?.(resolveTheme(preference))
       }
       if (payload.patch.closeBehavior) setCloseBehavior(uiDb, payload.patch.closeBehavior)
-      if (payload.patch.sendKey) {
-        setSendKey(uiDb, payload.patch.sendKey)
-        onSendKeyChange?.(payload.patch.sendKey)
+      if (payload.patch.messageTextSize) setMessageTextSize(uiDb, payload.patch.messageTextSize)
+      if (payload.patch.launchAtLogin !== undefined) {
+        setLaunchAtLogin(payload.patch.launchAtLogin)
+      }
+      if (payload.patch.sendKey) setSendKey(uiDb, payload.patch.sendKey)
+      // One event carries the whole shell-facing pair, so a patch that touches
+      // both cannot deliver half of itself and leave the other half stale.
+      if (payload.patch.sendKey || payload.patch.messageTextSize) {
+        onSettingsChange?.({
+          sendKey: getSendKey(uiDb),
+          messageTextSize: getMessageTextSize(uiDb),
+        })
       }
     },
     /**

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
+import { messageTextSizeSchema } from '@wegram/protocol'
 import { describe, expect, it } from 'vitest'
 
 import { ARCHIVE_PAGE_ANIM_MS } from '../src/renderer/src/lib/archivePage'
@@ -88,5 +89,19 @@ describe('style contract', () => {
     expect(propertyMs(read('topics.css'), '.wx-topics-page {', 'transform')).toBe(
       TOPICS_PAGE_ANIM_MS,
     )
+  })
+
+  /**
+   * 消息字号 (§9.11.3): the panel offers the protocol's steps, and the stylesheet is
+   * the only place their sizes live. A step added to the enum without a rule here
+   * would silently paint 标准, so the two are asserted together.
+   */
+  it('gives every 消息字号 step a scale', () => {
+    const tokens = read('tokens.css')
+    for (const step of messageTextSizeSchema.options) {
+      expect(tokens).toContain(`:root[data-msg-size='${step}']`)
+    }
+    // The step is only real if the transcript's own text reads the multiplier.
+    expect(read('message-rows.css')).toContain('calc(14px * var(--wx-msg-scale))')
   })
 })

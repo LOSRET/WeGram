@@ -7,6 +7,7 @@ export const createAuthSlice: SliceCreator<AuthActions> = (set) => ({
   setInfo: (info) => set({ info }),
   setTheme: (theme) => set({ theme }),
   setSendKey: (sendKey) => set({ sendKey }),
+  setMessageTextSize: (messageTextSize) => set({ messageTextSize }),
 
   /**
    * Logout: clear every chat/message/media field but keep the shell usable.

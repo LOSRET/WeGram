@@ -725,6 +725,19 @@ adapter reads the scope first because the setter **replaces the whole struct** �
 and mention fields the panel does not show are copied back, not reset. 声音 is `sound_id`
 (`'-1'` default, `'0'` off) and 预览 is `show_preview`.
 
+**通用组的补全(2026-11-23):消息字号 / 开机自启**。消息字号是四档(小/标准/大/超大),存 `ui.db` 的
+`messageTextSize`,默认「标准」就是既有的 14 px 正文——升级不改任何人的行高。它只缩放**消息文本**
+(气泡正文、富文本块、图片说明、代码块),通道是 shell 写在 `<html>` 上的 `data-msg-size` →
+`--wx-msg-scale`(`tokens.css`);**不要改成缩放 `:root` 字号**,那会连带放大会话列表、时间戳与
+输入框,而客户端不这么做。富文本的 px 尺寸因此改成 `em`(含 `RichMessage` 的 `SECTION_SIZE`),
+否则一条 Telegram 页面消息不会跟着缩放;虚拟列表靠 `measureElement` 重测,所以换档后行高自己收敛,
+不需要手动 `measure()`。开机自启**没有本地配置**:真相是操作系统的登录项
+(`app.getLoginItemSettings()`),每次 `settings:get` 读回、`settings:set` 直接写
+`setLoginItemSettings`;**只有打包版可写**,开发运行里 `process.execPath` 是 `node_modules` 的
+electron.exe,写进去就是一条打不开应用的启动项,所以 `canLaunchAtLogin=false` 时面板禁用该行。
+两项的写入都发一条携带**整对** `{ sendKey, messageTextSize }` 的 `evt:settings`(`settings:set` 里
+一次读齐再发)——半份事件是这个面板最容易留下的 bug。
+
 ### 5.11 How a channel post is composed
 
 The owner's instruction (2026-11-20): "依旧是微信的气泡，但是像 Telegram 一样把图片、消息和
@@ -1517,7 +1530,7 @@ One-off duplication audits merged the real duplicates and left the look-alikes a
 |---|---|---|
 | 1 | Search-face virtualisation | The conversation list is virtualised (2026-11-18) and, since 2026-11-23, pages on approach and prefetches the visible window's photos — measured on this account: 321 chats, 100/100/100/21 with no overlap. What is left is the search face: conversation hits and message hits still `.map` their page instead of virtualising it (they are paged, so the count is bounded — mechanical, not urgent) |
 | 2 | Reactions picker | display is done; WeChat has no reactions, so it needs the owner's sign-off (§9.3) |
-| 3 | Settings batches B and C | **B1 消息通知 landed 2026-11-23** (desktop switch + three scopes). B still open: six 隐私 rules + 黑名单, 登录设备, 存储统计/清理, 自动下载, 消息字号, 开机自启. C: 两步验证, 本地锁, 全局快捷键, 检查更新, 保存目录, 贴纸管理, 恢复默认. Each adds panels to the same nav table; prefer per-domain channels over growing `settings:set` (消息通知's are `notifications:get` / `setScope` / `setDesktop` in `packages/protocol/src/notification.ts`). 清理缓存 must invalidate `media/registry.ts` tokens or bubbles keep retrying deleted files |
+| 3 | Settings batches B and C | **B1 消息通知 landed 2026-11-23** (desktop switch + three scopes), **B2 通用补全 landed the same day** (消息字号 four steps through `data-msg-size` / `--wx-msg-scale`; 开机自启 read from and written to the OS login item, packaged builds only). B still open: six 隐私 rules + 黑名单, 登录设备, 存储统计/清理, 自动下载, 角标未读数. C: 两步验证, 本地锁, 全局快捷键, 检查更新, 保存目录, 贴纸管理, 恢复默认. Each adds panels to the same nav table; prefer per-domain channels over growing `settings:set` (消息通知's are `notifications:get` / `setScope` / `setDesktop` in `packages/protocol/src/notification.ts`). 清理缓存 must invalidate `media/registry.ts` tokens or bubbles keep retrying deleted files |
 | 4 | Private-chat P2 list | translate (`translateText`), scheduled/silent send, shared-media tabs, draft cloud sync, multi-select forward, location/contact/poll sending, message effects, chat background, screenshot, 收藏 → Saved Messages |
 | 5 | Search depth | missing 应用/贴文/图片/视频/音频/链接 filters, 联系人 hits, archived chats (global search still reads `chatListMain`) |
 | 6 | Viewer breadth | no 编辑, no AI block, no 查看原视频, no pin button anywhere |
@@ -1816,6 +1829,24 @@ claim is. Nothing here replaces §1 (state) or §9 (gaps).
   fields included) and mute is `mute_for = 2^31-1`.
 - Panel: `components/settings/NotificationPanel.tsx`; nav order follows §9.11.3 (消息通知
   after 通用). The mock adapter and the browser preview implement the same three channels.
+- `pnpm verify` green.
+
+**2026-11-23 (night) — 设置 B 批第二组:通用补全(消息字号 / 开机自启)**
+- 消息字号: four steps (`small` / `standard` / `large` / `xlarge`) in `ui.db`
+  (`messageTextSize`, default 标准 = the existing 14 px body), painted through
+  `data-msg-size` on `<html>` → `--wx-msg-scale`. It scales message text only — bubbles,
+  rich blocks, photo/album captions, code blocks — so the chat list, timestamps and the
+  composer keep their measured sizes. The rich-message sizes (and `SECTION_SIZE`) became
+  `em` for that reason.
+- 开机自启: read from and written to the OS login item (`app.getLoginItemSettings()` /
+  `setLoginItemSettings`), never stored in `ui.db`; `canLaunchAtLogin` is false in a
+  development run, where the row is disabled instead of registering
+  `node_modules/electron.exe` as a startup entry.
+- `evt:settings` now carries the whole `{ sendKey, messageTextSize }` pair, and
+  `settings:set` validates against the new `appSettingsPatchSchema` (a capability flag is an
+  answer, never a patch). The browser preview publishes the same event.
+- `scripts/style-contract.test.ts` pins every protocol step to a `[data-msg-size]` rule and
+  the bubble's `calc(14px * var(--wx-msg-scale))`.
 - `pnpm verify` green.
 
 

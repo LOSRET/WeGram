@@ -14,33 +14,36 @@
   min-width: 0;
 }
 
+/* A rich block scales with its bubble: the sizes below are em on purpose, so
+   消息字号 (§9.11.3) reaches a Telegram "page" without a second multiplier. The
+   base is the bubble's own `calc(14px * --wx-msg-scale)`. */
 .wx-rich__text {
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--wx-text);
-  font-size: 14px;
+  font-size: 1em;
   line-height: var(--wx-lh-body);
 }
 
 .wx-rich__text--title {
-  font-size: 17px;
+  font-size: 1.214em;
   font-weight: 600;
   line-height: 1.35;
 }
 
 .wx-rich__text--subtitle {
-  font-size: 16px;
+  font-size: 1.143em;
   font-weight: 600;
 }
 
 .wx-rich__text--header {
-  font-size: 15px;
+  font-size: 1.071em;
   font-weight: 600;
 }
 
 .wx-rich__text--subheader {
-  font-size: 14px;
+  font-size: 1em;
   font-weight: 600;
 }
 
@@ -50,7 +53,7 @@
 
 .wx-rich__text--kicker,
 .wx-rich__text--footer {
-  font-size: 12px;
+  font-size: 0.857em;
   color: var(--wx-text-secondary);
 }
 

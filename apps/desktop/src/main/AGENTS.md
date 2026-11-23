@@ -22,6 +22,9 @@ notifications.ts    desktop toasts from TDLib's notification stream; suppresses 
                     the focused shell shows (ui:setActiveChat), flashes the task bar, and
                     stops at once when 设置 → 消息通知's 桌面通知 switch is off (read per
                     delivery through store/prefs.ts)
+autostart.ts        设置 → 通用 → 开机自启: the OS login item is the source of truth (read on
+                    every settings:get, never mirrored in ui.db); writing it needs a packaged
+                    build, because a dev run's execPath is node_modules' electron.exe
 tray.ts / tray-icon.ts  the Windows notification-area icon (best-effort: logs and carries
                     on when the session has no notification area)
 ipc/router.ts       per-channel zod validation, typed handler map, Result envelope
@@ -62,7 +65,8 @@ media/              registry.ts (token → path | fileId) / protocol.ts (wx-medi
                     image-size.ts / voice-file.ts (a recorded 语音消息's temporary OGG:
                     written by the handler, pruned at startup once stale)
 store/              ui-db.ts (all SQL) / settings.ts (proxy + TDLib network options) /
-                    prefs.ts (ui.db-backed 关闭主窗口 · 发送消息 · 桌面通知, read on demand)
+                    prefs.ts (ui.db-backed 关闭主窗口 · 发送消息 · 消息字号 · 桌面通知, read on
+                    demand)
 proxy*.ts           proxy DTO ↔ stored config
 proxy-controller.ts the ONE place that decides the proxy in force (§6.4): manual →
                     WEGRAM_PROXY (dev) → system → direct, plus the 30 s retry that

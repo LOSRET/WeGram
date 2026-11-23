@@ -7,6 +7,7 @@ import type {
   ConnectionState,
   Message,
   MessageOp,
+  MessageTextSize,
   PeerStatus,
   SendKey,
   UserAvatar,
@@ -71,6 +72,11 @@ export interface AppData {
   theme: 'light' | 'dark'
   /** 发送消息's rule; the composer reads it when an Enter lands (evt:settings). */
   sendKey: SendKey
+  /**
+   * 消息字号; the shell writes it to `data-msg-size` on <html>, which is the one
+   * place the transcript's scale comes from (evt:settings, design doc §9.11.3).
+   */
+  messageTextSize: MessageTextSize
   chats: ChatSummary[]
   /**
    * 已归档会话, TDLib's second chat list. It is a list of its own rather than a
@@ -163,6 +169,7 @@ export interface AuthActions {
   setInfo: (info: AppInfo) => void
   setTheme: (theme: 'light' | 'dark') => void
   setSendKey: (sendKey: SendKey) => void
+  setMessageTextSize: (size: MessageTextSize) => void
   /** Clears every chat/message/media field, used on logout. */
   reset: () => void
 }

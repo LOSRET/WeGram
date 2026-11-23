@@ -45,7 +45,8 @@
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.07);
   font-family: Consolas, 'Courier New', monospace;
-  font-size: 12.5px;
+  /* A code block is message text, so 消息字号 reaches it too. */
+  font-size: calc(12.5px * var(--wx-msg-scale));
   line-height: 1.45;
   white-space: pre-wrap;
   overflow-x: auto;
@@ -115,7 +116,8 @@
   padding: 8px 12px;
   border-radius: var(--wx-bubble-radius);
   background: var(--wx-bubble-other);
-  font-size: 14px;
+  /* The photo/album caption is the message's text, so it scales (§9.11.3). */
+  font-size: calc(14px * var(--wx-msg-scale));
 }
 
 .wx-bubble--photo.wx-bubble--self .wx-caption,

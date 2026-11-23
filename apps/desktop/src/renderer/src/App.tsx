@@ -17,11 +17,19 @@ const RESYNC_DELAY_MS = 250
 export function App() {
   const auth = useAppStore((state) => state.auth)
   const theme = useAppStore((state) => state.theme)
+  const messageTextSize = useAppStore((state) => state.messageTextSize)
   const ready = auth.kind === 'ready'
 
   useEffect(() => {
     document.documentElement.dataset['theme'] = theme
   }, [theme])
+
+  // 消息字号 (design doc §9.11.3): the stylesheet's `--wx-msg-scale` hangs off this
+  // attribute, so the whole transcript (bubbles, rich blocks, captions) rescales
+  // without every row subscribing to the store.
+  useEffect(() => {
+    document.documentElement.dataset['msgSize'] = messageTextSize
+  }, [messageTextSize])
 
   // One subscription set for the whole app: every store mutation flows from here.
   useEffect(() => {
@@ -133,6 +141,7 @@ export function App() {
       window.tg.on('evt:settings', (event) => {
         track(event.seq)
         useAppStore.getState().setSendKey(event.payload.sendKey)
+        useAppStore.getState().setMessageTextSize(event.payload.messageTextSize)
       }),
       window.tg.on('evt:chats', (event) => {
         track(event.seq)
@@ -254,6 +263,7 @@ export function App() {
         store.setAuth(authState)
         store.setTheme(settings.theme)
         store.setSendKey(settings.sendKey)
+        store.setMessageTextSize(settings.messageTextSize)
         store.setConnection(connection)
       } catch (error) {
         store.setError(errorMessage(error))

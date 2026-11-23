@@ -73,7 +73,9 @@ components/contacts/      通讯录: ContactsList (service rows + address book b
 components/picker/        the expression panel's data hooks and body components
 components/ExpressionPicker.tsx  the picker's state + composition
 components/settings/      the 设置 panels: SettingsNav / SettingsGroup / SettingsRow /
-                         SettingsSelect + AccountPanel / GeneralPanel / NotificationPanel
+                         SettingsSelect + AccountPanel / GeneralPanel (通用: 外观, 消息字号,
+                         关闭主窗口, 发送消息, 开机自启 — the OS login item, disabled unless
+                         the build may write it) / NotificationPanel
                          (消息通知: 桌面通知 is local, the 私聊/群聊/频道 triples are TDLib's
                          scope defaults — optimistic switches that revert on a rejected
                          write) / NetworkPanel / AboutPanel (styles/settings.css holds the
@@ -478,6 +480,13 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   `lib/query.ts` is `staleTime: Infinity`: a query that reuses its key for another
   topic needs `staleTime: 0` (focus/reconnect refetch off) or it will never fetch
   again after `enabled` flips back on.
+- **消息字号 moves the bubble, never the root font.** The step is written by the
+  shell to `<html data-msg-size>` and reaches the transcript through
+  `--wx-msg-scale` (`tokens.css`); `:root { font-size }` would also grow the chat
+  list, the timestamps and the composer, which the client does not do. Rich
+  blocks (and `RichMessage`'s `SECTION_SIZE`) are `em` on purpose so one step
+  reaches a Telegram "page" too, and the virtualiser's `measureElement` is what
+  re-measures the rows — do not add a manual `measure()`.
 - User-facing copy is Chinese (`回复`/`复制`/`转发`…), code, identifiers and
   comments are English.
 
