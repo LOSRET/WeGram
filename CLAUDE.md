@@ -140,6 +140,7 @@ cd apps\desktop; pnpm dev       # Electron dev (needs ELECTRON_RUN_AS_NODE unset
 cd apps\desktop; pnpm web       # renderer-only preview at http://localhost:5174 (?perf=1 → W2 acceptance panel)
 cd apps\desktop; pnpm tdlib:smoke   # headless real-TDLib check (see below)
 cd apps\desktop; pnpm tdlib:test-dc # READ/WRITE check against Telegram's test data centers
+cd apps\desktop; pnpm tdlib:test-dc:writes # the §9.1 write matrix on the same test session
 cd apps\desktop; pnpm ui:db-check   # headless ui.db check (node:sqlite)
 cd apps\desktop; pwsh scripts\launch-detached.ps1 -NoSandbox   # only way Electron starts here (-Mock for the fake adapter, -RemoteDebugPort 9224 for CDP checks)
 ```
@@ -173,7 +174,9 @@ Desktop (beta build), sign the number in there; then
 `WEGRAM_TEST_PHONE=+... WEGRAM_TEST_ALLOW_REAL_PHONE=1 pnpm tdlib:test-dc` drives the
 TDLib login and, with `WEGRAM_TEST_CODE=<the 6-digit code from that session>`, runs the
 write checks. Measured on a fresh test account: authorization → `ready`, 3 chats,
-send → edit → photo upload → delete all pass.
+send → edit → photo upload → delete all pass; `pnpm tdlib:test-dc:writes` extends that to
+album/caption/pin/备注/联系人/拉黑/举报/删除聊天 (see `docs/HANDOFF.md` §9.1 for the three that
+need a fixture the account does not have).
 
 Spike commands (unchanged):
 

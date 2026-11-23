@@ -172,6 +172,7 @@ pnpm test
 cd apps\desktop; pnpm ui:db-check     # headless ui.db check (node:sqlite)
 cd apps\desktop; pnpm tdlib:smoke     # READ-ONLY real TDLib: getMe/getChats/history
 cd apps\desktop; pnpm tdlib:test-dc   # test data centers: send/edit/upload/delete
+cd apps\desktop; pnpm tdlib:test-dc:writes  # the §9.1 write matrix (album/pin/note/contacts/…)
 pwsh apps\desktop\scripts\launch-detached.ps1 -Mock   # Electron + mock adapter
 ```
 

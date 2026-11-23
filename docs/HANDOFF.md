@@ -93,11 +93,11 @@ pnpm workspace, W1 + W2 + the W3 main body implemented, plus the private-chat P0
 
 | Claim | Evidence |
 |---|---|
-| The build is sound | `pnpm verify` = lint → typecheck → test → build, zero warnings. Last recorded green run: 95 files / 726 tests (the count grows; read the run) |
+| The build is sound | `pnpm verify` = lint → typecheck → test → build, zero warnings. Last recorded green run: 2026-11-23, 104 files / 804 tests (the count grows; read the run) |
 | The UI behaves | mock Electron passes (`launch-detached.ps1 -NoSandbox -Mock`) and the browser preview; the numbers in §5 were measured off those windows |
 | Paging / scroll / FPS | CDP against the real account: 5000 messages at 60 fps, **0.0 px** drift when prepending, 60 pages with no duplicates |
 | The read path against real TDLib | `pnpm tdlib:smoke` (read-only) + real-account Electron sessions |
-| **Writes** to Telegram | only the ones run on the test DC: send/edit/photo/delete, and `inputMessageVoiceNote`. **Everything else in §7 marked compile/mock-verified is not proven** |
+| **Writes** to Telegram | the §9.1 matrix now runs on the test DCs: `pnpm tdlib:test-dc` (text / edit / photo / voice / delete) and `pnpm tdlib:test-dc:writes` (album, caption edit, pin, 标为未读, 备注, 联系人, 拉黑, 举报, 转文字, 删除聊天) — last run 9 pass / 3 partial / 1 skip / 0 fail. The partials and the skip are named in §9.1 |
 | The QR login with a real phone | **not yet** — mapping, encoding and fallback are mock-verified only |
 | Windows toasts, tray icon | **not yet** on this machine (no Start-Menu shortcut; `Shell_NotifyIcon` refused in the agent session) |
 | The installer, code signing, auto-update, sandboxed launch on a clean machine | **not yet** (v0.1.0 artifact predates the inlined credentials, so it still boots the mock) |
@@ -162,6 +162,7 @@ pnpm dev                                                  # Electron dev (unset 
 pnpm web                                                  # renderer preview :5174 (?perf=1 → acceptance panel)
 pnpm tdlib:smoke                                          # headless real-TDLib read check
 pnpm tdlib:test-dc                                        # write checks on Telegram's test DCs
+pnpm tdlib:test-dc:writes                                 # the §9.1 write matrix (album/pin/note/contacts/…)
 pnpm ui:db-check                                          # headless ui.db check (node:sqlite)
 pwsh scripts\launch-detached.ps1 -NoSandbox -Mock         # mock adapter in the real shell
 pwsh scripts\launch-detached.ps1 -NoSandbox -Mock -RemoteDebugPort 9224   # + CDP
@@ -214,6 +215,17 @@ test-DC account is created by an **official app**, then used by TDLib:
 the app first, and a torn/VSS copy of the DB loses authorization. If no test DC is
 available, say so and mark the write path **unverified** — never probe writes against the
 real session.
+
+**Two scripts, one session.** `pnpm tdlib:test-dc` proves the baseline chain (text → edit →
+photo → voice → delete); `pnpm tdlib:test-dc:writes` drives the §9.1 matrix — album + caption
+edit, pin, 标为未读, 备注, 联系人, 拉黑, 举报, 转文字, 重试, 删除聊天 — one
+PASS / PARTIAL / SKIP / FAIL line per path (`PARTIAL` = the call and TDLib's answer were
+exercised but this account has no fixture for the round trip; `SKIP` = the API refuses on
+that target). `WEGRAM_TEST_KEEP=1` leaves the probe rows behind; otherwise they are deleted.
+Both share `scripts/testdc/harness.ts` for the credential / session / number guards, so
+neither can drift onto the real session. The script recreates the 777000 fixture chat when a
+previous run's 删除聊天 check removed it, and deletes the *bot's* chat rather than a real
+conversation.
 
 ### 3.5 Driving the real renderer over CDP
 
@@ -1178,6 +1190,28 @@ are grouped by the layer that owns the rule; the code comments carry the same fa
   (`setPermissionRequestHandler` + `setPermissionCheckHandler`); the login, 群二维码 and viewer
   windows cannot open a device. The comment composer shares the card but passes no
   `onSendVoice`, so its mic still toasts.
+- **`addContact` answers before `user.is_contact` flips** (measured ~1.2 s on the test DC):
+  a card painted from one `getUser` kept showing 添加为联系人 after the toast had already said
+  已添加. `setUserContact` waits for the flag (150 ms polls, 3 s cap) and answers the settled
+  card; the same lag applies to `removeContacts`.
+- **`setUserNote` needs a contact**: TDLib answers `User isn't a contact` for anybody outside
+  the address book, so the 资料卡 opens its 备注 row only for `isContact` and explains the
+  order otherwise ("添加为联系人后可写备注"). WeChat writes a remark on anyone; Telegram does
+  not, and pretending otherwise is an error toast.
+- **`reportChat` can need more than two phases**: a *bot* report goes reason list →
+  "what is wrong with this bot?" (a second option list with **new** ids) → filed. The sheet
+  already treats any non-final answer as "the list again", which is what makes the chain work;
+  the ids must come from the last answer only, never be cached across phases.
+- **举报 is reachable for bots only** (confirmed against the test DC): @spambot's chat reports
+  and files, while a human's private chat answers `can_report_chat: false` — which is why a
+  person's card carries no 举报 button.
+- **A dead proxy does not fail a send** (measured 2026-11-23): pointing TDLib at a closed port
+  left the message `pending` for 120 s — TDLib queues and retries instead of raising
+  `updateMessageSendFailed`, so 重试 cannot be forced that way. A failed row needs a *server*
+  rejection, which the test DC does not produce on demand.
+- **The test DC's speech recogniser is intermittent**: the same clip produced a finished
+  transcript ("[en-US]") once and `TRANSCRIPTION_FAILED` on the later runs. The check retries
+  with a freshly uploaded clip; a permanent failure is the server, not the mapping.
 
 ---
 
@@ -1248,6 +1282,17 @@ Notes that move an estimate: **reactions** and **online status** have no WeChat 
 so they are product decisions as much as engineering ones; **notifications** must come from
 TDLib's notification API or mute/mention rules will be wrong; **round video notes** need
 MPEG4/H.264 ≤ 640 and a capture spike first.
+
+**Test-DC status (2026-11-23).** Every write in this table that had only a compile/mock proof
+was driven on Telegram's test DCs by `pnpm tdlib:test-dc:writes` — album, caption edit,
+pin/unpin, 标为未读, 备注, 联系人, 拉黑, 举报 (filed against a bot, two phases), 转文字,
+删除聊天 — 9 pass / 3 partial / 1 skip / 0 fail. It found three real defects, now fixed with
+tests: `markedUnread` was never mapped (so 标为未读 set nothing), `setUserContact` read
+`is_contact` before TDLib flipped it (~1.2 s), and 备注 was offered to a non-contact (TDLib
+refuses it). Still unproven: `resendMessages` (no failed row can be produced — see §6.7),
+`getGroupsInCommon` (this account's only group has no second member, so it needs a second
+test account), and whether `sendChatAction` actually reaches the peer (the adapter swallows
+its errors by design, so only the call path is proven).
 
 ### 7.3 Recipe: adding one send type (the pattern for most P1/P2 items)
 
@@ -1407,13 +1452,21 @@ One-off duplication audits merged the real duplicates and left the look-alikes a
 
 ### 9.1 Verification debt (highest value — close these before building more)
 
-1. **Test-DC writes.** Everything in §7 that writes was compile- and mock-verified only:
-   `sendMessageAlbum`, `pinChatMessage`, `setUserNote`, `setMessageSenderBlockList`,
-   `reportChat`, `editMessageCaption`, `recognizeSpeech`, `addContact`, `removeContacts`,
-   `getGroupsInCommon`, plus `sendChatAction`/`resendMessages`/`deleteChatHistory`/
-   `toggleChatIsMarkedAsUnread`. `scripts/tdlib-test-dc.ts` has the probe steps; run it with
-   the app closed on an authorized test session. `inputMessageVoiceNote` is the one write
-   confirmed there.
+1. **Test-DC writes — mostly closed 2026-11-23.** `pnpm tdlib:test-dc:writes` exercised
+   `sendMessageAlbum`, `editMessageCaption`, `pinChatMessage`/`unpinChatMessage`,
+   `toggleChatIsMarkedAsUnread`, `setUserNote`, `addContact`/`removeContacts`,
+   `setMessageSenderBlockList`, `reportChat` (bot, two phases, filed),
+   `deleteChatHistory` and `recognizeSpeech`; the baseline script keeps text/edit/photo/voice/
+   delete. Three defects surfaced and are fixed (§1.2, §7.2). What is still open:
+   - `resendMessages`: no failed row can be produced — a dead proxy leaves the message
+     `pending` for 120 s (§6.7). Either accept the compile/mock proof or build a
+     server-rejection fixture.
+   - `getGroupsInCommon`: the test account's only group has ourselves in it, so this needs a
+     second test account (or a member added to the group).
+   - `sendChatAction`: the call is sent on every keystroke path, but the adapter swallows its
+     errors on purpose, so nothing observable proves the peer saw the indicator.
+   - `recognizeSpeech`: proven once, then the server refused the same clip (`TRANSCRIPTION_
+     FAILED`); the failure mapping itself is proven by those runs.
 2. **The TDLib QR login with a real phone** — link mapping, encoding, QR-first UI and the
    phone fallback are mock-verified; the `requestQrCodeAuthentication` → scan → ready / 2FA
    chain and `auth:reset`'s rebuild need one real scan (design doc §14).
@@ -1629,6 +1682,11 @@ claim is. Nothing here replaces §1 (state) or §9 (gaps).
 - The animated-cell budget (ThorVG canvas, 30 fps, savedFrame, two-screen parse window) and
   the 贴纸包盒子 (464 × 558, 5-column grid).
 - The four handoff documents were consolidated into this one.
+- The §9.1 write matrix was driven on the test DC (`pnpm tdlib:test-dc:writes`: 9 pass /
+  3 partial / 1 skip, 0 fail). It found three defects — `markedUnread` never mapped,
+  `addContact`'s flag lagging ~1.2 s, 备注 offered to a non-contact — all fixed with tests;
+  举报 was filed end to end against a bot (two phases) and 删除聊天 proven with its own
+  disposable chat.
 
 
 
