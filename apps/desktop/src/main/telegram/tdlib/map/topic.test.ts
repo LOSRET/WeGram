@@ -57,6 +57,13 @@ describe('mapTopic', () => {
     expect(topic.iconEmojiId).toBeUndefined()
   })
 
+  it("carries the topic's own outgoing read marker (our rows' 已读)", () => {
+    expect(mapTopic(rawTopic()).lastReadOutboxMessageId).toBeUndefined()
+    expect(mapTopic(rawTopic({ last_read_outbox_message_id: 1205 })).lastReadOutboxMessageId).toBe(
+      1205,
+    )
+  })
+
   it('keeps a custom-emoji icon as its int64 string', () => {
     const raw = rawTopic()
     raw.info = {
@@ -66,7 +73,7 @@ describe('mapTopic', () => {
     expect(mapTopic(raw).iconEmojiId).toBe('5368324170671202286')
   })
 
-  it('reads 免打扰 from the topic\'s own notification settings', () => {
+  it("reads 免打扰 from the topic's own notification settings", () => {
     const raw = rawTopic({
       notification_settings: {
         _: 'chatNotificationSettings',

@@ -2,7 +2,7 @@ import type { ChatJoinState, Message } from '@wegram/protocol'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { loadLatestWindow } from '../../lib/anchoredWindow'
-import { topicUnreadMarker } from '../../lib/topics'
+import { topicUnreadMarker, transcriptReadMarkers } from '../../lib/topics'
 import { INFO_PANEL_ANIM_MS } from '../../lib/chatInfo'
 import { editTargetOf } from '../../lib/editTarget'
 import { errorMessage, invoke } from '../../lib/ipc'
@@ -31,7 +31,6 @@ import { useChatHistory } from './useChatHistory'
 import { useMarkRead } from './useMarkRead'
 import { usePeerStatus } from './usePeerStatus'
 import { TopicsTabs } from './topics/TopicsTabs'
-
 
 /**
  * The conversation pane: header, transcript, composer and the modals they open.
@@ -104,7 +103,6 @@ export function ChatPane() {
   const [profileUserId, setProfileUserId] = useState<number | null>(null)
   /** 贴纸包: the set a clicked sticker message belongs to (design doc §8.5). */
   const [stickerSetId, setStickerSetId] = useState<string | null>(null)
-
 
   /**
    * The full-pane discussion view (design doc §9.8). It stays mounted while it
@@ -203,9 +201,9 @@ export function ChatPane() {
   const topic =
     topicId === null
       ? null
-      : ((activeChatId === null ? undefined : topicsByChat[activeChatId]) ?? []).find(
+      : (((activeChatId === null ? undefined : topicsByChat[activeChatId]) ?? []).find(
           (item) => item.id === topicId,
-        ) ?? null
+        ) ?? null)
   const topicsOpen = isForum && topicId === null
   /** 论坛展示方式: one call per forum open, learned from `supergroupFullInfo`. */
   useEffect(() => {
@@ -232,9 +230,7 @@ export function ChatPane() {
    * under another topic's title.
    */
   const transcriptStale =
-    !topicsOpen &&
-    activeChatId !== null &&
-    (historyTopicByChat[activeChatId] ?? null) !== topicId
+    !topicsOpen && activeChatId !== null && (historyTopicByChat[activeChatId] ?? null) !== topicId
 
   /**
    * A forum opens on a topic (design doc §9.12): the conversation column is showing
@@ -429,6 +425,15 @@ export function ChatPane() {
 
   if (!chat || !activeChatId) return <NoChatPlaceholder />
 
+  /**
+   * 话题 (design doc §9.12): the transcript reads the same marker pair a flat chat
+   * does, but inside a topic the pair belongs to the topic row — TDLib's chat-level
+   * markers describe the General topic, so reading a topic never moved them and the
+   * pane kept reporting "N 条新消息" over rows the topic row counted as read (and
+   * left our own rows on 未读). The topic row falls back to the chat while the list
+   * page does not carry it.
+   */
+  const readMarkers = transcriptReadMarkers(topic ?? chat)
   const actions = createMessageActions(activeChatId, topicId)
 
   return (
@@ -494,6 +499,8 @@ export function ChatPane() {
                 ? (unreadMarkers[activeChatId] ?? null)
                 : null
           }
+          readInboxMessageId={readMarkers.inboxMessageId}
+          readOutboxMessageId={readMarkers.outboxMessageId}
           onSeenUpToChange={(messageId) =>
             setSeen(messageId === null ? null : { chatId: activeChatId, messageId })
           }
@@ -570,7 +577,6 @@ export function ChatPane() {
           onOpenInput={() => setChannelInputChatId(activeChatId)}
         />
       )}
-
 
       {info ? (
         <ChatInfoPanel

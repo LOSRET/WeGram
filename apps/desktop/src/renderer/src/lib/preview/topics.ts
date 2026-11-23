@@ -1,4 +1,4 @@
-import { filterTopics, orderTopics, pageTopics } from '@wegram/mock-session'
+import { filterTopics, nextReadState, orderTopics, pageTopics } from '@wegram/mock-session'
 import type { ChatSummary, ChatTopic, EventChannel, Message, TopicPage } from '@wegram/protocol'
 
 /**
@@ -78,9 +78,7 @@ export function previewTopicCreate(
     isPinned: false,
     muted: false,
     iconColor: input.iconColor,
-    ...(input.iconEmojiId && input.iconEmojiId !== '0'
-      ? { iconEmojiId: input.iconEmojiId }
-      : {}),
+    ...(input.iconEmojiId && input.iconEmojiId !== '0' ? { iconEmojiId: input.iconEmojiId } : {}),
     unread: 0,
   }
   store.topicsByChat[input.chatId] = [...topics, topic]
@@ -170,17 +168,29 @@ export function previewTopicLink(chatId: number, topicId: number): { link: strin
   return { link: `https://t.me/c/${chatId}/${topicId}` }
 }
 
-/** 标为已读 on one topic: clear it, then re-sum the chat. */
+/**
+ * 标为已读 on one topic: the chat's own read rule (`nextReadState`) over this
+ * topic's rows, then re-sum the chat — a report that stops short of the newest row
+ * leaves the rest unread, exactly like a flat transcript.
+ */
 export function previewTopicMarkRead(
   store: PreviewTopicStore,
   chatId: number,
   topicId: number,
   upToMessageId: number,
 ): void {
-  store.topicsByChat[chatId] = topicsOf(store, chatId).map((topic) =>
-    topic.id === topicId
-      ? { ...topic, unread: 0, lastReadInboxMessageId: upToMessageId }
-      : topic,
+  const topic = topicsOf(store, chatId).find((entry) => entry.id === topicId)
+  if (!topic) return
+  const state = nextReadState(
+    topic,
+    (store.messagesByChat[chatId] ?? []).filter((message) => message.topicId === topicId),
+    upToMessageId,
+  )
+  if (!state) return
+  store.topicsByChat[chatId] = topicsOf(store, chatId).map((entry) =>
+    entry.id === topicId
+      ? { ...entry, unread: state.unread, lastReadInboxMessageId: state.lastReadInboxMessageId }
+      : entry,
   )
   syncChatUnread(store, chatId)
   announce(store, chatId)

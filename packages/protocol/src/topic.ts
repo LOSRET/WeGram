@@ -19,7 +19,9 @@ export const GENERAL_TOPIC_ID = 1
  * The six colours Telegram offers for a topic icon (TDLib's `forumTopicIcon.color`
  * documents exactly these). Kept here so 新建话题 validates what the server accepts.
  */
-export const TOPIC_ICON_COLORS = [0x6fb9f0, 0xffd67e, 0xcb86db, 0x8eee98, 0xff93b2, 0xfb6f5f] as const
+export const TOPIC_ICON_COLORS = [
+  0x6fb9f0, 0xffd67e, 0xcb86db, 0x8eee98, 0xff93b2, 0xfb6f5f,
+] as const
 
 export const chatTopicSchema = z.object({
   /** TDLib `forumTopicInfo.forum_topic_id`; 1 is General (`isGeneral`). */
@@ -40,6 +42,13 @@ export const chatTopicSchema = z.object({
   unread: z.number().int().nonnegative(),
   /** Highest incoming message the server counts as read inside this topic. */
   lastReadInboxMessageId: z.number().int().nonnegative().optional(),
+  /**
+   * Highest outgoing message the members have read inside this topic: the source
+   * of the 已读/未读 receipt on our own rows. A forum keeps this marker per topic
+   * (TDLib `forumTopic.last_read_outbox_message_id`); the chat-level one only
+   * describes the General topic.
+   */
+  lastReadOutboxMessageId: z.number().int().nonnegative().optional(),
   /** Newest message of the topic; absent while it has none (a just-created one). */
   lastMessageId: z.number().int().positive().optional(),
   lastMessageText: z.string().optional(),

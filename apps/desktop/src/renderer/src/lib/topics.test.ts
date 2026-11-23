@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import type { ChatTopic } from '@wegram/protocol'
 
-import { topicBadge, topicSwatch, topicUnreadMarker } from './topics'
+import { topicBadge, topicSwatch, topicUnreadMarker, transcriptReadMarkers } from './topics'
 
 function topic(overrides: Partial<ChatTopic> = {}): ChatTopic {
   return {
@@ -19,7 +19,7 @@ function topic(overrides: Partial<ChatTopic> = {}): ChatTopic {
 }
 
 describe('topicSwatch', () => {
-  it('turns TDLib\'s 0xRRGGBB into a CSS colour', () => {
+  it("turns TDLib's 0xRRGGBB into a CSS colour", () => {
     expect(topicSwatch(0x6fb9f0)).toBe('#6fb9f0')
     expect(topicSwatch(0x000001)).toBe('#000001')
   })
@@ -37,7 +37,7 @@ describe('topicUnreadMarker', () => {
     expect(topicUnreadMarker(null)).toBeNull()
   })
 
-  it('carries the topic\'s own read boundary', () => {
+  it("carries the topic's own read boundary", () => {
     expect(topicUnreadMarker(topic({ unread: 3, lastReadInboxMessageId: 1201 }))).toEqual({
       lastReadInboxMessageId: 1201,
       unread: 3,
@@ -56,5 +56,27 @@ describe('topicBadge', () => {
   it('draws no badge at zero', () => {
     expect(topicBadge(topic())).toBeNull()
     expect(topicBadge(topic({ unread: 4 }))).toBe(4)
+  })
+})
+
+describe('transcriptReadMarkers', () => {
+  it("takes a topic's own pair, so its buoy and receipt match its row", () => {
+    expect(
+      transcriptReadMarkers(topic({ lastReadInboxMessageId: 1220, lastReadOutboxMessageId: 1210 })),
+    ).toEqual({ inboxMessageId: 1220, outboxMessageId: 1210 })
+  })
+
+  it("reads the chat's pair when no topic is open", () => {
+    expect(
+      transcriptReadMarkers({ lastReadInboxMessageId: 1201, lastReadOutboxMessageId: 108 }),
+    ).toEqual({ inboxMessageId: 1201, outboxMessageId: 108 })
+  })
+
+  it('treats absent markers as "nothing read yet"', () => {
+    expect(transcriptReadMarkers(topic())).toEqual({
+      inboxMessageId: null,
+      outboxMessageId: 0,
+    })
+    expect(transcriptReadMarkers(null)).toEqual({ inboxMessageId: null, outboxMessageId: 0 })
   })
 })

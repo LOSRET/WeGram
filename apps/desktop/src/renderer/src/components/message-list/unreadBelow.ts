@@ -1,13 +1,14 @@
 /**
  * What the "N 条新消息" pill should say.
  *
- * The pill, the chat row and the rail badge have to tell the same story, so the
- * count is derived from the source the badges come from: the read marker
- * (`chat.lastReadInboxMessageId`, which our own `messages:read` moves and the
- * server answers). "Still new" means **newer than the marker and still below the
- * viewport** — everything the reader has scrolled past has already moved the
- * marker, and messages the server counts as read (another device, the open-chat
- * snapshot) are not new any more.
+ * The pill, the row and the rail badge have to tell the same story, so the count is
+ * derived from the source the row's badge comes from: the read marker (the chat's
+ * `lastReadInboxMessageId`, or the topic's own inside a forum — see
+ * `lib/topics.ts`), which our own `messages:read` moves and the server answers.
+ * "Still new" means **newer than the marker and still below the viewport** —
+ * everything the reader has scrolled past has already moved the marker, and
+ * messages the server counts as read (another device, the open-chat snapshot) are
+ * not new any more.
  *
  * Deriving it instead of counting arrivals also removes a whole class of bugs:
  * a prepended history page, a burst that arrives while the first page is still
@@ -21,8 +22,8 @@ export interface UnreadMessage {
 /**
  * @param seenIndex Index of the newest message whose row has been on screen, or
  *   -1 before the first measurement. Everything after it is still below the fold.
- * @param readMarker `chat.lastReadInboxMessageId`; null when the server has not
- *   reported one yet (a fresh session), in which case nothing counts as read.
+ * @param readMarker The transcript's incoming read marker; null when the server has
+ *   not reported one yet (a fresh session), in which case nothing counts as read.
  */
 export function countUnreadBelow(
   messages: readonly UnreadMessage[],

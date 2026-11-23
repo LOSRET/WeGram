@@ -1,4 +1,4 @@
-import { filterTopics, orderTopics, pageTopics } from '@wegram/mock-session'
+import { filterTopics, nextReadState, orderTopics, pageTopics } from '@wegram/mock-session'
 import { AppError } from '@wegram/protocol'
 import type { ChatSummary, ChatTopic, TopicIcon, TopicPage } from '@wegram/protocol'
 
@@ -26,7 +26,6 @@ function requireFixture(store: MockTopicStore, chatId: number): Fixture {
 function topicsOf(fixture: Fixture): ChatTopic[] {
   return fixture.topics ?? []
 }
-
 
 /** The chat row's unread is the sum of its topics', like TDLib's chat counter. */
 function syncChatUnread(fixture: Fixture): void {
@@ -90,9 +89,7 @@ export function createMockTopics(store: MockTopicStore) {
       isPinned: false,
       muted: false,
       iconColor: input.iconColor,
-      ...(input.iconEmojiId && input.iconEmojiId !== '0'
-        ? { iconEmojiId: input.iconEmojiId }
-        : {}),
+      ...(input.iconEmojiId && input.iconEmojiId !== '0' ? { iconEmojiId: input.iconEmojiId } : {}),
       unread: 0,
     }
     fixture.topics = [...topics, topic]
@@ -180,13 +177,30 @@ export function createMockTopics(store: MockTopicStore) {
     return topic ? { link: `https://t.me/c/${chatId}/${topic.id}` } : null
   }
 
-  /** 标为已读 (the topic menu's item): clears one topic, re-sums the chat. */
-  const markRead = async (chatId: number, topicId: number, upToMessageId: number): Promise<void> => {
+  /**
+   * 标为已读 (the topic menu's item): one topic's marker and counter, re-summed into
+   * the chat. It runs the chat's own read rule (`nextReadState`) over this topic's
+   * rows, so a report that stops short of the newest row leaves the rest unread
+   * instead of clearing a topic the reader has not finished.
+   */
+  const markRead = async (
+    chatId: number,
+    topicId: number,
+    upToMessageId: number,
+  ): Promise<void> => {
     const fixture = requireFixture(store, chatId)
-    fixture.topics = topicsOf(fixture).map((topic) =>
-      topic.id === topicId
-        ? { ...topic, unread: 0, lastReadInboxMessageId: upToMessageId }
-        : topic,
+    const topic = topicsOf(fixture).find((entry) => entry.id === topicId)
+    if (!topic) return
+    const state = nextReadState(
+      topic,
+      fixture.messages.filter((message) => message.topicId === topicId),
+      upToMessageId,
+    )
+    if (!state) return
+    fixture.topics = topicsOf(fixture).map((entry) =>
+      entry.id === topicId
+        ? { ...entry, unread: state.unread, lastReadInboxMessageId: state.lastReadInboxMessageId }
+        : entry,
     )
     syncChatUnread(fixture)
     announce(store, chatId)

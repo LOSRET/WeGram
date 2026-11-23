@@ -18,6 +18,7 @@ export function mapTopic(raw: TdObject): ChatTopic {
   const color = Number(info.icon?.color ?? 0)
   const emojiId = String(info.icon?.custom_emoji_id ?? '0')
   const lastReadInbox = Number(raw.last_read_inbox_message_id ?? 0)
+  const lastReadOutbox = Number(raw.last_read_outbox_message_id ?? 0)
   const spoilers = lastMessage ? previewSpoilers(lastMessage.content) : []
   return {
     id: Number(info.forum_topic_id ?? 0),
@@ -32,6 +33,7 @@ export function mapTopic(raw: TdObject): ChatTopic {
     ...(emojiId !== '0' && emojiId !== '' ? { iconEmojiId: emojiId } : {}),
     unread: Number(raw.unread_count ?? 0),
     ...(lastReadInbox > 0 ? { lastReadInboxMessageId: lastReadInbox } : {}),
+    ...(lastReadOutbox > 0 ? { lastReadOutboxMessageId: lastReadOutbox } : {}),
     ...(lastMessage ? { lastMessageId: Number(lastMessage.id) } : {}),
     ...(lastMessage ? { lastMessageText: previewContent(lastMessage.content) } : {}),
     ...(spoilers.length > 0 ? { lastMessageSpoilers: spoilers } : {}),

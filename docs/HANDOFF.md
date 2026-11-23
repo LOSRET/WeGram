@@ -1581,6 +1581,15 @@ can never become a forum) — use createNewBasicGroupChat → upgrade → toggle
 repeated group creation trips a 429 (`retry after 243/297`), which the probe now waits out. The
 proxy is mandatory on this machine: `TDLIB_PROXY=http://127.0.0.1:7892`.
 
+**Read state is per topic (2026-11-23):** TDLib's `chat.last_read_inbox/outbox_message_id`
+describe the General topic; each `forumTopic` carries its own pair and
+`updateForumTopic` reports it. The transcript's "N 条新消息" buoy and its 已读/未读
+receipt now take the pair from the topic row (`ChatTopic.lastReadOutboxMessageId` was
+added for the receipt) through `transcriptReadMarkers`; reading a topic used to keep
+counting against the forum's General marker, so a fully read topic still offered
+"N 条新消息" and its own rows stayed on 未读. The mock and browser preview apply the
+same `nextReadState` rule to one topic's rows.
+
 **Measured caveats to keep:** `chat.view_as_topics` (not `chat.is_forum`) is what picks the
 view; General is id 1 and may be hidden/closed so the list can lack it; `getChatPinnedMessage`
 and `pinChatMessage` have no topic parameter (pins stay chat-level); `editForumTopic` cannot

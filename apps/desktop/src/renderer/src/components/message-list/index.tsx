@@ -50,6 +50,15 @@ export interface MessageListProps {
   onSeenUpToChange: (messageId: number | null) => void
   /** What was unread when the chat was opened, for the "以下是新消息" divider. */
   unreadMarker: UnreadMarker | null
+  /**
+   * The LIVE read markers of this transcript — the topic's own pair while a topic
+   * is open, otherwise the chat's (`transcriptReadMarkers`). The buoy and the
+   * 已读/未读 receipt derive from them with the same rules a flat chat uses;
+   * `unreadMarker` above stays the open-time snapshot only the divider reads.
+   */
+  readInboxMessageId: number | null
+  /** Highest outgoing id the members have read (话题: inside that topic). */
+  readOutboxMessageId: number
   onLoadOlder: () => Promise<void>
   /**
    * Keep one older page in hand (see `useChatHistory.prefetchOlder`). The list
@@ -124,6 +133,8 @@ export function MessageList({
   landing,
   located,
   unreadMarker,
+  readInboxMessageId,
+  readOutboxMessageId,
   onSeenUpToChange,
   onLoadOlder,
   onPrefetchOlder,
@@ -252,16 +263,18 @@ export function MessageList({
 
   /**
    * The pill's N is "how many new messages are still below the fold", derived from
-   * the same read marker the chat row and the rail badge come from — not a counter
-   * of arrivals. That is what keeps the three numbers agreeing: our own
-   * `messages:read` moves the marker, the server answers with the new unread count,
-   * and the pill follows. See `components/message-list/unreadBelow.ts`.
+   * the same read marker the row it belongs to comes from — not a counter of
+   * arrivals. That is what keeps the numbers agreeing: our own `messages:read`
+   * moves the marker, the server answers with the new unread count, and the pill
+   * follows. A topic passes its own markers (design doc §9.12), so a read topic
+   * stops counting against the forum's General marker. See
+   * `components/message-list/unreadBelow.ts`.
    */
   const { measureViewport, buoy } = useViewportSeen({
     rows,
     lastMessageIndexOfRow,
     messages,
-    lastReadInboxMessageId: chat.lastReadInboxMessageId ?? null,
+    lastReadInboxMessageId: readInboxMessageId,
     scrollRef,
     contentRef,
     virtualizer,
@@ -342,7 +355,7 @@ export function MessageList({
                   repliedTo={repliedTo}
                   self={self}
                   avatarUrl={senderAvatarUrl(first, chat, self, userAvatars)}
-                  readOutboxMaxId={chat.lastReadOutboxMessageId ?? 0}
+                  readOutboxMaxId={readOutboxMessageId}
                   onOpenMenu={openMenu}
                   onOpenComments={onOpenComments}
                   onResend={onResend}
