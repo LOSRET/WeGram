@@ -226,6 +226,10 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       const wantArchive = store.list === 'archive'
       return chats.filter((chat) => (chat.archived === true) === wantArchive)
     }
+    case 'chats:prefetchAvatars':
+      // The fixtures' rows carry their photos from the start (`ChatRow` reads
+      // `chat.avatarUrl`), so there is nothing to queue in the preview.
+      return undefined
     case 'chats:get': {
       const chat = chats.find((item) => item.id === store.chatId)
       if (!chat) throw { code: 'invalid_payload', message: `找不到会话 ${String(store.chatId)}` }

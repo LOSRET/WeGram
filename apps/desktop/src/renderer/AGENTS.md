@@ -106,7 +106,8 @@ components/Avatar.tsx    the ONE avatar box (photo or initials); the box class i
 components/CustomEmoji.tsx  a Premium custom emoji in text: its sticker art at 20 px,
                         with the base glyph as the fallback
 components/ChatList.tsx  the conversation column: pill (server search panel, §5.9 of
-                        HANDOFF), "+" and the virtualised rows; search results are a
+                        HANDOFF), "+" and the virtualised rows (which also page the list on
+                        approach and ask for the visible rows' photos); search results are a
                         plain face in the same scroller (tabs + message rows). 已归档会话
                         is a PAGE, not a third face: ArchiveEntry (the row above the
                         scroller, with the archive's unread total) mounts
@@ -140,6 +141,15 @@ lib/messageSearch.ts  the search panel's hit/cursor rules (join a page to its ch
                       summaries, dedupe an appended page; pure, unit-tested)
 lib/useMessageSearch.ts  cross-chat message search: one page per scope, cursor paging
                       and load-more for the active tab
+lib/chatPaging.ts     (pure, unit-tested) 会话列表分页's trigger: CHAT_PAGE_SIZE (100) /
+                      CHAT_LOAD_AHEAD (30) and nearListEnd — has the virtual window reached
+                      the loaded end?
+lib/chatAvatars.ts    (pure, unit-tested) 头像按需: the visible rows whose photo nobody asked
+                      for yet
+lib/useChatPaging.ts  会话列表分页: owns loading / done / the server offset and merges each
+                      page through the store (the archive page uses the same hook)
+lib/useChatAvatarPrefetch.ts  头像按需: coalesces the visible window into
+                      chats:prefetchAvatars; the photo comes back as a chats upsert
 lib/self.ts           SelfIdentity + selfIdentity(auth); one placeholder id (1000)
 lib/popupPlacement.ts (pure, unit-tested) "which edge does this card hang from"
 lib/mediaBox.ts       (pure, unit-tested) the reserved media box + percent text

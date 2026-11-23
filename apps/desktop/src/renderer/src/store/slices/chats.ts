@@ -1,4 +1,4 @@
-import { routeChatOps, sortChats } from '../reducers'
+import { mergeChatList, routeChatOps, sortChats } from '../reducers'
 import type { ChatActions, SliceCreator } from '../types'
 
 /**
@@ -17,6 +17,14 @@ export const createChatsSlice: SliceCreator<ChatActions> = (set, get) => ({
   setChats: (chats) => set({ chats: sortChats(chats) }),
 
   setArchivedChats: (chats) => set({ archivedChats: sortChats(chats) }),
+
+  /** 分页 and the resync repair add to a list; see `mergeChatList`. */
+  mergeChats: (list, page) =>
+    set((state) =>
+      list === 'main'
+        ? { chats: mergeChatList(state.chats, page) }
+        : { archivedChats: mergeChatList(state.archivedChats, page) },
+    ),
 
   /** Live chat updates: upsert by id (moving between Main and Archive), delete on a delete op. */
   applyChatOps: (ops) => {

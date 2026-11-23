@@ -23,6 +23,8 @@ import { ARCHIVE_PAGE_ANIM_MS } from '../lib/archivePage'
 import { CHAT_ROW_H, LIST_OVERSCAN } from '../lib/listMetrics'
 import type { MessageHit, SearchScope } from '../lib/messageSearch'
 import { normalizeQuery } from '../lib/search'
+import { useChatAvatarPrefetch } from '../lib/useChatAvatarPrefetch'
+import { useChatPaging } from '../lib/useChatPaging'
 import { useGlobalSearch } from '../lib/useGlobalSearch'
 import { useMessageSearch } from '../lib/useMessageSearch'
 
@@ -158,6 +160,23 @@ export function ChatList({
     getItemKey: (index) => chats[index]?.id ?? index,
   })
 
+  const virtualItems = virtualizer.getVirtualItems()
+  const firstIndex = virtualItems[0]?.index ?? 0
+  const lastIndex = virtualItems[virtualItems.length - 1]?.index ?? -1
+
+  /**
+   * 分页 + 头像按需: the window the reader is looking at decides both. Paging
+   * only applies to the conversation face (`searching` draws the hits instead),
+   * and `-1` disables the avatar pass there for the same reason.
+   */
+  const paging = useChatPaging('main')
+  const ensureLoaded = paging.ensureLoaded
+  useEffect(() => {
+    if (searching) return
+    ensureLoaded(lastIndex, chats.length)
+  }, [searching, lastIndex, chats.length, ensureLoaded])
+  useChatAvatarPrefetch(chats, firstIndex, searching ? -1 : lastIndex)
+
   const openPlus = (event: MouseEvent<HTMLButtonElement>): void => {
     event.stopPropagation()
     const rect = event.currentTarget.getBoundingClientRect()
@@ -270,7 +289,7 @@ export function ChatList({
             <div className="wx-list__empty">还没有会话</div>
           ) : (
             <div className="wx-list__sizer" style={{ height: virtualizer.getTotalSize() }}>
-              {virtualizer.getVirtualItems().map((virtualItem) => {
+              {virtualItems.map((virtualItem) => {
                 const chat = chats[virtualItem.index]
                 if (!chat) return null
                 return (

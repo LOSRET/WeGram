@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from 'react'
 import { OverlayScrollbar } from '../OverlayScrollbar'
 import { ArchiveBar } from './ArchiveBar'
 import { ChatRow } from './ChatRow'
+import { useChatAvatarPrefetch } from '../../lib/useChatAvatarPrefetch'
+import { useChatPaging } from '../../lib/useChatPaging'
 import { CHAT_ROW_H, LIST_OVERSCAN } from '../../lib/listMetrics'
 
 interface ArchivePageProps {
@@ -60,6 +62,19 @@ export function ArchivePage({
     getItemKey: (index) => chats[index]?.id ?? index,
   })
 
+  const virtualItems = virtualizer.getVirtualItems()
+  const firstIndex = virtualItems[0]?.index ?? 0
+  const lastIndex = virtualItems[virtualItems.length - 1]?.index ?? -1
+
+  // The archive is the second TDLib chat list, so it pages and prefetches photos
+  // on exactly the same rules as the conversation list.
+  const paging = useChatPaging('archive')
+  const ensureLoaded = paging.ensureLoaded
+  useEffect(() => {
+    ensureLoaded(lastIndex, chats.length)
+  }, [lastIndex, chats.length, ensureLoaded])
+  useChatAvatarPrefetch(chats, firstIndex, lastIndex)
+
   return (
     <div className={`wx-archive-page${entered && open ? ' is-open' : ''}`}>
       <ArchiveBar count={chats.length} onBack={onBack} />
@@ -69,7 +84,7 @@ export function ArchivePage({
             <div className="wx-list__empty">还没有已归档的会话</div>
           ) : (
             <div className="wx-list__sizer" style={{ height: virtualizer.getTotalSize() }}>
-              {virtualizer.getVirtualItems().map((virtualItem) => {
+              {virtualItems.map((virtualItem) => {
                 const chat = chats[virtualItem.index]
                 if (!chat) return null
                 return (

@@ -23,6 +23,13 @@ const noPayload = z.void()
 
 export const chatInvokeChannels = [
   'chats:list',
+  /**
+   * 头像按需: the rows the conversation list is actually showing. The adapter's
+   * photo pool only prefetches the page it was handed, so a chat that appears
+   * without an upsert (a row paged in as the reader reaches the end) would keep
+   * its initials. The finished photos arrive as ordinary `chats` upsert ops.
+   */
+  'chats:prefetchAvatars',
   'chats:get',
   'chats:open',
   /** Opens (creating if needed) the private chat of a contact card's user. */
@@ -99,6 +106,11 @@ export const chatInvokeSchemas = {
       list: z.enum(['main', 'archive']).optional(),
     }),
     response: z.array(chatSummarySchema),
+  },
+  'chats:prefetchAvatars': {
+    // One screen of rows; a jump can ask for a little more than one window.
+    request: z.object({ chatIds: z.array(z.number().int()).min(1).max(64) }),
+    response: noPayload,
   },
   'chats:get': { request: z.object({ chatId: z.number().int() }), response: chatSummarySchema },
   'chats:open': { request: z.object({ chatId: z.number().int() }), response: noPayload },

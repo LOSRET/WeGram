@@ -39,6 +39,25 @@ export interface ChatLists {
  * Returns the ids that a `remove` op deleted separately: the caller has to drop
  * their transcripts and paging state too.
  */
+/**
+ * Add a page of chats to a list without disturbing what is already there.
+ *
+ * Two callers need this and neither may replace: 分页 appends slices of the
+ * server's list as the reader reaches the end, and the event-gap resync re-reads
+ * the first page to repair what a dropped event left stale. In both cases the
+ * incoming row wins (it is the freshest read) and a row the page does not
+ * mention survives — a replacement would drop every page already loaded.
+ */
+export function mergeChatList(current: ChatSummary[], page: ChatSummary[]): ChatSummary[] {
+  if (page.length === 0) return current
+  const byId = new Map(current.map((chat) => [chat.id, chat]))
+  for (const chat of page) byId.set(chat.id, chat)
+  return sortChats([...byId.values()])
+}
+
+/** The two conversation lists the store keeps (TDLib `chatListMain` / `chatListArchive`). */
+export type ChatListName = 'main' | 'archive'
+
 export function routeChatOps(
   current: ChatLists,
   ops: ChatOp[],

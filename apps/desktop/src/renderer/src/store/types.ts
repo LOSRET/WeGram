@@ -12,6 +12,7 @@ import type {
 } from '@wegram/protocol'
 import type { StateCreator } from 'zustand'
 
+import type { ChatListName } from './reducers'
 import type { UnreadBoundary } from '../lib/unreadBoundary'
 
 export interface EditingState {
@@ -144,6 +145,12 @@ export interface AuthActions {
 export interface ChatActions {
   setChats: (chats: ChatSummary[]) => void
   setArchivedChats: (chats: ChatSummary[]) => void
+  /**
+   * Append a page of chats (分页 as the reader reaches the end) or repair the
+   * loaded rows after an event gap. The page wins on conflict; rows it does not
+   * mention stay, so a loaded page is never dropped by a 100-row refetch.
+   */
+  mergeChats: (list: ChatListName, page: ChatSummary[]) => void
   applyChatOps: (ops: ChatOp[]) => void
   setActiveChat: (chatId: number | null) => void
 }

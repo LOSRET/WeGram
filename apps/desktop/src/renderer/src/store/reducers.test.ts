@@ -6,6 +6,7 @@ import {
   PENDING_OPS_LIMIT,
   appendNewerMessages,
   hasReplayableOps,
+  mergeChatList,
   reduceOps,
   routeChatOps,
   sortChats,
@@ -253,5 +254,42 @@ describe('reduceOps reactions', () => {
     const { list } = reduceOps([withReactions(), message(2)], [op])
     expect(list[0]?.reactions).toEqual([{ emoji: '👍', count: 2, chosen: true }])
     expect(list[1]?.reactions).toEqual([{ emoji: '👍', count: 1 }])
+  })
+})
+
+describe('mergeChatList (分页 + 事件断档修复)', () => {
+  const chat = (id: number, lastMessageAt: number, pinned = false) => ({
+    id,
+    title: `chat ${id}`,
+    kind: 'private' as const,
+    unread: 0,
+    pinned,
+    lastMessageAt,
+  })
+
+  it('appends a page and keeps the order', () => {
+    const current = [chat(2, 200), chat(1, 100)]
+    const merged = mergeChatList(current as never, [chat(3, 300)] as never)
+    expect(merged.map((row) => row.id)).toEqual([3, 2, 1])
+  })
+
+  it('lets the incoming row win without duplicating an id', () => {
+    const current = [chat(1, 100)]
+    const refreshed = { ...chat(1, 400), avatarUrl: 'wx-media://f/a' }
+    const merged = mergeChatList(current as never, [refreshed] as never)
+    expect(merged).toHaveLength(1)
+    expect(merged[0]?.avatarUrl).toBe('wx-media://f/a')
+    expect(merged[0]?.lastMessageAt).toBe(400)
+  })
+
+  it('keeps loaded rows the page does not mention', () => {
+    const current = [chat(5, 500), chat(6, 600)]
+    const merged = mergeChatList(current as never, [chat(6, 600)] as never)
+    expect(merged.map((row) => row.id)).toEqual([6, 5])
+  })
+
+  it('returns the same array for an empty page', () => {
+    const current = [chat(1, 100)] as never
+    expect(mergeChatList(current, [])).toBe(current)
   })
 })

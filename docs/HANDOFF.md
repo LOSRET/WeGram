@@ -74,7 +74,7 @@ pnpm workspace, W1 + W2 + the W3 main body implemented, plus the private-chat P0
 | Area | State |
 |---|---|
 | Shell | WeChat 4.x three-column shell (native 32 px `titleBarOverlay`), rail with four real sections, 通讯录, 收藏/朋友圈 placeholders, overlay scrollbars on both long panes, 设置 as its own window |
-| Chat list | 65 px rows, search pill → global search, chat right-click menu (置顶/免打扰/标为未读/删除聊天), unread dot, 已归档会话 row + archive page |
+| Chat list | virtualised 65 px rows (sizer + overscan 8), **paged on approach** (100-row slices, `mergeChats` by id) and **on-demand row photos** (`chats:prefetchAvatars` for the visible window), search pill → global search, chat right-click menu (置顶/免打扰/标为未读/删除聊天), unread dot, 已归档会话 row + archive page |
 | Transcript | virtualised list, anchored prepend, load-around anchors, day/unread separators, real sender photos, read receipts, typing + presence, reply/edit/delete/forward, polls, comments bar, channel post composition, pinned bar, reaction chips |
 | Media | photo/document send+receive with progress, `wx-media://` Range streaming (including a file TDLib is still downloading), viewer window for photos **and** videos, 表情 panel, 贴纸包盒子, album send, caption edit |
 | Stickers / emoji | WebP `<img>`, TGS → lottie-web (transcript) or one ThorVG canvas (grids), WebM `<video>`, animated-emoji messages (no bubble, one pass, click sound), premium sticker effects, custom emoji entities, Apple emoji as a CBDT colour font |
@@ -933,6 +933,19 @@ are grouped by the layer that owns the rule; the code comments carry the same fa
   every programmatic scroll (measured: 13 rows at y −4842…−2708 before, the real
   2025↔today window at −1098…+394 after), and `stickToNewest()` uses
   `virtualizer.scrollToEnd()` and re-sticks at 150/400 ms.
+- **The chat list pages on approach, and asks for the photos of what it shows.** The
+  conversation rows have been virtualised since 2026-11-18 (`ChatList.tsx`: `CHAT_ROW_H` 65,
+  `LIST_OVERSCAN` 8, sizer + translated slots; `ArchivePage.tsx` the same), so the old
+  "526 rows render at once" note was stale. What was missing was *data*: the shell fetched
+  one 100-row page and stopped, so a chat below it only appeared when TDLib pushed an update
+  (measured on this account: **321 chats**, 100/100/100/21 across offsets with **0 overlap**).
+  The virtual window now asks for the next slice within `CHAT_LOAD_AHEAD` (30) rows of the
+  loaded end and merges it by id; the event-gap resync merges the first page the same way, so
+  a repair no longer drops the pages the reader had loaded. Photos: the adapter's pool only
+  prefetches the page it is handed, and `ChatRow` draws `chat.avatarUrl` alone, so rows paged
+  in would keep their initials — the list now hands the missing ids of the visible window to
+  `chats:prefetchAvatars`, and the finished photos arrive as ordinary `chats` upserts
+  (measured: the 4 ids asked for came back as 4 avatar upserts).
 - **Restoring a reading position needs all three pieces**: (a) the list must not mount before
   the stored anchor is known, or a cached chat captures the bottom as its position; (b)
   `scrollToIndex` is only an estimate with dynamic heights, so the position is corrected
@@ -1489,7 +1502,7 @@ One-off duplication audits merged the real duplicates and left the look-alikes a
 
 | # | Gap | Notes |
 |---|---|---|
-| 1 | Virtualise the chat list | **526 rows** render at once on this account (measured). Smooth today, the next scaling risk; the avatar pool only prefetches what it is handed (100-chat first page + `emitChatUpsert`), so a row scrolled into view without an update keeps its initials |
+| 1 | Search-face virtualisation | The conversation list is virtualised (2026-11-18) and, since 2026-11-23, pages on approach and prefetches the visible window's photos — measured on this account: 321 chats, 100/100/100/21 with no overlap. What is left is the search face: conversation hits and message hits still `.map` their page instead of virtualising it (they are paged, so the count is bounded — mechanical, not urgent) |
 | 2 | Reactions picker | display is done; WeChat has no reactions, so it needs the owner's sign-off (§9.3) |
 | 3 | Settings batches B and C | B: 消息通知 scope, six 隐私 rules + 黑名单, 登录设备, 存储统计/清理, 自动下载, 消息字号, 开机自启. C: 两步验证, 本地锁, 全局快捷键, 检查更新, 保存目录, 贴纸管理, 恢复默认. Each adds panels to the same nav table; prefer per-domain channels over growing `settings:set`. 清理缓存 must invalidate `media/registry.ts` tokens or bubbles keep retrying deleted files |
 | 4 | Private-chat P2 list | translate (`translateText`), scheduled/silent send, shared-media tabs, draft cloud sync, multi-select forward, location/contact/poll sending, message effects, chat background, screenshot, 收藏 → Saved Messages |

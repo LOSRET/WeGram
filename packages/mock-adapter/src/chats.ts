@@ -256,6 +256,7 @@ export function mockInviteLink(chatId: number, temporary = false): ChatInviteLin
  */
 export interface MockChatApi {
   listChats(input: { limit: number; offset: number; list?: 'main' | 'archive' }): Promise<ChatSummary[]>
+  prefetchAvatars(chatIds: number[]): Promise<void>
   getChat(chatId: number): Promise<ChatSummary>
   openChat(chatId: number): Promise<void>
   openPrivateChat(userId: number): Promise<ChatSummary>
@@ -288,6 +289,12 @@ export function createMockChats(
   const pins = new Map<number, ChatPinnedMessage>()
   return {
     listChats: async (input) => listMockChats(store, input),
+    /**
+     * The fixtures' photos are registered when the account is built (see
+     * ./avatars.ts), so every row already carries its URL and there is nothing
+     * to queue; the channel is exercised all the same.
+     */
+    prefetchAvatars: async (_chatIds) => undefined,
     getChat: async (chatId) => getMockChat(store, chatId),
     openChat: async (chatId) => openMockChat(store, chatId),
     openPrivateChat: async (userId) => openMockPrivateChat(store, userId),

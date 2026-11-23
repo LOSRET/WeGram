@@ -136,6 +136,13 @@ export interface TelegramAdapter {
   me(): Promise<Self>
 
   listChats(input: InvokeRequest<'chats:list'>): Promise<ChatSummary[]>
+  /**
+   * Queues the photos of the rows the list is showing. The photo pool skips a
+   * chat it already has (or has proved photoless), and each finished download
+   * arrives as an ordinary `chats` upsert carrying `avatarUrl` — the renderer
+   * never patches a row itself.
+   */
+  prefetchChatAvatars(chatIds: number[]): Promise<void>
   getChat(chatId: number): Promise<ChatSummary>
   openChat(chatId: number): Promise<void>
   /**

@@ -286,6 +286,14 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   }))
 
   readonly listChats = this.chatApi.listChats
+  /**
+   * Photos for the rows the list is showing (`chats:prefetchAvatars`). The pool
+   * owns the queue and the misses, so asking twice costs nothing, and each
+   * finished photo is pushed as a `chats` upsert carrying its URL.
+   */
+  async prefetchChatAvatars(chatIds: number[]): Promise<void> {
+    this.avatars.prefetch(chatIds)
+  }
   readonly getChat = this.chatApi.getChat
   readonly openChat = this.chatApi.openChat
   readonly openPrivateChat = this.chatApi.openPrivateChat

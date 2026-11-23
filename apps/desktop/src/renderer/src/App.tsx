@@ -65,8 +65,13 @@ export function App() {
           invoke('chats:list', { limit: RESYNC_CHAT_LIMIT, offset: 0 }),
           invoke('chats:list', { limit: RESYNC_CHAT_LIMIT, offset: 0, list: 'archive' }),
         ])
-        useAppStore.getState().setChats(chats)
-        useAppStore.getState().setArchivedChats(archivedChats)
+        /**
+         * Merged, not replaced: the repair must fix what the gap left stale
+         * without dropping the pages 分页 had already loaded (a replace with one
+         * 100-row page would also throw the reader's list back to the top).
+         */
+        useAppStore.getState().mergeChats('main', chats)
+        useAppStore.getState().mergeChats('archive', archivedChats)
 
         const activeChatId = useAppStore.getState().activeChatId
         if (activeChatId !== null) {

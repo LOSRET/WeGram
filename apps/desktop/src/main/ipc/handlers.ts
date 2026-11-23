@@ -173,6 +173,7 @@ export function createHandlers({
     'auth:me': () => adapter.me(),
 
     'chats:list': (payload) => adapter.listChats(payload),
+    'chats:prefetchAvatars': (payload) => adapter.prefetchChatAvatars(payload.chatIds),
     'chats:get': (payload) => adapter.getChat(payload.chatId),
     'chats:open': (payload) => adapter.openChat(payload.chatId),
     'chats:openPrivate': (payload) => adapter.openPrivateChat(payload.userId),
