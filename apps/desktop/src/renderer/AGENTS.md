@@ -173,6 +173,8 @@ styles/font.css       the @font-face for the emoji colour font (assets/fonts/
 lib/viewer.ts         which messages become one viewer strip (pure, unit-tested)
 lib/player.ts         video player-bar maths: clocks, seek clamp, progress (pure, unit-tested)
 lib/tgs.ts            gzip guards + Lottie decode cache
+lib/stickerCanvasWindow.ts (pure, unit-tested) a shared sticker canvas's parse and
+                      release bands (two screens parse, three release)
 lib/stickerMedia.ts   Sticker → MessageMedia (shared by the picker and the preview)
 lib/customEmoji.ts    custom emoji ids → sticker art: one batched lookup per frame,
                       cached for the session (chunkIds is pure, tested)
@@ -402,13 +404,29 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   `StickerCanvasLayer` + `@thorvg/webcanvas` (one WebGL scene, one `render()` per
   frame, 30 fps); the cells stay in the DOM for hover/click and their thumbnails are
   hidden only once their animation exists. A TGS cell under the canvas passes
-  `preview` so it never mounts a second lottie. WebM cells are the exception — ThorVG
-  does not decode video — so their `<video>` auto-plays while the cell is inside the
-  panel's scroller (a 0 px `useInView`, whose root is the nearest scroll container,
-  not the window). No looping `StickerRenderer` for TGS in a grid; the transcript is
-  the one place where per-sticker lottie-web is correct (a screenful is a handful of
-  stickers), with `setSubframe(false)` and a `once` animation staying mounted so
-  scrolling back does not replay it.
+  `preview` so it never mounts a second lottie. Parsing is viewport-driven
+  (`lib/stickerCanvasWindow`: two screens each way), two at a time and with a
+  main-thread yield between parses, and parsing waits for the scroll to settle —
+  painting keeps running at 30 fps while scrolling (plus one immediate frame per
+  newly visible cell), because a cell that scrolls into view has no pixels until
+  the shared canvas draws it. Off screen a sticker is only paused; three screens
+  away its scene is released **after
+  its last painted frame is saved into the cell** (desktop's `savedFrame`), so a
+  revisit shows that still image while the animation is parsed again — never a
+  thumbnail flash and never a per-frame rebuild. Closing the panel (or opening
+  another set) unmounts the layer and disposes everything. Parsing the whole pack in
+  one burst and advancing all of it every frame is what made scrolling a pack
+  stutter. The layer downloads through
+  `lib/media`'s leases with **one owner per sticker** (`ensureMedia` holds one
+  file per owner, so a shared owner would cancel the previous transfer): a reopened
+  grid reuses the cached `wx-media://` URLs, and closing the box releases its
+  owners, which cancels a pack nobody is waiting for any more. WebM cells are the
+  exception — ThorVG does not decode video — so their `<video>` auto-plays while
+  the cell is inside the panel's scroller (a 0 px `useInView`, whose root is the
+  nearest scroll container, not the window). No looping `StickerRenderer` for TGS in
+  a grid; the transcript is the one place where per-sticker lottie-web is correct
+  (a screenful is a handful of stickers), with `setSubframe(false)` and a `once`
+  animation staying mounted so scrolling back does not replay it.
 - **The ThorVG wasm is a data: URL on purpose.** `vite-thorvg-wasm.ts` reads the
   installed package's `thorvg.wasm` and emits it behind `virtual:thorvg-wasm`;
   Electron's packaged renderer loads from `file://`, where Emscripten's fetch of a

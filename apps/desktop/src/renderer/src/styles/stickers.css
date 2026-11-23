@@ -165,6 +165,7 @@
 }
 
 .wx-picker__sticker {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -444,6 +445,7 @@
 }
 
 .wx-pack__sticker {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -549,4 +551,18 @@
 
 .wx-sticker-canvas-cell .wx-sticker {
   visibility: hidden;
+}
+
+/* A cell whose animation was released keeps its last painted frame (desktop's
+   `savedFrame`): it fills the cell exactly where the canvas drew it, so coming
+   back to a released sticker shows that still image instead of its thumbnail while
+   the animation is parsed again. See StickerCanvasLayer.tsx and
+   lib/stickerCanvasWindow.ts. */
+.wx-sticker-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
 }
