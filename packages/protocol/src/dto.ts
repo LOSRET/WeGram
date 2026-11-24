@@ -82,6 +82,11 @@ export const messageEntitySchema = z.object({
     'hashtag',
     'spoiler',
     'customEmoji',
+    /**
+     * `/command` (TDLib `textEntityTypeBotCommand`): the word is a command the
+     * chat's bot accepts, so the transcript makes it clickable (§8.3).
+     */
+    'botCommand',
   ]),
   offset: z.number().int().nonnegative(),
   length: z.number().int().positive(),
@@ -184,18 +189,35 @@ export const messageMediaSchema = z.object({
 export type MessageMedia = z.infer<typeof messageMediaSchema>
 
 /**
- * One button under a message or inside a rich page (Telegram's inline keyboard).
- * `url` is set for the kinds that open something; `callback` marks the ones that
- * send data to a bot — this client shows them but does not press them yet.
+ * What pressing an inline button sends back to its bot (TDLib `inlineKeyboardButtonTypeCallback*`).
+ *
+ * `data` is the base64 payload TDLib handed over, posted back verbatim; a game
+ * button carries no payload of its own — the short name of the message's game is
+ * what the callback query names instead.
  */
+export const inlineButtonCallbackSchema = z.discriminatedUnion('type', [
+  /** A general callback button. */
+  z.object({ type: z.literal('data'), data: z.string() }),
+  /** A callback that also asks for this account's 2-step verification password. */
+  z.object({ type: z.literal('password'), data: z.string() }),
+  /** A game button: starts the game attached to the message. */
+  z.object({ type: z.literal('game'), gameShortName: z.string() }),
+])
+export type InlineButtonCallback = z.infer<typeof inlineButtonCallbackSchema>
+
 /** Visual style a bot can put on a button (TDLib buttonStyle*). */
 export const inlineButtonStyleSchema = z.enum(['default', 'primary', 'danger', 'success', 'link'])
 export type InlineButtonStyle = z.infer<typeof inlineButtonStyleSchema>
 
+/**
+ * One button under a message or inside a rich page (Telegram's inline keyboard).
+ * `url` is set for the kinds that open something; `callback` is what a button
+ * posts to its bot (§8.3).
+ */
 export const inlineButtonSchema = z.object({
   text: z.string(),
   url: z.string().optional(),
-  callback: z.boolean().optional(),
+  callback: inlineButtonCallbackSchema.optional(),
   /** Absent for the ordinary grey button; see inlineButtonStyleSchema. */
   style: inlineButtonStyleSchema.optional(),
 })

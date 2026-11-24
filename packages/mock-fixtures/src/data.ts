@@ -563,6 +563,78 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
     ],
   })
 
+  /**
+   * A bot chat: the commands it publishes (the composer's "/" list) and the
+   * inline keyboard under its last message (§8.3). Both fakes serve it, so the
+   * button plumbing and the command list are visible without a Telegram account.
+   */
+  fixtures.set(13, {
+    chat: {
+      id: 13,
+      title: 'WeGram 助手',
+      kind: 'private',
+      userId: 26,
+      unread: 0,
+      pinned: false,
+      muted: false,
+      lastMessageText: '输入 /help 查看全部命令。',
+      lastMessageAt: at(5),
+      lastReadInboxMessageId: 1302,
+      lastReadOutboxMessageId: 0,
+    },
+    bot: {
+      commands: [
+        { command: 'start', description: '重新开始' },
+        { command: 'help', description: '看看我能做什么' },
+        { command: 'settings', description: '设置提醒' },
+      ],
+    },
+    messages: [
+      // An outgoing command: the transcript makes it clickable (botCommand).
+      {
+        id: 1300,
+        chatId: 13,
+        senderId: selfId,
+        senderName: '我',
+        outgoing: true,
+        date: at(60),
+        kind: 'text',
+        text: '/start',
+        entities: [{ type: 'botCommand', offset: 0, length: 6 }],
+      },
+      {
+        id: 1301,
+        chatId: 13,
+        senderId: 26,
+        senderName: 'WeGram 助手',
+        outgoing: false,
+        date: at(30),
+        kind: 'text',
+        text: '你好，我是 WeGram 助手。点下面的按钮试试。',
+      },
+      // The inline keyboard: a callback payload, a URL and an inert copy button.
+      {
+        id: 1302,
+        chatId: 13,
+        senderId: 26,
+        senderName: 'WeGram 助手',
+        outgoing: false,
+        date: at(5),
+        kind: 'text',
+        text: '输入 /help 查看全部命令。',
+        entities: [{ type: 'botCommand', offset: 3, length: 5 }],
+        buttons: [
+          [
+            { text: '设置提醒', callback: { type: 'data', data: 'settings' } },
+            { text: '帮助中心', url: 'https://telegram.org/faq' },
+          ],
+          // A callback the mock answers with `show_alert`: the one-button dialog.
+          [{ text: '弹窗提醒', callback: { type: 'data', data: 'alert' } }, { text: '复制示例' }],
+        ],
+      },
+    ],
+  })
+
   // The 通讯录 people (the address book's private chats) live in ./contacts.ts.
   addContactFixtures(fixtures, { at, text })
 

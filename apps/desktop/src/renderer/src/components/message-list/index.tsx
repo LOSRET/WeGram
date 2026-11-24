@@ -88,6 +88,8 @@ export interface MessageListProps {
   onTranscribe: (message: Message) => void
   /** 贴纸: clicking a sticker opens the box of the pack it belongs to (§8.5). */
   onOpenStickerSet: (setId: string) => void
+  /** A `/command` in a message: sends it to the chat, like the official client. */
+  onBotCommand: (command: string) => void
   /** 置顶消息: the id this chat has pinned, so the menu can say 取消置顶. */
   pinnedMessageId: number | null
   onTogglePin: (message: Message) => void
@@ -150,6 +152,7 @@ export function MessageList({
   onResend,
   onTranscribe,
   onOpenStickerSet,
+  onBotCommand,
   pinnedMessageId,
   onTogglePin,
 }: MessageListProps) {
@@ -360,6 +363,7 @@ export function MessageList({
                   onOpenComments={onOpenComments}
                   onResend={onResend}
                   onOpenStickerSet={onOpenStickerSet}
+                  onBotCommand={onBotCommand}
                 />
               </div>
             )

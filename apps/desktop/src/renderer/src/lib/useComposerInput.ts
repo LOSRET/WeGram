@@ -8,6 +8,12 @@ export interface ComposerKeyHandlers {
   onSend: () => void
   /** Escape, only while the box is editing an existing message. */
   onEscape?: () => void
+  /**
+   * A first look at the key, before the Escape and send rules. The chat composer's
+   * "/" command list takes the arrows, Enter/Tab and Escape here. Return true when
+   * the key was handled, false to let the usual rules run.
+   */
+  onKeyDown?: (event: KeyboardEvent<HTMLTextAreaElement>) => boolean
 }
 
 /**
@@ -34,6 +40,7 @@ export function useComposerInput(handlers: ComposerKeyHandlers) {
         composingRef.current = false
       },
       onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => {
+        if (handlers.onKeyDown?.(event)) return
         if (handlers.onEscape && event.key === 'Escape') {
           event.preventDefault()
           handlers.onEscape()

@@ -8,6 +8,7 @@ export const createUiSlice: SliceCreator<UiActions> = (set) => ({
     set((state) => ({ peerStatusByUser: { ...state.peerStatusByUser, [userId]: status } })),
 
   setToast: (toast) => set({ toast }),
+  setAlert: (alert) => set({ alert }),
   setError: (error) => set({ error }),
 
   noteStickerSetsChanged: () =>

@@ -20,6 +20,8 @@ credentials (development only), plus the real PNG/WebP/TGS/WebM media it generat
 - `edits.ts` — 编辑 / 编辑说明 / delete / 重试 as one `createMockEdits` factory: each
   rewrites one fixture row and announces the op that describes it (a text edit is an
   `edit`, a caption is a `replace`).
+- `bots.ts` — the fixture bot's two endpoints: the commands it publishes (the composer's
+  "/" list) and its canned callback answer (a toast, and an alert for the `alert` payload).
 - `users.ts` — 资料卡 for the fixture people: the card's data, 共同群聊 (from the
   seed's `commonChatIds`), its 备注 / 添加删除联系人 writes and the phased 举报 answer
   (person and one message), kept in an in-session override map (nothing persists).

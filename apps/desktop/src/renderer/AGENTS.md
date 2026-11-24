@@ -34,6 +34,10 @@ components/message-list/  virtualiser + MessageRow + Divider + the scroll hooks:
                          views/time footer; the one-bubble channel composition is
                          styles/channel.css), PremiumStickerEffect (a Premium sticker's
                          second TGS, painted once at 1.49× the sticker and replayed on tap)
+components/AlertDialog.tsx  a bot's alert answer (TDLib `callbackQueryAnswer.show_alert`) as a
+                         one-button sheet; its free text keeps line breaks
+lib/botCommands.ts     (pure, unit-tested) the composer's "/" trigger and the command filter
+lib/useBotCommands.ts  the bot command list, asked lazily once per chat (`bots:commands`)
 components/composer/       ComposerCard: the ONE bordered input card (§8.4 + §9.8) — text,
                          the 表情/收藏/文件/截图/语音 tool row, 发送, the attach menu and the
                          ExpressionPicker. Both composers render it; a caller only says where
@@ -403,6 +407,11 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   asks (`recognizeSpeech` answers `Ok` at once); the pending and final text arrive as
   the voice note's content changing, so the row repaints through a `replace` op and
   the transcript block draws what `Message.transcription` says. Never poll.
+- **机器人按钮要回答问题,命令走发送路径.** `InlineButtons` posts a callback button's payload through
+  `bots:callback`; the bot's answer becomes a toast, an `AlertDialog` (`show_alert`) or an opened
+  URL, and a `password` button refuses with a toast because there is no 2FA prompt to ask with.
+  A `botCommand` entity and the composer's "/" list both send through the existing send path
+  (`messageActions.send` / the composer's own submit) — never a second `messages:send` call site.
 - **表情回应 are displayed, never offered.** `MessageRow` draws the chips from
   `Message.reactions` (`updateMessageReactions` replaces the whole list, so the
   `reactions` op replaces rather than merges); a custom-emoji reaction is its

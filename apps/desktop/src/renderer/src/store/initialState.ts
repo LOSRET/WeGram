@@ -29,6 +29,7 @@ export const DATA_DEFAULTS: AppData = {
   peerStatusByUser: {},
   editing: null,
   toast: null,
+  alert: null,
   error: null,
   mediaUrls: {},
   mediaProgress: {},

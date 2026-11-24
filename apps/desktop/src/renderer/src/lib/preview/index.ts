@@ -19,6 +19,8 @@ import type {
   ViewerItem,
 } from '@wegram/protocol'
 
+import { inlineButtonCallbackSchema } from '@wegram/protocol'
+
 import { handlePreviewComments } from './comments'
 import { handlePreviewMedia } from './media'
 import { openPreviewViewer, previewViewerState, previewViewerUnsupported } from './viewer'
@@ -76,6 +78,7 @@ import {
   messagesByChat,
   msg,
   now,
+  previewBotCommands,
   previewCommonChatsFor,
   previewChangeStickerSet,
   previewCustomEmoji,
@@ -443,6 +446,18 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'messages:typing':
       // The preview has no peer to show an indicator.
       return undefined
+    /** Bots: the "/" command list and a pressed inline button. */
+    case 'bots:commands':
+      return previewBotCommands(Number(store.chatId))
+    case 'bots:callback': {
+      // Mirrors the mock adapter's two answers: a toast, and an alert dialog. The
+      // payload is parsed, not cast: the preview stands in for the IPC boundary.
+      const callback = inlineButtonCallbackSchema.safeParse(store.callback)
+      if (callback.success && callback.data.type === 'data' && callback.data.data === 'alert') {
+        return { text: '这是一个模拟的机器人弹窗。\n第二行说明换行也会保留。', showAlert: true }
+      }
+      return { text: '机器人收到了这次点击（模拟）' }
+    }
     case 'messages:resend': {
       // Clear the failure on the fixture row, like `resendMessages` on the mock.
       const ids = (store.messageIds as number[]) ?? []

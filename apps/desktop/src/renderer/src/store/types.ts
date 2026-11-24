@@ -121,6 +121,11 @@ export interface AppData {
   peerStatusByUser: Record<number, PeerStatus>
   editing: EditingState | null
   toast: string | null
+  /**
+   * A bot's alert answer (`callbackQueryAnswer.show_alert`): a message the bot
+   * wants shown as a dialog rather than a toast, because a toast is easy to miss.
+   */
+  alert: string | null
   error: string | null
   /** fileId → wx-media:// URL, filled by downloads and by `evt:file`. */
   mediaUrls: Record<number, string>
@@ -246,6 +251,8 @@ export interface UiActions {
   setTyping: (chatId: number, active: boolean) => void
   setPeerStatus: (userId: number, status: PeerStatus) => void
   setToast: (message: string | null) => void
+  /** A bot's alert answer; drawn as a one-button dialog, dismissed by 确定. */
+  setAlert: (message: string | null) => void
   setError: (message: string | null) => void
   noteStickerSetsChanged: () => void
 }

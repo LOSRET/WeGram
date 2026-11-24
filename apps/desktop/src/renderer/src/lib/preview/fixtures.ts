@@ -185,6 +185,21 @@ for (const seed of seeds.values()) {
  * account. The mock adapter reads the same `commonChatIds`, so the two fakes
  * cannot disagree about a card.
  */
+/**
+ * The commands the chat's fixture bot publishes, for the composer's "/" list.
+ * The mock adapter reads the same seed, so the two fakes cannot disagree.
+ */
+export function previewBotCommands(chatId: number): {
+  isBot: boolean
+  commands: Array<{ command: string; description: string }>
+} {
+  for (const seed of seeds.values()) {
+    if (seed.chat.id !== chatId) continue
+    return seed.bot ? { isBot: true, commands: seed.bot.commands } : { isBot: false, commands: [] }
+  }
+  return { isBot: false, commands: [] }
+}
+
 export function previewCommonChatsFor(userId: number): ChatSummary[] {
   for (const seed of seeds.values()) {
     if (seed.chat.userId !== userId) continue
@@ -196,11 +211,13 @@ export function previewCommonChatsFor(userId: number): ChatSummary[] {
   return []
 }
 
-/** The address book: every private seed that is a person, not Saved Messages. */
+/** The address book: every private seed that is a person, not Saved Messages or a bot. */
 export const contacts: Contact[] = [...seeds.values()]
   .flatMap((seed) => {
     const userId = seed.chat.userId
     if (seed.chat.kind !== 'private' || userId === undefined || userId === ME.id) return []
+    // A bot is not an address-book contact (TDLib's getContacts agrees).
+    if (seed.bot) return []
     return [
       {
         userId,

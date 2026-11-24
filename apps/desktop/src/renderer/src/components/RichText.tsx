@@ -16,6 +16,11 @@ interface RichTextProps {
    * over the conversation one of its titles just opened.
    */
   onMention?: (target: MentionTarget) => void
+  /**
+   * A `/command` in the text. Absent where a command cannot be run (a caption
+   * drawn outside the transcript), which leaves the word highlighted but inert.
+   */
+  onBotCommand?: (command: string) => void
 }
 
 /**
@@ -23,13 +28,13 @@ interface RichTextProps {
  * `segmentText` turns them into pieces that know every entity covering them, and
  * each piece is wrapped inside-out in a fixed order so nesting is stable.
  */
-export function RichText({ text, entities, onMention }: RichTextProps) {
+export function RichText({ text, entities, onMention, onBotCommand }: RichTextProps) {
   const segments = segmentText(text, entities)
   return (
     <>
       {segments.map((segment, index) => (
         <Fragment key={index}>
-          {wrapSegment(text, segment.text, segment.entities, onMention)}
+          {wrapSegment(text, segment.text, segment.entities, onMention, onBotCommand)}
         </Fragment>
       ))}
     </>
@@ -48,6 +53,7 @@ const WRAP_ORDER: Array<MessageEntity['type']> = [
   'spoiler',
   'mention',
   'mentionName',
+  'botCommand',
   'hashtag',
   'url',
   'textUrl',
@@ -58,12 +64,13 @@ function wrapSegment(
   text: string,
   entities: EntityAttributes[],
   onMention: ((target: MentionTarget) => void) | undefined,
+  onBotCommand: ((command: string) => void) | undefined,
 ): ReactNode {
   let node: ReactNode = text
   const ordered = [...entities].sort(
     (a, b) => WRAP_ORDER.indexOf(a.type) - WRAP_ORDER.indexOf(b.type),
   )
-  for (const entity of ordered) node = wrap(entity, node, fullText, onMention)
+  for (const entity of ordered) node = wrap(entity, node, fullText, onMention, onBotCommand)
   return node
 }
 
@@ -72,6 +79,7 @@ function wrap(
   children: ReactNode,
   fullText: string,
   onMention: ((target: MentionTarget) => void) | undefined,
+  onBotCommand: ((command: string) => void) | undefined,
 ): ReactNode {
   switch (entity.type) {
     case 'bold':
@@ -119,6 +127,32 @@ function wrap(
           }}
           onKeyDown={(event) => {
             if (event.key === 'Enter' || event.key === ' ') open(target)
+          }}
+        >
+          {children}
+        </span>
+      )
+    }
+    case 'botCommand': {
+      // The entity's own range carries the command (`/start`), so a bold word
+      // inside it cannot shorten what gets sent.
+      const command = fullText.slice(entity.offset, entity.offset + entity.length)
+      if (!onBotCommand || !command.startsWith('/')) {
+        return <span className="wx-entity-bot-command">{children}</span>
+      }
+      return (
+        <span
+          className="wx-entity-bot-command wx-entity-bot-command--link"
+          role="button"
+          tabIndex={0}
+          onClick={(event) => {
+            // A command can sit inside a link entity's words; cancel that too.
+            event.preventDefault()
+            event.stopPropagation()
+            onBotCommand(command)
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') onBotCommand(command)
           }}
         >
           {children}

@@ -47,6 +47,14 @@ export interface FixtureSeed {
    */
   commonChatIds?: number[]
   /**
+   * A bot chat (private only): the commands the bot publishes, which the
+   * composer's "/" list draws. A bot is not an address-book contact, so the
+   * 通讯录 skips a seed carrying this — exactly like TDLib's `getContacts`.
+   */
+  bot?: {
+    commands: Array<{ command: string; description: string }>
+  }
+  /**
    * Comment threads by message id (design doc §9.8). TDLib keeps them in the
    * message thread — a channel's linked discussion group — not in the transcript.
    */

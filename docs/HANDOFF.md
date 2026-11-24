@@ -86,6 +86,7 @@ pnpm workspace, W1 + W2 + the W3 main body implemented, plus the private-chat P0
 | Channels | 服务号 bottom card, 加入/申请加入 for an unjoined channel, keyboard switch for admins |
 | Settings | batch A (账号与安全 / 通用 / 网络与代理 / 关于) + batch B's first group 消息通知 (桌面通知 + 私聊/群聊/频道的 免打扰 / 提示音 / 预览); the rest of B and C pending (§9) |
 | Private chat P0/P1 | send failure + 重试, outgoing typing, online/last-seen, delete chat / mark unread, notifications + tray, voice notes (recorded in-renderer, OGG/Opus muxed in-repo), albums, pinned bar, speech-to-text, reactions (display only), block/report, profile card with 备注 + 共同群聊, caption edit, add/remove contact |
+| 机器人 | inline-keyboard callbacks end to end (`bots:callback` → `getCallbackQueryAnswer`; answer as toast / alert dialog / URL), the composer's `/` command list (`bots:commands`, lazily asked) and clickable `botCommand` entities that send the command; a fixture bot chat serves both in the mock/preview |
 | Proxy | 跟随系统代理 by default, `proxy:refresh` / `evt:proxy`, probe + 30 s retry, DPAPI-sealed secrets |
 | Packaging | `.github/workflows/release.yml`: version bump on `main` → NSIS installer → GitHub Release (proven by v0.1.0–v0.1.2); the installer has never been installed or signed |
 
@@ -99,6 +100,7 @@ pnpm workspace, W1 + W2 + the W3 main body implemented, plus the private-chat P0
 | The read path against real TDLib | `pnpm tdlib:smoke` (read-only) + real-account Electron sessions |
 | **Writes** to Telegram | the §9.1 matrix now runs on the test DCs: `pnpm tdlib:test-dc` (text / edit / photo / voice / delete) and `pnpm tdlib:test-dc:writes` (album, caption edit, pin, 标为未读, 备注, 联系人, 拉黑, 举报, 转文字, 删除聊天) — last run 9 pass / 3 partial / 1 skip / 0 fail. The partials and the skip are named in §9.1 |
 | The QR login with a real phone | **not yet** — mapping, encoding and fallback are mock-verified only |
+| 机器人 commands + callbacks against real TDLib | `pnpm tdlib:test-dc:bot` (test DCs): BotFather's 27 commands map through `bot_info.commands`, and pressing the `/mybots` inline button answers a callback query (empty answer, no 502) — run 2026-11-24 |
 | Windows toasts, tray icon | **not yet** on this machine (no Start-Menu shortcut; `Shell_NotifyIcon` refused in the agent session) |
 | The installer, code signing, auto-update, sandboxed launch on a clean machine | **not yet** (v0.1.0 artifact predates the inlined credentials, so it still boots the mock) |
 | Settings batch A against a real account | **not yet** — mock only |
@@ -163,6 +165,7 @@ pnpm web                                                  # renderer preview :51
 pnpm tdlib:smoke                                          # headless real-TDLib read check
 pnpm tdlib:test-dc                                        # write checks on Telegram's test DCs
 pnpm tdlib:test-dc:writes                                 # the §9.1 write matrix (album/pin/note/contacts/…)
+pnpm tdlib:test-dc:bot                                    # 机器人: BotFather's commands + a real callback query
 pnpm ui:db-check                                          # headless ui.db check (node:sqlite)
 pwsh scripts\launch-detached.ps1 -NoSandbox -Mock         # mock adapter in the real shell
 pwsh scripts\launch-detached.ps1 -NoSandbox -Mock -RemoteDebugPort 9224   # + CDP
@@ -271,7 +274,7 @@ handler in the preview, and anything touching `ui.db` needs `pnpm ui:db-check`.
 packages/protocol/src/        dto.ts (message + ops zod schemas), channels.ts + the domain
                              tables it spreads (chats.ts, qr.ts, send.ts, presence.ts,
                              network.ts, settings.ts, voice.ts, poll.ts, comment.ts,
-                             search.ts, user.ts, reaction.ts, stickers.ts, chat.ts,
+                             search.ts, user.ts, bot.ts, reaction.ts, stickers.ts, chat.ts,
                              contact.ts), events.ts, errors.ts, index.ts
 packages/adapter-contract/src/  the seam: TelegramAdapter + AdapterEvent/Emitter
 packages/mock-adapter/src/      the fake adapter + generated fixture media
@@ -1342,7 +1345,7 @@ point.
 
 1. **Protocol first** — `packages/protocol/src/channels.ts` (channel + zod request/response)
    or the domain module it spreads (`chats.ts`, `send.ts`, `poll.ts`, `comment.ts`,
-   `search.ts`, `user.ts`, `voice.ts`, `reaction.ts`). New `Message` fields go in `dto.ts`;
+   `search.ts`, `user.ts`, `voice.ts`, `bot.ts`, `reaction.ts`). New `Message` fields go in `dto.ts`;
    when a module starts carrying a second concern, split it instead.
 2. **Adapter seam** — `packages/adapter-contract/src/adapter.ts`: the method and any event;
    both adapters implement it in the same batch.
@@ -1411,9 +1414,9 @@ document are updated in the same batch.
 | `telegram/mock.ts` (1122) | `packages/mock-adapter` (16 files) + `main/telegram/mock/{transcript,effects}` |
 | `lib/preview-bridge.ts` (775) | `lib/preview/` (`index`, `fixtures`, `sends`, `messages`, `chats`) behind a two-line entry point so the dev-only import stays visible |
 | `styles/index.css` (3206) | 14 files under `styles/`, imported in source order (`tokens` first). The compiled CSS came out byte-identical (same hash, 60.32 kB) — that is the check to repeat after any order edit |
-| `protocol/dto.ts` / `channels.ts` at cap | per-domain modules: `settings.ts`, `viewer.ts`, `chats.ts`, `chat.ts`, `comment.ts`, `stickers.ts`, `poll.ts`, `voice.ts`, `user.ts`, `reaction.ts`, `events.ts`, `message-ops.ts`. `index.ts` still exports every type, so no consumer import changed |
+| `protocol/dto.ts` / `channels.ts` at cap | per-domain modules: `settings.ts`, `viewer.ts`, `chats.ts`, `chat.ts`, `comment.ts`, `stickers.ts`, `poll.ts`, `voice.ts`, `user.ts`, `bot.ts`, `reaction.ts`, `events.ts`, `message-ops.ts`. `index.ts` still exports every type, so no consumer import changed |
 | `mock-fixtures/data.ts` at cap | `seed.ts` (types) + `stress.ts` (the 5000-message chat) |
-| `tdlib/index.ts` at cap | `chat-api.ts` / `send-api.ts` / `user-api.ts`: `createXxxApi` returns a domain's seam methods as one object the class binds as fields, lazily reading `actionDeps` |
+| `tdlib/index.ts` at cap | `chat-api.ts` / `send-api.ts` / `user-api.ts` / `bot-api.ts`: `createXxxApi` returns a domain's seam methods as one object the class binds as fields, lazily reading `actionDeps` |
 | `MediaBubble.tsx` at cap | `VoiceBubble.tsx` (voice geometry shares nothing with photo/video/file) |
 
 ### 8.3 Invariants the split (and the code) must keep
@@ -1544,6 +1547,7 @@ One-off duplication audits merged the real duplicates and left the look-alikes a
 | 12 | Preload size | 187 kB because it imports the protocol index (zod); splitting a channels-only entry point would fix it |
 | 13 | Popovers | modals, the forward list and the sticker grid still use native thin scrollbars; converting to `<OverlayScrollbar>` is mechanical |
 | 14 | `tdlib:smoke` coverage | it checks only the first channel for `messageSenderChat`; anonymous-admin groups have no fixture |
+| 15 | 机器人 breadth | done 2026-11-24: callback buttons, the `/` command list and clickable `botCommand`. Still open: a bot's profile page (`botInfo.description` / commands / menu button), inline bots (`@bot query`), the custom reply keyboard (`replyMarkupShowKeyboard` / `forceReply`), WebApp buttons (小程序 is a stated non-goal), adding a bot to a group (no `addChatMembers` anywhere) and the guard bot when joining (kept as a readable error) |
 
 ### 9.3 Open product decisions
 
@@ -1753,6 +1757,17 @@ acceptCall call_id:int32 protocol:callProtocol = Ok;
 discardCall call_id:int32 is_disconnected:Bool invite_link:string duration:int32 is_video:Bool connection_id:int64 = Ok;
 updateNewCallSignalingData call_id:int32 data:bytes = Update;
 createNewSecretChat user_id:int53 = Chat;
+
+getCallbackQueryAnswer chat_id:int53 message_id:int53 payload:CallbackQueryPayload = CallbackQueryAnswer;
+callbackQueryPayloadData data:bytes = CallbackQueryPayload;
+callbackQueryPayloadDataWithPassword password:string data:bytes = CallbackQueryPayload;
+callbackQueryPayloadGame game_short_name:string = CallbackQueryPayload;
+callbackQueryAnswer text:string show_alert:Bool url:string = CallbackQueryAnswer;
+inlineKeyboardButtonTypeCallback data:bytes = InlineKeyboardButtonType;
+inlineKeyboardButtonTypeCallbackWithPassword data:bytes = InlineKeyboardButtonType;
+inlineKeyboardButtonTypeCallbackGame = InlineKeyboardButtonType;
+botCommand command:string description:string is_ephemeral:Bool = BotCommand;  // userFullInfo.bot_info.commands
+textEntityTypeBotCommand = TextEntityType;
 ```
 
 If a line here disagrees with `.cache/td_api.tl`, the scheme wins.
@@ -1861,6 +1876,26 @@ claim is. Nothing here replaces §1 (state) or §9 (gaps).
   changes in place), and 消息通知 / 网络与代理 no longer paint a switch before their read
   answers (a switch is not drawn with a value the panel has not seen).
 - `pnpm verify` green. Not in the v0.2.4 installer (that build predates the fix).
+
+**2026-11-24 — 机器人:回调按钮与命令**
+- `bots:callback` → TDLib `getCallbackQueryAnswer` for `callback` / `callbackWithPassword` /
+  `callbackGame` buttons (a game button carries no name; the message's `messageGame` supplies it).
+  The answer is drawn as a toast, a one-button `AlertDialog` (`show_alert`, line breaks kept) or
+  an opened URL. Password-flavoured buttons refuse with a Chinese toast — this client has no 2FA
+  prompt yet.
+- `bots:commands` → `userFullInfo.bot_info.commands`, asked lazily the first time the box starts
+  a `/` command. `lib/botCommands.ts` owns the trigger/filter (unit-tested), `useBotCommands`
+  caches per chat, and `useComposerInput` gained an `onKeyDown` interceptor so the list's arrows
+  and Enter/Tab never send the half-typed command. Picking inserts `/command ` and keeps the caret.
+- `textEntityTypeBotCommand` maps to a `botCommand` entity; the transcript colours it like a link
+  and a click sends the command through `messageActions.send`. Rows without a send path (the
+  comment panel) keep the colour but do not react.
+- Fixtures: chat 13 `WeGram 助手` carries three commands and an inline keyboard (a callback, a URL
+  and an inert copy button), so both features are visible in the mock adapter and the browser
+  preview; the callback's `alert` payload demos the dialog.
+- Verified with real TDLib on the test DC: `pnpm tdlib:test-dc:bot` maps BotFather's 27
+  commands and presses a real `/mybots` callback button (empty answer, no 502). `pnpm verify`
+  green.
 
 
 

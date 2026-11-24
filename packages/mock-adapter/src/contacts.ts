@@ -15,6 +15,8 @@ export function listMockContacts(fixtures: Map<number, Fixture>): Contact[] {
   for (const fixture of fixtures.values()) {
     const { chat, contact } = fixture
     if (chat.kind !== 'private' || chat.userId === undefined || chat.userId === ME.id) continue
+    // A bot is not an address-book contact (TDLib's getContacts agrees).
+    if (fixture.bot) continue
     contacts.push({
       userId: chat.userId,
       title: chat.title,

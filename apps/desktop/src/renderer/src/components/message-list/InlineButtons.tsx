@@ -1,27 +1,65 @@
-import type { InlineButton } from '@wegram/protocol'
+import type { CallbackAnswer, InlineButton } from '@wegram/protocol'
+import { useState } from 'react'
 
+import { errorMessage, invoke } from '../../lib/ipc'
+import { openTelegramLink } from '../../lib/openTelegramLink'
+import { telegramLinkTarget } from '../../lib/telegramLink'
 import { useAppStore } from '../../store/useAppStore'
 import { safeHref } from '../RichText'
 import { TelegramLink } from '../TelegramLink'
 
 interface InlineButtonsProps {
   rows: InlineButton[][]
+  /** The chat and message the keyboard hangs off: where a press posts to. */
+  chatId: number
+  messageId: number
 }
 
 /**
  * Telegram's inline keyboard under a message bubble.
  *
  * URL buttons are plain links, so the shell's existing `setWindowOpenHandler`
- * (windows.ts) sends them to the OS and the renderer never navigates. The other
- * kinds are drawn but say what they cannot do instead of pretending to work:
- * pressing a callback button posts data to a bot, which this client does not do.
+ * (windows.ts) sends them to the OS and the renderer never navigates. A callback
+ * button posts its payload back to the bot (`bots:callback`) and the bot's answer
+ * is drawn — a toast, an alert dialog, or a URL to open. Anything else stays
+ * inert and says so instead of pretending to work.
  */
-export function InlineButtons({ rows }: InlineButtonsProps) {
+export function InlineButtons({ rows, chatId, messageId }: InlineButtonsProps) {
+  /** `row:index` of the button whose callback is in flight: one press at a time. */
+  const [pressing, setPressing] = useState<string | null>(null)
+
+  const press = (button: InlineButton, key: string): void => {
+    const callback = button.callback
+    if (!callback) {
+      useAppStore.getState().setToast('这类按钮暂未支持')
+      return
+    }
+    if (callback.type === 'password') {
+      // TDLib's `callbackQueryPayloadDataWithPassword` wants the account's
+      // 2-step password, and this client has no prompt for it yet.
+      useAppStore.getState().setToast('需要两步验证密码的按钮暂未支持')
+      return
+    }
+    if (pressing) return
+    setPressing(key)
+    void (async () => {
+      try {
+        const answer = await invoke('bots:callback', { chatId, messageId, callback })
+        showAnswer(answer)
+      } catch (error) {
+        useAppStore.getState().setError(errorMessage(error))
+      } finally {
+        setPressing(null)
+      }
+    })()
+  }
+
   return (
     <div className="wx-inline-buttons">
       {rows.map((row, rowIndex) => (
         <div className="wx-inline-buttons__row" key={rowIndex}>
           {row.map((button, index) => {
+            const key = `${rowIndex}:${index}`
             const href = safeHref(button.url)
             // The bot's own style (primary / danger / success / link); the
             // ordinary grey button — no style, or an explicit `default` — gets
@@ -37,9 +75,13 @@ export function InlineButtons({ rows }: InlineButtonsProps) {
             ) : (
               <button
                 type="button"
-                className={'wx-inline-button' + tint + ' wx-inline-button--inert'}
+                className={
+                  'wx-inline-button' + tint + (button.callback ? '' : ' wx-inline-button--inert')
+                }
                 key={index}
-                onClick={() => explain(button)}
+                disabled={pressing === key}
+                aria-busy={pressing === key}
+                onClick={() => press(button, key)}
               >
                 {button.text}
               </button>
@@ -51,6 +93,20 @@ export function InlineButtons({ rows }: InlineButtonsProps) {
   )
 }
 
-function explain(button: InlineButton): void {
-  useAppStore.getState().setToast(button.callback ? '机器人按钮的回调暂未支持' : '这类按钮暂未支持')
+/**
+ * Draws what the bot answered. TDLib's answer carries three independent things:
+ * a URL to open, a text, and whether that text is an alert instead of a toast.
+ */
+function showAnswer(answer: CallbackAnswer): void {
+  if (answer.url) {
+    // A t.me link still opens inside the app; anything else follows the shell's
+    // usual external-link policy (the anchor's `target="_blank"` route).
+    const target = telegramLinkTarget(answer.url)
+    if (target) openTelegramLink(target)
+    else window.open(answer.url, '_blank', 'noopener')
+  }
+  if (!answer.text) return
+  const store = useAppStore.getState()
+  if (answer.showAlert) store.setAlert(answer.text)
+  else store.setToast(answer.text)
 }

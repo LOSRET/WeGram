@@ -23,6 +23,7 @@ moved out of `channels.ts` at its budget), `message-ops.ts` (the `MessageOp` pat
 duration + reply, and its send channel), `presence.ts` (peer status, the active-chat
 report) and `user.ts` (the 资料卡 DTO + its 备注 / 共同群聊 / 添加联系人 channels),
 `report.ts` (the phased 举报 contract for a person and for one message),
+`bot.ts` (机器人: the command list + a callback button's answer and its two channels),
 `reaction.ts` (the 表情回应 chip DTO, display-only for now) and `properties.ts` (the
 per-message capability answer the context menu reads). The channel tables of `chats.ts`, `qr.ts`, `send.ts`, `presence.ts` and
 `network.ts` are spread into the two command tables; `events.ts` owns its own.

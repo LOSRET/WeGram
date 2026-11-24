@@ -36,6 +36,7 @@ import { mapUser } from './map/user'
 import { setProxy as applyProxyConfig, testProxy as testProxyConfig } from './proxy'
 import type { ProxyDeps } from './proxy'
 import * as stickers from './stickers'
+import { createBotApi } from './bot-api'
 import { createChatApi } from './chat-api'
 import { createSendApi } from './send-api'
 import { createTopicApi } from './topic-api'
@@ -430,6 +431,11 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   readonly setUserBlocked = this.userApi.setUserBlocked
   readonly reportUser = this.userApi.reportUser
   readonly reportMessage = this.userApi.reportMessage
+
+  /** Bots: the command list and inline-button callbacks; `bot-api.ts`. */
+  private readonly botApi = createBotApi(() => this.actionDeps)
+  readonly botCommands = this.botApi.botCommands
+  readonly pressCallback = this.botApi.pressCallback
 
   async searchGlobal(input: { q: string; limit: number }): Promise<ChatSummary[]> {
     return actions.searchGlobal(this.actionDeps, input)

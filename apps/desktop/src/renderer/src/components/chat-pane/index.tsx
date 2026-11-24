@@ -526,6 +526,13 @@ export function ChatPane() {
           onCopy={actions.copy}
           onOpenComments={openComments}
           onOpenStickerSet={setStickerSetId}
+          /**
+           * A `/command` in the transcript runs it: the same send path a typed
+           * message takes, so an anchored window returns to the newest page first.
+           */
+          onBotCommand={(command) => {
+            void actions.send(command, undefined)
+          }}
           onResend={(message) => {
             void actions.resend(message)
           }}

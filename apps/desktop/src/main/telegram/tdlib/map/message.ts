@@ -49,7 +49,13 @@ export async function mapMessage(
   const content = await resolveContent(ctx, chatId, raw)
   const mapped = mapContent(content)
   const sending = mapSendingState(raw.sending_state)
-  const buttons = mapReplyMarkup(raw.reply_markup)
+  // A callback-game button carries no name of its own: the game attached to the
+  // message is what the callback query names, so it is read from the content.
+  const gameShortName =
+    content._ === 'messageGame' && typeof content.game?.short_name === 'string'
+      ? content.game.short_name
+      : undefined
+  const buttons = mapReplyMarkup(raw.reply_markup, gameShortName)
   const albumId = albumIdOf(raw)
   const topicId = topicIdOf(raw)
   const interaction = mapInteraction(raw)

@@ -41,7 +41,7 @@ function Block({ block, chatId, messageId }: BlockProps) {
     case 'divider':
       return <hr className="wx-rich__divider" />
     case 'buttons':
-      return <InlineButtons rows={block.rows} />
+      return <InlineButtons rows={block.rows} chatId={chatId} messageId={messageId} />
     case 'list':
       return <ListBlock items={block.items} chatId={chatId} messageId={messageId} />
     case 'table':

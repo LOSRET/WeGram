@@ -68,6 +68,12 @@ export interface MessageRowProps {
    * like `onResend`: a row drawn outside the chat pane has no box to open.
    */
   onOpenStickerSet?: (setId: string) => void
+  /**
+   * A `/command` in the text: clicking sends it to the chat, the way the official
+   * client runs a bot command. Optional like `onResend`: the comment panel draws
+   * rows from its own thread and has no send path of its own.
+   */
+  onBotCommand?: (command: string) => void
 }
 
 /**
@@ -109,6 +115,7 @@ export const MessageRow = memo(
     onOpenComments,
     onResend,
     onOpenStickerSet,
+    onBotCommand,
   }: MessageRowProps) {
     /**
      * A premium sticker's effect plays once; a tap on the sticker replays it, so
@@ -305,7 +312,7 @@ export const MessageRow = memo(
             // Emoji-only message: no bubble, large glyph, like WeChat big emoji.
             <>
               <div className="wx-big-emoji" onContextMenu={openMenu}>
-                <RichText text={first.text} entities={first.entities} />
+                <RichText text={first.text} entities={first.entities} onBotCommand={onBotCommand} />
               </div>
               {channelMeta(true)}
             </>
@@ -345,7 +352,11 @@ export const MessageRow = memo(
               ) : null}
               {caption ? (
                 <div className={mediaKind || album ? 'wx-caption' : undefined}>
-                  <RichText text={caption.text} entities={caption.entities} />
+                  <RichText
+                    text={caption.text}
+                    entities={caption.entities}
+                    onBotCommand={onBotCommand}
+                  />
                 </div>
               ) : null}
               {channelMeta()}
@@ -385,7 +396,7 @@ export const MessageRow = memo(
           {/* Telegram's inline keyboard is attached to the message, not to its
               bubble: under it, on the transcript's own background, so the buttons
               read as their own control strip instead of part of the body. */}
-          {buttons ? <InlineButtons rows={buttons} /> : null}
+          {buttons ? <InlineButtons rows={buttons} chatId={chat.id} messageId={first.id} /> : null}
           {/* 未发送: always visible, unlike the hover meta — a failed message that
               looks delivered is the one bug this row exists to prevent. */}
           {last.sendingState === 'failed' && onResend ? (

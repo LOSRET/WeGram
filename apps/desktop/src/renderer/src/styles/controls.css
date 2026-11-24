@@ -265,6 +265,13 @@
   color: var(--wx-text-secondary);
 }
 
+/* A bot's alert answer: free text, so its line breaks and long words must not
+   be lost (the bot wrote them, not the layout). */
+.wx-dialog__body--alert {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .wx-dialog__actions {
   display: flex;
   margin: 18px -20px 0;

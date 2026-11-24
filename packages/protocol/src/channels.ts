@@ -10,6 +10,7 @@ import { voiceInvokeChannels, voiceInvokeSchemas } from './voice'
 import { presenceInvokeChannels, presenceInvokeSchemas } from './presence'
 import { userInvokeChannels, userInvokeSchemas } from './user'
 import { reportInvokeChannels, reportInvokeSchemas } from './report'
+import { botInvokeChannels, botInvokeSchemas } from './bot'
 import { chatInvokeChannels, chatInvokeSchemas } from './chats'
 import { qrInvokeChannels, qrInvokeSchemas } from './qr'
 import { pollInvokeChannels, pollInvokeSchemas } from './poll'
@@ -130,6 +131,8 @@ export const invokeChannels = [
   ...userInvokeChannels,
   /** 举报: the phased reportChat contract, for a person or one message; ./report.ts. */
   ...reportInvokeChannels,
+  /** Bots: the commands a bot publishes and pressing an inline button; ./bot.ts. */
+  ...botInvokeChannels,
   'search:global',
   'search:inChat',
   /**
@@ -367,6 +370,7 @@ export const invokeSchemas = {
   ...presenceInvokeSchemas,
   ...userInvokeSchemas,
   ...reportInvokeSchemas,
+  ...botInvokeSchemas,
   'search:global': {
     request: z.object({ q: z.string().min(1), limit: z.number().int().positive().max(50) }),
     response: z.array(chatSummarySchema),

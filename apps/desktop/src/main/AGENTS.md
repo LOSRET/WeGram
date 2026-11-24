@@ -56,6 +56,9 @@ telegram/tdlib/topic-api.ts  createTopicApi: 话题 (design doc §9.12) — list
 telegram/tdlib/send-api.ts  createSendApi: the message seam methods (send/edit/delete/
                     forward/read/typing/retry/media/album/sticker/voice), split out of
                     index.ts at the same budget when 语音消息's send landed
+telegram/tdlib/bot-api.ts  createBotApi: the bot seam methods (bots:commands / bots:callback),
+                    split out the way user-api.ts was; actions/bots.ts holds the two TDLib
+                    requests (bot_info.commands, getCallbackQueryAnswer)
 telegram/tdlib/user-api.ts  createUserApi: the person seam methods (userStatus, 资料卡,
                     共同群聊, 举报 and the note / contact writes) as one bound object,
                     split out of index.ts at the same budget

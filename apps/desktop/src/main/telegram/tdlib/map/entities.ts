@@ -17,6 +17,8 @@ const ENTITY_TYPES: Record<string, MessageEntity['type']> = {
   textEntityTypeHashtag: 'hashtag',
   textEntityTypeSpoiler: 'spoiler',
   textEntityTypeCustomEmoji: 'customEmoji',
+  // `/command`: the transcript makes it clickable, like a mention (§8.3).
+  textEntityTypeBotCommand: 'botCommand',
 }
 
 /** TDLib entity types we render; unknown ones are dropped, not guessed. */

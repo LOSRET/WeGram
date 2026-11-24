@@ -31,6 +31,27 @@
   outline-offset: 1px;
 }
 
+/* A bot command (`/start`): the same blue as a link, because clicking it runs
+   the command the way the official client does (§8.3). Without a send path the
+   word keeps the colour but stays inert. */
+.wx-entity-bot-command {
+  color: #576b95;
+}
+
+.wx-entity-bot-command--link {
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.wx-entity-bot-command--link:hover {
+  text-decoration: underline;
+}
+
+.wx-entity-bot-command--link:focus-visible {
+  outline: 2px solid #576b95;
+  outline-offset: 1px;
+}
+
 .wx-code {
   padding: 1px 4px;
   border-radius: 3px;

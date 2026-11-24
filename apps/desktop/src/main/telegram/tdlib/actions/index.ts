@@ -7,6 +7,7 @@
  * `TdlibAdapter` is the only caller; keeping the groups apart means a change to
  * history paging never has to be reviewed against the send path.
  */
+export * from './bots'
 export * from './chats'
 export * from './comments'
 export * from './contacts'

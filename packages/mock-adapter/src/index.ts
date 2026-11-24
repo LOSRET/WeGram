@@ -24,6 +24,7 @@ import type {
 import { AdapterEmitter, type TelegramAdapter } from '@wegram/adapter-contract'
 import { MockAssets } from './assets'
 import { MockAvatars } from './avatars'
+import { mockBotCommands, mockCallbackAnswer } from './bots'
 import { createMockChats } from './chats'
 import { createMockComments } from './comments'
 import { createMockTopics } from './topics'
@@ -345,6 +346,18 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     return this.users.reportMessage(input)
   }
 
+  /** The fixture bot's commands (composer's "/" list) and its callback answer. */
+  async botCommands(chatId: number) {
+    return mockBotCommands(this.fixtures, chatId)
+  }
+  async pressCallback(input: {
+    chatId: number
+    messageId: number
+    callback: Parameters<typeof mockCallbackAnswer>[1]['callback']
+  }) {
+    return mockCallbackAnswer(this.fixtures, input)
+  }
+
   /** The mock address book; see `listMockContacts`. */
   async listContacts(): Promise<Contact[]> {
     return listMockContacts(this.fixtures)
@@ -441,9 +454,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
         ...original,
         id: this.nextMessageId++,
         chatId: input.toChatId,
-        ...(input.toTopicId === undefined
-          ? { topicId: undefined }
-          : { topicId: input.toTopicId }),
+        ...(input.toTopicId === undefined ? { topicId: undefined } : { topicId: input.toTopicId }),
       })
     }
     this.emit({ type: 'chats', ops: [{ op: 'upsert', chat: { ...target.chat } }] })
@@ -454,7 +465,11 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     // Nothing to tell a fake peer.
   }
 
-  async markRead(input: { chatId: number; topicId?: number; upToMessageId: number }): Promise<void> {
+  async markRead(input: {
+    chatId: number
+    topicId?: number
+    upToMessageId: number
+  }): Promise<void> {
     if (input.topicId !== undefined) {
       // 话题内已读: one topic's counter and the chat's sum, not the whole chat's.
       await this.topicApi.markRead(input.chatId, input.topicId, input.upToMessageId)

@@ -1,6 +1,7 @@
 import type { ChatSummary, Contact } from '@wegram/protocol'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
+import { AlertDialog } from './AlertDialog'
 import { AppMenu } from './AppMenu'
 import { ChatList } from './ChatList'
 import { ChatPane } from './chat-pane'
@@ -27,6 +28,8 @@ export function MainShell() {
   const setError = useAppStore((state) => state.setError)
   const toast = useAppStore((state) => state.toast)
   const setToast = useAppStore((state) => state.setToast)
+  /** A bot's alert answer; the dialog is one 确定 button and belongs here. */
+  const alert = useAppStore((state) => state.alert)
 
   /** The conversation column's global search: the server answers, the list draws. */
   const [query, setQuery] = useState('')
@@ -274,6 +277,14 @@ export function MainShell() {
       ) : null}
 
       {toast ? <div className="wx-toast">{toast}</div> : null}
+
+      {alert ? (
+        <AlertDialog
+          title="机器人"
+          message={alert}
+          onClose={() => useAppStore.getState().setAlert(null)}
+        />
+      ) : null}
     </div>
   )
 }

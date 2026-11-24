@@ -11,7 +11,7 @@ const seeds = buildFixtureSeeds({ selfId: 1000, mediaOf, now: () => NOW })
 describe('the fake account', () => {
   it('holds the conversations the UI is built against', () => {
     expect([...seeds.keys()].sort((a, b) => a - b)).toEqual([
-      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 99,
+      1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 99,
     ])
     expect(seeds.get(99)?.messages).toHaveLength(5000)
   })
@@ -23,6 +23,24 @@ describe('the fake account', () => {
     expect(forum?.topics?.some((topic) => topic.isGeneral)).toBe(true)
     expect(forum?.topics?.some((topic) => topic.isClosed)).toBe(true)
     expect(forum?.messages.every((message) => typeof message.topicId === 'number')).toBe(true)
+  })
+
+  it('carries a bot with its commands, an inline keyboard and a command entity', () => {
+    const bot = seeds.get(13)
+    expect(bot?.chat.kind).toBe('private')
+    expect(bot?.bot?.commands.map((command) => command.command)).toEqual([
+      'start',
+      'help',
+      'settings',
+    ])
+    const keyboard = bot?.messages.find((message) => message.id === 1302)
+    expect(keyboard?.buttons?.[0]?.[0]).toEqual({
+      text: '设置提醒',
+      callback: { type: 'data', data: 'settings' },
+    })
+    expect(keyboard?.entities).toEqual([{ type: 'botCommand', offset: 3, length: 5 }])
+    // The bot is not an address-book contact, so no contact fields travel.
+    expect(bot?.contact).toBeUndefined()
   })
 
   it('keeps the album as two messages sharing one album id', () => {

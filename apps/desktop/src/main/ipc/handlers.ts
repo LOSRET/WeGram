@@ -233,6 +233,9 @@ export function createHandlers({
       adapter.setUserContact(payload.userId, payload.contact, payload.sharePhone),
     'users:setBlocked': (payload) => adapter.setUserBlocked(payload.userId, payload.blocked),
     'users:commonChats': (payload) => adapter.commonChats(payload),
+    /** Bots: the "/" command list of a bot chat, and pressing an inline button. */
+    'bots:commands': (payload) => adapter.botCommands(payload.chatId),
+    'bots:callback': (payload) => adapter.pressCallback(payload),
     'users:report': (payload) =>
       adapter.reportUser(payload.userId, {
         ...(payload.optionId === undefined ? {} : { optionId: payload.optionId }),

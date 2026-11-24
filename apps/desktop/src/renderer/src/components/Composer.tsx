@@ -1,9 +1,11 @@
-import type { Message, Sticker } from '@wegram/protocol'
-import { useEffect, useRef, useState } from 'react'
+import type { BotCommand, Message, Sticker } from '@wegram/protocol'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 
 import { albumSendOf } from '../lib/albumSend'
 import { loadLatestWindow } from '../lib/anchoredWindow'
+import { commandQuery, commandText, filterCommands } from '../lib/botCommands'
 import { TypingPing } from '../lib/typingPing'
+import { useBotCommands } from '../lib/useBotCommands'
 import { useComposerInput } from '../lib/useComposerInput'
 import type { RecordedVoice } from '../lib/voice/recorder'
 import { errorMessage, invoke } from '../lib/ipc'
@@ -57,6 +59,26 @@ export function Composer({
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  /**
+   * 机器人命令: "/" at the start of the box opens the bot's command list
+   * (design doc §8.3). The list is derived from the box, never stored, so it
+   * closes by itself as soon as the reader types a space or deletes the slash.
+   */
+  const { commands: botCommands, load: loadBotCommands } = useBotCommands(chatId)
+  const query = commandQuery(text)
+  const matches = useMemo(
+    () => (query === null ? [] : filterCommands(botCommands, query)),
+    [query, botCommands],
+  )
+  /**
+   * Esc dismisses the list for the fragment it was open on; one more character
+   * reopens it. Stored as the fragment, so it cannot leak into the next "/".
+   */
+  const [dismissed, setDismissed] = useState<string | null>(null)
+  const [commandIndex, setCommandIndex] = useState(0)
+  const commandListOpen = query !== null && query !== dismissed && matches.length > 0
+  /** The caret to restore once a picked command has landed in the box. */
+  const pendingCaret = useRef<number | null>(null)
   const draftTimer = useRef<number | null>(null)
   /**
    * 对方正在输入. One throttle per open chat: the cleanup cancels the indicator
@@ -127,6 +149,65 @@ export function Composer({
     }
   }, [text, chatId, topicId, editing])
 
+  /** The list starts at its first command for every fragment. */
+  useEffect(() => {
+    setCommandIndex(0)
+  }, [query])
+
+  /** The commands are asked for only once the reader starts a command. */
+  useEffect(() => {
+    if (query !== null) loadBotCommands()
+  }, [query, loadBotCommands])
+
+  /** A picked command replaces the box and leaves the caret after its space. */
+  useEffect(() => {
+    const caret = pendingCaret.current
+    if (caret === null) return
+    pendingCaret.current = null
+    const node = textareaRef.current
+    if (!node) return
+    node.focus()
+    node.setSelectionRange(caret, caret)
+  }, [text, textareaRef])
+
+  const pickCommand = (command: BotCommand): void => {
+    const next = commandText(command)
+    setText(next)
+    pendingCaret.current = next.length
+  }
+
+  /**
+   * The "/" list takes the arrows and Enter/Tab before the send rule does, so
+   * picking a command never sends the half-typed one. Esc closes the list only.
+   */
+  const commandKeys = (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
+    if (!commandListOpen) return false
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      setCommandIndex((current) =>
+        event.key === 'ArrowDown'
+          ? (current + 1) % matches.length
+          : (current - 1 + matches.length) % matches.length,
+      )
+      return true
+    }
+    if (event.key === 'Escape') {
+      setDismissed(query ?? '')
+      return true
+    }
+    // Ctrl+Enter / Cmd+Enter stay the send gesture even over the list.
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) return false
+    if (event.key === 'Enter' || event.key === 'Tab') {
+      if (event.nativeEvent.isComposing) return false
+      const command = matches[commandIndex] ?? matches[0]
+      if (!command) return false
+      event.preventDefault()
+      pickCommand(command)
+      return true
+    }
+    return false
+  }
+
   /** Every keystroke also pings (throttled); emptying the box cancels at once. */
   const changeText = (next: string): void => {
     setText(next)
@@ -163,6 +244,7 @@ export function Composer({
   const { inputHandlers } = useComposerInput({
     onSend: () => void submit(),
     onEscape: editing ? onCancelEdit : undefined,
+    onKeyDown: commandKeys,
   })
 
   /**
@@ -261,9 +343,7 @@ export function Composer({
       ...(topicId === null ? {} : { topicId }),
       typing: recording,
       action: 'recording',
-    }).catch(
-      () => undefined,
-    )
+    }).catch(() => undefined)
   }
 
   /**
@@ -310,6 +390,35 @@ export function Composer({
           <button className="wx-composer-bar__close" onClick={onCancelReply} title="取消回复">
             ×
           </button>
+        </div>
+      ) : null}
+
+      {/*
+        机器人命令: the bot's own list, anchored above the input the way the
+        client's is. Rows are divs because the textarea keeps the keyboard: the
+        arrows and Enter are handled by the box, not by a focused menu.
+      */}
+      {commandListOpen ? (
+        <div className="wx-bot-commands" role="listbox" aria-label="机器人命令">
+          {matches.map((command, index) => (
+            <div
+              key={command.command}
+              role="option"
+              aria-selected={index === commandIndex}
+              className={`wx-bot-command${index === commandIndex ? ' wx-bot-command--active' : ''}`}
+              onMouseEnter={() => setCommandIndex(index)}
+              // mousedown, not click: the caret must stay in the box.
+              onMouseDown={(event) => {
+                event.preventDefault()
+                pickCommand(command)
+              }}
+            >
+              <span className="wx-bot-command__name">/{command.command}</span>
+              {command.description ? (
+                <span className="wx-bot-command__desc">{command.description}</span>
+              ) : null}
+            </div>
+          ))}
         </div>
       ) : null}
 

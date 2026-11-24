@@ -1,5 +1,7 @@
 import type {
   AuthState,
+  BotCommandsAnswer,
+  CallbackAnswer,
   ChatReport,
   BootState,
   ChatInviteLink,
@@ -307,6 +309,19 @@ export interface TelegramAdapter {
    * `messageProperties.can_report_chat` says the message may be reported.
    */
   reportMessage(input: InvokeRequest<'messages:report'>): Promise<ChatReport>
+  /**
+   * The commands the chat's bot publishes (TDLib `botInfo.commands`), for the
+   * composer's "/" list. Only a private chat with a bot has any: anything else
+   * answers `{ isBot: false, commands: [] }`, and the composer then draws no list.
+   */
+  botCommands(chatId: number): Promise<BotCommandsAnswer>
+  /**
+   * Presses one inline keyboard button (TDLib `getCallbackQueryAnswer`). The
+   * answer is the bot's: a toast text, an alert the caller must show as a dialog,
+   * or a URL to open. A bot that edits its message instead sends an ordinary
+   * content update, so nothing else is answered.
+   */
+  pressCallback(input: InvokeRequest<'bots:callback'>): Promise<CallbackAnswer>
 
   history(
     input: InvokeRequest<'messages:history'>,
