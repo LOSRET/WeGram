@@ -103,6 +103,26 @@
   gap: 3px;
 }
 
+/* Telegram's post-author signature is plain text, not a profile link. Keep it
+   beside the counter and truncate a long name instead of stretching the footer. */
+.wx-channel-meta__author {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 180px;
+  align-items: center;
+  gap: 3px;
+}
+
+.wx-channel-meta__author svg {
+  flex: none;
+}
+
+.wx-channel-meta__author-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* 评论 N 条 as the bubble's last row: flush with its edges, under its own
    hairline, and no card of its own — the handle belongs to the post's bubble. The negative
    margins eat the bubble padding through the variables, so a media bubble keeps

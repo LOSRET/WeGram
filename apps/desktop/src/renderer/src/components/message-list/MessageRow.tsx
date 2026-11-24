@@ -238,9 +238,10 @@ export const MessageRow = memo(
     const readReceipt = last.outgoing ? (readOutboxMaxId >= last.id ? ' · 已读' : ' · 未读') : ''
 
     /**
-     * The channel footer: views and time in the bubble's bottom-right corner, or
-     * under a body that has no bubble (a sticker, a big emoji). A channel post has
-     * no read receipt — it is none of the reader's business.
+     * The channel footer: views, optional author signature and time in the
+     * bubble's bottom-right corner, or under a body that has no bubble (a sticker,
+     * a big emoji). An album shares one row, so its first signed item wins. A
+     * channel post has no read receipt — it is none of the reader's business.
      */
     const channelMeta = (outside = false): ReactNode =>
       channel ? (
@@ -248,6 +249,7 @@ export const MessageRow = memo(
           time={last.date}
           edited={last.edited}
           views={interaction?.views}
+          authorSignature={first.authorSignature ?? last.authorSignature}
           outside={outside}
         />
       ) : null

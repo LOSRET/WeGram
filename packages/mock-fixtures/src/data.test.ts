@@ -112,10 +112,9 @@ describe('the fake account', () => {
     expect(post?.interaction).toEqual({ comments: 7, canOpen: true })
 
     const channel = seeds.get(5)
-    expect(channel?.messages.find((m) => m.id === 502)?.interaction).toMatchObject({
-      comments: 78,
-      views: 12_400,
-      forwards: 96,
+    expect(channel?.messages.find((m) => m.id === 502)).toMatchObject({
+      authorSignature: 'Telegram 编辑部',
+      interaction: { comments: 78, views: 12_400, forwards: 96 },
     })
     expect(channel?.commentAccess).toEqual({ joined: false, canComment: false })
   })

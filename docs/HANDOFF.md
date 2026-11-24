@@ -76,7 +76,7 @@ pnpm workspace, W1 + W2 + the W3 main body implemented, plus the private-chat P0
 |---|---|
 | Shell | WeChat 4.x three-column shell (native 32 px `titleBarOverlay`), rail with four real sections, 通讯录, 收藏/朋友圈 placeholders, overlay scrollbars on both long panes, 设置 as its own window |
 | Chat list | virtualised 65 px rows (sizer + overscan 8), **paged on approach** (100-row slices, `mergeChats` by id) and **on-demand row photos** (`chats:prefetchAvatars` for the visible window), search pill → global search, chat right-click menu (置顶/免打扰/标为未读/删除聊天), unread dot, 已归档会话 row + archive page |
-| Transcript | virtualised list, anchored prepend, load-around anchors, day/unread separators, real sender photos, read receipts, typing + presence, reply/edit/delete/forward, polls, comments bar, channel post composition, pinned bar, reaction chips, link preview cards |
+| Transcript | virtualised list, anchored prepend, load-around anchors, day/unread separators, real sender photos, read receipts, typing + presence, reply/edit/delete/forward, polls, comments bar, channel post composition + author signatures, pinned bar, reaction chips, link preview cards |
 | Media | photo/document send+receive with progress, `wx-media://` Range streaming (including a file TDLib is still downloading), viewer window for photos **and** videos, 表情 panel, 贴纸包盒子, album send, caption edit |
 | Stickers / emoji | WebP `<img>`, TGS → lottie-web (transcript) or one ThorVG canvas (grids), WebM `<video>`, animated-emoji messages (no bubble, one pass, click sound), premium sticker effects, custom emoji entities, Apple emoji as a CBDT colour font |
 | Polls | `PollBubble` + `lib/poll.ts`, `messages:vote` / `messages:addPollOption`, option order vs position, immediate `poll` patches from `updateMessageContent.new_content` and a 5 s visible-poll keepalive |
@@ -752,8 +752,8 @@ The owner's instruction (2026-11-20): "依旧是微信的气泡，但是像 Tele
 radius, avatar column, hover row) whose *inside* is Telegram's composition: the media gets a
 3 px inset of the bubble's own colour, the caption continues on the same surface, 评论 N 条 is
 the last row (hairline above, the bubble's own bottom corners, no card of its own), and the
-view counter with the time closes it (`ChannelMeta`). The hover timestamp is suppressed for
-channels (no read receipt; counters are part of the post). Channel photos may grow to
+view counter, optional author signature and time close it (`ChannelMeta`). The hover
+timestamp is suppressed for channels (no read receipt; counters are part of the post). Channel photos may grow to
 420×480, every other chat keeps WeChat's 240×300. Two measured traps: the bubble's width is
 taken **from the media** (`channelMediaWidth` + the 3 px inset), otherwise a long caption wins
 the `fit-content` race and leaves empty bubble right of the picture; and the 评论 row is

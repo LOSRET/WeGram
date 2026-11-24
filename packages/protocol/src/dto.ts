@@ -571,6 +571,11 @@ export const messageSchema = z.object({
   senderChatId: z.number().int().optional(),
   senderName: z.string(),
   /**
+   * TDLib `message.author_signature`: the optional post-author signature on a
+   * channel post or anonymous group message. It is plain text, not a profile link.
+   */
+  authorSignature: z.string().optional(),
+  /**
    * `wx-media://` URL of the sender's profile photo, when it was already
    * downloaded while the message was mapped. Photos that finish later arrive on
    * `evt:avatars` (keyed by user id), or with the chat's own `avatarUrl` when the

@@ -35,7 +35,7 @@ components/message-list/  virtualiser + MessageRow + Divider + the scroll hooks:
                          vote/quiz card, §9.10), InlineButtons, LinkPreviewCard (a text
                          message's link preview / 即时预览 card, §8.9),
                          CommentBar (评论 N 条 handle, §9.8), ChannelMeta (a channel post's
-                         views/time footer; the one-bubble channel composition is
+                         views/author-signature/time footer; the one-bubble channel composition is
                          styles/channel.css), PremiumStickerEffect (a Premium sticker's
                          second TGS, painted once at 1.49× the sticker and replayed on tap)
 components/Modal.tsx     the ONE modal shell: backdrop + centred sheet, click-outside

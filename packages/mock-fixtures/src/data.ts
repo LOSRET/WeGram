@@ -414,6 +414,7 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
         senderId: 0,
         senderChatId: 5,
         senderName: 'Telegram News',
+        authorSignature: 'Telegram 编辑部',
         outgoing: false,
         date: at(600),
         kind: 'text',

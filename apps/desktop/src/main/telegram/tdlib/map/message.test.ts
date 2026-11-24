@@ -109,6 +109,28 @@ describe('mapMessage', () => {
     expect(message.senderName).toBe('chat-55')
   })
 
+  it('carries a channel author signature and drops blank or non-string values', async () => {
+    const raw = {
+      id: 1,
+      date: 10,
+      sender_id: { _: 'messageSenderChat', chat_id: 55 },
+      content: { _: 'messageText', text: { text: 'post' } },
+    }
+    const signed = await mapMessage(makeContext(), 8, {
+      ...raw,
+      author_signature: '  Elvin Starry  ',
+    })
+    expect(signed.authorSignature).toBe('Elvin Starry')
+
+    for (const authorSignature of ['', '   ', 42]) {
+      const unsigned = await mapMessage(makeContext(), 8, {
+        ...raw,
+        author_signature: authorSignature,
+      })
+      expect(unsigned).not.toHaveProperty('authorSignature')
+    }
+  })
+
   it('uses 未知 when there is no sender at all', async () => {
     const message = await mapMessage(makeContext(), 8, {
       id: 1,

@@ -129,6 +129,20 @@ describe('style contract', () => {
   })
 
   /**
+   * A percentage inside the signature's max-width cycles while a channel bubble
+   * is sized by fit-content: a long name then stretches the bubble to 560 px.
+   * The cap must stay a fixed length; flex shrinking handles a narrow pane.
+   */
+  it('caps a channel author signature without a percentage max-width', () => {
+    const css = read('channel.css')
+    const start = css.indexOf('.wx-channel-meta__author {')
+    if (start < 0) throw new Error('the channel author signature rule is missing')
+    const block = css.slice(start, css.indexOf('}', start))
+    expect(block).toMatch(/max-width:\s*180px;/)
+    expect(block).not.toContain('100%')
+  })
+
+  /**
    * 消息字号 (§9.11.3): the panel offers the protocol's steps, and the stylesheet is
    * the only place their sizes live. A step added to the enum without a rule here
    * would silently paint 标准, so the two are asserted together.

@@ -38,6 +38,10 @@ export async function mapMessage(
     : senderChatId
       ? await ctx.resolveChatTitle(senderChatId)
       : '未知'
+  // Telegram's optional channel/anonymous-admin signature is display text only;
+  // it must never be inferred from the sender's profile or treated as a user id.
+  const authorSignature =
+    typeof raw.author_signature === 'string' ? raw.author_signature.trim() : ''
   // The photo is a bonus, never a reason to hold the message back: a cached one
   // travels with the row, an uncached one is queued and arrives on evt:avatars.
   const senderAvatarUrl = senderUserId
@@ -84,6 +88,7 @@ export async function mapMessage(
     senderId: senderUserId,
     ...(senderChatId ? { senderChatId } : {}),
     senderName,
+    ...(authorSignature ? { authorSignature } : {}),
     ...(senderAvatarUrl ? { senderAvatarUrl } : {}),
     outgoing: Boolean(raw.is_outgoing),
     ...(typeof raw.can_be_saved === 'boolean' ? { canBeSaved: raw.can_be_saved } : {}),
