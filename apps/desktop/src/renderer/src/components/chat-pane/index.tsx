@@ -714,6 +714,7 @@ export function ChatPane() {
           }
           open={comments.isOpen}
           onClose={closeComments}
+          onOpenStickerSet={setStickerSetId}
         />
       ) : null}
 

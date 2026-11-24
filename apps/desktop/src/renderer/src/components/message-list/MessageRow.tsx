@@ -68,7 +68,7 @@ export interface MessageRowProps {
   onResend?: (message: Message) => void
   /**
    * A sticker opens the box of the set it belongs to (design doc §8.5). Optional
-   * like `onResend`: a row drawn outside the chat pane has no box to open.
+   * for a presentational row that has no pack box to open.
    */
   onOpenStickerSet?: (setId: string) => void
   /**

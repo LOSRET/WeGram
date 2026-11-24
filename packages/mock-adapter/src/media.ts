@@ -6,7 +6,7 @@ import type { Message, MessageMedia } from '@wegram/protocol'
 
 import type { MediaKind } from '@wegram/adapter-contract'
 import type { MockAssets } from './assets'
-import { mimeFromPath, type MockFile } from './constants'
+import { mimeFromPath, MOCK_STICKER_SET_ID, type MockFile } from './constants'
 import { outgoingMessage } from './transcript'
 
 /**
@@ -178,6 +178,7 @@ export function buildStickerMessage(
     media: {
       fileId: sticker.fileId,
       stickerFormat: sticker.format,
+      stickerSetId: MOCK_STICKER_SET_ID,
       ...(sticker.emoji ? { stickerEmoji: sticker.emoji } : {}),
       ...(sticker.width ? { width: sticker.width } : {}),
       ...(sticker.height ? { height: sticker.height } : {}),

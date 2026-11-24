@@ -1,3 +1,4 @@
+import { DEMO_STICKER_SET_ID } from '@wegram/mock-fixtures'
 import { composeCommentAccess, pageOlder } from '@wegram/mock-session'
 import type { EventChannel, Message } from '@wegram/protocol'
 
@@ -101,7 +102,10 @@ function commentRow(chatId: number, id: number, payload: unknown): Message {
       date: now(),
       kind: 'sticker',
       text: '',
-      media: media(sticker.fileId, stickerMedia(sticker)),
+      media: media(sticker.fileId, {
+        ...stickerMedia(sticker),
+        stickerSetId: DEMO_STICKER_SET_ID,
+      }),
     }
   }
   if (content.kind === 'media') {

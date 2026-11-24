@@ -90,10 +90,13 @@ export function CommentPanel({
   message,
   open,
   onClose,
+  onOpenStickerSet,
 }: {
   message: Message
   open: boolean
   onClose: () => void
+  /** A comment's sticker opens the same pack box as a transcript sticker. */
+  onOpenStickerSet: (setId: string) => void
 }) {
   const key = commentKey(message.chatId, message.id)
   /**
@@ -473,6 +476,7 @@ export function CommentPanel({
                       readOutboxMaxId={Number.MAX_SAFE_INTEGER}
                       onOpenMenu={noopMenu}
                       onOpenComments={noopComments}
+                      onOpenStickerSet={onOpenStickerSet}
                     />
                   </div>
                 ))}
