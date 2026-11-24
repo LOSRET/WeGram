@@ -1,5 +1,5 @@
 import type { StickerSet } from '@wegram/protocol'
-import { useCallback, useEffect, useState, type MouseEvent } from 'react'
+import { useEffect, useState, type MouseEvent } from 'react'
 
 import { copyText } from '../lib/clipboard'
 import { useEscapeKey } from '../lib/useEscapeKey'
@@ -8,14 +8,12 @@ import type { MentionTarget } from '../lib/mention'
 import { mentionEntitiesOf } from '../lib/mentionText'
 import { openMention } from '../lib/openMention'
 import { anchorOf, type PopupAnchor } from '../lib/popupPlacement'
-import { stickerMedia } from '../lib/stickerMedia'
 import { stickerSetLink } from '../lib/stickerSetLink'
 import { useAppStore } from '../store/useAppStore'
 import { AnchoredPopup } from './ContextMenu'
 import { ForwardDialog } from './ForwardDialog'
 import { RichText } from './RichText'
-import { StickerCanvasLayer } from './StickerCanvasLayer'
-import { StickerRenderer } from './StickerRenderer'
+import { StickerGrid } from './StickerGrid'
 import { MoreIcon } from './WechatIcons'
 
 /**
@@ -39,10 +37,6 @@ export function StickerSetBox({ setId, onClose }: { setId: string; onClose: () =
   const [menu, setMenu] = useState<PopupAnchor | null>(null)
   const [sharing, setSharing] = useState(false)
   const [busy, setBusy] = useState(false)
-  /** ThorVG could not start: TGS cells fall back to their hover animation. */
-  const [canvasFailed, setCanvasFailed] = useState(false)
-  const onCanvasFailed = useCallback(() => setCanvasFailed(true), [])
-
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -73,8 +67,6 @@ export function StickerSetBox({ setId, onClose }: { setId: string; onClose: () =
 
   const installed = stickerSet !== null && stickerSet.isInstalled && !stickerSet.isArchived
   const link = stickerSetLink(stickerSet?.name)
-  const hasTgs = stickerSet?.stickers.some((sticker) => sticker.format === 'tgs') ?? false
-  const canvasOwner = `pack-${stickerSet?.id ?? ''}`.slice(0, 64)
 
   const openMenu = (event: MouseEvent<HTMLButtonElement>): void => {
     setMenu(anchorOf(event.currentTarget.getBoundingClientRect()))
@@ -202,30 +194,13 @@ export function StickerSetBox({ setId, onClose }: { setId: string; onClose: () =
           ) : loadError ? (
             <div className="wx-pack__state wx-pack__state--error">{loadError}</div>
           ) : stickerSet ? (
-            <div className="wx-pack__grid">
-              {stickerSet.stickers.map((sticker, index) => (
-                <div
-                  key={sticker.fileId}
-                  className="wx-pack__sticker"
-                  data-sticker-index={index}
-                  title={sticker.emoji ?? '贴纸'}
-                >
-                  <StickerRenderer
-                    media={stickerMedia(sticker)}
-                    size={92}
-                    preview={sticker.format === 'tgs' && !canvasFailed}
-                    playOnHover={sticker.format === 'tgs' && canvasFailed}
-                  />
-                </div>
-              ))}
-              {hasTgs ? (
-                <StickerCanvasLayer
-                  stickers={stickerSet.stickers}
-                  owner={canvasOwner}
-                  onFailed={onCanvasFailed}
-                />
-              ) : null}
-            </div>
+            <StickerGrid
+              stickers={stickerSet.stickers}
+              className="wx-pack__grid"
+              cellClassName="wx-pack__sticker"
+              owner={`pack-${stickerSet.id}`.slice(0, 64)}
+              resetKey={setId}
+            />
           ) : null}
         </div>
 

@@ -116,6 +116,10 @@ components/StickerSetBox.tsx  贴纸包盒子 (§8.5): clicking a sticker messag
                         set (title + ⋮ menu + grid + 移除/添加贴纸包); it fetches
                         `stickers:set` by `MessageMedia.stickerSetId` and writes
                         `stickers:changeSet` (remove / add / archive)
+components/StickerGrid.tsx  the ONE sticker pack grid: the cells (a button when the
+                        grid sends, a div when it only draws) + the shared ThorVG
+                        canvas with the per-cell hover animation as its fallback; the
+                        表情 panel's set body and the 贴纸包盒子 both render it
 components/StickerCanvasLayer.tsx  the shared ThorVG canvas over a TGS sticker grid
                         (one WebGL scene, one render per frame, 30 fps); the grid
                         keeps the cells for hover/click and hides their thumbnails
@@ -297,9 +301,10 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   wrong). `INFO_PANEL_ANIM_MS` is pinned to the stylesheet by
   `style-contract.test.ts`. The machine is `lib/useSlidingPanel.ts` now: a new slide
   uses it instead of writing another timer pair. A channel reuses the group panel;
-  its member block is administrator-only, so the panel asks `chats:canGetMembers` (`supergroupFullInfo.
-  can_get_members`) and draws 搜索群成员 + the grid only when that answers true — a
-  subscriber would otherwise see the channel's own face pretending to be a member.
+  its member block is administrator-only, so the panel asks `chats:canGetMembers`
+  (`supergroupFullInfo.can_get_members`) and draws 搜索群成员 + the grid only when
+  that answers true — a subscriber would otherwise see the channel's own face
+  pretending to be a member.
 - **Esc belongs to the topmost layer.** `lib/useEscapeKey.ts` keeps the mounted
   listeners on a stack and only the newest one acts; two plain `window` listeners
   cannot express that (`stopPropagation` does not stop other listeners on the same
@@ -513,9 +518,10 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   and may legitimately save an empty box — it removes the 说明.
 - **A sticker grid is one ThorVG canvas, never N lottie players.** A pack is ~120
   TGS; lottie-web gives each playing sticker its own SVG tree, which is what used to
-  jank. The 表情 panel's set body and the 贴纸包盒子 render TGS cells through
-  `StickerCanvasLayer` + `@thorvg/webcanvas` (one WebGL scene, one `render()` per
-  frame, 30 fps); the cells stay in the DOM for hover/click and their thumbnails are
+  jank. The 表情 panel's set body and the 贴纸包盒子 both render
+  `components/StickerGrid.tsx`, whose TGS cells go through `StickerCanvasLayer` +
+  `@thorvg/webcanvas` (one WebGL scene, one `render()` per frame, 30 fps); the cells
+  stay in the DOM for hover/click and their thumbnails are
   hidden only once their animation exists. A TGS cell under the canvas passes
   `preview` so it never mounts a second lottie. Parsing is viewport-driven
   (`lib/stickerCanvasWindow`: two screens each way), two at a time and with a
