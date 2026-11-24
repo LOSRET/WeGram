@@ -1476,6 +1476,12 @@ One-off duplication audits merged the real duplicates and left the look-alikes a
   crossed as `forbidden` instead of `poll_answered` in the preview, and the preview could not
   draw the seed's 简介/备注 because it read the address-book row instead of the seed. Still
   duplicated on purpose: the two fakes' event types and their invoke switch / adapter class.
+- **Main pass (2026-11-24)**: the five sheet factories share `app-window.ts`'s
+  `displayForWindow` / `displayForCursor` / `centerOnDisplay` / `showWhenReady` (the old
+  copies each picked a display, centred the work area and wrote their own raise/focus
+  order), and the four theme switches share `repaintWindowChrome`. The media-preview
+  vocabulary ([图片] etc.) and the caption-edit kinds moved to `@wegram/protocol`, so main's
+  chat-list line, the renderer's reply preview and the fakes cannot disagree.
 - **Renderer pass (2026-11-24)**: the four slide panels (聊天信息 / 评论 / 已归档会话 /
   话题) now share `lib/useSlidingPanel.ts` (open/close, the 20 ms mount-closed entry, the
   delayed unmount, the reopen race) and `useEnterOnOpen`; every sheet renders through

@@ -521,6 +521,19 @@ export const CAPTION_MESSAGE_KINDS: ReadonlySet<MessageKind> = new Set<MessageKi
 ])
 
 /**
+ * The word a media row is previewed as, where no text can carry it: the chat list's
+ * last-message line (mapped in main from a TDLib content type), a reply's quote and
+ * the fakes' outgoing rows. One vocabulary, so a photo says [图片] in all three.
+ */
+export const MESSAGE_KIND_LABELS = {
+  photo: '[图片]',
+  video: '[视频]',
+  file: '[文件]',
+  sticker: '[贴纸]',
+  voice: '[语音]',
+} as const
+
+/**
  * Engagement under a message — the row WeChat's article cards carry above their
  * comment list. TDLib fills it from `messageInteractionInfo`: counters on
  * channels, and `reply_info` wherever the message owns a comment thread (a

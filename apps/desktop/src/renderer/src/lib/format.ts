@@ -1,3 +1,4 @@
+import { MESSAGE_KIND_LABELS } from '@wegram/protocol'
 import type { ChatSummary, Message } from '@wegram/protocol'
 
 /** `[start, end)` spoiler runs of a preview, as `ChatSummary` carries them. */
@@ -143,18 +144,20 @@ export function messagePreview(message: Message): string {
   const text = message.text.trim()
   switch (message.kind) {
     case 'photo':
-      return text ? `[图片] ${text}` : '[图片]'
+      return text ? `${MESSAGE_KIND_LABELS.photo} ${text}` : MESSAGE_KIND_LABELS.photo
     case 'video':
-      return text ? `[视频] ${text}` : '[视频]'
+      return text ? `${MESSAGE_KIND_LABELS.video} ${text}` : MESSAGE_KIND_LABELS.video
     case 'file':
-      return text ? `[文件] ${text}` : `[文件] ${message.media?.fileName ?? ''}`.trim()
+      return text
+        ? `${MESSAGE_KIND_LABELS.file} ${text}`
+        : `${MESSAGE_KIND_LABELS.file} ${message.media?.fileName ?? ''}`.trim()
     case 'sticker':
-      return '[贴纸]'
+      return MESSAGE_KIND_LABELS.sticker
     case 'emoji':
       // The glyph is the whole message; Telegram's list preview shows it too.
       return text || '[表情]'
     case 'voice':
-      return `[语音] ${formatDuration(message.media?.duration)}`.trim()
+      return `${MESSAGE_KIND_LABELS.voice} ${formatDuration(message.media?.duration)}`.trim()
     case 'poll':
       return `[投票] ${text}`
     case 'rich':

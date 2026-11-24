@@ -1,3 +1,4 @@
+import { MESSAGE_KIND_LABELS } from '@wegram/protocol'
 import type { LinkPreviewMedia, Message, MessageEntity, Poll, RichBlock } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
@@ -440,18 +441,18 @@ export function previewContent(content: TdObject | undefined): string {
 function mapContentLabel(content: TdObject | undefined): string {
   switch (content?._) {
     case 'messagePhoto':
-      return '[图片]'
+      return MESSAGE_KIND_LABELS.photo
     case 'messageVideo':
-      return '[视频]'
+      return MESSAGE_KIND_LABELS.video
     case 'messageSticker':
-      return '[贴纸]'
+      return MESSAGE_KIND_LABELS.sticker
     case 'messageAnimatedEmoji':
       // One emoji is the whole message, so the list shows the emoji itself.
       return typeof content.emoji === 'string' ? content.emoji : ''
     case 'messageVoiceNote':
-      return '[语音]'
+      return MESSAGE_KIND_LABELS.voice
     case 'messageDocument':
-      return '[文件]'
+      return MESSAGE_KIND_LABELS.file
     case 'messagePoll':
       return '[投票]'
     case 'messageRichMessage':

@@ -1,7 +1,7 @@
 import { stat } from 'node:fs/promises'
 import { basename } from 'node:path'
 
-import { AppError } from '@wegram/protocol'
+import { AppError, MESSAGE_KIND_LABELS } from '@wegram/protocol'
 import type { Message, MessageMedia } from '@wegram/protocol'
 
 import type { MediaKind } from '@wegram/adapter-contract'
@@ -159,7 +159,7 @@ export async function buildVoiceMessage(
     },
     replyTo: input.replyTo,
   })
-  return { message, preview: '[语音]', fileId, size: info.size }
+  return { message, preview: MESSAGE_KIND_LABELS.voice, fileId, size: info.size }
 }
 
 /** Builds the row a sticker from the picker becomes. */
@@ -185,5 +185,8 @@ export function buildStickerMessage(
     },
     replyTo: input.replyTo,
   })
-  return { message, preview: `[贴纸] ${sticker.emoji ?? ''}`.trim() }
+  return {
+    message,
+    preview: `${MESSAGE_KIND_LABELS.sticker} ${sticker.emoji ?? ''}`.trim(),
+  }
 }
