@@ -12,6 +12,7 @@ import { resolveCommentLanding } from '../../lib/commentAnchor'
 import { messagePreview } from '../../lib/format'
 import { selfIdentity } from '../../lib/self'
 import { errorMessage, invoke } from '../../lib/ipc'
+import { useEnterOnOpen } from '../../lib/useSlidingPanel'
 import { ViewerSource } from '../../lib/viewerSource'
 import { reduceLoadedOps } from '../../store/reducers'
 import { useAppStore } from '../../store/useAppStore'
@@ -107,7 +108,7 @@ export function CommentPanel({
   )
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [entered, setEntered] = useState(false)
+  const entered = useEnterOnOpen(open)
   /**
    * The official client's comment gate (design doc §9.8): whether the account
    * may post in the discussion group, whether a join button is the next step,
@@ -299,17 +300,6 @@ export function CommentPanel({
       })
     })
   }, [key])
-
-  // Slide in: mount closed (translateX(100 %)), open on the next paint. The
-  // timeout is the fallback for an occluded window, where rAF is throttled.
-  useEffect(() => {
-    if (!open) {
-      setEntered(false)
-      return
-    }
-    const timer = window.setTimeout(() => setEntered(true), 20)
-    return () => window.clearTimeout(timer)
-  }, [open])
 
   useEffect(() => {
     backRef.current?.focus({ preventScroll: true })

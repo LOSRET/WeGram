@@ -12,6 +12,7 @@ import { OverlayScrollbar } from '../OverlayScrollbar'
 import { ContextMenu, Popup, type MenuItem } from '../ContextMenu'
 import { SearchField } from '../SearchField'
 import { useChatTopics } from '../chat-pane/topics/useChatTopics'
+import { useEnterOnOpen } from '../../lib/useSlidingPanel'
 import { TopicDialog } from './TopicDialog'
 
 /** A topic row is two lines of text on the 64 px rhythm of a conversation row. */
@@ -36,7 +37,7 @@ interface TopicsSidebarProps {
  * page, and 返回 closes the forum and brings the conversation list back.
  */
 export function TopicsSidebar({ chat, open, onBack }: TopicsSidebarProps) {
-  const [entered, setEntered] = useState(false)
+  const entered = useEnterOnOpen(open)
   const [query, setQuery] = useState('')
   const [menu, setMenu] = useState<{ topic: ChatTopic; x: number; y: number } | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<ChatTopic | null>(null)
@@ -50,15 +51,6 @@ export function TopicsSidebar({ chat, open, onBack }: TopicsSidebarProps) {
   const activeTopicId = useAppStore((state) => state.activeTopicId)
 
   const { topics, loading, hasMore, loadMore } = useChatTopics(chat.id, query)
-
-  useEffect(() => {
-    if (!open) {
-      setEntered(false)
-      return
-    }
-    const timer = window.setTimeout(() => setEntered(true), 20)
-    return () => window.clearTimeout(timer)
-  }, [open])
 
   const virtualizer = useVirtualizer({
     count: topics.length,

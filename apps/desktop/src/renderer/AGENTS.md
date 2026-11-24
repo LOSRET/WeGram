@@ -209,6 +209,10 @@ lib/mentionText.ts    (pure, unit-tested) the @usernames a plain string carries 
                       sticker pack's title is parsed like message text, the one
                       non-message surface the official client also links
 lib/useAnchoredScroll.ts  ready gate, stick-to-bottom, resize compensation
+lib/useSlidingPanel.ts  the ONE slide-panel state machine (open/close, the 20 ms
+                      mount-closed entry, the delayed unmount after the CSS slide,
+                      the reopen-during-slide-out race) + `useEnterOnOpen`; 聊天信息,
+                      评论, 已归档会话 and 话题 all use it
 lib/scrollGeometry.ts (pure, unit-tested) the ONE "is the reader at the bottom" rule
 lib/jumpSettle.ts    (pure, unit-tested) "has the jump to the newest message landed?"
 lib/chatInfo.ts      (pure, unit-tested) the panel's slide length + which faces its

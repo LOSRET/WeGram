@@ -1,8 +1,9 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { ChatSummary } from '@wegram/protocol'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 
 import { OverlayScrollbar } from '../OverlayScrollbar'
+import { useEnterOnOpen } from '../../lib/useSlidingPanel'
 import { ArchiveBar } from './ArchiveBar'
 import { ChatRow } from './ChatRow'
 import { useChatAvatarPrefetch } from '../../lib/useChatAvatarPrefetch'
@@ -40,19 +41,11 @@ export function ArchivePage({
   onContextMenu,
   onBack,
 }: ArchivePageProps) {
-  const [entered, setEntered] = useState(false)
+  // Mount closed, then open on the next frame (see `lib/useSlidingPanel`).
+  const entered = useEnterOnOpen(open)
   // The scrolling view and the box that hosts the floating scrollbar.
   const bodyRef = useRef<HTMLDivElement | null>(null)
   const scrollRef = useRef<HTMLDivElement | null>(null)
-
-  useEffect(() => {
-    if (!open) {
-      setEntered(false)
-      return
-    }
-    const timer = window.setTimeout(() => setEntered(true), 20)
-    return () => window.clearTimeout(timer)
-  }, [open])
 
   const virtualizer = useVirtualizer({
     count: chats.length,

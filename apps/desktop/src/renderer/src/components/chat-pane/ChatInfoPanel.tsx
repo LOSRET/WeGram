@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 
 import { INFO_MEMBER_LIMIT, personTiles } from '../../lib/chatInfo'
 import { errorMessage, invoke } from '../../lib/ipc'
+import { useEnterOnOpen } from '../../lib/useSlidingPanel'
 import { useAppStore } from '../../store/useAppStore'
 import { Avatar } from '../Avatar'
 import { ConfirmDialog } from '../ConfirmDialog'
@@ -64,7 +65,7 @@ export function ChatInfoPanel({
   onClose,
   onLocate,
 }: ChatInfoPanelProps) {
-  const [entered, setEntered] = useState(false)
+  const entered = useEnterOnOpen(open)
   const [members, setMembers] = useState<ChatMember[]>([])
   /**
    * 管理员显示群成员: whether this account may read a channel's subscriber list.
@@ -106,17 +107,6 @@ export function ChatInfoPanel({
    */
   const memberTable = isGroup || (isChannel && canReadMembers === true)
   const showMemberBlock = !isChannel || memberTable
-
-  // Mount closed, open on the next paint. The timeout is the fallback for an
-  // occluded window, where rAF is throttled (see AGENTS.md).
-  useEffect(() => {
-    if (!open) {
-      setEntered(false)
-      return
-    }
-    const timer = window.setTimeout(() => setEntered(true), 20)
-    return () => window.clearTimeout(timer)
-  }, [open])
 
   // 管理员显示群成员. A group's members are readable by its members; a channel
   // answers subscribers with a refusal, so the panel asks before it draws the

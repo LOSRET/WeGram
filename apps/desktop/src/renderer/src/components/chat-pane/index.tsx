@@ -1,5 +1,5 @@
 import type { ChatJoinState, LinkPreview, Message } from '@wegram/protocol'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { loadLatestWindow } from '../../lib/anchoredWindow'
 import { topicUnreadMarker, transcriptReadMarkers } from '../../lib/topics'
@@ -21,6 +21,7 @@ import { ChatInfoPanel } from './ChatInfoPanel'
 import { usePinnedMessage } from './usePinnedMessage'
 import { PinnedBar } from './PinnedBar'
 import { COMMENT_PANEL_ANIM_MS } from '../../lib/comments'
+import { useSlidingPanel } from '../../lib/useSlidingPanel'
 import { CommentPanel } from './CommentPanel'
 import {
   AnchorPendingPlaceholder,
@@ -74,13 +75,14 @@ export function ChatPane() {
 
   const [forwarding, setForwarding] = useState<Message | null>(null)
   const [deleting, setDeleting] = useState<PendingDelete | null>(null)
-  /**
-   * 聊天信息 (design doc §9.9). Like the discussion view it keeps its content while
-   * it slides out, so the open flag lives next to the unmount timer rather than in
-   * the panel itself.
-   */
-  const [info, setInfo] = useState<{ open: boolean } | null>(null)
-  const infoTimerRef = useRef<number | null>(null)
+  /** 聊天信息 (design doc §9.9): `lib/useSlidingPanel` keeps it mounted while it slides. */
+  const info = useSlidingPanel<undefined>(INFO_PANEL_ANIM_MS)
+  const {
+    open: openInfoPanel,
+    close: closeInfo,
+    isOpen: infoOpen,
+    reset: resetInfo,
+  } = info
   /** 清空聊天记录 asks first: the history of a chat cannot be undeleted. */
   const [clearConfirm, setClearConfirm] = useState(false)
   /**
@@ -106,32 +108,18 @@ export function ChatPane() {
   /** 贴纸包: the set a clicked sticker message belongs to (design doc §8.5). */
   const [stickerSetId, setStickerSetId] = useState<string | null>(null)
 
-  /**
-   * The full-pane discussion view (design doc §9.8). It stays mounted while it
-   * slides out, which is why the message is kept next to the open flag and the
-   * unmount is scheduled after the animation.
-   */
-  const [comments, setComments] = useState<{ message: Message; open: boolean } | null>(null)
-  const commentTimerRef = useRef<number | null>(null)
+  /** The full-pane discussion view (design doc §9.8); it keeps its message while it slides. */
+  const comments = useSlidingPanel<Message>(COMMENT_PANEL_ANIM_MS)
+  const {
+    open: openCommentsPanel,
+    close: closeComments,
+    reset: resetComments,
+  } = comments
 
   const openInfo = useCallback((): void => {
-    if (infoTimerRef.current !== null) {
-      window.clearTimeout(infoTimerRef.current)
-      infoTimerRef.current = null
-    }
-    setInfo({ open: true })
-  }, [])
+    openInfoPanel(undefined)
+  }, [openInfoPanel])
 
-  const closeInfo = useCallback((): void => {
-    setInfo((current) => (current ? { ...current, open: false } : null))
-    if (infoTimerRef.current !== null) window.clearTimeout(infoTimerRef.current)
-    infoTimerRef.current = window.setTimeout(() => {
-      infoTimerRef.current = null
-      setInfo((current) => (current && !current.open ? null : current))
-    }, INFO_PANEL_ANIM_MS)
-  }, [])
-
-  const infoOpen = info?.open ?? false
   const toggleInfo = useCallback((): void => {
     if (infoOpen) closeInfo()
     else openInfo()
@@ -143,24 +131,11 @@ export function ChatPane() {
    */
   const openComments = useCallback(
     (message: Message): void => {
-      if (commentTimerRef.current !== null) {
-        window.clearTimeout(commentTimerRef.current)
-        commentTimerRef.current = null
-      }
       closeInfo()
-      setComments({ message, open: true })
+      openCommentsPanel(message)
     },
-    [closeInfo],
+    [closeInfo, openCommentsPanel],
   )
-
-  const closeComments = useCallback((): void => {
-    setComments((current) => (current ? { ...current, open: false } : null))
-    if (commentTimerRef.current !== null) window.clearTimeout(commentTimerRef.current)
-    commentTimerRef.current = window.setTimeout(() => {
-      commentTimerRef.current = null
-      setComments((current) => (current && !current.open ? null : current))
-    }, COMMENT_PANEL_ANIM_MS)
-  }, [])
 
   /**
    * 即时预览 (design doc §8.9) opens the reader as its own window, like the client:
@@ -180,27 +155,15 @@ export function ChatPane() {
     [closeInfo],
   )
 
-  useEffect(
-    () => () => {
-      if (commentTimerRef.current !== null) window.clearTimeout(commentTimerRef.current)
-      if (infoTimerRef.current !== null) window.clearTimeout(infoTimerRef.current)
-    },
-    [],
-  )
-
   /**
    * Another conversation owns another discussion view or another 聊天信息 panel:
-   * switching chats closes both (the panel belongs to the chat that opened it).
+   * switching chats drops both at once (the panel belongs to the chat that opened it).
    */
   useEffect(() => {
-    setComments(null)
-    setInfo(null)
+    resetComments()
+    resetInfo()
     setStickerSetId(null)
-    if (infoTimerRef.current !== null) {
-      window.clearTimeout(infoTimerRef.current)
-      infoTimerRef.current = null
-    }
-  }, [activeChatId])
+  }, [activeChatId, resetComments, resetInfo])
 
   /**
    * The open row can be in either list. Reading only `chats` made an archived chat
@@ -668,10 +631,10 @@ export function ChatPane() {
         />
       )}
 
-      {info ? (
+      {info.panel ? (
         <ChatInfoPanel
           chat={chat}
-          open={info.open}
+          open={info.isOpen}
           muting={muteBusy}
           pinning={pinBusy}
           onToggleMuted={() => {
@@ -689,13 +652,16 @@ export function ChatPane() {
         />
       ) : null}
 
-      {comments ? (
+      {comments.panel ? (
         <CommentPanel
           /* The live store row, not the snapshot taken on open: posting a comment
              patches `interaction.comments` through an `interaction` op, and the
              panel's header follows it. */
-          message={messages.find((item) => item.id === comments.message.id) ?? comments.message}
-          open={comments.open}
+          message={
+            messages.find((item) => item.id === comments.panel?.value.id) ??
+            comments.panel.value
+          }
+          open={comments.isOpen}
           onClose={closeComments}
         />
       ) : null}

@@ -23,6 +23,7 @@ import { PlusIcon } from './Icon'
 import { SearchField } from './SearchField'
 import { ARCHIVE_PAGE_ANIM_MS } from '../lib/archivePage'
 import { TOPICS_PAGE_ANIM_MS } from '../lib/topics'
+import { useSlidingPanel } from '../lib/useSlidingPanel'
 import { CHAT_ROW_H, LIST_OVERSCAN } from '../lib/listMetrics'
 import type { MessageHit, SearchScope } from '../lib/messageSearch'
 import { normalizeQuery } from '../lib/search'
@@ -91,47 +92,22 @@ export function ChatList({
   const [menu, setMenu] = useState<{ chat: ChatSummary; x: number; y: number } | null>(null)
 
   /**
-   * 已归档会话's page. `open` drives the slide and the page stays mounted until it
-   * has slid out (`ARCHIVE_PAGE_ANIM_MS`); the timer is the parent's job because
-   * only the parent can decide when the page leaves the tree.
+   * 已归档会话's page. `lib/useSlidingPanel` keeps it mounted while it slides and
+   * drops it after `ARCHIVE_PAGE_ANIM_MS`.
    */
-  const [archive, setArchive] = useState<{ open: boolean } | null>(null)
+  const archive = useSlidingPanel<undefined>(ARCHIVE_PAGE_ANIM_MS)
+  const { open: openArchivePanel, close: closeArchive, isOpen: archiveOpen } = archive
   /**
    * 话题 (design doc §9.12): while the open chat is a forum, this column shows its
    * topic list — the 已归档会话 gesture one column to the left. The message pane
    * keeps the transcript, so picking a topic swaps it instead of covering it.
    */
-  const [topicsPage, setTopicsPage] = useState<{ open: boolean; chat: ChatSummary } | null>(null)
-  const topicsTimerRef = useRef<number | null>(null)
-  const archiveTimerRef = useRef<number | null>(null)
-  const archiveOpen = archive?.open === true
+  const topicsPage = useSlidingPanel<ChatSummary>(TOPICS_PAGE_ANIM_MS)
+  const { open: openTopicsPage, close: closeTopicsPage } = topicsPage
 
   const openArchive = useCallback(() => {
-    if (archiveTimerRef.current !== null) {
-      window.clearTimeout(archiveTimerRef.current)
-      archiveTimerRef.current = null
-    }
-    setArchive({ open: true })
-  }, [])
-
-  const closeArchive = useCallback(() => {
-    setArchive((current) => (current ? { ...current, open: false } : null))
-    if (archiveTimerRef.current !== null) window.clearTimeout(archiveTimerRef.current)
-    archiveTimerRef.current = window.setTimeout(() => {
-      archiveTimerRef.current = null
-      // A reopen during the slide-out cleared the flag already; only a closed
-      // page is dropped here.
-      setArchive((current) => (current !== null && !current.open ? null : current))
-    }, ARCHIVE_PAGE_ANIM_MS)
-  }, [])
-
-  useEffect(
-    () => () => {
-      if (archiveTimerRef.current !== null) window.clearTimeout(archiveTimerRef.current)
-      if (topicsTimerRef.current !== null) window.clearTimeout(topicsTimerRef.current)
-    },
-    [],
-  )
+    openArchivePanel(undefined)
+  }, [openArchivePanel])
 
   /**
    * The row whose conversation the pane is showing. It can be in either list, like
@@ -146,16 +122,6 @@ export function ChatList({
     activeChatId === null ? undefined : state.forumLayoutByChat[activeChatId],
   )
   const forumActive = activeChat?.forum === true && forumLayout !== 'tabs'
-  /** Close the page with its slide; the column unmounts it afterwards. */
-  const closeTopicsPage = useCallback((): void => {
-    setTopicsPage((current) => (current ? { ...current, open: false } : null))
-    if (topicsTimerRef.current !== null) window.clearTimeout(topicsTimerRef.current)
-    topicsTimerRef.current = window.setTimeout(() => {
-      topicsTimerRef.current = null
-      setTopicsPage((current) => (current !== null && !current.open ? null : current))
-    }, TOPICS_PAGE_ANIM_MS)
-  }, [])
-
   /**
    * A forum's page slides in as soon as the chat opens (the official client opens
    * a forum on its topics) and slides out when the chat closes. It keeps its own
@@ -167,12 +133,8 @@ export function ChatList({
       closeTopicsPage()
       return
     }
-    if (topicsTimerRef.current !== null) {
-      window.clearTimeout(topicsTimerRef.current)
-      topicsTimerRef.current = null
-    }
-    setTopicsPage({ open: true, chat: activeChat })
-  }, [forumActive, activeChat, activeChatId, closeTopicsPage])
+    openTopicsPage(activeChat)
+  }, [forumActive, activeChat, activeChatId, closeTopicsPage, openTopicsPage])
 
   /**
    * An empty archive is not somewhere to sit: unarchiving its last chat returns
@@ -432,22 +394,22 @@ export function ChatList({
         <OverlayScrollbar scrollerRef={scrollRef} hostRef={bodyRef} />
       </div>
 
-      {topicsPage !== null ? (
+      {topicsPage.panel ? (
         <TopicsSidebar
-          key={topicsPage.chat.id}
-          chat={topicsPage.chat}
-          open={topicsPage.open}
+          key={topicsPage.panel.value.id}
+          chat={topicsPage.panel.value}
+          open={topicsPage.isOpen}
           // 返回 closes the forum: the topic list IS this column's page while the
           // chat is open, so going back means going back to the conversations.
           onBack={() => useAppStore.getState().setActiveChat(null)}
         />
       ) : null}
 
-      {archive !== null ? (
+      {archive.panel ? (
         <ArchivePage
           chats={archivedChats}
           activeChatId={activeChatId}
-          open={archive.open}
+          open={archive.isOpen}
           onSelect={onSelect}
           onContextMenu={openMenu}
           onBack={closeArchive}
