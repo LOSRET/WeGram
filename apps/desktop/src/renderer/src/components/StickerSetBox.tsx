@@ -21,7 +21,7 @@ import { MoreIcon } from './WechatIcons'
  * A sticker set as its own box, the way Telegram Desktop shows one (design doc
  * §8.5): clicking a sticker in a message opens the box for the pack that sticker
  * belongs to. It carries the pack's title (its `@username` opens the author), a
- * ⋮ menu (分享表情包 / 复制链接 / 归档贴纸), every sticker in a five-column grid,
+ * ⋮ menu (分享表情包 / 复制链接 / 归档贴纸), every sticker in a four-column grid,
  * and 移除贴纸包 — or 添加贴纸包, when the reader clicked a sticker from a pack
  * this account has not installed.
  *
@@ -221,7 +221,7 @@ export function StickerSetBox({ setId, onClose }: { setId: string; onClose: () =
                 >
                   <StickerRenderer
                     media={stickerMedia(sticker)}
-                    size={72}
+                    size={92}
                     preview={sticker.format === 'tgs' && !canvasFailed}
                     playOnHover={sticker.format === 'tgs' && canvasFailed}
                   />

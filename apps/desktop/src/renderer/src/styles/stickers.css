@@ -362,7 +362,8 @@
 
 /* 贴纸包详情 — the box Telegram Desktop shows when a sticker is clicked (design
    doc §8.5): a 464 × 558 card floating un-dimmed over the conversation, with the
-   pack title, a ⋮ menu, a five-column grid and the 移除贴纸包 footer. */
+   pack title, a ⋮ menu, a grid that mirrors the 表情 panel's 4 × 104 px cells and
+   the 移除贴纸包 footer. */
 .wx-pack-layer {
   position: fixed;
   inset: 0;
@@ -437,11 +438,13 @@
   scrollbar-width: thin;
 }
 
+/* Four columns, the same 104 px cell the 表情 panel's set body uses: the box and
+   the picker show one pack, so they must not disagree about its layout. */
 .wx-pack__grid {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 2px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
 }
 
 .wx-pack__sticker {
@@ -450,8 +453,8 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 82px;
-  padding: 2px;
+  height: 104px;
+  padding: 4px;
   border-radius: 8px;
 }
 

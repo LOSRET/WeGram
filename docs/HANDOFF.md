@@ -538,7 +538,9 @@ transcript keeps lottie-web with `setSubframe(false)`.
 **贴纸包盒子 464 × 558** (the client measured 462 × 558). Clicking a sticker in a message
 opens the box of its pack, floating **un-dimmed** over the conversation in a transparent
 full-window layer (click outside or Esc closes): a **52 px** title row (title / ⋮ / ×), the
-pack in a **5-column grid at 82 px cells**, and a **58 px** footer with **移除贴纸包** in
+pack in a **4-column grid at 104 px cells** — the same cell the 表情 panel's set body uses.
+WeChat itself packs 5 × 82 px; the owner asked for 4 so the box and the picker agree — and a
+**58 px** footer with **移除贴纸包** in
 `--wx-danger` (or **添加贴纸包** in `--wx-brand` for an uninstalled pack) beside a count pill.
 Title → ⋮ → 分享表情包 / 复制链接 / 归档贴纸 (归档 only while installed); the link is
 `https://t.me/addstickers/<name>` from TDLib's `stickerSet.name`. The grid is display-only.
@@ -1813,7 +1815,7 @@ claim is. Nothing here replaces §1 (state) or §9 (gaps).
   scrolls away — and the list rests one row further down (`scrollMargin` on the
   virtualiser), which is why it starts out of view and the reader scrolls up to find it.
 - The animated-cell budget (ThorVG canvas, 30 fps, savedFrame, two-screen parse window) and
-  the 贴纸包盒子 (464 × 558, 5-column grid).
+  the 贴纸包盒子 (464 × 558, 4-column grid).
 - The four handoff documents were consolidated into this one.
 - The §9.1 write matrix was driven on the test DC (`pnpm tdlib:test-dc:writes`: 9 pass /
   3 partial / 1 skip, 0 fail). It found three defects — `markedUnread` never mapped,
