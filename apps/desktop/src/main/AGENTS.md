@@ -10,7 +10,10 @@ adds what is specific to this layer.
 index.ts            app lifecycle, adapter wiring, media scheme, login↔shell hand-over
                     (syncWindowsToAuth / showMainWindow)
 app-window.ts       the ONE BrowserWindow factory (security webPreferences, route load,
-                    navigation policy) + the shell's title-bar overlay
+                    navigation policy) + the shell's title-bar overlay + the placement
+                    helpers every sheet uses (displayForWindow / displayForCursor,
+                    centerOnDisplay, showWhenReady) and repaintWindowChrome (background +
+                    title strip after a theme switch)
 windows.ts          the shell window: geometry, theme repaint, minimize↔viewer wiring
 login-window.ts     the frameless 280×373 login BrowserWindow (#login), close/refocus
 viewer.ts           the 图片和视频 window; unowned on purpose (see below), pins/hides it

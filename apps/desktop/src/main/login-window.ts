@@ -1,7 +1,12 @@
 import type { BrowserWindow } from 'electron'
-import { screen } from 'electron'
 
-import { attachNavigationPolicy, createAppWindow } from './app-window'
+import {
+  attachNavigationPolicy,
+  centerOnDisplay,
+  createAppWindow,
+  displayForWindow,
+  showWhenReady,
+} from './app-window'
 
 /**
  * The login window is its own window, like WeChat's: 280×373 DIP measured off the
@@ -36,15 +41,12 @@ export function createLoginWindow(theme: 'light' | 'dark'): BrowserWindow {
   })
 
   // Centred in the work area, like the client's login window.
-  const { x, y, width, height } = screen.getPrimaryDisplay().workArea
-  win.setBounds({
-    x: Math.round(x + (width - LOGIN_WINDOW_W) / 2),
-    y: Math.round(y + (height - LOGIN_WINDOW_H) / 2),
-    width: LOGIN_WINDOW_W,
-    height: LOGIN_WINDOW_H,
-  })
-
-  win.once('ready-to-show', () => win.show())
+  centerOnDisplay(
+    win,
+    { width: LOGIN_WINDOW_W, height: LOGIN_WINDOW_H },
+    displayForWindow(null),
+  )
+  showWhenReady(win)
 
   // The only window while the reader is signed out: it may not navigate at all.
   attachNavigationPolicy(win, { links: 'deny', label: 'login window' })

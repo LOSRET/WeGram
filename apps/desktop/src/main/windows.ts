@@ -1,12 +1,9 @@
 import type { BrowserWindow } from 'electron'
 import { nativeTheme } from 'electron'
 
-import { attachNavigationPolicy, createAppWindow } from './app-window'
+import { attachNavigationPolicy, createAppWindow, repaintWindowChrome } from './app-window'
 import type { UiDatabase } from './store/ui-db'
-import { createLogger } from './util'
 import { hideViewerWithShell, showViewerWithShell } from './viewer'
-
-const logger = createLogger('windows')
 
 /**
  * Brings the shell window forward above the standalone viewer.
@@ -84,13 +81,5 @@ export function storedTheme(uiDb: UiDatabase | null): 'light' | 'dark' {
  * the theme changes — otherwise a dark UI keeps a light window-controls strip.
  */
 export function applyTitleBarTheme(win: BrowserWindow | null, theme: 'light' | 'dark'): void {
-  if (!win || win.isDestroyed()) return
-  try {
-    win.setTitleBarOverlay(shellTitleBarOverlay(theme))
-  } catch (error) {
-    logger.warn(
-      'setTitleBarOverlay failed:',
-      error instanceof Error ? error.message : String(error),
-    )
-  }
+  repaintWindowChrome(win, { overlay: shellTitleBarOverlay(theme) })
 }

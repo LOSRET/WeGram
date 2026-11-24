@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, screen, shell } from 'electron'
 
 import { createLogger } from './util'
 
@@ -75,6 +75,80 @@ export function loadRenderer(win: BrowserWindow, hash?: string): void {
   }
   const file = join(__dirname, '../renderer/index.html')
   void (hash ? win.loadFile(file, { hash }) : win.loadFile(file))
+}
+
+/** The display an anchored window opens on: the anchor's, else the primary one. */
+export function displayForWindow(anchor: BrowserWindow | null): Electron.Display {
+  if (anchor && !anchor.isDestroyed()) return screen.getDisplayMatching(anchor.getBounds())
+  return screen.getPrimaryDisplay()
+}
+
+/**
+ * The display under the pointer: where 图片和视频 and 即时预览 open, because the
+ * reader clicked something on that screen.
+ */
+export function displayForCursor(anchor: BrowserWindow | null): Electron.Display {
+  if (anchor && !anchor.isDestroyed()) return screen.getDisplayMatching(anchor.getBounds())
+  return screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
+}
+
+/** Centres a window in a display's work area. */
+export function centerOnDisplay(
+  win: BrowserWindow,
+  size: { width: number; height: number },
+  display: Electron.Display,
+): void {
+  const { x, y, width, height } = display.workArea
+  win.setBounds({
+    x: Math.round(x + (width - size.width) / 2),
+    y: Math.round(y + (height - size.height) / 2),
+    width: size.width,
+    height: size.height,
+  })
+}
+
+/**
+ * Shows a window once its renderer has painted.
+ *
+ * `raise` is for a window nothing owns (the viewer, 即时预览, the sheets): Windows
+ * does not put it above the shell by itself, and focusing alone would leave it
+ * behind. `focus` is the middle case (群二维码, which is owned); the login window
+ * only appears.
+ */
+export function showWhenReady(
+  win: BrowserWindow,
+  options: { raise?: boolean; focus?: boolean } = {},
+): void {
+  win.once('ready-to-show', () => {
+    win.show()
+    if (options.raise) {
+      win.moveTop()
+      win.focus()
+    } else if (options.focus) {
+      win.focus()
+    }
+  })
+}
+
+/**
+ * Repaints the parts of a window the renderer cannot: the native background (a dark
+ * theme otherwise flashes a light sheet for one frame) and the title strip Windows
+ * draws. A window that is mid-teardown refuses the call; nothing to repaint then.
+ */
+export function repaintWindowChrome(
+  win: BrowserWindow | null,
+  options: { background?: string; overlay?: Electron.TitleBarOverlay },
+): void {
+  if (!win || win.isDestroyed()) return
+  try {
+    if (options.overlay) win.setTitleBarOverlay(options.overlay)
+    if (options.background) win.setBackgroundColor(options.background)
+  } catch (error) {
+    logger.warn(
+      'repaintWindowChrome failed:',
+      error instanceof Error ? error.message : String(error),
+    )
+  }
 }
 
 /**

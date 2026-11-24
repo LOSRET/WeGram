@@ -1,12 +1,16 @@
 import type { ViewerItem, ViewerState } from '@wegram/protocol'
 import { AppError } from '@wegram/protocol'
-import { BrowserWindow, screen } from 'electron'
+import { BrowserWindow } from 'electron'
 
-import { attachNavigationPolicy, createAppWindow } from './app-window'
-import { createLogger } from './util'
+import {
+  attachNavigationPolicy,
+  centerOnDisplay,
+  createAppWindow,
+  displayForCursor,
+  repaintWindowChrome,
+  showWhenReady,
+} from './app-window'
 import { VIEWER_MIN_H, VIEWER_MIN_W, viewerWindowSize } from './viewer-size'
-
-const logger = createLogger('viewer')
 
 /** Height of the toolbar in the viewer window; also the titleBarOverlay height. */
 export const VIEWER_TOOLBAR_H = 40
@@ -131,22 +135,11 @@ export function isViewerWindow(win: BrowserWindow | null): boolean {
 /** Repaints the native window-controls strip when the app theme changes. */
 export function setViewerTheme(next: 'light' | 'dark'): void {
   theme = next
-  const win = getViewerWindow()
-  if (!win) return
-  try {
-    win.setTitleBarOverlay(titleBarOverlay(next))
-  } catch (error) {
-    logger.warn(
-      'setTitleBarOverlay failed:',
-      error instanceof Error ? error.message : String(error),
-    )
-  }
+  repaintWindowChrome(getViewerWindow(), { overlay: titleBarOverlay(next) })
 }
 
 function createViewerWindow(parent: BrowserWindow | null): BrowserWindow {
-  const display = parent
-    ? screen.getDisplayMatching(parent.getBounds())
-    : screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
+  const display = displayForCursor(parent)
   const size = viewerWindowSize({
     screen: display.size,
     workArea: display.workAreaSize,
@@ -165,20 +158,8 @@ function createViewerWindow(parent: BrowserWindow | null): BrowserWindow {
   })
 
   // Centred inside the work area, like the client's viewer.
-  const { x, y, width, height } = display.workArea
-  win.setBounds({
-    x: Math.round(x + (width - size.width) / 2),
-    y: Math.round(y + (height - size.height) / 2),
-    width: size.width,
-    height: size.height,
-  })
-
-  win.once('ready-to-show', () => {
-    win.show()
-    // Nothing owns this window any more, so it raises and focuses itself.
-    win.moveTop()
-    win.focus()
-  })
+  centerOnDisplay(win, size, display)
+  showWhenReady(win, { raise: true })
 
   // The viewer is a route of the same bundle; leaving it would strand the
   // toolbar and the strip it is showing (the shell and login windows guard this

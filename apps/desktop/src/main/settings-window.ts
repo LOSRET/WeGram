@@ -1,7 +1,13 @@
 import type { BrowserWindow } from 'electron'
-import { screen } from 'electron'
 
-import { attachNavigationPolicy, createAppWindow } from './app-window'
+import {
+  attachNavigationPolicy,
+  centerOnDisplay,
+  createAppWindow,
+  displayForWindow,
+  repaintWindowChrome,
+  showWhenReady,
+} from './app-window'
 
 /**
  * 设置 opens as its own window (design doc §9.11): a frameless 640 × 558 sheet,
@@ -50,23 +56,12 @@ export function openSettingsWindow(theme: 'light' | 'dark', anchor: BrowserWindo
     if (settingsWindow === win) settingsWindow = null
   })
 
-  const display =
-    anchor && !anchor.isDestroyed()
-      ? screen.getDisplayMatching(anchor.getBounds())
-      : screen.getPrimaryDisplay()
-  const { x, y, width, height } = display.workArea
-  win.setBounds({
-    x: Math.round(x + (width - SETTINGS_WINDOW_W) / 2),
-    y: Math.round(y + (height - SETTINGS_WINDOW_H) / 2),
-    width: SETTINGS_WINDOW_W,
-    height: SETTINGS_WINDOW_H,
-  })
-
-  win.once('ready-to-show', () => {
-    win.show()
-    win.moveTop()
-    win.focus()
-  })
+  centerOnDisplay(
+    win,
+    { width: SETTINGS_WINDOW_W, height: SETTINGS_WINDOW_H },
+    displayForWindow(anchor),
+  )
+  showWhenReady(win, { raise: true })
 
   // Settings is a dead end: it may not navigate anywhere or open a new window.
   attachNavigationPolicy(win, { links: 'deny', label: 'settings window' })
@@ -86,7 +81,7 @@ export function closeSettingsWindow(): void {
  * with the theme or a dark sheet flashes light for one frame after a switch.
  */
 export function setSettingsTheme(theme: 'light' | 'dark'): void {
-  const win = getSettingsWindow()
-  if (!win) return
-  win.setBackgroundColor(theme === 'dark' ? '#1e1e1f' : '#fafafa')
+  repaintWindowChrome(getSettingsWindow(), {
+    background: theme === 'dark' ? '#1e1e1f' : '#fafafa',
+  })
 }

@@ -1,8 +1,15 @@
 import type { InstantViewTarget, InstantViewWindowState } from '@wegram/protocol'
 import { AppError } from '@wegram/protocol'
-import { BrowserWindow, screen } from 'electron'
+import { BrowserWindow } from 'electron'
 
-import { attachNavigationPolicy, createAppWindow } from './app-window'
+import {
+  attachNavigationPolicy,
+  centerOnDisplay,
+  createAppWindow,
+  displayForCursor,
+  repaintWindowChrome,
+  showWhenReady,
+} from './app-window'
 
 /** Height of the strip the window controls sit in; the renderer draws it. */
 const READER_BAR_H = 40
@@ -68,14 +75,10 @@ export function instantViewWindowState(): InstantViewWindowState {
  */
 export function setInstantViewTheme(next: 'light' | 'dark'): void {
   theme = next
-  const win = getInstantViewWindow()
-  if (!win) return
-  try {
-    win.setTitleBarOverlay(titleBarOverlay(next))
-    win.setBackgroundColor(next === 'dark' ? '#1e1e1f' : '#fafafa')
-  } catch {
-    // A window that is mid-teardown refuses the call; nothing to repaint then.
-  }
+  repaintWindowChrome(getInstantViewWindow(), {
+    overlay: titleBarOverlay(next),
+    background: next === 'dark' ? '#1e1e1f' : '#fafafa',
+  })
 }
 
 export function closeInstantViewWindow(): void {
@@ -96,9 +99,7 @@ function titleBarOverlay(next: 'light' | 'dark'): {
 }
 
 function createReaderWindow(parent: BrowserWindow | null): BrowserWindow {
-  const display = parent
-    ? screen.getDisplayMatching(parent.getBounds())
-    : screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
+  const display = displayForCursor(parent)
   const area = display.workArea
   // A reading column, not a phone sheet: the client's IV window is roughly this,
   // and it keeps 640 px of text plus the page's margins comfortable.
@@ -122,19 +123,8 @@ function createReaderWindow(parent: BrowserWindow | null): BrowserWindow {
   win.setMenu(null)
   win.setMenuBarVisibility(false)
 
-  win.setBounds({
-    x: Math.round(area.x + (area.width - width) / 2),
-    y: Math.round(area.y + (area.height - height) / 2),
-    width,
-    height,
-  })
-
-  win.once('ready-to-show', () => {
-    win.show()
-    // Nothing owns this window, so it raises and focuses itself.
-    win.moveTop()
-    win.focus()
-  })
+  centerOnDisplay(win, { width, height }, display)
+  showWhenReady(win, { raise: true })
 
   // The page is a web article: an external link leaves the app, and the article may
   // never navigate this window away from its own route.

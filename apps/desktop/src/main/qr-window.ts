@@ -1,7 +1,12 @@
 import type { BrowserWindow } from 'electron'
-import { screen } from 'electron'
 
-import { attachNavigationPolicy, createAppWindow } from './app-window'
+import {
+  attachNavigationPolicy,
+  centerOnDisplay,
+  createAppWindow,
+  displayForWindow,
+  showWhenReady,
+} from './app-window'
 
 /**
  * 群二维码 opens as its own small window, like WeChat's: a frameless 360 × 560
@@ -57,21 +62,8 @@ export function openQrWindow(
   })
 
   if (parent) win.setParentWindow(parent)
-  const display = parent
-    ? screen.getDisplayMatching(parent.getBounds())
-    : screen.getPrimaryDisplay()
-  const { x, y, width, height } = display.workArea
-  win.setBounds({
-    x: Math.round(x + (width - QR_WINDOW_W) / 2),
-    y: Math.round(y + (height - QR_WINDOW_H) / 2),
-    width: QR_WINDOW_W,
-    height: QR_WINDOW_H,
-  })
-
-  win.once('ready-to-show', () => {
-    win.show()
-    win.focus()
-  })
+  centerOnDisplay(win, { width: QR_WINDOW_W, height: QR_WINDOW_H }, displayForWindow(parent))
+  showWhenReady(win, { focus: true })
 
   // A QR sheet is a dead end: it may not navigate anywhere or open a new window.
   attachNavigationPolicy(win, { links: 'deny', label: 'qr window' })
