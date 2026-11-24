@@ -7,7 +7,13 @@ import { describe, expect, it } from 'vitest'
 import { ARCHIVE_PAGE_ANIM_MS } from '../src/renderer/src/lib/archivePage'
 import { INFO_PANEL_ANIM_MS } from '../src/renderer/src/lib/chatInfo'
 import { COMMENT_PANEL_ANIM_MS } from '../src/renderer/src/lib/comments'
-import { CHAT_ROW_H } from '../src/renderer/src/lib/listMetrics'
+import {
+  CHAT_ROW_H,
+  MSG_AVATAR,
+  MSG_ROW_GAP,
+  STACK_MAX_FRACTION,
+  STACK_MAX_WIDTH,
+} from '../src/renderer/src/lib/listMetrics'
 import { TOPICS_PAGE_ANIM_MS } from '../src/renderer/src/lib/topics'
 
 /**
@@ -69,6 +75,37 @@ function propertyMs(css: string, selector: string, property: string): number {
 describe('style contract', () => {
   it('keeps the virtualised row height equal to --wx-list-item-h', () => {
     expect(pxAfter(read('tokens.css'), '--wx-list-item-h')).toBe(CHAT_ROW_H)
+  })
+
+  /**
+   * An album is composed at 430 px and scaled down to the stack's cap, so the cap
+   * is read by `MessageRow` before any CSS is measured — it has to be the same
+   * `min(560px, 66%)` the stylesheet gives `.wx-message-stack`.
+   */
+  it('keeps the bubble cap equal to the stack max-width', () => {
+    const css = read('message-rows.css')
+    const start = css.indexOf('.wx-message-stack {')
+    if (start < 0) throw new Error('.wx-message-stack is missing from message-rows.css')
+    const block = css.slice(start, css.indexOf('}', start))
+    const match = /max-width:\s*min\((\d+)px,\s*([\d.]+)%\)/.exec(block)
+    if (!match) throw new Error('the stack max-width is missing from message-rows.css')
+    expect(Number(match[1])).toBe(STACK_MAX_WIDTH)
+    expect(Number(match[2]) / 100).toBeCloseTo(STACK_MAX_FRACTION, 5)
+  })
+
+  /**
+   * An album takes the row's own space (the avatar and the row's gap removed), so
+   * those two measurements are read in TypeScript before any CSS is measured.
+   */
+  it('keeps the row measurements equal to the stylesheet', () => {
+    expect(pxAfter(read('tokens.css'), '--wx-avatar-msg')).toBe(MSG_AVATAR)
+    const css = read('message-rows.css')
+    const start = css.indexOf('.wx-message-row {')
+    if (start < 0) throw new Error('.wx-message-row is missing from message-rows.css')
+    const block = css.slice(start, css.indexOf('}', start))
+    const gap = /gap:\s*(\d+)px/.exec(block)
+    if (!gap) throw new Error('the row gap is missing from message-rows.css')
+    expect(Number(gap[1])).toBe(MSG_ROW_GAP)
   })
 
   it('keeps the panel slide equal to COMMENT_PANEL_ANIM_MS', () => {

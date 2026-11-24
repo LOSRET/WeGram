@@ -37,13 +37,10 @@
   background: var(--wx-bubble-self);
 }
 
-/* An album's grid is 2 × 116 px + a 3 px gap (`styles/rich-text.css`); the bubble is
-   that plus its own inset, so the grid fills it edge to edge like a single photo
-   instead of the caption widening the bubble and leaving a gap on the right. */
-.wx-bubble--channel.wx-bubble--album {
-  width: calc(2 * 116px + 3px + 2 * var(--wx-channel-pad-x));
-  max-width: 100%;
-}
+/* An album's width comes from its own composition (`lib/albumLayout.ts`); the
+   bubble is sized from that layout inline, so the cells fill it edge to edge like
+   a single photo instead of the caption widening the bubble and leaving a gap on
+   the right. */
 
 /* The caption belongs to the bubble instead of being WeChat's second grey bubble
    under the photograph. */

@@ -1,8 +1,10 @@
 import type { ChatSummary, LinkPreview, Message } from '@wegram/protocol'
-import { memo, useState, type MouseEvent, type ReactNode } from 'react'
+import { memo, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 
+import { albumLayoutOf, resizeAlbum } from '../../lib/albumLayout'
 import { hasCommentBar, isCommentablePost } from '../../lib/comments'
 import { formatMessageTime, messagePreview } from '../../lib/format'
+import { MSG_AVATAR, MSG_ROW_GAP } from '../../lib/listMetrics'
 import { stickerBox } from '../../lib/stickerBox'
 import { Avatar } from '../Avatar'
 import { CustomEmoji } from '../CustomEmoji'
@@ -126,6 +128,23 @@ export const MessageRow = memo(
      * the row owns the counter and hands it to the effect.
      */
     const [premiumReplay, setPremiumReplay] = useState(0)
+    /**
+     * An album is composed at Telegram Desktop's 430 px and scaled down to the
+     * bubble's cap when the pane is narrower, so the row's own width is measured
+     * here — before the first paint, hence `useLayoutEffect`.
+     */
+    const rowRef = useRef<HTMLDivElement | null>(null)
+    const [rowWidth, setRowWidth] = useState(0)
+    const isAlbumRow = messages.length > 1
+    useLayoutEffect(() => {
+      const row = rowRef.current
+      if (!row || !isAlbumRow) return
+      const measure = (): void => setRowWidth(row.getBoundingClientRect().width)
+      measure()
+      const observer = new ResizeObserver(measure)
+      observer.observe(row)
+      return () => observer.disconnect()
+    }, [isAlbumRow])
     const first = messages[0]
     const last = messages[messages.length - 1]
     if (!first || !last) return null
@@ -140,6 +159,8 @@ export const MessageRow = memo(
     // the media, and the group shares one meta line. A lone album item (the sibling
     // has not been paged in, or was deleted) still renders as a normal bubble.
     const album = messages.length > 1
+    /** The album's composition, from the same pure geometry the cells are drawn with. */
+    const albumLayout = album ? albumLayoutOf(messages) : null
     const media = first.media
     const mediaKind =
       first.kind === 'photo' ||
@@ -179,15 +200,35 @@ export const MessageRow = memo(
     const showSender = !first.outgoing && chat.kind !== 'private'
     const channelBubble = channel ? ' wx-bubble--channel' : ''
     /**
-     * A channel media post is as wide as its media, so the caption and the comment
-     * handle wrap inside that width. Left to `fit-content`, a long caption widened
-     * the bubble past the picture and left a strip of empty bubble on its right.
-     * The frame is the media bubble's own inset in `styles/channel.css`.
+     * An album is Telegram's: composed at 430 px, and when the pane cannot hold
+     * that it takes the row's own space — the avatar and the row's gap removed, the
+     * 66 % text-bubble cap deliberately ignored — and `resizeAlbum` scales the
+     * composition, seams included, like tdesktop's `countCurrentSize`.
      */
-    const channelMediaBox =
-      channel && !album && media && (mediaKind === 'photo' || mediaKind === 'video')
-        ? channelMediaWidth(mediaKind, media) + 2 * CHANNEL_MEDIA_INSET
+    const albumMaxWidth =
+      rowWidth > 0
+        ? Math.max(1, rowWidth - MSG_AVATAR - MSG_ROW_GAP - (channel ? 2 * CHANNEL_MEDIA_INSET : 0))
         : undefined
+    const albumDrawn =
+      albumLayout === null
+        ? null
+        : albumMaxWidth === undefined
+          ? albumLayout
+          : resizeAlbum(albumLayout, albumMaxWidth)
+
+    /**
+     * The bubble's width: a media post is as wide as its media, so the caption (and
+     * the comment handle, in a channel) wraps inside it instead of widening the
+     * bubble past the picture and leaving a strip of empty bubble on its right. An
+     * album sets it for a plain chat too — a Telegram album is wider than a text
+     * bubble, which is what `.wx-bubble--album`'s `max-width: none` allows.
+     */
+    const mediaFrameWidth =
+      albumDrawn !== null
+        ? albumDrawn.width + (channel ? 2 * CHANNEL_MEDIA_INSET : 0)
+        : channel && media && (mediaKind === 'photo' || mediaKind === 'video')
+          ? channelMediaWidth(mediaKind, media) + 2 * CHANNEL_MEDIA_INSET
+          : undefined
 
     const openMenu = (event: MouseEvent): void => {
       event.preventDefault()
@@ -217,7 +258,10 @@ export const MessageRow = memo(
       ) : null
 
     return (
-      <div className={`wx-message-row${first.outgoing ? ' wx-message-row--self' : ''}`}>
+      <div
+        className={`wx-message-row${first.outgoing ? ' wx-message-row--self' : ''}`}
+        ref={rowRef}
+      >
         <Avatar
           className="wx-avatar wx-avatar--small"
           url={avatarUrl}
@@ -329,7 +373,7 @@ export const MessageRow = memo(
                     ? ` wx-bubble--media wx-bubble--${mediaKind}`
                     : ''
               }`}
-              {...(channelMediaBox === undefined ? {} : { style: { width: channelMediaBox } })}
+              {...(mediaFrameWidth === undefined ? {} : { style: { width: mediaFrameWidth } })}
               onContextMenu={openMenu}
             >
               {repliedTo ? (
@@ -337,8 +381,8 @@ export const MessageRow = memo(
                   {repliedTo.senderName}：{messagePreview(repliedTo)}
                 </div>
               ) : null}
-              {album ? (
-                <AlbumBubble chatId={chat.id} messages={messages} />
+              {album && albumDrawn ? (
+                <AlbumBubble chatId={chat.id} messages={messages} layout={albumDrawn} />
               ) : mediaKind && media ? (
                 <MediaBubble
                   media={media}

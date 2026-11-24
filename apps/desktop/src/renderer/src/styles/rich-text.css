@@ -162,9 +162,14 @@
 
 /* ---------- Albums (Telegram media groups, design doc §8.6) ---------- */
 
-/* The bubble is only a frame: the grid draws the media, the caption sits under it
-   like a photo's, and the row keeps one avatar / one meta line for the group. */
+/* The bubble is only a frame: the cells are placed by `lib/albumLayout.ts` (the
+   official client's album geometry), the caption sits under them like a photo's,
+   and the row keeps one avatar / one meta line for the group. */
+/* Telegram lets media be wider than a text bubble: an album is as wide as its own
+   composition (430 px, scaled down on a narrow pane), so the 100 % stack cap that
+   keeps text bubbles readable is released here — the width is set inline. */
 .wx-bubble--album {
+  max-width: none;
   padding: 0;
   background: transparent;
   box-shadow: none;
@@ -174,15 +179,17 @@
   background: transparent;
 }
 
+/* The box is the composition's own size; the cells sit on top of it at the
+   coordinates the layout gave them. `overflow: hidden` rounds the outer frame and
+   clips nothing else — the seams are the layout's spacing, so they stay square. */
 .wx-album {
-  display: grid;
-  grid-template-columns: repeat(2, 116px);
-  gap: 3px;
-  border-radius: 4px;
+  position: relative;
   overflow: hidden;
+  border-radius: 4px;
 }
 
 .wx-album__cell {
+  position: absolute;
   display: block;
   min-width: 0;
 }
@@ -190,13 +197,8 @@
 .wx-album .wx-photo,
 .wx-album .wx-video {
   width: 100%;
-  height: 116px;
+  height: 100%;
   border-radius: 0;
-}
-
-/* An odd last cell fills the row, the way Telegram's 3-up album reads. */
-.wx-album__cell:last-child:nth-child(odd) {
-  grid-column: span 2;
 }
 
 .wx-photo {

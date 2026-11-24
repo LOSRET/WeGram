@@ -198,6 +198,10 @@ lib/presence.ts       (pure, unit-tested) 在线 / 最后上线 copy for the pee
 lib/editTarget.ts     (pure, unit-tested) which edit path a row has: 编辑 (text) or
                       编辑说明 (a media caption), and the menu's word for each
 lib/albumSend.ts      (pure, unit-tested) when a multi-select becomes ONE Telegram album
+lib/albumLayout.ts    (pure, unit-tested) the album's geometry — tdesktop's
+                      `LayoutMediaGroup` ported: aspect-ratio templates for 1–4
+                      items, a row-split search for 5–10, Telegram Desktop's
+                      430/100/4 px box and its proportional shrink (`resizeAlbum`)
 lib/useComposerInput.ts  composition ref + textarea props, shared by both composers
 lib/contacts.ts       通讯录 initial/grouping, pinyin via ICU (pure, unit-tested)
 lib/entities.ts       TL entity → text segments (pure, unit-tested)
