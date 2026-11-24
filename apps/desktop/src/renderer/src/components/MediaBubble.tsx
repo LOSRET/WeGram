@@ -16,8 +16,8 @@ import { percentOf, reserveBox } from '../lib/mediaBox'
 import { bubblePriority, thumbPriority } from '../lib/mediaPriority'
 import { pickVariant } from '../lib/mediaVariant'
 import { useInView } from '../lib/useInView'
-import { openPhotoViewer, openVideoViewer } from '../lib/viewer'
-import { useViewerSource } from '../lib/viewerSource'
+import { openPageViewer, openPhotoViewer, openVideoViewer } from '../lib/viewer'
+import { usePageViewerSource, useViewerSource } from '../lib/viewerSource'
 import { useAppStore } from '../store/useAppStore'
 import { VoiceBubble } from './VoiceBubble'
 import { PlayIcon } from './viewer/ViewerIcons'
@@ -216,6 +216,8 @@ function PhotoBubble({
   const [loadedUrl, setLoadedUrl] = useState<string>()
   // The pane this bubble is drawn in, for panes that do not live in the chat store.
   const source = useViewerSource()
+  // 即时预览's page: its pictures belong to no message, so the strip is the page's own.
+  const page = usePageViewerSource()
 
   const box = inAlbum
     ? undefined
@@ -254,7 +256,9 @@ function PhotoBubble({
       className={`wx-photo${inAlbum ? ' wx-photo--album' : ''}`}
       style={box}
       // The client opens the photo in its own window, not in an overlay.
-      onClick={() => openPhotoViewer(chatId, messageId, source)}
+      onClick={() =>
+        page ? openPageViewer(page, media.fileId) : openPhotoViewer(chatId, messageId, source)
+      }
       title="查看大图"
     >
       {media.minithumbnail ? (
@@ -306,6 +310,7 @@ function VideoBubble({
 }) {
   const [ref, view] = useInView<HTMLButtonElement>(MEDIA_PRELOAD_PX)
   const source = useViewerSource()
+  const page = usePageViewerSource()
 
   const box = inAlbum
     ? undefined
@@ -327,7 +332,9 @@ function VideoBubble({
       type="button"
       className={`wx-video wx-video--poster${inAlbum ? ' wx-video--album' : ''}`}
       style={box}
-      onClick={() => openVideoViewer(chatId, messageId, source)}
+      onClick={() =>
+        page ? openPageViewer(page, media.fileId) : openVideoViewer(chatId, messageId, source)
+      }
       title="播放视频"
     >
       {media.minithumbnail ? (
@@ -374,6 +381,7 @@ function AnimationBubble({
 }) {
   const [ref, view] = useInView<HTMLButtonElement>(MEDIA_PRELOAD_PX)
   const source = useViewerSource()
+  const page = usePageViewerSource()
   const [url, setUrl] = useState<string>()
   const [failed, setFailed] = useState(false)
   const videoRef = useRef<HTMLVideoElement | null>(null)
@@ -427,7 +435,9 @@ function AnimationBubble({
       type="button"
       className={`wx-video wx-video--animation${inAlbum ? ' wx-video--album' : ''}`}
       style={box}
-      onClick={() => openVideoViewer(chatId, messageId, source)}
+      onClick={() =>
+        page ? openPageViewer(page, media.fileId) : openVideoViewer(chatId, messageId, source)
+      }
       title="查看动图"
     >
       {url && !failed ? (
@@ -495,4 +505,3 @@ function FileBubble({ media }: { media: MessageMedia }) {
     </button>
   )
 }
-

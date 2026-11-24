@@ -595,7 +595,8 @@ export function createHandlers({
      */
     'viewer:locate': (payload) => {
       const chatId = viewerChatId()
-      if (chatId === null) throw new AppError('internal', 'Nothing is open in the viewer')
+      // A strip that came from no chat (即时预览's page, §8.9) has nowhere to go.
+      if (chatId === null) throw new AppError('internal', '这条媒体不来自聊天')
       onLocate({ chatId, messageId: payload.messageId })
     },
     'viewer:close': () => {

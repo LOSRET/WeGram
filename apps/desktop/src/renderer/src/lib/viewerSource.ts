@@ -1,4 +1,4 @@
-import type { Message } from '@wegram/protocol'
+import type { Message, ViewerItem } from '@wegram/protocol'
 import { createContext, useContext } from 'react'
 
 /**
@@ -20,4 +20,20 @@ export const ViewerSource = createContext<readonly Message[] | null>(null)
 /** The rows of the pane around this bubble, or `null` to read `messagesByChat`. */
 export function useViewerSource(): readonly Message[] | null {
   return useContext(ViewerSource)
+}
+
+/**
+ * The viewer strip of a pane whose media belongs to no message at all: 即时预览's
+ * page (design doc §8.9). A page's pictures are blocks, not messages, so
+ * `buildViewerStrip` cannot build its strip and there is no chat to read either.
+ *
+ * The strip is the page's own media in document order; a click resolves its index by
+ * file id, and the viewer is opened without a conversation (a page has no 定位到聊天
+ * 位置). Any provider here wins over `ViewerSource`.
+ */
+export const PageViewerSource = createContext<readonly ViewerItem[] | null>(null)
+
+/** The page's own strip, or `null` when this bubble lives in a conversation. */
+export function usePageViewerSource(): readonly ViewerItem[] | null {
+  return useContext(PageViewerSource)
 }

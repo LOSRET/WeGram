@@ -15,8 +15,11 @@ export const VIEWER_TOOLBAR_H = 40
 const VIEWER_TITLE = '图片和视频'
 
 export interface ViewerRequest {
-  /** The conversation the strip came from; 定位到聊天位置 hands it back to the shell. */
-  chatId: number
+  /**
+   * The conversation the strip came from; 定位到聊天位置 hands it back to the shell.
+   * Absent when the strip belongs to no chat (即时预览's page media, §8.9).
+   */
+  chatId?: number
   items: ViewerItem[]
   index: number
 }

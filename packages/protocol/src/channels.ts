@@ -598,8 +598,11 @@ export const invokeSchemas = {
    */
   'viewer:open': {
     request: z.object({
-      /** The conversation the strip was taken from; 定位到聊天位置 needs it. */
-      chatId: z.number().int(),
+      /**
+       * The conversation the strip was taken from; 定位到聊天位置 needs it. Absent
+       * for a strip that belongs to no chat — 即时预览's page media (§8.9).
+       */
+      chatId: z.number().int().optional(),
       items: viewerItemsSchema,
       index: z.number().int().nonnegative(),
     }),

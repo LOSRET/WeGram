@@ -1,7 +1,7 @@
 import type { Message, MessageMedia } from '@wegram/protocol'
 import { describe, expect, it } from 'vitest'
 
-import { buildViewerStrip } from './viewer'
+import { buildViewerStrip, viewerWindow } from './viewer'
 
 function message(
   id: number,
@@ -106,5 +106,32 @@ describe('buildViewerStrip', () => {
 
     expect(strip?.items.map((item) => item.fileId)).toEqual([13])
     expect(strip?.index).toBe(0)
+  })
+})
+/**
+ * A page can hold more pictures than one window pages through (the protocol caps a
+ * strip at 200), so the click has to be centred inside the window it opens.
+ */
+describe('viewerWindow', () => {
+  const ids = Array.from({ length: 250 }, (_, index) => index)
+
+  it('keeps a short strip whole', () => {
+    expect(viewerWindow([1, 2, 3], 1)).toEqual({ items: [1, 2, 3], index: 1 })
+  })
+
+  it('centres a long strip on the clicked item', () => {
+    const strip = viewerWindow(ids, 120)
+
+    expect(strip.items).toHaveLength(200)
+    expect(strip.items[strip.index]).toBe(120)
+    expect(strip.items[0]).toBe(20)
+  })
+
+  it('clamps at both ends instead of running off the strip', () => {
+    expect(viewerWindow(ids, 0)).toMatchObject({ index: 0 })
+    expect(viewerWindow(ids, 0).items[0]).toBe(0)
+    const last = viewerWindow(ids, 249)
+    expect(last.items).toHaveLength(200)
+    expect(last.items[last.index]).toBe(249)
   })
 })

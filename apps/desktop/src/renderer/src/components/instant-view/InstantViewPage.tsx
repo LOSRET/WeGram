@@ -1,12 +1,13 @@
-import type { InstantView } from '@wegram/protocol'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import type { InstantView, ViewerItem } from '@wegram/protocol'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
+import { pageViewerItems } from '../../lib/instantViewMedia'
 import { errorMessage, invoke } from '../../lib/ipc'
-import { ViewerSource } from '../../lib/viewerSource'
+import { PageViewerSource } from '../../lib/viewerSource'
 import { RichMessage } from '../message-list/RichMessage'
 
-/** A page's media belongs to no message of a chat: 查看大图 has nothing to page. */
-const NO_ROWS: readonly never[] = []
+/** The strip both "nothing loaded yet" and a page without pictures hand down. */
+const NO_ITEMS: readonly ViewerItem[] = []
 
 /**
  * 即时预览's page body: one `web:instantView` call, then the rich-message renderer
@@ -22,6 +23,10 @@ export function InstantViewPage({ url }: { url: string }) {
   const [error, setError] = useState<string | null>(null)
   /** Only the newest request may land: the window can be re-targeted mid-flight. */
   const requestRef = useRef(0)
+
+  // 查看大图 pages through the page's own pictures: its blocks belong to no message,
+  // so the strip is built from them here and a click resolves its index by file id.
+  const viewerItems = useMemo(() => (page ? pageViewerItems(page.blocks) : NO_ITEMS), [page])
 
   const load = useCallback(async (): Promise<void> => {
     const ticket = ++requestRef.current
@@ -56,7 +61,7 @@ export function InstantViewPage({ url }: { url: string }) {
         </div>
       ) : null}
       {page ? (
-        <ViewerSource value={NO_ROWS}>
+        <PageViewerSource value={viewerItems}>
           <article className="wx-iv-page__article">
             <RichMessage
               blocks={page.blocks}
@@ -69,7 +74,7 @@ export function InstantViewPage({ url }: { url: string }) {
               <p className="wx-iv-page__note">这是网页摘要，完整版请在浏览器打开。</p>
             ) : null}
           </article>
-        </ViewerSource>
+        </PageViewerSource>
       ) : null}
     </div>
   )

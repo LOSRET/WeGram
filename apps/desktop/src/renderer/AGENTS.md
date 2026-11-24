@@ -390,7 +390,12 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   has no store entry and `buildViewerStrip` answered "not in the strip" (silently — the
   click just returned). Any pane with its own list must hand that list to viewers through
   `lib/viewerSource.ts` (`<ViewerSource value={rows}>`); `MediaBubble` reads it and
-  `openViewer` prefers it over the store.
+  `openViewer` prefers it over the store. **即时预览 is the same rule one step further**: its
+  page's pictures are blocks, not messages, so there is no row to look up — the page
+  folds its `media`/`gallery` blocks into a `ViewerItem` strip (`lib/instantViewMedia.ts`)
+  and provides it through `PageViewerSource`; `MediaBubble` resolves the click by file id
+  and `viewer:open` carries **no** `chatId`, which is what makes 定位到聊天位置 say
+  「这条媒体不来自聊天」 instead of opening conversation 0.
 - **通讯录 is the Telegram address book, not the chat list.** `contacts:list`
   (`getContacts` + `getUser` in main) returns `Contact[]` — people, not
   conversations — so a contact you never wrote to has a card but no chat; 发消息
