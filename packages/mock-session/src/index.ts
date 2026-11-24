@@ -5,8 +5,21 @@ export { nextReadState } from './read'
 export type { ReadState } from './read'
 export { pageAround, pageNewer, pageOlder } from './paging'
 export type { AroundPage, NewerPage, OlderPage } from './paging'
-export { applyPollVote, appendPollOption, castPollVote, pollVoteRejection } from './poll'
-export type { FakePoll, FakePollOption, PollRejection, PollVoteRejection, PollWrite } from './poll'
+export {
+  applyPollVote,
+  copyPoll,
+  newPollOption,
+  pollOptionTarget,
+  pollVoteRejection,
+} from './poll'
+export type {
+  FakePoll,
+  FakePollOption,
+  NewPollOption,
+  PollOptionTarget,
+  PollRejection,
+  PollVoteRejection,
+} from './poll'
 export {
   createTopic,
   DEFAULT_TOPIC_ICONS,

@@ -17,8 +17,19 @@ Pure rules that both fakes must answer identically:
   `comment-access.ts` rule) and `threadInteraction`.
 - `chatList.ts` — `sortChatList`: the chat list's order (pinned first, then newest
   activity), which both fakes serve.
-- `poll.ts` — `applyPollVote`: the fake vote arithmetic (first vote, change, retract,
-  multi-answer, quiz lock, percentages), shared by both fakes.
+- `poll.ts` — `applyPollVote` (first vote, change, retract, multi-answer, quiz
+  lock, percentages), `copyPoll` / `pollOptionTarget` / `newPollOption` for the
+  add-option path, and `pollVoteRejection` — the code + words a refused vote
+  crosses as (a quiz is `poll_answered`, the rest forbidden / invalid payload).
+- `topics.ts` — the 话题 rules: `orderTopics` / `filterTopics` / `pageTopics` plus
+  `createTopic`, `topicEditPatch`, `setTopicFlag`, `removeTopic`, `topicListPage`,
+  `topicRead`, `sumTopicUnread` and `DEFAULT_TOPIC_ICONS`.
+- `search.ts` — `searchChatRows` (the 聊天 / 频道 title match; an empty box finds
+  nothing), `searchMessageRows` (in-chat substring) and `searchMessagesInScope`
+  (the merged per-scope stream, its numeric cursor and `total`).
+- `profile.ts` — `REPORT_OPTIONS` / `reportAnswer` (the phased 举报 sheet) and
+  `composeProfile` / `pageCommonChats` for the 资料卡 (备注 overrides, a bot is
+  never a contact and is the only reportable person).
 
 The package imports nothing — no zod, no Node, no Electron, no React — because the
 renderer is a sandboxed page and `@wegram/mock-session` is bundled into it. Keep it

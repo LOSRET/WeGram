@@ -1,4 +1,13 @@
-import { filterTopics, nextReadState, orderTopics, pageTopics } from '@wegram/mock-session'
+import {
+  createTopic,
+  DEFAULT_TOPIC_ICONS,
+  removeTopic,
+  setTopicFlag,
+  sumTopicUnread,
+  topicEditPatch,
+  topicListPage,
+  topicRead,
+} from '@wegram/mock-session'
 import { AppError } from '@wegram/protocol'
 import type { ChatSummary, ChatTopic, TopicIcon, TopicPage } from '@wegram/protocol'
 
@@ -8,9 +17,9 @@ import type { Fixture } from './constants'
 /**
  * 话题 (design doc §9.12) for the fake account: the list, its cursor and the
  * management calls, held in the fixture itself so both fakes and the UI see one
- * state. Real TDLib hands ordering to the server (`forumTopic.order`); the mock
- * sorts the way the official client shows it — pinned, General, then newest
- * activity.
+ * state. The rules are `@wegram/mock-session`'s — the browser preview runs the
+ * same ones, so the two fakes cannot disagree about a topic row. Real TDLib hands
+ * ordering to the server (`forumTopic.order`).
  */
 export interface MockTopicStore {
   fixtures: Map<number, Fixture>
@@ -31,10 +40,7 @@ function topicsOf(fixture: Fixture): ChatTopic[] {
 function syncChatUnread(fixture: Fixture): void {
   const topics = topicsOf(fixture)
   if (topics.length === 0) return
-  fixture.chat = {
-    ...fixture.chat,
-    unread: topics.reduce((total, topic) => total + topic.unread, 0),
-  }
+  fixture.chat = { ...fixture.chat, unread: sumTopicUnread(topics) }
 }
 
 function announce(store: MockTopicStore, chatId: number): void {
@@ -51,23 +57,7 @@ export function createMockTopics(store: MockTopicStore) {
     limit?: number
   }): Promise<TopicPage> => {
     const fixture = requireFixture(store, input.chatId)
-    // The shared fake rules own the order and the search (`@wegram/mock-session`).
-    const all = filterTopics(orderTopics(topicsOf(fixture)), input.query ?? '')
-    const limit = Math.min(Math.max(input.limit ?? 50, 1), 100)
-    const page = pageTopics(all, input.cursor?.topicId, limit)
-    const last = page.topics.at(-1)
-    return {
-      topics: page.topics.map((topic) => ({ ...topic })),
-      totalCount: all.length,
-      next:
-        page.nextTopicId !== null && last
-          ? {
-              date: last.lastMessageAt ?? 0,
-              messageId: last.lastMessageId ?? 0,
-              topicId: page.nextTopicId,
-            }
-          : null,
-    }
+    return topicListPage(topicsOf(fixture), input)
   }
 
   const create = async (input: {
@@ -77,22 +67,8 @@ export function createMockTopics(store: MockTopicStore) {
     iconEmojiId?: string
   }): Promise<ChatTopic> => {
     const fixture = requireFixture(store, input.chatId)
-    const topics = topicsOf(fixture)
-    // 1 is General and never allocated; real ids are message ids, so this is
-    // unique without asking anything.
-    const id = Math.max(0, ...topics.map((topic) => topic.id)) + 1
-    const topic: ChatTopic = {
-      id,
-      title: input.title,
-      isGeneral: false,
-      isClosed: false,
-      isPinned: false,
-      muted: false,
-      iconColor: input.iconColor,
-      ...(input.iconEmojiId && input.iconEmojiId !== '0' ? { iconEmojiId: input.iconEmojiId } : {}),
-      unread: 0,
-    }
-    fixture.topics = [...topics, topic]
+    const topic = createTopic(topicsOf(fixture), input)
+    fixture.topics = [...topicsOf(fixture), topic]
     announce(store, input.chatId)
     return { ...topic }
   }
@@ -104,41 +80,28 @@ export function createMockTopics(store: MockTopicStore) {
     iconEmojiId?: string
   }): Promise<void> => {
     const fixture = requireFixture(store, input.chatId)
+    const patch = topicEditPatch(input)
     fixture.topics = topicsOf(fixture).map((topic) =>
-      topic.id === input.topicId
-        ? {
-            ...topic,
-            ...(input.title ? { title: input.title } : {}),
-            ...(input.iconEmojiId === undefined
-              ? {}
-              : input.iconEmojiId === '0'
-                ? { iconEmojiId: undefined }
-                : { iconEmojiId: input.iconEmojiId }),
-          }
-        : topic,
+      topic.id === input.topicId ? { ...topic, ...patch } : topic,
     )
     announce(store, input.chatId)
   }
 
   const setPinned = async (chatId: number, topicId: number, pinned: boolean): Promise<void> => {
     const fixture = requireFixture(store, chatId)
-    fixture.topics = topicsOf(fixture).map((topic) =>
-      topic.id === topicId ? { ...topic, isPinned: pinned } : topic,
-    )
+    fixture.topics = setTopicFlag(topicsOf(fixture), topicId, 'isPinned', pinned)
     announce(store, chatId)
   }
 
   const setClosed = async (chatId: number, topicId: number, closed: boolean): Promise<void> => {
     const fixture = requireFixture(store, chatId)
-    fixture.topics = topicsOf(fixture).map((topic) =>
-      topic.id === topicId ? { ...topic, isClosed: closed } : topic,
-    )
+    fixture.topics = setTopicFlag(topicsOf(fixture), topicId, 'isClosed', closed)
     announce(store, chatId)
   }
 
   const remove = async (chatId: number, topicId: number): Promise<void> => {
     const fixture = requireFixture(store, chatId)
-    fixture.topics = topicsOf(fixture).filter((topic) => topic.id !== topicId)
+    fixture.topics = removeTopic(topicsOf(fixture), topicId)
     fixture.messages = fixture.messages.filter((message) => message.topicId !== topicId)
     const last = fixture.messages.at(-1)
     fixture.chat = {
@@ -154,21 +117,13 @@ export function createMockTopics(store: MockTopicStore) {
   /** 话题免打扰: the row's own flag, refreshed through `evt:topics`. */
   const setMuted = async (chatId: number, topicId: number, muted: boolean): Promise<void> => {
     const fixture = requireFixture(store, chatId)
-    fixture.topics = topicsOf(fixture).map((topic) =>
-      topic.id === topicId ? { ...topic, muted } : topic,
-    )
+    fixture.topics = setTopicFlag(topicsOf(fixture), topicId, 'muted', muted)
     announce(store, chatId)
   }
 
-  /**
-   * 话题图标: the fake account's three piece-of-art emoji. The ids are the sticker
-   * file ids, which is how the mock's custom-emoji lookup is keyed.
-   */
-  const icons = async (): Promise<TopicIcon[]> => [
-    { id: '7001', emoji: '😀' },
-    { id: '7002', emoji: '❤️' },
-    { id: '7003', emoji: '✨' },
-  ]
+  /** 话题图标: the fake account's three-piece set, as the picker draws it. */
+  const icons = async (): Promise<TopicIcon[]> =>
+    DEFAULT_TOPIC_ICONS.map((icon) => ({ ...icon }))
 
   /** 复制话题链接: a t.me link the fake account can open again. */
   const link = async (chatId: number, topicId: number): Promise<{ link: string } | null> => {
@@ -178,10 +133,8 @@ export function createMockTopics(store: MockTopicStore) {
   }
 
   /**
-   * 标为已读 (the topic menu's item): one topic's marker and counter, re-summed into
-   * the chat. It runs the chat's own read rule (`nextReadState`) over this topic's
-   * rows, so a report that stops short of the newest row leaves the rest unread
-   * instead of clearing a topic the reader has not finished.
+   * 标为已读 (the topic menu's item): one topic's marker and counter, re-summed
+   * into the chat. The read rule itself is `topicRead`'s.
    */
   const markRead = async (
     chatId: number,
@@ -189,19 +142,14 @@ export function createMockTopics(store: MockTopicStore) {
     upToMessageId: number,
   ): Promise<void> => {
     const fixture = requireFixture(store, chatId)
-    const topic = topicsOf(fixture).find((entry) => entry.id === topicId)
-    if (!topic) return
-    const state = nextReadState(
-      topic,
+    const read = topicRead(
+      topicsOf(fixture),
+      topicId,
       fixture.messages.filter((message) => message.topicId === topicId),
       upToMessageId,
     )
-    if (!state) return
-    fixture.topics = topicsOf(fixture).map((entry) =>
-      entry.id === topicId
-        ? { ...entry, unread: state.unread, lastReadInboxMessageId: state.lastReadInboxMessageId }
-        : entry,
-    )
+    if (!read) return
+    fixture.topics = read.topics
     syncChatUnread(fixture)
     announce(store, chatId)
   }

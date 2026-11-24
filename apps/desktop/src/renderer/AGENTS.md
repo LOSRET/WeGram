@@ -238,9 +238,13 @@ lib/thorvg.ts         the one ThorVG WASM engine; the wasm arrives as a data: UR
 lib/useInView.ts      the visibility gate a sticker and its effect share (geometry first)
 lib/preview-bridge.ts DEV-ONLY entry point (re-exports lib/preview)
 lib/preview/          browser-preview session + invoke switch (index.ts); fixtures.ts is a
-                      thin adapter over @wegram/mock-fixtures (data: URLs + gradient faces);
-                      chats.ts / messages.ts / comments.ts / qr.ts / media.ts / ui.ts /
-                      viewer.ts hold the handler rules the invoke switch delegates to
+                      thin adapter over @wegram/mock-fixtures (data: URLs + gradient faces,
+                      plus previewPersonFor for the 资料卡); chats.ts / messages.ts /
+                      comments.ts / topics.ts / search / polls / profile.ts / qr.ts /
+                      media.ts / ui.ts / viewer.ts hold the handler rules the invoke
+                      switch delegates to. Matching, paging, poll, 话题 and 资料卡 rules
+                      are NOT re-implemented here: they come from @wegram/mock-session,
+                      the same package the Electron mock adapter uses
 ```
 
 `styles/index.css` is the entry point only: it imports `styles/*.css` in source order

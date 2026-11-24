@@ -1,3 +1,4 @@
+import { searchChatRows, searchMessageRows, searchMessagesInScope } from '@wegram/mock-session'
 import type {
   ChatInviteLink,
   ChatJoinResult,
@@ -242,16 +243,15 @@ export function previewInviteLink(chatId: number, temporary = false): ChatInvite
   }
 }
 
-/** Global search, the mock adapter's title rule over the fixture account. */
+/** Global search: the fakes' shared title rule over the fixture account. */
 export function searchPreviewChats(chats: ChatSummary[], q: string, limit: number): ChatSummary[] {
-  const needle = q.trim().toLowerCase()
-  if (needle === '') return []
-  return chats.filter((chat) => chat.title.toLowerCase().includes(needle)).slice(0, limit)
+  return searchChatRows(chats, q, limit)
 }
 
 /**
- * Cross-chat hits for the search panel, the mock adapter's rule over the fixture
- * account: one merged stream per scope, the numeric offset as its cursor.
+ * Cross-chat hits for the search panel: the fakes' shared scope rule over the
+ * fixture account, one merged stream per scope with the numeric offset as its
+ * cursor.
  */
 export function searchPreviewAllMessages(
   store: PreviewChatStore,
@@ -267,47 +267,19 @@ export function searchPreviewAllMessages(
   total: number
   cursor: SearchMessagesCursor
 } {
-  const needle = input.q.trim().toLowerCase()
-  const wantChannel = input.scope === 'channel'
-  const key = wantChannel ? 'channel' : 'private'
-  const offset = Number.parseInt(input.cursor?.[key] ?? '0', 10) || 0
-
-  const hits: { chat: ChatSummary; message: Message }[] = []
-  for (const chat of store.chats) {
-    if ((chat.kind === 'channel') !== wantChannel) continue
-    for (const message of store.messagesByChat[chat.id] ?? []) {
-      if (message.text.toLowerCase().includes(needle)) hits.push({ chat, message })
-    }
-  }
-  hits.sort((a, b) => b.message.date - a.message.date || b.message.id - a.message.id)
-
-  const page = hits.slice(offset, offset + input.limit)
-  const next = offset + input.limit < hits.length ? String(offset + input.limit) : ''
-  return {
-    messages: page.map((hit) => hit.message),
-    chats: [...new Map(page.map((hit) => [hit.chat.id, hit.chat])).values()].map((chat) => ({
-      ...chat,
-    })),
-    total: hits.length,
-    cursor: {
-      private: wantChannel ? '' : next,
-      group: '',
-      channel: wantChannel ? next : '',
-    },
-  }
+  return searchMessagesInScope(
+    store.chats.map((chat) => ({ chat, messages: store.messagesByChat[chat.id] ?? [] })),
+    input,
+  )
 }
 
-/** In-chat search, the mock adapter's substring rule over the transcript. */
+/** In-chat search: the fakes' shared substring rule over the transcript. */
 export function searchPreviewMessages(
   store: PreviewChatStore,
   chatId: number,
   q: string,
 ): Message[] {
-  const needle = q.toLowerCase()
-  if (needle === '') return []
-  return (store.messagesByChat[chatId] ?? []).filter((message) =>
-    message.text.toLowerCase().includes(needle),
-  )
+  return searchMessageRows(store.messagesByChat[chatId] ?? [], q)
 }
 
 /**

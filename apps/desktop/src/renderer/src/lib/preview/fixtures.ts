@@ -1,9 +1,10 @@
 import { buildFixtureSeeds, DEMO_STICKER_SET_ID } from '@wegram/mock-fixtures'
 import { sortChatList } from '@wegram/mock-session'
 import type { FakeCommentFlags } from '@wegram/mock-session'
+
+import type { PreviewPerson } from './profile'
 import type {
   AppInfo,
-  BotProfile,
   ChatSummary,
   ChatTopic,
   Contact,
@@ -202,28 +203,23 @@ export function previewBotCommands(chatId: number): {
 }
 
 /**
- * 机器人 (§8.3): the fixture bot's profile-page data. A bot is not in the address
- * book, so the preview's 资料卡 cannot take it from `contacts` — it is read off
- * the same seed the mock adapter serves, so the two fakes cannot disagree.
+ * The person behind a 资料卡: the seed's identity, 简介 and 备注, plus a bot's
+ * `bot_info` stand-in. The mock adapter reads the same seed fields, so the two
+ * fakes cannot disagree about a card.
  */
-export function previewBotProfile(userId: number): {
-  userId: number
-  title: string
-  avatarUrl?: string
-  bot: BotProfile
-} | null {
+export function previewPersonFor(userId: number): PreviewPerson | null {
   for (const seed of seeds.values()) {
-    if (seed.chat.userId !== userId || !seed.bot) continue
-    const { shortDescription, description, commands } = seed.bot
+    if (seed.chat.userId !== userId) continue
+    const { chat, contact, bot } = seed
     return {
       userId,
-      title: seed.chat.title,
-      ...(seed.chat.avatarUrl ? { avatarUrl: seed.chat.avatarUrl } : {}),
-      bot: {
-        ...(shortDescription ? { shortDescription } : {}),
-        ...(description ? { description } : {}),
-        commands,
-      },
+      title: chat.title,
+      ...(contact?.username ? { username: contact.username } : {}),
+      ...(contact?.phone ? { phone: contact.phone } : {}),
+      ...(chat.avatarUrl ? { avatarUrl: chat.avatarUrl } : {}),
+      ...(contact?.bio ? { bio: contact.bio } : {}),
+      ...(contact?.note ? { note: contact.note } : {}),
+      ...(bot ? { bot } : {}),
     }
   }
   return null

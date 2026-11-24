@@ -24,7 +24,7 @@ export interface FakePoll {
   canSeeResults: boolean
   quiz: boolean
   closed: boolean
-  /** 添加选项 is a TDLib poll right (`can_add_option`). */
+  /** 添加选项 is a TDLib poll right (can_add_option). */
   canAddOption?: boolean
   restriction?: string
   answered: boolean
@@ -85,6 +85,14 @@ export function applyPollVote(poll: FakePoll, optionIds: number[]): PollVoteReje
   return null
 }
 
+/**
+ * A poll copy the caller may mutate. `applyPollVote` mutates its argument, so a
+ * refused vote must not reach the stored row; the copy keeps the caller's type.
+ */
+export function copyPoll<P extends FakePoll>(poll: P): P {
+  return { ...poll, options: poll.options.map((option) => ({ ...option })) }
+}
+
 /** One refused vote / add-option, as the renderer receives it. */
 export interface PollRejection {
   code: 'forbidden' | 'poll_answered' | 'invalid_payload'
@@ -124,48 +132,43 @@ function voteRejectionText(reason: PollVoteRejection): string {
   }
 }
 
-/** A poll write: the refreshed row, or why the fake refused it. */
-export type PollWrite = { poll: FakePoll } | { rejection: PollRejection }
-
 /**
- * 投票: a copy of the poll with this account's answer applied. The copy matters —
- * `applyPollVote` mutates, and a refused vote must leave the stored row alone.
+ * 添加选项's guard: a row that is not a poll, a closed one and an empty box are the
+ * fake's refusals; anything else hands back the poll and the trimmed text.
  */
-export function castPollVote(poll: FakePoll, optionIds: number[]): PollWrite {
-  const next: FakePoll = { ...poll, options: poll.options.map((option) => ({ ...option })) }
-  const rejection = applyPollVote(next, optionIds)
-  return rejection ? { rejection: pollVoteRejection(rejection) } : { poll: next }
-}
+export type PollOptionTarget<P extends FakePoll = FakePoll> =
+  | { poll: P; text: string }
+  | { rejection: PollRejection }
 
-/**
- * 添加选项: the new option goes at the end with no votes, so the other rows keep
- * their counters. A closed poll and an empty box are refused the fake's own way.
- */
-export function appendPollOption(
-  poll: FakePoll,
-  input: { messageId: number; text: string },
-): PollWrite {
-  if (!poll.canAddOption || poll.closed) {
+export function pollOptionTarget<P extends FakePoll>(
+  poll: P | undefined,
+  text: string,
+): PollOptionTarget<P> {
+  if (!poll || !poll.canAddOption || poll.closed) {
     return { rejection: { code: 'forbidden', message: '这个投票不能添加选项' } }
   }
-  const text = input.text.trim()
-  if (!text) return { rejection: { code: 'invalid_payload', message: '选项内容不能为空' } }
-  const index = poll.options.length
-  return {
-    poll: {
-      ...poll,
-      options: [
-        ...poll.options,
-        {
-          index,
-          id: `option-${input.messageId}-${index}`,
-          text,
-          voterCount: 0,
-          votePercentage: 0,
-          chosen: false,
-        },
-      ],
-    },
-  }
+  const trimmed = text.trim()
+  if (!trimmed) return { rejection: { code: 'invalid_payload', message: '选项内容不能为空' } }
+  return { poll, text: trimmed }
 }
 
+/** The row 添加选项 appends: no votes yet, so every other counter stands. */
+export interface NewPollOption {
+  index: number
+  id: string
+  text: string
+  voterCount: number
+  votePercentage: number
+  chosen: boolean
+}
+
+export function newPollOption(messageId: number, index: number, text: string): NewPollOption {
+  return {
+    index,
+    id: `option-${messageId}-${index}`,
+    text,
+    voterCount: 0,
+    votePercentage: 0,
+    chosen: false,
+  }
+}

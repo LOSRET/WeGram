@@ -1467,6 +1467,15 @@ One-off duplication audits merged the real duplicates and left the look-alikes a
   `setError(errorMessage(e))` at ~28 sites (where an error goes depends on the call site);
   per-panel skeletons and CSS blocks (`wx-*` is a measured contract); the preview's invoke
   switch vs `main/ipc/handlers.ts` (handlers need Electron, the preview may not import main).
+- **Second pass (2026-11-24), the fake rules added after the first one**: the 话题 list and
+  its writes, both search paths, the poll vote/add-option path (with the code+words a refusal
+  carries) and 资料卡/举报 composition moved into `@wegram/mock-session` (new `search.ts`,
+  `profile.ts`, extended `topics.ts` / `poll.ts`). Each fake keeps only its store read/write and
+  its own event type. Three drifts had already accumulated between the two fakes and are gone:
+  an empty search matched everything in the mock and nothing in the preview, a refused quiz
+  crossed as `forbidden` instead of `poll_answered` in the preview, and the preview could not
+  draw the seed's 简介/备注 because it read the address-book row instead of the seed. Still
+  duplicated on purpose: the two fakes' event types and their invoke switch / adapter class.
 - Removing the casts found a real defect: `ui:saveDraft` declared an `entities` field nobody
   sent or kept — deleted.
 

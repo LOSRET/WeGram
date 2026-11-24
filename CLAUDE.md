@@ -18,7 +18,7 @@ pnpm workspace with W1 + W2 + the W3 main body implemented:
 - `packages/protocol` — IPC contract: DTO zod schemas, channel tables, `AppError`. Single source of truth shared by main, preload and renderer. Exported straight from source (`src/index.ts`), no build step.
 - `packages/adapter-contract` — the `TelegramAdapter` seam (`adapter.ts`: interface, events, `AdapterEmitter`) shared by the TDLib adapter and the fake one, so the mock implements the seam without importing app code. Types plus a 20-line emitter only.
 - `packages/mock-adapter` — the fake `TelegramAdapter` (auth flow, chats, history, search, stickers, media), plus the generated PNG/WebP/TGS/WebM fixtures; main injects the `wx-media://` registry and the image-size probe. Development only.
-- `packages/mock-session` — the fake session's pure rules (paging, read marker, comment access, chat-list order), shared by the main mock adapter and the browser preview. Imports nothing: it is bundled into the renderer.
+- `packages/mock-session` — the fake session's pure rules (paging, read marker, comment access, chat-list order, 话题, search, poll votes and 资料卡/举报), shared by the main mock adapter and the browser preview. Imports nothing: it is bundled into the renderer.
 - `packages/mock-fixtures` — the demo account both fakes serve (chats, messages, comment threads, contact fields); each side injects its media and clock.
 - `apps/desktop` — Electron app: `src/main` (adapter + IPC + store + media protocol), `src/preload` (whitelisted `window.tg`), `src/renderer` (React 19 + Tailwind v4 UI).
 - `spikes/tdlib` — measured TDLib behaviour on this machine; `RESULTS.md` holds packaging constraints that only fail at build time.

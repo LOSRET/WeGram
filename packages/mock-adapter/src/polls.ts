@@ -1,17 +1,24 @@
-import type { InvokeRequest, Message } from '@wegram/protocol'
+import {
+  applyPollVote,
+  copyPoll,
+  newPollOption,
+  pollOptionTarget,
+  pollVoteRejection,
+} from '@wegram/mock-session'
 import { AppError } from '@wegram/protocol'
+import type { InvokeRequest, Message } from '@wegram/protocol'
 
 import type { AdapterEvent } from '@wegram/adapter-contract'
-import { applyPollVote, type PollVoteRejection } from '@wegram/mock-session'
 
 import type { Fixture } from './constants'
 
 /**
  * Poll endpoints for the fake adapter (design doc §9.10).
  *
- * The vote arithmetic is the shared rule in @wegram/mock-session; this module
- * only finds the row, applies it and announces the refreshed message. Split out
- * of index.ts when the adapter class reached its line budget.
+ * The vote arithmetic, the add-option row and the words a refusal carries are
+ * `@wegram/mock-session`'s — the browser preview serves the same answers, so the
+ * two fakes cannot drift. This module only finds the row, writes the copy and
+ * announces the refreshed message.
  */
 export function createMockPolls(
   fixtures: Map<number, Fixture>,
@@ -40,52 +47,32 @@ export function createMockPolls(
   const votePoll = async (input: InvokeRequest<'messages:vote'>): Promise<void> => {
     const message = requireMessage(input.chatId, input.messageId)
     if (!message.poll) throw new AppError('invalid_payload', '这条消息不是投票')
-    const poll = { ...message.poll, options: message.poll.options.map((option) => ({ ...option })) }
+    const poll = copyPoll(message.poll)
     const rejection = applyPollVote(poll, input.optionIds)
-    if (rejection) throw rejectionError(rejection)
+    if (rejection) {
+      const refusal = pollVoteRejection(rejection)
+      throw new AppError(refusal.code, refusal.message)
+    }
     replacePoll(input.chatId, message, poll)
   }
 
-  const addPollOption = async (input: InvokeRequest<'messages:addPollOption'>): Promise<void> => {
+  const addPollOption = async (
+    input: InvokeRequest<'messages:addPollOption'>,
+  ): Promise<void> => {
     const message = requireMessage(input.chatId, input.messageId)
-    if (!message.poll?.canAddOption || message.poll.closed) {
-      throw new AppError('forbidden', '这个投票不能添加选项')
+    const target = pollOptionTarget(message.poll, input.text)
+    if ('rejection' in target) {
+      throw new AppError(target.rejection.code, target.rejection.message)
     }
-    const text = input.text.trim()
-    if (!text) throw new AppError('invalid_payload', '选项内容不能为空')
-    const index = message.poll.options.length
     const poll = {
-      ...message.poll,
+      ...target.poll,
       options: [
-        ...message.poll.options,
-        {
-          index,
-          id: `option-${message.id}-${index}`,
-          text,
-          voterCount: 0,
-          votePercentage: 0,
-          chosen: false,
-        },
+        ...target.poll.options,
+        newPollOption(input.messageId, target.poll.options.length, target.text),
       ],
     }
     replacePoll(input.chatId, message, poll)
   }
 
   return { votePoll, addPollOption }
-}
-
-/** The fake's AppError for a vote the shared poll rules refused. */
-function rejectionError(rejection: PollVoteRejection): AppError {
-  switch (rejection) {
-    case 'closed':
-      return new AppError('forbidden', '投票已结束')
-    case 'restricted':
-      return new AppError('forbidden', '当前账号不能参与这个投票')
-    case 'quiz-locked':
-      return new AppError('poll_answered', '这道题已经答过了')
-    case 'single-answer':
-      return new AppError('invalid_payload', '这个投票只能选一项')
-    case 'invalid-option':
-      return new AppError('invalid_payload', '选项不存在')
-  }
 }

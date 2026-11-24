@@ -16,15 +16,16 @@ credentials (development only), plus the real PNG/WebP/TGS/WebM media it generat
 - `chats.ts` — conversation endpoints as one `createMockChats` factory (list/open/mute/
   pin/clear/members/rename/leave/pinned/invite link); `history.ts` — transcript paging.
 - `comments.ts`, `contacts.ts`, `search.ts`, `stickers.ts`, `polls.ts` — the remaining
-  endpoints; `polls.ts` applies the shared vote rule and emits a `replace`.
+  endpoints; `search.ts` and `polls.ts` only adapt the fixture map to the shared
+  matching / vote rules and emit their own events.
 - `edits.ts` — 编辑 / 编辑说明 / delete / 重试 as one `createMockEdits` factory: each
   rewrites one fixture row and announces the op that describes it (a text edit is an
   `edit`, a caption is a `replace`).
 - `bots.ts` — the fixture bot's two endpoints: the commands it publishes (the composer's
   "/" list) and its canned callback answer (a toast, and an alert for the `alert` payload).
-- `users.ts` — 资料卡 for the fixture people: the card's data, 共同群聊 (from the
-  seed's `commonChatIds`), its 备注 / 添加删除联系人 writes and the phased 举报 answer
-  (person and one message), kept in an in-session override map (nothing persists).
+- `users.ts` — 资料卡 for the fixture people: reads the seed into the shared card
+  composition, keeps this session's 备注 / 添加删除联系人 / 拉黑 overrides in a map
+  (nothing persists) and answers 共同群聊 and the phased 举报 from the shared rules.
 - `sends.ts` — the outgoing path (text / one media file / 相册 / sticker / 语音消息 ->
   the voice row `buildVoiceMessage` in `media.ts`) as one
   `createMockSends` factory: build the row, append it, start the fake upload. It is
@@ -36,7 +37,9 @@ credentials (development only), plus the real PNG/WebP/TGS/WebM media it generat
   caller appends the row (transcript or thread) and starts the upload simulation.
 - `transcript.ts` — the one "append and announce" writer; `effects.ts` — read marker and
   transfer simulation; `traffic.ts` — ambient incoming messages.
-- Paging, read, comment and chat-list-order rules come from `@wegram/mock-session`.
+- Paging, read, comment, chat-list-order, 话题, search, poll and 资料卡 rules come
+  from `@wegram/mock-session`; both fakes must answer them identically, so a rule
+  change lands here and in the preview's handler modules in the same batch.
 
 ## Rules
 

@@ -85,7 +85,7 @@ import {
   now,
   media as previewMedia,
   previewBotCommands,
-  previewBotProfile,
+  previewPersonFor,
   previewMemberByUsername,
   previewCommonChatsFor,
   previewChangeStickerSet,
@@ -236,9 +236,8 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       channel,
       store,
       previewProfile,
-      contacts,
+      previewPersonFor,
       previewCommonChatsFor,
-      previewBotProfile,
     )
   }
 

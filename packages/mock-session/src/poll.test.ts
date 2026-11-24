@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
 
-import { applyPollVote, appendPollOption, castPollVote, type FakePoll } from './poll'
+import {
+  applyPollVote,
+  copyPoll,
+  newPollOption,
+  pollOptionTarget,
+  pollVoteRejection,
+  type FakePoll,
+} from './poll'
 
 function poll(overrides: Partial<FakePoll> = {}): FakePoll {
   return {
@@ -67,35 +74,51 @@ describe('applyPollVote', () => {
   })
 })
 
-describe('castPollVote', () => {
-  it('answers a copy and leaves the stored poll untouched', () => {
+describe('copyPoll', () => {
+  it('copies the options so the stored row survives a refused vote', () => {
     const stored = poll()
-    const result = castPollVote(stored, [1])
-    if ('rejection' in result) throw new Error('vote was refused')
-    expect(result.poll.options[1]).toMatchObject({ chosen: true, voterCount: 1 })
-    expect(stored.options[1]).toMatchObject({ chosen: false, voterCount: 0 })
+    const copy = copyPoll(stored)
+    copy.options[0]!.chosen = true
+    copy.totalVoterCount = 5
+    expect(stored.options[0]?.chosen).toBe(false)
     expect(stored.totalVoterCount).toBe(0)
-  })
-
-  it('maps a refused vote to the code and words the renderer shows', () => {
-    const quiz = castPollVote(poll({ quiz: true, answered: true }), [0])
-    expect(quiz).toEqual({
-      rejection: { code: 'poll_answered', message: '这道题已经答过了' },
-    })
-    const closed = castPollVote(poll({ closed: true }), [0])
-    expect(closed).toEqual({ rejection: { code: 'forbidden', message: '投票已结束' } })
-    const bad = castPollVote(poll(), [9])
-    expect(bad).toEqual({ rejection: { code: 'invalid_payload', message: '选项不存在' } })
   })
 })
 
-describe('appendPollOption', () => {
-  it('appends an unvoted option at the end', () => {
+describe('pollVoteRejection', () => {
+  it('maps a refusal to the code and words the renderer shows', () => {
+    expect(pollVoteRejection('quiz-locked')).toEqual({
+      code: 'poll_answered',
+      message: '这道题已经答过了',
+    })
+    expect(pollVoteRejection('closed')).toEqual({ code: 'forbidden', message: '投票已结束' })
+    expect(pollVoteRejection('invalid-option')).toEqual({
+      code: 'invalid_payload',
+      message: '选项不存在',
+    })
+  })
+})
+
+describe('pollOptionTarget', () => {
+  it('hands back the poll and the trimmed text', () => {
     const stored = poll({ canAddOption: true })
-    const result = appendPollOption(stored, { messageId: 10, text: '  c  ' })
-    if ('rejection' in result) throw new Error('option was refused')
-    expect(result.poll.options).toHaveLength(4)
-    expect(result.poll.options[3]).toEqual({
+    expect(pollOptionTarget(stored, '  c  ')).toEqual({ poll: stored, text: 'c' })
+  })
+
+  it('refuses a closed poll, a row that is not one, and an empty box', () => {
+    const missing = { rejection: { code: 'forbidden', message: '这个投票不能添加选项' } }
+    expect(pollOptionTarget(undefined, 'c')).toEqual(missing)
+    expect(pollOptionTarget(poll({ canAddOption: false }), 'c')).toEqual(missing)
+    expect(pollOptionTarget(poll({ canAddOption: true, closed: true }), 'c')).toEqual(missing)
+    expect(pollOptionTarget(poll({ canAddOption: true }), '   ')).toEqual({
+      rejection: { code: 'invalid_payload', message: '选项内容不能为空' },
+    })
+  })
+})
+
+describe('newPollOption', () => {
+  it('builds the unvoted row at the end of the list', () => {
+    expect(newPollOption(10, 3, 'c')).toEqual({
       index: 3,
       id: 'option-10-3',
       text: 'c',
@@ -103,20 +126,5 @@ describe('appendPollOption', () => {
       votePercentage: 0,
       chosen: false,
     })
-    expect(stored.options).toHaveLength(3)
-  })
-
-  it('refuses a closed poll and an empty box', () => {
-    expect(appendPollOption(poll({ canAddOption: false }), { messageId: 1, text: 'x' })).toEqual({
-      rejection: { code: 'forbidden', message: '这个投票不能添加选项' },
-    })
-    expect(appendPollOption(poll({ canAddOption: true, closed: true }), {
-      messageId: 1,
-      text: 'x',
-    })).toEqual({ rejection: { code: 'forbidden', message: '这个投票不能添加选项' } })
-    expect(appendPollOption(poll({ canAddOption: true }), { messageId: 1, text: '  ' })).toEqual({
-      rejection: { code: 'invalid_payload', message: '选项内容不能为空' },
-    })
   })
 })
-
