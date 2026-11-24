@@ -1,4 +1,13 @@
-import { sortChatList } from '@wegram/mock-session'
+import {
+  applyChatCleared,
+  canFakeGetMembers,
+  canFakePost,
+  chatPinKey,
+  fakeJoinState,
+  listedChatMembers,
+  pinnedMessageFrom,
+  sortChatList,
+} from '@wegram/mock-session'
 import { AppError } from '@wegram/protocol'
 import type {
   ChatInviteLink,
@@ -87,8 +96,7 @@ export function openMockPrivateChat(store: MockChatStore, userId: number): ChatS
 
 export function canMockPost(store: MockChatStore, chatId: number): boolean {
   const fixture = requireFixture(store, chatId)
-  // Groups and private chats keep the composer; only channels gate on rights.
-  return fixture.chat.kind === 'channel' ? Boolean(fixture.canPost) : true
+  return canFakePost(fixture.chat, fixture.canPost)
 }
 
 /**
@@ -97,8 +105,7 @@ export function canMockPost(store: MockChatStore, chatId: number): boolean {
  */
 export function mockChatJoinState(store: MockChatStore, chatId: number): ChatJoinState {
   const fixture = requireFixture(store, chatId)
-  if (fixture.chat.kind !== 'channel') return { joined: true, byRequest: false }
-  return { joined: fixture.joined !== false, byRequest: false }
+  return fakeJoinState(fixture.chat, fixture.joined)
 }
 
 /** 加入频道: the fixture subscribes at once; it never asks for approval. */
@@ -145,9 +152,7 @@ export function setMockArchived(
 export function clearMockHistory(store: MockChatStore, chatId: number): void {
   const fixture = requireFixture(store, chatId)
   fixture.messages = []
-  fixture.chat.unread = 0
-  delete fixture.chat.lastMessageText
-  delete fixture.chat.lastMessageAt
+  applyChatCleared(fixture.chat)
   store.emit({ type: 'chats', ops: [{ op: 'upsert', chat: { ...fixture.chat } }] })
 }
 
@@ -191,22 +196,11 @@ export function mockChatMembers(
   query = '',
 ): ChatMember[] {
   const fixture = requireFixture(store, chatId)
-  if (fixture.chat.kind === 'private') return []
-  const needle = query.trim().toLowerCase()
-  const seen = new Set<number>()
-  const members: ChatMember[] = []
-  for (const message of fixture.messages) {
-    if (message.outgoing || message.senderId <= 0 || seen.has(message.senderId)) continue
-    if (needle !== '' && !message.senderName.toLowerCase().includes(needle)) continue
-    seen.add(message.senderId)
-    members.push({
-      userId: message.senderId,
-      title: message.senderName,
-      ...(message.senderAvatarUrl ? { avatarUrl: message.senderAvatarUrl } : {}),
-    })
-    if (members.length >= limit) break
-  }
-  return members
+  return listedChatMembers(fixture.messages, {
+    limit,
+    query,
+    isPrivate: fixture.chat.kind === 'private',
+  })
 }
 
 /**
@@ -216,8 +210,7 @@ export function mockChatMembers(
  */
 export function canMockGetMembers(store: MockChatStore, chatId: number): boolean {
   const fixture = requireFixture(store, chatId)
-  if (fixture.chat.kind === 'channel') return Boolean(fixture.canPost)
-  return fixture.chat.kind === 'group'
+  return canFakeGetMembers(fixture.chat, fixture.canPost)
 }
 
 /**
@@ -326,8 +319,6 @@ export function createMockChats(
    * fixture pins nothing). A forum topic keeps its own pin, like TDLib.
    */
   const pins = new Map<string, ChatPinnedMessage>()
-  const pinKey = (chatId: number, topicId: number | undefined): string =>
-    topicId === undefined ? String(chatId) : `${chatId}:${topicId}`
   return {
     listChats: async (input) => listMockChats(store, input),
     /**
@@ -355,20 +346,18 @@ export function createMockChats(
     setTitle: async (chatId, title) => setMockTitle(store, chatId, title),
     leave: async (chatId) => leaveMockChat(store, chatId),
     pinnedMessage: async (chatId, topicId) =>
-      pins.get(pinKey(chatId, topicId)) ?? (topicId === undefined ? mockPinnedMessage() : null),
+      pins.get(chatPinKey(chatId, topicId)) ??
+      (topicId === undefined ? mockPinnedMessage() : null),
     setPinnedMessage: async (chatId, messageId, topicId) => {
       const fixture = requireFixture(store, chatId)
       if (messageId === null) {
-        pins.delete(pinKey(chatId, topicId))
+        pins.delete(chatPinKey(chatId, topicId))
         return null
       }
       const message = fixture.messages.find((item) => item.id === messageId)
       if (!message) throw new AppError('internal', `Unknown mock message ${messageId}`)
-      const pinned: ChatPinnedMessage = {
-        messageId,
-        text: message.text || `[${message.kind}]`,
-      }
-      pins.set(pinKey(chatId, topicId), pinned)
+      const pinned: ChatPinnedMessage = pinnedMessageFrom(message, messageId)
+      pins.set(chatPinKey(chatId, topicId), pinned)
       return pinned
     },
     inviteLink: async (chatId, temporary) => mockInviteLink(chatId, temporary),

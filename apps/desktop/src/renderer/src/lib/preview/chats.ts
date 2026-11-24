@@ -1,4 +1,15 @@
-import { searchChatRows, searchMessageRows, searchMessagesInScope } from '@wegram/mock-session'
+import {
+  applyChatCleared,
+  canFakeGetMembers,
+  canFakePost,
+  chatPinKey,
+  fakeJoinState,
+  listedChatMembers,
+  pinnedMessageFrom,
+  searchChatRows,
+  searchMessageRows,
+  searchMessagesInScope,
+} from '@wegram/mock-session'
 import type {
   ChatInviteLink,
   ChatJoinResult,
@@ -41,8 +52,23 @@ function announce(store: PreviewChatStore, chat: ChatSummary): void {
  * is exactly the state a channel opened from 搜索 is in.
  */
 export function previewJoinState(chat: ChatSummary, notJoined: Set<number>): ChatJoinState {
-  if (chat.kind !== 'channel') return { joined: true, byRequest: false }
-  return { joined: !notJoined.has(chat.id), byRequest: false }
+  return fakeJoinState(chat, !notJoined.has(chat.id))
+}
+
+/** 发帖权限: only a channel gates on rights, exactly like the mock adapter. */
+export function previewCanPost(
+  chat: ChatSummary,
+  channelPostRights: Record<number, boolean>,
+): boolean {
+  return canFakePost(chat, channelPostRights[chat.id])
+}
+
+/** 管理员显示群成员: a managed fixture channel is the administrator case. */
+export function previewCanGetMembers(
+  chat: ChatSummary,
+  channelPostRights: Record<number, boolean>,
+): boolean {
+  return canFakeGetMembers(chat, channelPostRights[chat.id])
 }
 
 /** 加入频道: the preview subscribes at once; it never asks for approval. */
@@ -89,9 +115,7 @@ export function setPreviewArchived(
 export function clearPreviewHistory(store: PreviewChatStore, chatId: number): void {
   const chat = findChat(store, chatId)
   store.messagesByChat[chat.id] = []
-  chat.unread = 0
-  delete chat.lastMessageText
-  delete chat.lastMessageAt
+  applyChatCleared(chat)
   announce(store, chat)
 }
 
@@ -162,22 +186,11 @@ export function previewChatMembers(
   query = '',
 ): ChatMember[] {
   const chat = findChat(store, chatId)
-  if (chat.kind === 'private') return []
-  const needle = query.trim().toLowerCase()
-  const seen = new Set<number>()
-  const members: ChatMember[] = []
-  for (const message of store.messagesByChat[chat.id] ?? []) {
-    if (message.outgoing || message.senderId <= 0 || seen.has(message.senderId)) continue
-    if (needle !== '' && !message.senderName.toLowerCase().includes(needle)) continue
-    seen.add(message.senderId)
-    members.push({
-      userId: message.senderId,
-      title: message.senderName,
-      ...(message.senderAvatarUrl ? { avatarUrl: message.senderAvatarUrl } : {}),
-    })
-    if (members.length >= limit) break
-  }
-  return members
+  return listedChatMembers(store.messagesByChat[chat.id] ?? [], {
+    limit,
+    query,
+    isPrivate: chat.kind === 'private',
+  })
 }
 
 /** 群聊名称: the preview has no permissions, so a rename always applies. */
@@ -200,18 +213,13 @@ export function leavePreviewChat(store: PreviewChatStore, chatId: number): void 
   store.emit('evt:chats', { ops: [{ op: 'remove', chatId }] })
 }
 
-/** 话题 (design doc §9.12): a forum topic keeps its own pin, like TDLib. */
-function pinKey(chatId: number, topicId: number | undefined): string {
-  return topicId === undefined ? String(chatId) : `${chatId}:${topicId}`
-}
-
 /** The fixture pins nothing until this session pins one (see previewPinMessage). */
 export function previewPinnedMessage(
   pins: Map<string, ChatPinnedMessage>,
   chatId: number,
   topicId?: number,
 ): ChatPinnedMessage | null {
-  return pins.get(pinKey(chatId, topicId)) ?? null
+  return pins.get(chatPinKey(chatId, topicId)) ?? null
 }
 
 /** 置顶消息 / 取消置顶: `null` removes the chat's pin, like the real channel. */
@@ -223,15 +231,12 @@ export function previewPinMessage(
   topicId?: number,
 ): ChatPinnedMessage | null {
   if (messageId === null) {
-    pins.delete(pinKey(chatId, topicId))
+    pins.delete(chatPinKey(chatId, topicId))
     return null
   }
   const message = (store.messagesByChat[chatId] ?? []).find((item) => item.id === messageId)
-  const pinned: ChatPinnedMessage = {
-    messageId,
-    text: message?.text || `[${message?.kind ?? '消息'}]`,
-  }
-  pins.set(pinKey(chatId, topicId), pinned)
+  const pinned: ChatPinnedMessage = pinnedMessageFrom(message, messageId)
+  pins.set(chatPinKey(chatId, topicId), pinned)
   return pinned
 }
 

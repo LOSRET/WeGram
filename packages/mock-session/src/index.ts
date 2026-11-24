@@ -48,6 +48,16 @@ export type {
 } from './topics'
 export { searchChatRows, searchMessageRows, searchMessagesInScope } from './search'
 export type { ScopeSearchEntry, ScopeSearchInput, ScopeSearchPage } from './search'
+export {
+  applyChatCleared,
+  canFakeGetMembers,
+  canFakePost,
+  chatPinKey,
+  fakeJoinState,
+  listedChatMembers,
+  pinnedMessageFrom,
+} from './chats'
+export type { FakeChatMember, FakeMemberMessage } from './chats'
 export { composeProfile, pageCommonChats, reportAnswer, REPORT_OPTIONS } from './profile'
 export type {
   FakeBotProfile,

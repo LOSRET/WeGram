@@ -17,6 +17,9 @@ Pure rules that both fakes must answer identically:
   `comment-access.ts` rule) and `threadInteraction`.
 - `chatList.ts` — `sortChatList`: the chat list's order (pinned first, then newest
   activity), which both fakes serve.
+- `chats.ts` — the conversation rules: `listedChatMembers` (the people who posted),
+  `canFakePost` / `canFakeGetMembers` (channel rights), `fakeJoinState`, `applyChatCleared`,
+  `chatPinKey` and `pinnedMessageFrom`.
 - `poll.ts` — `applyPollVote` (first vote, change, retract, multi-answer, quiz
   lock, percentages), `copyPoll` / `pollOptionTarget` / `newPollOption` for the
   add-option path, and `pollVoteRejection` — the code + words a refused vote

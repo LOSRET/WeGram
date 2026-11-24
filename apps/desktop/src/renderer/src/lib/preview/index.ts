@@ -62,6 +62,8 @@ import {
   previewAddMember,
   previewChatMembers,
   previewInviteLink,
+  previewCanGetMembers,
+  previewCanPost,
   previewJoinState,
   previewOpenUsername,
   handlePreviewPins,
@@ -316,12 +318,11 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     }
     case 'chats:canPost': {
       const chat = chats.find((item) => item.id === store.chatId)
-      return chat?.kind === 'channel' ? Boolean(channelPostRights[chat.id]) : true
+      return chat ? previewCanPost(chat, channelPostRights) : true
     }
     case 'chats:canGetMembers': {
-      // A managed fixture channel is the administrator case (see the mock adapter).
       const chat = chats.find((item) => item.id === store.chatId)
-      return chat?.kind === 'channel' ? Boolean(channelPostRights[chat.id]) : chat?.kind === 'group'
+      return chat ? previewCanGetMembers(chat, channelPostRights) : false
     }
     case 'chats:joinState': {
       const chat = chats.find((item) => item.id === store.chatId)
