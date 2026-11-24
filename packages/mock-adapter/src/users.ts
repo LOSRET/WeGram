@@ -1,3 +1,4 @@
+import { commonGroupIds, seedByUserId } from '@wegram/mock-fixtures'
 import { composeProfile, pageCommonChats, reportAnswer } from '@wegram/mock-session'
 import type { ProfileOverrides, ProfileSource } from '@wegram/mock-session'
 import { AppError } from '@wegram/protocol'
@@ -19,18 +20,17 @@ export function createMockUsers(fixtures: Map<number, Fixture>) {
   const overrides = new Map<number, ProfileOverrides>()
 
   const findFixture = (userId: number): Fixture => {
-    for (const fixture of fixtures.values()) {
-      if (fixture.chat.userId === userId) return fixture
-    }
-    throw new AppError('invalid_payload', `Mock 账号里没有用户 ${userId}`)
+    const seed = seedByUserId(fixtures, userId)
+    if (!seed) throw new AppError('invalid_payload', `Mock 账号里没有用户 ${userId}`)
+    return seed
   }
 
   /** 共同群聊: the fixture's group chats this person shares with the account. */
   const commonChatsOf = (userId: number): ChatSummary[] => {
-    const fixture = findFixture(userId)
-    return (fixture.commonChatIds ?? []).flatMap((id) => {
+    const person = findFixture(userId)
+    return commonGroupIds(fixtures, person.chat.userId ?? 0).flatMap((id) => {
       const shared = fixtures.get(id)
-      return shared?.chat.kind === 'group' ? [{ ...shared.chat }] : []
+      return shared ? [{ ...shared.chat }] : []
     })
   }
 

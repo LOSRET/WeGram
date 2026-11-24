@@ -1,4 +1,13 @@
-import { buildFixtureSeeds, DEMO_STICKER_SET_ID } from '@wegram/mock-fixtures'
+import {
+  botCommandsAnswer,
+  buildFixtureSeeds,
+  commonGroupIds,
+  DEMO_STICKER_SET_ID,
+  firstBotSeed,
+  memberByUsername,
+  seedByChatId,
+  seedByUserId,
+} from '@wegram/mock-fixtures'
 import { sortChatList } from '@wegram/mock-session'
 import type { FakeCommentFlags } from '@wegram/mock-session'
 
@@ -187,42 +196,32 @@ for (const seed of seeds.values()) {
  * account. The mock adapter reads the same `commonChatIds`, so the two fakes
  * cannot disagree about a card.
  */
-/**
- * The commands the chat's fixture bot publishes, for the composer's "/" list.
- * The mock adapter reads the same seed, so the two fakes cannot disagree.
- */
+/** The commands the chat's fixture bot publishes, for the composer's "/" list. */
 export function previewBotCommands(chatId: number): {
   isBot: boolean
   commands: Array<{ command: string; description: string }>
 } {
-  for (const seed of seeds.values()) {
-    if (seed.chat.id !== chatId) continue
-    return seed.bot ? { isBot: true, commands: seed.bot.commands } : { isBot: false, commands: [] }
-  }
-  return { isBot: false, commands: [] }
+  return botCommandsAnswer(seedByChatId(seeds, chatId))
 }
 
 /**
  * The person behind a 资料卡: the seed's identity, 简介 and 备注, plus a bot's
- * `bot_info` stand-in. The mock adapter reads the same seed fields, so the two
- * fakes cannot disagree about a card.
+ * `bot_info` stand-in. The mock adapter reads the same seed fields.
  */
 export function previewPersonFor(userId: number): PreviewPerson | null {
-  for (const seed of seeds.values()) {
-    if (seed.chat.userId !== userId) continue
-    const { chat, contact, bot } = seed
-    return {
-      userId,
-      title: chat.title,
-      ...(contact?.username ? { username: contact.username } : {}),
-      ...(contact?.phone ? { phone: contact.phone } : {}),
-      ...(chat.avatarUrl ? { avatarUrl: chat.avatarUrl } : {}),
-      ...(contact?.bio ? { bio: contact.bio } : {}),
-      ...(contact?.note ? { note: contact.note } : {}),
-      ...(bot ? { bot } : {}),
-    }
+  const seed = seedByUserId(seeds, userId)
+  if (!seed) return null
+  const { chat, contact, bot } = seed
+  return {
+    userId,
+    title: chat.title,
+    ...(contact?.username ? { username: contact.username } : {}),
+    ...(contact?.phone ? { phone: contact.phone } : {}),
+    ...(chat.avatarUrl ? { avatarUrl: chat.avatarUrl } : {}),
+    ...(contact?.bio ? { bio: contact.bio } : {}),
+    ...(contact?.note ? { note: contact.note } : {}),
+    ...(bot ? { bot } : {}),
   }
-  return null
 }
 
 /**
@@ -230,42 +229,22 @@ export function previewPersonFor(userId: number): PreviewPerson | null {
  * The inline picker is addressed by handle, so the preview needs it (§8.3).
  */
 export function previewBotUsername(): string {
-  for (const seed of seeds.values()) {
-    const username = seed.bot?.username?.trim().toLowerCase()
-    if (username) return username
-  }
-  return ''
+  return firstBotSeed(seeds)?.bot?.username?.trim().toLowerCase() ?? ''
 }
 
-/**
- * 添加成员 (§8.3): the fixture person or bot behind an @username, or null. The
- * preview resolves the same handles the mock adapter does, so the two cannot
- * disagree about who can be added.
- */
+/** 添加成员 (§8.3): the person or bot behind an @username, or null. */
 export function previewMemberByUsername(
   username: string,
 ): { userId: number; title: string } | null {
-  const handle = username.trim().replace(/^@+/, '').toLowerCase()
-  if (!handle) return null
-  for (const seed of seeds.values()) {
-    const userId = seed.chat.userId
-    if (!userId || seed.chat.kind !== 'private') continue
-    const person = seed.contact?.username?.toLowerCase() === handle
-    const bot = seed.bot?.username?.toLowerCase() === handle
-    if (person || bot) return { userId, title: seed.chat.title }
-  }
-  return null
+  return memberByUsername(seeds, username)
 }
 
+/** 共同群聊: the seed's group ids, mapped to this preview's decorated rows. */
 export function previewCommonChatsFor(userId: number): ChatSummary[] {
-  for (const seed of seeds.values()) {
-    if (seed.chat.userId !== userId) continue
-    return (seed.commonChatIds ?? []).flatMap((id) => {
-      const chat = chats.find((item) => item.id === id)
-      return chat?.kind === 'group' ? [{ ...chat }] : []
-    })
-  }
-  return []
+  return commonGroupIds(seeds, userId).flatMap((id) => {
+    const chat = chats.find((item) => item.id === id)
+    return chat ? [{ ...chat }] : []
+  })
 }
 
 /** The address book: every private seed that is a person, not Saved Messages or a bot. */

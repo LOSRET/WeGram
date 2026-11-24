@@ -17,7 +17,6 @@ import type {
   ChatMember,
   ChatPinnedMessage,
   ChatSummary,
-  Contact,
   EventChannel,
   Message,
   SearchMessagesCursor,
@@ -146,12 +145,12 @@ export function setPreviewUnread(
  */
 export function previewOpenUsername(
   chats: ChatSummary[],
-  contacts: Contact[],
   input: string,
+  resolve: (username: string) => { userId: number } | null,
 ): ChatSummary {
   const username = input.trim().replace(/^@+/, '').toLowerCase()
-  const contact = contacts.find((item) => item.username?.toLowerCase() === username)
-  const chat = contact ? chats.find((item) => item.userId === contact.userId) : undefined
+  const member = resolve(input)
+  const chat = member ? chats.find((item) => item.userId === member.userId) : undefined
   if (!chat) throw { code: 'invalid_payload', message: `找不到 @${username} 这个用户名` }
   return { ...chat }
 }

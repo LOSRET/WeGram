@@ -1,3 +1,4 @@
+import { botCommandsAnswer, botSeedByUsername } from '@wegram/mock-fixtures'
 import { AppError } from '@wegram/protocol'
 import type {
   BotCommandsAnswer,
@@ -27,21 +28,12 @@ export function createMockBots(fixtures: Map<number, Fixture>) {
   let sequence = 0
 
   /** The fixture bot that owns an @username, or `null` for anything else. */
-  const botWithUsername = (username: string): Fixture | null => {
-    const handle = username.replace(/^@/, '').trim().toLowerCase()
-    if (!handle) return null
-    for (const fixture of fixtures.values()) {
-      const bot = fixture.bot
-      if (bot?.username && bot.username.toLowerCase() === handle) return fixture
-    }
-    return null
-  }
+  const botWithUsername = (username: string): Fixture | null =>
+    botSeedByUsername(fixtures, username)
 
   /** A chat that is not the fixture bot answers "no commands", like TDLib does. */
-  const commands = (chatId: number): BotCommandsAnswer => {
-    const bot = fixtures.get(chatId)?.bot
-    return bot ? { isBot: true, commands: bot.commands } : { isBot: false, commands: [] }
-  }
+  const commands = (chatId: number): BotCommandsAnswer =>
+    botCommandsAnswer(fixtures.get(chatId) ?? null)
 
   /**
    * Pressing a callback button in the mock: the fixture's bot answers at once.

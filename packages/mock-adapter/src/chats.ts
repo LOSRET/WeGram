@@ -1,3 +1,4 @@
+import { memberByUsername, seedByUserId, seedByUsername } from '@wegram/mock-fixtures'
 import {
   applyChatCleared,
   canFakeGetMembers,
@@ -78,17 +79,15 @@ export function openMockChat(store: MockChatStore, chatId: number): void {
  */
 export function openMockUsernameChat(store: MockChatStore, input: string): ChatSummary {
   const username = input.trim().replace(/^@+/, '').toLowerCase()
-  const fixture = [...store.fixtures.values()].find(
-    (item) => item.contact?.username?.toLowerCase() === username,
-  )
-  if (!username || !fixture) throw new AppError('invalid_payload', `找不到 @${username} 这个用户名`)
-  return fixture.chat
+  const seed = seedByUsername(store.fixtures, input)
+  if (!username || !seed) throw new AppError('invalid_payload', `找不到 @${username} 这个用户名`)
+  return seed.chat
 }
 
 /** The mock has no user directory; reuse the private chat that carries that id. */
 export function openMockPrivateChat(store: MockChatStore, userId: number): ChatSummary {
   const fixture =
-    [...store.fixtures.values()].find((item) => item.chat.userId === userId) ??
+    seedByUserId(store.fixtures, userId) ??
     [...store.fixtures.values()].find((item) => item.chat.kind === 'private')
   if (!fixture) throw new AppError('not_implemented', `mock has no private chat for user ${userId}`)
   return fixture.chat
@@ -229,15 +228,9 @@ export function addMockChatMember(
     throw new AppError('invalid_payload', '私聊不能添加成员')
   }
   const handle = username.trim().replace(/^@+/, '').toLowerCase()
-  for (const candidate of store.fixtures.values()) {
-    const person = candidate.contact?.username?.toLowerCase() === handle
-    const bot = candidate.bot?.username?.toLowerCase() === handle
-    if (!(person || bot)) continue
-    const userId = candidate.chat.userId ?? 0
-    if (!userId) continue
-    return { userId, title: candidate.chat.title }
-  }
-  throw new AppError('invalid_payload', `找不到 @${handle}`)
+  const member = memberByUsername(store.fixtures, username)
+  if (!member) throw new AppError('invalid_payload', `找不到 @${handle}`)
+  return member
 }
 
 /** 群聊名称; the fixture has no permissions, so a rename always applies. */

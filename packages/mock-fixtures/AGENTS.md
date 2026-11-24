@@ -26,6 +26,11 @@ Scope: the demo account both fakes serve — the Electron mock adapter
 - `services.ts` — the demo's service rows (a missed call, a self-destructed photo):
   the finished text a fixture carries, so the centered notices can be seen without
   TDLib. Split out of `data.ts` for the same size budget.
+- `lookup.ts` — the lookups both fakes make over the dataset: `seedByChatId` /
+  `seedByUserId` / `seedByUsername` (a person's handle or a bot's), `memberByUsername`
+  (添加成员), `botSeedByUsername` / `firstBotSeed` / `botCommandsAnswer` and
+  `commonGroupIds` (共同群聊). They return ids or seed rows, so each fake maps them to
+  its own chat objects.
 
 The data says *what* a message is, never *where its bytes live*: a media reference is
 a `fileId` plus the protocol fields (size, duration, format), and the caller's

@@ -453,7 +453,11 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       return { ...chat }
     }
     case 'chats:openUsername':
-      return previewOpenUsername(chats, contacts, String(store.username ?? ''))
+      return previewOpenUsername(
+        chats,
+        String(store.username ?? ''),
+        previewMemberByUsername,
+      )
     case 'contacts:list':
       return contacts
     case 'users:status': {
