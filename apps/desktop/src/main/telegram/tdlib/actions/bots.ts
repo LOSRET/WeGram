@@ -10,6 +10,7 @@ import type {
 
 import type { TdObject } from '../client'
 import { asArray } from '../json'
+import { botText } from '../map/user'
 import { mapInlineResults } from '../map/inline'
 import { mapMessage } from '../map/message'
 import { replyTo, topicRef } from './message-input'
@@ -56,7 +57,11 @@ export async function botCommands(
   const commands = asArray<TdObject>(full?.bot_info?.commands)
     .map(commandOf)
     .filter((command): command is BotCommand => command !== null)
-  return { isBot: true, commands }
+  return {
+    isBot: true,
+    commands,
+    description: botText(full?.bot_info?.description) ?? '',
+  }
 }
 
 /** One `botCommand`: TDLib stores the text without the leading '/'. */

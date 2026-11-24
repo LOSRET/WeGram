@@ -112,6 +112,11 @@ export interface AppData {
    */
   locate: { chatId: number; messageId: number; tick: number } | null
   replyToByChat: Record<number, number | null>
+  /**
+   * One-shot `/start` payload captured from a bot deep link. It survives chat
+   * switches until a message is sent, then is cleared; it is never persisted.
+   */
+  botStartParametersByChat: Record<number, string>
   typingByChat: Record<number, boolean>
   /**
    * userId → online / last seen. Kept apart from the chat rows because presence
@@ -206,6 +211,10 @@ export interface ChatActions {
   mergeChats: (list: ChatListName, page: ChatSummary[]) => void
   applyChatOps: (ops: ChatOp[]) => void
   setActiveChat: (chatId: number | null) => void
+  /** Remembers the validated payload of a `t.me/bot?start=...` link. */
+  setBotStartParameter: (chatId: number, parameter: string) => void
+  /** Consumes or discards a bot link's one-shot payload. */
+  clearBotStartParameter: (chatId: number) => void
 }
 
 export interface MessageActions {

@@ -23,7 +23,7 @@ export const botCommandSchema = z.object({
 })
 export type BotCommand = z.infer<typeof botCommandSchema>
 
-/** What a chat's bot knows, for the composer's "/" list. */
+/** What a chat's bot knows, for the composer's "/" list and first-open screen. */
 export const botCommandsAnswerSchema = z.object({
   /**
    * True only for a private chat with a bot. A group can contain bots, but
@@ -32,6 +32,11 @@ export const botCommandsAnswerSchema = z.object({
    */
   isBot: z.boolean(),
   commands: z.array(botCommandSchema),
+  /**
+   * TDLib `botInfo.description`: the text Telegram shows in an empty bot chat.
+   * Empty is valid; the client still offers its 开始 button.
+   */
+  description: z.string().optional(),
 })
 export type BotCommandsAnswer = z.infer<typeof botCommandsAnswerSchema>
 

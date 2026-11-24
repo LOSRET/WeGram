@@ -28,7 +28,11 @@ function seeds(): Map<number, FixtureSeed> {
   map.set(13, {
     chat: chat(13, 'WeGram 助手', { kind: 'private', userId: 26 }),
     messages: [],
-    bot: { username: 'wegram_helper', commands: [{ command: 'start', description: '开始' }] },
+    bot: {
+      username: 'wegram_helper',
+      description: '你好，我是 WeGram 助手。',
+      commands: [{ command: 'start', description: '开始' }],
+    },
   })
   map.set(2, { chat: chat(2, '产品群'), messages: [] })
   map.set(4, { chat: chat(4, '频道', { kind: 'channel' }), messages: [] })
@@ -73,6 +77,7 @@ describe('seed lookups', () => {
     expect(botCommandsAnswer(index.get(13) ?? null)).toEqual({
       isBot: true,
       commands: [{ command: 'start', description: '开始' }],
+      description: '你好，我是 WeGram 助手。',
     })
     expect(botCommandsAnswer(index.get(2) ?? null)).toEqual({ isBot: false, commands: [] })
   })

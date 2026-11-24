@@ -13,6 +13,10 @@
   --wx-brand-active: #06ad56;
   --wx-brand-weak: #e8f7ee;
   --wx-brand-text: #07c160;
+  /* First-open bot screen: accessible ink on the brand fill in both themes. */
+  --wx-bot-start-bg: #07c160;
+  --wx-bot-start-bg-hover: #06ad56;
+  --wx-bot-start-ink: #002b15;
 
   /* Chrome */
   --wx-rail: #e0e0e0;
@@ -241,6 +245,9 @@
   --wx-switch-off: #3a3a3c;
   --wx-switch-on: #07c160;
   --wx-brand-weak: rgba(7, 193, 96, 0.16);
+  --wx-bot-start-bg: #0b7d45;
+  --wx-bot-start-bg-hover: #096b3b;
+  --wx-bot-start-ink: #ffffff;
   --wx-rail-icon: #969697;
   --wx-icon: #a5a5a5;
   --wx-icon-strong: #b1b1b1;

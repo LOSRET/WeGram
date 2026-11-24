@@ -294,11 +294,30 @@ describe('prependHistory', () => {
   })
 })
 
+describe('bot start parameters', () => {
+  it('keeps a deep-link payload until it is explicitly consumed', () => {
+    const store = useAppStore.getState()
+    store.setBotStartParameter(CHAT_ID, 'ref_42')
+    expect(useAppStore.getState().botStartParametersByChat[CHAT_ID]).toBe('ref_42')
+
+    store.clearBotStartParameter(CHAT_ID)
+    expect(useAppStore.getState().botStartParametersByChat[CHAT_ID]).toBeUndefined()
+  })
+
+  it('drops a deleted chat payload with the rest of its transcript state', () => {
+    const store = useAppStore.getState()
+    store.setBotStartParameter(CHAT_ID, 'ref_42')
+    store.applyChatOps([{ op: 'remove', chatId: CHAT_ID }])
+    expect(useAppStore.getState().botStartParametersByChat[CHAT_ID]).toBeUndefined()
+  })
+})
+
 describe('reset', () => {
   it('clears every piece of session data but keeps the actions', () => {
     const store = useAppStore.getState()
     store.setActiveChat(CHAT_ID)
     store.setHistory(CHAT_ID, [message(1)], true)
+    store.setBotStartParameter(CHAT_ID, 'ref_42')
     store.setMediaUrl(7, 'wx-media://f/abc')
     store.setToast('saved')
 
@@ -307,6 +326,7 @@ describe('reset', () => {
     const state = useAppStore.getState()
     expect(state.activeChatId).toBeNull()
     expect(state.messagesByChat).toEqual({})
+    expect(state.botStartParametersByChat).toEqual({})
     expect(state.olderPagesByChat).toEqual({})
     expect(state.mediaUrls).toEqual({})
     expect(state.toast).toBeNull()
