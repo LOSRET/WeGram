@@ -1,4 +1,4 @@
-import type { ChatSummary, Message, MessageOp } from '@wegram/protocol'
+import type { ChatSummary, Message, MessageOp, Poll } from '@wegram/protocol'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -31,6 +31,24 @@ function message(id: number, overrides: Partial<Message> = {}): Message {
 const newOp = (id: number): MessageOp => ({ op: 'new', message: message(id) })
 const deleteOp = (...ids: number[]): MessageOp => ({ op: 'delete', chatId: 1, messageIds: ids })
 const readOp = (): MessageOp => ({ op: 'read', chatId: 1, upToMessageId: 5 })
+
+function poll(totalVoterCount: number): Poll {
+  return {
+    id: '55',
+    question: 'pick',
+    options: [
+      { index: 0, text: 'a', voterCount: totalVoterCount, votePercentage: 100, chosen: false },
+      { index: 1, text: 'b', voterCount: 0, votePercentage: 0, chosen: false },
+    ],
+    totalVoterCount,
+    anonymous: true,
+    allowsMultipleAnswers: false,
+    canSeeResults: true,
+    quiz: false,
+    closed: false,
+    answered: false,
+  }
+}
 
 describe('sortChats', () => {
   it('puts pinned chats first, then orders by last activity', () => {
@@ -138,6 +156,17 @@ describe('reduceOps', () => {
     expect(list[1]).toMatchObject({ id: 2, text: 'edited', edited: true })
   })
 
+  it('patches poll results without remapping the message', () => {
+    const original = message(2, { kind: 'poll', text: 'pick', poll: poll(2) })
+    const refreshed = poll(18)
+    const { list } = reduceOps(
+      [message(1), original],
+      [{ op: 'poll', chatId: 1, messageId: 2, poll: refreshed }],
+    )
+    expect(list[1]).toEqual({ ...original, poll: refreshed })
+    expect(list[0]).toEqual(message(1))
+  })
+
   it('removes deleted ids and reports them to the caller', () => {
     const { list, deleted } = reduceOps([message(1), message(2), message(3)], [deleteOp(2, 3)])
     expect(list.map((item) => item.id)).toEqual([1])
@@ -185,6 +214,16 @@ describe('reduceLoadedOps', () => {
     expect(next[1]).toBe(voted)
     expect(next[0]).toBe(thread[0])
     // The row is patched in place: a vote is not an arrival.
+    expect(next.map((item) => item.id)).toEqual([10, 11])
+  })
+
+  it('patches a poll in a renderer-owned comment thread', () => {
+    const original = message(11, { chatId: 500, kind: 'poll', text: 'pick', poll: poll(2) })
+    const refreshed = poll(18)
+    const next = reduceLoadedOps([message(10, { chatId: 500 }), original], 500, [
+      { op: 'poll', chatId: 500, messageId: 11, poll: refreshed },
+    ])
+    expect(next[1]).toEqual({ ...original, poll: refreshed })
     expect(next.map((item) => item.id)).toEqual([10, 11])
   })
 
@@ -240,8 +279,9 @@ describe('splitOpsForWindow', () => {
 
   it('always applies id-only ops, which cannot invent a row', () => {
     const edit: MessageOp = { op: 'edit', chatId: 1, messageId: 11, text: 'x' }
-    const { applicable } = splitOpsForWindow(window, [edit, readOp()])
-    expect(applicable).toHaveLength(2)
+    const pollOp: MessageOp = { op: 'poll', chatId: 1, messageId: 11, poll: poll(18) }
+    const { applicable } = splitOpsForWindow(window, [edit, pollOp, readOp()])
+    expect(applicable).toHaveLength(3)
   })
 })
 

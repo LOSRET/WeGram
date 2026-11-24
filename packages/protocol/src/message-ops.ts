@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { messageInteractionSchema, messageSchema } from './dto'
+import { pollSchema } from './poll'
 import { messageReactionSchema } from './reaction'
 
 /**
@@ -20,6 +21,17 @@ export const messageOpSchema = z.discriminatedUnion('op', [
   }),
   /** Full replacement, used when the server changes the content (media, caption). */
   z.object({ op: z.literal('replace'), message: messageSchema }),
+  /**
+   * A poll's results changed without the rest of the message changing. TDLib's
+   * updateMessageContent carries the complete new messagePoll, so this patch is
+   * applied immediately rather than waiting for a second getMessage read.
+   */
+  z.object({
+    op: z.literal('poll'),
+    chatId: z.number().int(),
+    messageId: z.number().int(),
+    poll: pollSchema,
+  }),
   z.object({
     op: z.literal('delete'),
     chatId: z.number().int(),

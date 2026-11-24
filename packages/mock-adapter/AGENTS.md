@@ -17,7 +17,8 @@ credentials (development only), plus the real PNG/WebP/TGS/WebM media it generat
   pin/clear/members/rename/leave/pinned/invite link); `history.ts` — transcript paging.
 - `comments.ts`, `contacts.ts`, `search.ts`, `stickers.ts`, `polls.ts` — the remaining
   endpoints; `search.ts` and `polls.ts` only adapt the fixture map to the shared
-  matching / vote rules and emit their own events.
+  matching / vote rules and emit their own events. The poll refresh endpoint is a
+  side-effect-free availability check because the mock has no TDLib cache to keep alive.
 - `edits.ts` — 编辑 / 编辑说明 / delete / 重试 as one `createMockEdits` factory: each
   rewrites one fixture row and announces the op that describes it (a text edit is an
   `edit`, a caption is a `replace`).

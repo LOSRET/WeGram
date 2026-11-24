@@ -69,10 +69,14 @@ export type Poll = z.infer<typeof pollSchema>
 
 /**
  * Poll commands. They live beside the DTO for the same reason the comment
- * contract does: the channel table is at its size budget, and the two commands
+ * contract does: the channel table is at its size budget, and these commands
  * only make sense next to the shape they mutate.
  */
-export const pollInvokeChannels = ['messages:vote', 'messages:addPollOption'] as const
+export const pollInvokeChannels = [
+  'messages:vote',
+  'messages:addPollOption',
+  'messages:refreshPoll',
+] as const
 
 export const pollInvokeSchemas = {
   /** optionIds are positions in the poll's options, not option ids. */
@@ -92,5 +96,17 @@ export const pollInvokeSchemas = {
       text: z.string().min(1).max(255),
     }),
     response: z.void(),
+  },
+  /**
+   * Keeps a visible poll's TDLib message cache entry alive and re-reads its counters.
+   * False means the message/poll is no longer available; a background refresh must
+   * not raise the renderer's error banner.
+   */
+  'messages:refreshPoll': {
+    request: z.object({
+      chatId: z.number().int(),
+      messageId: z.number().int(),
+    }),
+    response: z.boolean(),
   },
 } as const

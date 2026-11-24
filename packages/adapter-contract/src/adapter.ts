@@ -383,6 +383,8 @@ export interface TelegramAdapter {
   votePoll(input: InvokeRequest<'messages:vote'>): Promise<void>
   /** Adds an answer option, when the poll says it may be added. */
   addPollOption(input: InvokeRequest<'messages:addPollOption'>): Promise<void>
+  /** Re-reads a visible poll and announces changed results; false if it vanished. */
+  refreshPoll(input: InvokeRequest<'messages:refreshPoll'>): Promise<boolean>
   sendText(input: InvokeRequest<'messages:send'>): Promise<{ localId: string; message: Message }>
   editText(input: InvokeRequest<'messages:edit'>): Promise<Message>
   /**

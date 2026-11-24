@@ -6,6 +6,7 @@ import {
   pollCanChangeAnswer,
   pollChosen,
   pollCorrectAnswer,
+  pollDraftSelection,
   pollFooter,
   pollOptionCorrect,
   pollOptionWrong,
@@ -84,6 +85,44 @@ describe('poll rules', () => {
     expect(pollChosen(answered)).toEqual([0])
     expect(pollSelectionChanged(answered, [0])).toBe(false)
     expect(pollSelectionChanged(answered, [1])).toBe(true)
+  })
+
+  it('keeps staged ticks across a count-only poll refresh', () => {
+    const multiple = poll({ allowsMultipleAnswers: true })
+    const refreshed = {
+      ...multiple,
+      totalVoterCount: 9,
+      options: multiple.options.map((option) => ({
+        ...option,
+        voterCount: option.voterCount + 2,
+      })),
+    }
+    expect(pollDraftSelection({ poll: multiple, selection: [0, 1] }, refreshed)).toEqual([0, 1])
+  })
+
+  it('drops staged ticks when the server answer, options or closed state changes', () => {
+    const multiple = poll({ allowsMultipleAnswers: true })
+    const answered = {
+      ...multiple,
+      answered: true,
+      options: multiple.options.map((option) => ({ ...option, chosen: option.index === 1 })),
+    }
+    expect(pollDraftSelection({ poll: multiple, selection: [0] }, answered)).toEqual([1])
+    expect(
+      pollDraftSelection({ poll: multiple, selection: [0] }, { ...multiple, closed: true }),
+    ).toEqual([])
+    expect(
+      pollDraftSelection(
+        { poll: multiple, selection: [0] },
+        {
+          ...multiple,
+          options: [
+            ...multiple.options,
+            { index: 2, text: 'c', voterCount: 0, votePercentage: 0, chosen: false },
+          ],
+        },
+      ),
+    ).toEqual([])
   })
 
   it('offers adding an option only when the server allows it and the poll is open', () => {

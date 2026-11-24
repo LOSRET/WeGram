@@ -74,6 +74,13 @@ describe('mock polls', () => {
     expect(events.some((event) => event.type === 'messages')).toBe(true)
   })
 
+  it('keeps the mock refresh endpoint side-effect free', async () => {
+    const { fixture, events } = setup()
+    const polls = createMockPolls(new Map([[1, fixture]]), (event) => events.push(event))
+    await expect(polls.refreshPoll({ chatId: 1, messageId: 10 })).resolves.toBe(true)
+    expect(events).toEqual([])
+  })
+
   it('refuses a new option on a closed poll', async () => {
     const { fixture } = setup()
     const message = fixture.messages[0]

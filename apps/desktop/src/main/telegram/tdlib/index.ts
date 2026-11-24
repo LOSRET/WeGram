@@ -399,6 +399,10 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     return actions.addPollOption(this.actionDeps, input)
   }
 
+  async refreshPoll(input: InvokeRequest<'messages:refreshPoll'>): Promise<boolean> {
+    return actions.refreshPoll(this.actionDeps, input)
+  }
+
   /** Sends, edits and deletes; `send-api.ts`, deps read lazily. */
   private readonly sendApi = createSendApi(() => this.actionDeps)
   readonly sendText = this.sendApi.sendText

@@ -303,3 +303,7 @@
 .wx-poll__closed {
   color: var(--wx-text-tertiary);
 }
+
+.wx-poll__refresh-failed {
+  color: var(--wx-text-tertiary);
+}

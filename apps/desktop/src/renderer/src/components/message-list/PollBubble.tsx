@@ -7,6 +7,7 @@ import {
   pollCanChangeAnswer,
   pollChosen,
   pollCorrectAnswer,
+  pollDraftSelection,
   pollFooter,
   pollOptionCorrect,
   pollOptionWrong,
@@ -16,6 +17,7 @@ import {
   pollToggleSelection,
   pollVotable,
 } from '../../lib/poll'
+import { usePollRefresh } from '../../lib/usePollRefresh'
 import { useAppStore } from '../../store/useAppStore'
 
 /**
@@ -27,8 +29,8 @@ import { useAppStore } from '../../store/useAppStore'
  * sends on the tap, a multiple-answer one stages the ticks and offers 投票.
  *
  * A server-side vote change arrives as a message replace, and the new poll
- * object is what resets the staged selection: draft remembers the poll it was
- * made against, so a fresh object ignores it without an effect.
+ * object resets the staged selection when the server answer or option set changes.
+ * Count-only heartbeat refreshes keep a half-finished multiple-answer selection.
  *
  * The "server said no, you may not change this" lock is keyed by poll id, never by
  * object identity: the refusal reads the message back, so the replace it emits
@@ -55,7 +57,8 @@ export function PollBubble({
   const [adding, setAdding] = useState(false)
   const [optionText, setOptionText] = useState('')
 
-  const selection = draft?.poll === poll ? draft.selection : pollChosen(poll)
+  const selection = pollDraftSelection(draft, poll)
+  const refreshFailed = usePollRefresh(chatId, messageId, poll)
   const results = pollResultsVisible(poll)
   const lockKey = poll.id || String(messageId)
   const locked = lockedPollId !== null && lockedPollId === lockKey
@@ -208,6 +211,7 @@ export function PollBubble({
       ) : null}
       <div className="wx-poll__footer">
         <span>{pollFooter(poll)}</span>
+        {refreshFailed ? <span className="wx-poll__refresh-failed">更新失败</span> : null}
         {poll.closed ? <span className="wx-poll__closed">已结束</span> : null}
       </div>
     </div>

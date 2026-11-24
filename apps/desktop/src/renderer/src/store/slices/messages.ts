@@ -24,6 +24,7 @@ function bufferStillUsable(page: OlderPage, ops: MessageOp[]): boolean {
   return !ops.some((op) => {
     if (op.op === 'delete') return op.messageIds.some((id) => ids.has(id))
     if (op.op === 'edit') return ids.has(op.messageId)
+    if (op.op === 'poll') return ids.has(op.messageId)
     if (op.op === 'replace') return ids.has(op.message.id)
     return false
   })

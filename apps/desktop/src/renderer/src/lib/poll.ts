@@ -68,6 +68,32 @@ export function pollToggleSelection(poll: Poll, selected: number[], index: numbe
   return next.sort((a, b) => a - b)
 }
 
+/**
+ * Keeps staged ticks across count-only refreshes. A five-second poll heartbeat
+ * replaces the message object even when only the cache was touched; keying the
+ * draft by object identity would erase a half-finished multiple-answer vote.
+ * A changed server answer, option set or closed state still discards it.
+ */
+export function pollDraftSelection(
+  draft: { poll: Poll; selection: number[] } | null,
+  poll: Poll,
+): number[] {
+  if (!draft || draft.poll.id !== poll.id || draft.poll.closed !== poll.closed) {
+    return pollChosen(poll)
+  }
+  if (
+    draft.poll.allowsMultipleAnswers !== poll.allowsMultipleAnswers ||
+    pollChosen(draft.poll).join(',') !== pollChosen(poll).join(',')
+  ) {
+    return pollChosen(poll)
+  }
+  const optionKeys = (value: Poll): string[] =>
+    value.options.map((option) => option.id ?? String(option.index))
+  if (optionKeys(draft.poll).join(',') !== optionKeys(poll).join(',')) return pollChosen(poll)
+  const valid = new Set(poll.options.map((option) => option.index))
+  return draft.selection.filter((index) => valid.has(index))
+}
+
 export function pollSelectionChanged(poll: Poll, selected: number[]): boolean {
   const chosen = pollChosen(poll)
   const next = [...selected].sort((a, b) => a - b)

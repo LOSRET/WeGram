@@ -79,7 +79,7 @@ pnpm workspace, W1 + W2 + the W3 main body implemented, plus the private-chat P0
 | Transcript | virtualised list, anchored prepend, load-around anchors, day/unread separators, real sender photos, read receipts, typing + presence, reply/edit/delete/forward, polls, comments bar, channel post composition, pinned bar, reaction chips, link preview cards |
 | Media | photo/document send+receive with progress, `wx-media://` Range streaming (including a file TDLib is still downloading), viewer window for photos **and** videos, 表情 panel, 贴纸包盒子, album send, caption edit |
 | Stickers / emoji | WebP `<img>`, TGS → lottie-web (transcript) or one ThorVG canvas (grids), WebM `<video>`, animated-emoji messages (no bubble, one pass, click sound), premium sticker effects, custom emoji entities, Apple emoji as a CBDT colour font |
-| Polls | `PollBubble` + `lib/poll.ts`, `messages:vote` / `messages:addPollOption`, option order vs position |
+| Polls | `PollBubble` + `lib/poll.ts`, `messages:vote` / `messages:addPollOption`, option order vs position, immediate `poll` patches from `updateMessageContent.new_content` and a 5 s visible-poll keepalive |
 | Login | own frameless 280×373 window: TDLib QR (local `qrcode`), 用手机号登录 fallback via `auth:reset`, profile step only for a restored session |
 | 通讯录 | TDLib address book (`getContacts` + `getUser`), pinyin initials via ICU, contact card with 备注/DC/phone, 发消息 creates the private chat |
 | 链接预览 | a text message's link preview (Message.linkPreview from TDLib messageText.link_preview): cover photo + site/title/description, tinted from a stable hue of the URL, and the ⚡ 即时预览 bar that opens the reader as its own window (`web:open` → `main/instant-view-window.ts`, route `#instantview`; `web:instantView` → TDLib `getWebPageInstantView`, mapped into the rich-block union and drawn by `RichMessage`; zoom in the toolbar; design doc §8.9) |
@@ -338,7 +338,7 @@ apps/desktop/src/renderer/src/
   store/                     types, initialState (DATA_DEFAULTS), reducers, slices/{auth,
                              chats,messages,media,ui}, useAppStore (assembler)
   lib/                       pure rules + hooks: format, entities, media, mediaVariant,
-                             mediaPriority, tgs, poll, comments, presence, typingPing,
+                             mediaPriority, tgs, poll, pollRefresh/usePollRefresh, comments, presence, typingPing,
                              albumSend, editTarget, voice/ (recorder + oggOpus), qr, zoom,
                              player, viewer, chatInfo, listMetrics, scrollGeometry,
                              telegramLink, stickerMedia, stickerSetLink, customEmoji,
@@ -932,9 +932,15 @@ are grouped by the layer that owns the rule; the code comments carry the same fa
   id (`td-5242881` → `6291456`). The swap is real and is handled as a re-key: the
   `replaceId` op keeps the row in place.
 - **A vote is not echoed by the command.** `setPollAnswer` answers `Ok`; the changed poll
-  arrives later as `updateMessageContent` (a `replace`), so the renderer must not invent
-  counters locally. Quiz correct answers stay empty until the account answers or the poll
-  closes.
+  arrives later as `updateMessageContent`. Its `new_content` is applied immediately as a
+  `poll` patch, not discarded behind a second `getMessage` read. Quiz correct answers stay
+  empty until the account answers or the poll closes.
+- **A visible poll needs a foreground keepalive.** TDLib unregisters a poll when its
+  containing message leaves the message cache and refreshes registered online polls only
+  every 42–60 seconds. Renderer-owned comment rows can outlive that cache entry (measured:
+  official client 18 voters, WeGram still 2), so `usePollRefresh` re-reads mounted open polls
+  every 5 seconds and on focus/visibility. The read touches TDLib's LRU; an evicted row is
+  loaded again, re-registering the poll and triggering TDLib's immediate results fetch.
 - **The poll schema is newer than the version number suggests**: 1.8.70 (c8828d50) already
   has `pollOption.id`, `option_order`, `can_see_results`, `can_add_option`,
   `vote_restriction_reason`. `setPollAnswer` takes `chat_id`/`message_id`/`option_ids`, and

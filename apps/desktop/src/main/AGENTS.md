@@ -54,7 +54,10 @@ telegram/tdlib/actions/  TDLib requests as functions over ActionDeps, grouped in
                     chats / pins / history / files / send / comments / poll / users /
                     notification-settings (消息通知's per-scope defaults) and web
                     (即时预览's getWebPageInstantView)
-                    (index.ts re-exports); message-input.ts holds the one send
+                    (index.ts re-exports); `poll.ts` also owns the visible-poll keepalive
+                    (`messages:refreshPoll` → `getMessage`), which must touch TDLib's LRU
+                    or a comment poll loses its live registration after cache eviction.
+                    message-input.ts holds the one send
                     envelope. pins.ts owns 群公告 + 置顶消息 (one pinned message per
                     chat, and an unpin has to resolve the current id)
 telegram/tdlib/chat-api.ts  createChatApi: the chat seam methods (list/open/mute/pin/

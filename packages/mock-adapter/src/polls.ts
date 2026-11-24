@@ -74,5 +74,10 @@ export function createMockPolls(
     replacePoll(input.chatId, message, poll)
   }
 
-  return { votePoll, addPollOption }
+  const refreshPoll = async (input: InvokeRequest<'messages:refreshPoll'>): Promise<boolean> => {
+    const message = requireMessage(input.chatId, input.messageId)
+    return message.poll !== undefined
+  }
+
+  return { votePoll, addPollOption, refreshPoll }
 }

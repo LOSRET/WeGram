@@ -17,6 +17,7 @@ import { mapConnectionBoot, mapConnectionState } from './map/chat'
 import type { MapperContext } from './map/context'
 import { isTranscriptRemoval } from './map/deletion'
 import { mapMessage, mapReactions } from './map/message'
+import { mapPoll } from './map/poll'
 import { mapPeerStatus } from './map/status'
 
 /** What the update stream needs from the adapter. */
@@ -70,7 +71,29 @@ export function createUpdateHandler(deps: UpdateDeps): (update: TdObject) => Pro
         await emitChatUpsert(deps, raw.chat_id)
         return
       }
-      case 'updateMessageContent':
+      case 'updateMessageContent': {
+        const content = update.new_content
+        if (content?._ === 'messagePoll') {
+          const poll = mapPoll(content)
+          if (poll) {
+            deps.emit({
+              type: 'messages',
+              chatId: update.chat_id,
+              ops: [
+                {
+                  op: 'poll',
+                  chatId: update.chat_id,
+                  messageId: update.message_id,
+                  poll,
+                },
+              ],
+            })
+          }
+          return
+        }
+        await replaceMessageFromUpdate(deps, update.chat_id, update.message_id)
+        return
+      }
       case 'updateMessageEdited':
       /**
        * A bot swapped the keyboard under its message without touching the text —
@@ -78,25 +101,11 @@ export function createUpdateHandler(deps: UpdateDeps): (update: TdObject) => Pro
        * thing that changed, and every client-side markup (the buttons, the custom
        * keyboard, its removal and 强制回复) is read from it, so the row is remapped.
        */
-      case 'updateMessageReplyMarkup': {
+      case 'updateMessageReplyMarkup':
         // Remap the whole message instead of patching the text: an edit can change
         // media and a media upload completion can change a caption (§6.1).
-        const chatId: number = update.chat_id
-        const messageId: number = update.message_id
-        try {
-          const raw = await deps.invoke({
-            _: 'getMessage',
-            chat_id: chatId,
-            message_id: messageId,
-          })
-          if (!raw || raw._ === 'error') return
-          const message = await mapMessage(deps.mapper, chatId, raw)
-          deps.emit({ type: 'messages', chatId, ops: [{ op: 'replace', message }] })
-        } catch {
-          // The message may have been deleted in the same batch.
-        }
+        await replaceMessageFromUpdate(deps, update.chat_id, update.message_id)
         return
-      }
       /**
        * Engagement counters moved (views, forwards, replies). The update carries
        * no message content and fires on every view, so the whole message is not
@@ -380,6 +389,23 @@ export function createUpdateHandler(deps: UpdateDeps): (update: TdObject) => Pro
       default:
         return
     }
+  }
+}
+
+async function replaceMessageFromUpdate(
+  deps: UpdateDeps,
+  chatId: number,
+  messageId: number,
+): Promise<boolean> {
+  try {
+    const raw = await deps.invoke({ _: 'getMessage', chat_id: chatId, message_id: messageId })
+    if (!raw || raw._ === 'error') return false
+    const message = await mapMessage(deps.mapper, chatId, raw)
+    deps.emit({ type: 'messages', chatId, ops: [{ op: 'replace', message }] })
+    return true
+  } catch {
+    // The message may have been deleted in the same batch.
+    return false
   }
 }
 

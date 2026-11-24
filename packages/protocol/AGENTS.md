@@ -14,7 +14,7 @@ app settings, `app:info`), `network.ts` (the TDLib network-option channels —
 switch, and their `notifications:*` channel table), `viewer.ts` (the 图片和视频 window's payloads),
 `chat.ts` (the chat DTOs: kind/summary/member/pinned message/invite link/chat ops),
 `chats.ts` (the chat domain's channel keys and schemas), `qr.ts` (the 群二维码
-window's channels), `poll.ts` (the poll DTO + the vote/add-option channels),
+window's channels), `poll.ts` (the poll DTO + the vote/add-option/refresh channels),
 `comment.ts` (the comment-thread contract, including what a
 comment carries: text, a sticker or a local file), `search.ts` (the cross-chat
 message search schemas), `events.ts` (the `evt:*` tables + `EventChannel`/`EventEnvelope`,

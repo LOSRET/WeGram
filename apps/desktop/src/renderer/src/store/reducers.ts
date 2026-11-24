@@ -129,6 +129,9 @@ export function reduceOps(
       case 'replace':
         next = upsertMessage(next, op.message)
         break
+      case 'poll':
+        next = next.map((item) => (item.id === op.messageId ? { ...item, poll: op.poll } : item))
+        break
       case 'edit':
         next = next.map((item) =>
           item.id === op.messageId ? { ...item, text: op.text, edited: true } : item,
@@ -280,6 +283,7 @@ export function reduceLoadedOps(
       case 'replace':
         return op.message.chatId === chatId && held.has(op.message.id)
       case 'edit':
+      case 'poll':
       case 'sendState':
       case 'reactions':
       case 'interaction':

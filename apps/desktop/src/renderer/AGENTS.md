@@ -177,6 +177,10 @@ lib/format.ts         time / preview / avatar helpers (pure, unit-tested)
 lib/poll.ts           (pure, unit-tested) results visibility, votability, selection
                       staging, footer/mode copy, vote-restriction copy, quiz correctness,
                       whether an answer may still be changed (allows_revoting)
+lib/pollRefresh.ts    (pure, unit-tested) the 5 s visible-poll keepalive timing
+lib/usePollRefresh.ts  re-reads a mounted open poll on mount/focus/visibility and every
+                       5 s, keeping its TDLib cache registration alive; reports failure
+                       as the card's 更新失败 note, never the global error banner
 lib/search.ts         normalizeQuery / containsText / matchSegments — the ONE reading of a
                       search box, and the hit emphasis a result row draws
 lib/useGlobalSearch.ts  the search panel's conversation hits: 260 ms debounce over

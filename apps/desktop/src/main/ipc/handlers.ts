@@ -274,6 +274,7 @@ export function createHandlers({
     'messages:resend': (payload) => adapter.resendMessages(payload.chatId, payload.messageIds),
     'messages:vote': (payload) => adapter.votePoll(payload),
     'messages:addPollOption': (payload) => adapter.addPollOption(payload),
+    'messages:refreshPoll': (payload) => adapter.refreshPoll(payload),
 
     'search:global': (payload) => adapter.searchGlobal(payload),
     'search:inChat': (payload) => adapter.searchInChat(payload),

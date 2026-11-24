@@ -276,6 +276,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   private readonly pollApi = createMockPolls(this.fixtures, (event) => this.emit(event))
   readonly votePoll = this.pollApi.votePoll
   readonly addPollOption = this.pollApi.addPollOption
+  readonly refreshPoll = this.pollApi.refreshPoll
   readonly listChats = this.chatApi.listChats
   readonly prefetchChatAvatars = this.chatApi.prefetchAvatars
   readonly getChat = this.chatApi.getChat

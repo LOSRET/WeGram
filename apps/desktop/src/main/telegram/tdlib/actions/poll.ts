@@ -34,11 +34,11 @@ export async function votePoll(
   } catch (error) {
     // A refusal means this copy is stale (voted elsewhere, quiz settled): re-read
     // it before reporting, so the card cannot stay votable after the server said no.
-    await refreshPoll(deps, input.chatId, input.messageId)
+    await refreshPollMessage(deps, input.chatId, input.messageId, true)
     if (isChangeRefusal(error)) throw new AppError('poll_answered', '已经投过票，不能再改')
     throw error
   }
-  await refreshPoll(deps, input.chatId, input.messageId)
+  await refreshPollMessage(deps, input.chatId, input.messageId, true)
 }
 
 /** Adds an answer option when the poll allows it (messagePoll.can_add_option). */
@@ -53,7 +53,21 @@ export async function addPollOption(
     // `media` is a nullable class field: TDLib's JSON parser wants it present.
     option: { _: 'inputPollOption', text: formattedText(input.text), media: null },
   })
-  await refreshPoll(deps, input.chatId, input.messageId)
+  await refreshPollMessage(deps, input.chatId, input.messageId, true)
+}
+
+/**
+ * Keeps a visible poll's message hot in TDLib's LRU. A comment thread is
+ * renderer-owned and can outlive TDLib's cache registration; reading the row again
+ * re-registers the poll and triggers TDLib's immediate fetch. The heartbeat itself
+ * emits nothing, so a slow local read can never overwrite a newer pushed update.
+ * False is a normal background outcome (deleted/evicted), not an error banner.
+ */
+export async function refreshPoll(
+  deps: ActionDeps,
+  input: InvokeRequest<'messages:refreshPoll'>,
+): Promise<boolean> {
+  return refreshPollMessage(deps, input.chatId, input.messageId, false)
 }
 
 /**
@@ -85,15 +99,23 @@ function isChangeRefusal(error: unknown): boolean {
   )
 }
 
-/** Replaces the row with the server's copy, so the card never waits for an update. */
-async function refreshPoll(deps: ActionDeps, chatId: number, messageId: number): Promise<void> {
+/** Reads the server copy; vote writes announce it, heartbeats only touch the LRU. */
+async function refreshPollMessage(
+  deps: ActionDeps,
+  chatId: number,
+  messageId: number,
+  announce: boolean,
+): Promise<boolean> {
   try {
     const raw = await deps.invoke({ _: 'getMessage', chat_id: chatId, message_id: messageId })
-    if (!raw || raw._ === 'error') return
+    if (!raw || raw._ === 'error') return false
     const message = await mapMessage(deps.mapper, chatId, raw)
-    deps.emit({ type: 'messages', chatId, ops: [{ op: 'replace', message }] })
+    if (!message.poll) return false
+    if (announce) deps.emit({ type: 'messages', chatId, ops: [{ op: 'replace', message }] })
+    return true
   } catch (error) {
     // The update that normally carries the new poll can still arrive.
-    deps.logger.warn('poll: could not read the message back after a write', error)
+    deps.logger.warn('poll: could not read the message back', error)
+    return false
   }
 }
