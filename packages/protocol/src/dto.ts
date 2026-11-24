@@ -504,6 +504,23 @@ export const messageKindSchema = z.enum([
 export type MessageKind = z.infer<typeof messageKindSchema>
 
 /**
+ * The kinds whose content carries a caption (`editMessageCaption`): photo, video
+ * (an animation is a video to us), document and voice note. A sticker's emoji and a
+ * rich page's blocks are edited by other calls that this client does not implement.
+ *
+ * One set for both consumers: the renderer decides which edit label a row offers
+ * (`lib/editTarget.ts`), and the fake adapters answer `can_be_edited` for the same
+ * rows — the mock used to say only plain text was editable, so 编辑说明 was never
+ * offered against it.
+ */
+export const CAPTION_MESSAGE_KINDS: ReadonlySet<MessageKind> = new Set<MessageKind>([
+  'photo',
+  'video',
+  'file',
+  'voice',
+])
+
+/**
  * Engagement under a message — the row WeChat's article cards carry above their
  * comment list. TDLib fills it from `messageInteractionInfo`: counters on
  * channels, and `reply_info` wherever the message owns a comment thread (a

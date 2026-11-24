@@ -1,3 +1,4 @@
+import { CAPTION_MESSAGE_KINDS } from '@wegram/protocol'
 import type { Message } from '@wegram/protocol'
 
 /**
@@ -13,21 +14,9 @@ import type { Message } from '@wegram/protocol'
  */
 export type EditTarget = 'text' | 'caption'
 
-/**
- * The kinds whose TDLib content carries a caption: photo, video (an animation is
- * a video to us), document and voice note. A sticker's emoji and a rich page's
- * blocks are edited by other calls that are not implemented.
- */
-const CAPTION_KINDS: ReadonlySet<Message['kind']> = new Set<Message['kind']>([
-  'photo',
-  'video',
-  'file',
-  'voice',
-])
-
 export function editTargetOf(message: Message): EditTarget | null {
   if (message.kind === 'text') return 'text'
-  if (CAPTION_KINDS.has(message.kind) && message.media) return 'caption'
+  if (CAPTION_MESSAGE_KINDS.has(message.kind) && message.media) return 'caption'
   return null
 }
 

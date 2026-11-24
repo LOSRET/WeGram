@@ -1,4 +1,4 @@
-import { AppError, type MessageProperties } from '@wegram/protocol'
+import { AppError, CAPTION_MESSAGE_KINDS, type MessageProperties } from '@wegram/protocol'
 
 import type { Fixture } from './constants'
 
@@ -23,7 +23,12 @@ export function mockMessageProperties(
     throw new AppError('internal', `Unknown mock message ${input.chatId}/${input.messageId}`)
   }
   return {
-    canBeEdited: message.outgoing && message.kind === 'text',
+    // The same rows the renderer's `lib/editTarget.ts` offers 编辑/编辑说明 on: plain
+    // text and a media row whose content is a caption. (This used to allow text
+    // only, so a photo with a caption was not editable against the mock.)
+    canBeEdited:
+      message.outgoing &&
+      (message.kind === 'text' || (CAPTION_MESSAGE_KINDS.has(message.kind) && Boolean(message.media))),
     canBeForwarded: true,
     canBeDeletedOnlyForSelf: true,
     canBeDeletedForAllUsers: message.outgoing,

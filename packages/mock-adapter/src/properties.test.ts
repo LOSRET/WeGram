@@ -25,6 +25,36 @@ function store(seed: Fixture[]): { fixtures: Map<number, Fixture> } {
   return { fixtures: new Map(seed.map((item) => [item.chat.id, item])) }
 }
 
+describe('mockMessageProperties 编辑', () => {
+  it('offers 编辑 to our own text', () => {
+    const seed = fixture(2, 'group')
+    const message = seed.messages[0]
+    if (!message) throw new Error('missing message')
+    message.outgoing = true
+    expect(mockMessageProperties(store([seed]), { chatId: 2, messageId: 20 }).canBeEdited).toBe(
+      true,
+    )
+  })
+
+  it('offers 编辑说明 on our own media caption, like the renderer\u2019s edit target', () => {
+    const seed = fixture(2, 'group')
+    const message = seed.messages[0]
+    if (!message) throw new Error('missing message')
+    message.outgoing = true
+    seed.messages[0] = { ...message, kind: 'photo', media: { fileId: 7 } }
+    expect(mockMessageProperties(store([seed]), { chatId: 2, messageId: 20 }).canBeEdited).toBe(
+      true,
+    )
+  })
+
+  it('never edits somebody else\u2019s row', () => {
+    const seed = fixture(2, 'group')
+    expect(mockMessageProperties(store([seed]), { chatId: 2, messageId: 20 }).canBeEdited).toBe(
+      false,
+    )
+  })
+})
+
 describe('mockMessageProperties 举报 gate', () => {
   it("mirrors TDLib: a human's private chat cannot be reported from a message", () => {
     const props = mockMessageProperties(store([fixture(3, 'private')]), {
