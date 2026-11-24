@@ -147,7 +147,8 @@ lib/ipc.ts            thin `window.tg` wrapper
 lib/clipboard.ts      text copy for the contact card (navigator.clipboard + execCommand fallback)
 lib/format.ts         time / preview / avatar helpers (pure, unit-tested)
 lib/poll.ts           (pure, unit-tested) results visibility, votability, selection
-                      staging, footer/mode copy, vote-restriction copy, quiz correctness
+                      staging, footer/mode copy, vote-restriction copy, quiz correctness,
+                      whether an answer may still be changed (allows_revoting)
 lib/search.ts         normalizeQuery / containsText / matchSegments — the ONE reading of a
                       search box, and the hit emphasis a result row draws
 lib/useGlobalSearch.ts  the search panel's conversation hits: 260 ms debounce over

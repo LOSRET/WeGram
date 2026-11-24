@@ -36,6 +36,21 @@ export function pollVotable(poll: Poll): boolean {
   return true
 }
 
+/**
+ * Whether an answer already given may still be changed — switched or retracted.
+ *
+ * TDLib refuses both as soon as the poll's allows_revoting is false ("Can't retract
+ * vote in the poll" / "Can't revote in the poll"), so the card must not offer the
+ * tap at all: the request could only bounce, and the refresh the refusal triggers
+ * replaced the poll object the hint was pinned to (design doc §9.10). A first vote
+ * is unaffected, and a quiz is final once answered.
+ */
+export function pollCanChangeAnswer(poll: Poll): boolean {
+  if (!poll.answered) return true
+  if (poll.quiz) return false
+  return poll.allowsRevoting === true
+}
+
 /** Positions this account picked, sorted so two selections compare cheaply. */
 export function pollChosen(poll: Poll): number[] {
   return poll.options

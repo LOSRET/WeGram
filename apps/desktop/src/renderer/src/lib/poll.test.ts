@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   pollCanAddOption,
+  pollCanChangeAnswer,
   pollChosen,
   pollCorrectAnswer,
   pollFooter,
@@ -46,6 +47,23 @@ describe('poll rules', () => {
     expect(pollVotable(poll({ closed: true }))).toBe(false)
     expect(pollVotable(poll({ restriction: 'membershipRequired' }))).toBe(false)
     expect(pollVotable(poll({ quiz: true, answered: true }))).toBe(false)
+  })
+
+  it('refuses to change an answer the poll will not take back', () => {
+    const answered = poll({
+      answered: true,
+      options: [
+        { index: 0, text: 'a', voterCount: 3, votePercentage: 60, chosen: true },
+        { index: 1, text: 'b', voterCount: 2, votePercentage: 40, chosen: false },
+      ],
+    })
+    // Unanswered: the first vote is always on offer.
+    expect(pollCanChangeAnswer(poll())).toBe(true)
+    // Answered, no allows_revoting: TDLib would refuse both a retract and a switch.
+    expect(pollCanChangeAnswer(answered)).toBe(false)
+    expect(pollCanChangeAnswer({ ...answered, allowsRevoting: true })).toBe(true)
+    // A quiz is final whatever the flag says.
+    expect(pollCanChangeAnswer({ ...answered, quiz: true, allowsRevoting: true })).toBe(false)
   })
 
   it('replaces a single answer but toggles a multiple one', () => {

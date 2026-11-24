@@ -35,7 +35,7 @@ export async function votePoll(
     // A refusal means this copy is stale (voted elsewhere, quiz settled): re-read
     // it before reporting, so the card cannot stay votable after the server said no.
     await refreshPoll(deps, input.chatId, input.messageId)
-    if (isRevoteRefusal(error)) throw new AppError('poll_answered', '这道题已经答过了')
+    if (isChangeRefusal(error)) throw new AppError('poll_answered', '已经投过票，不能再改')
     throw error
   }
   await refreshPoll(deps, input.chatId, input.messageId)
@@ -72,10 +72,17 @@ async function answer(deps: ActionDeps, method: TdObject): Promise<void> {
   }
 }
 
-/** TDLib's refusal for an answer this account already gave: a quiz is final. */
-function isRevoteRefusal(error: unknown): boolean {
+/**
+ * TDLib's refusals for an answer this poll will not take back: the poll answered
+ * once has its revoting disabled (PollManager: "Can't retract vote in the poll" /
+ * "Can't revote in the poll"), and a quiz is final ("Can't revote in a quiz").
+ * The renderer turns this into the card's own 不能修改 line, not the error bar.
+ */
+function isChangeRefusal(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error)
-  return /can't revote/i.test(message)
+  return /can't retract vote in the poll|can't revote in the poll|can't revote in a quiz/i.test(
+    message,
+  )
 }
 
 /** Replaces the row with the server's copy, so the card never waits for an update. */

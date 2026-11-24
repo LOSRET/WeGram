@@ -21,6 +21,8 @@ export interface PollMessageOptions {
   anonymous?: boolean
   multiple?: boolean
   canAddOption?: boolean
+  /** Telegram's default is to allow changing an answer; a poll may disable it. */
+  revoting?: boolean
   closed?: boolean
   /** Options this account picked, by position. */
   chosen?: number[]
@@ -61,6 +63,7 @@ export function pollMessage(input: PollMessageOptions): Message {
       totalVoterCount: total,
       anonymous: input.anonymous !== false,
       allowsMultipleAnswers: input.multiple === true,
+      allowsRevoting: input.revoting !== false,
       canSeeResults: closed || chosen.length > 0,
       quiz: input.quiz === true,
       ...(input.correct?.length ? { correctOptionIds: input.correct } : {}),

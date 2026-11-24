@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react'
 import { errorMessage, invoke, isAppErrorShape } from '../../lib/ipc'
 import {
   pollCanAddOption,
+  pollCanChangeAnswer,
   pollChosen,
   pollCorrectAnswer,
   pollFooter,
@@ -28,6 +29,11 @@ import { useAppStore } from '../../store/useAppStore'
  * A server-side vote change arrives as a message replace, and the new poll
  * object is what resets the staged selection: draft remembers the poll it was
  * made against, so a fresh object ignores it without an effect.
+ *
+ * The "server said no, you may not change this" lock is keyed by poll id, never by
+ * object identity: the refusal reads the message back, so the replace it emits
+ * arrives as a fresh object and an identity-keyed lock lasted one frame — the hint
+ * flashed and the card went votable again, inviting the same doomed tap.
  */
 export function PollBubble({
   chatId,
@@ -40,19 +46,29 @@ export function PollBubble({
 }) {
   const [busy, setBusy] = useState(false)
   const [draft, setDraft] = useState<{ poll: Poll; selection: number[] } | null>(null)
-  /** The poll the server refused an answer for: this account already answered it. */
-  const [lockedFor, setLockedFor] = useState<Poll | null>(null)
+  /**
+   * The poll id the server refused an answer for: this account already answered it
+   * and the poll will not take the answer back. Ids survive the replace that the
+   * refusal itself emits; object identity does not.
+   */
+  const [lockedPollId, setLockedPollId] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [optionText, setOptionText] = useState('')
 
   const selection = draft?.poll === poll ? draft.selection : pollChosen(poll)
   const results = pollResultsVisible(poll)
-  // A refreshed poll arrives as a new object, which releases the lock by itself.
-  const locked = lockedFor === poll
-  const votable = pollVotable(poll) && !busy && !locked
+  const lockKey = poll.id || String(messageId)
+  const locked = lockedPollId !== null && lockedPollId === lockKey
+  // A poll that does not allow revoting keeps the answer it has: the card says so
+  // instead of sending a retract/switch the server refuses (§9.10).
+  const mayChange = pollCanChangeAnswer(poll)
+  const votable = pollVotable(poll) && mayChange && !busy && !locked
   const solution = pollCorrectAnswer(poll)
   const canAddOption = pollCanAddOption(poll)
   const restriction = pollRestrictionText(poll)
+  // Only a poll answer is worded this way; a quiz shows its 正确答案 block instead,
+  // and a closed poll's footer already says 已结束.
+  const answerLocked = !poll.closed && !poll.quiz && !mayChange
 
   const fail = (cause: unknown): void => {
     useAppStore.getState().setError(errorMessage(cause))
@@ -66,7 +82,7 @@ export function PollBubble({
         // Already answered (possibly on another client): lock the card instead of
         // raising the banner, which would only invite another tap (§9.10).
         if (isAppErrorShape(cause) && cause.code === 'poll_answered') {
-          setLockedFor(poll)
+          setLockedPollId(lockKey)
           return
         }
         fail(cause)
@@ -149,7 +165,9 @@ export function PollBubble({
         })}
       </div>
       {restriction ? <div className="wx-poll__hint">{restriction}</div> : null}
-      {locked ? <div className="wx-poll__hint">你的答案已经提交，不能修改</div> : null}
+      {locked || answerLocked ? (
+        <div className="wx-poll__hint">你的答案已经提交，不能修改</div>
+      ) : null}
       {staged ? (
         <div className="wx-poll__actions">
           <button type="button" className="wx-poll__submit" onClick={() => vote(selection)}>
