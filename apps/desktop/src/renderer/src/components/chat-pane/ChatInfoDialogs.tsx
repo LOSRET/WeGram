@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { copyText } from '../../lib/clipboard'
 import { errorMessage, invoke } from '../../lib/ipc'
+import { useAppStore } from '../../store/useAppStore'
 import { QrCode } from '../QrCode'
 
 /**
@@ -62,6 +63,80 @@ export function RenameDialog({
   )
 }
 
+/**
+ * 添加成员 (§8.3/§9.9): one @username, put into the group with `addChatMembers`.
+ *
+ * This is how a bot joins a group — it has no invite-link flow, and the handle is
+ * the only identifier it has. Telegram's own sheet is a search over contacts and
+ * usernames; asking for the handle is the smaller honest version, and a refusal
+ * (a privacy setting, or Premium) keeps the sheet open with the reason and points
+ * at the invite link instead.
+ */
+export function AddMemberDialog({
+  chatId,
+  onOpenInvite,
+  onClose,
+}: {
+  chatId: number
+  /** 改用邀请链接: the same group's link, for somebody who refuses direct adds. */
+  onOpenInvite: () => void
+  onClose: () => void
+}) {
+  const [value, setValue] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const handle = value.trim().replace(/^@+/, '')
+  const submit = async (): Promise<void> => {
+    if (handle.length < 3 || busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      const member = await invoke('chats:addMember', { chatId, username: handle })
+      useAppStore.getState().setToast(`已添加 ${member.title}`)
+      onClose()
+    } catch (failure) {
+      // The sheet stays open: the reason often suggests the invite link below.
+      setError(errorMessage(failure))
+      setBusy(false)
+    }
+  }
+  return (
+    <div className="wx-modal-backdrop" onClick={onClose}>
+      <form
+        className="wx-modal wx-modal--small wx-info-dialog"
+        onClick={(event) => event.stopPropagation()}
+        onSubmit={(event) => {
+          event.preventDefault()
+          void submit()
+        }}
+      >
+        <div className="wx-dialog__title">添加成员</div>
+        <input
+          className="wx-input"
+          value={value}
+          autoFocus
+          maxLength={64}
+          spellCheck={false}
+          placeholder="@用户名"
+          onChange={(event) => setValue(event.target.value)}
+        />
+        <p className="wx-info-dialog__hint">输入对方的 @用户名，机器人也用这个。</p>
+        {error ? <p className="wx-info-dialog__error">{error}</p> : null}
+        <button type="button" className="wx-info-dialog__link" onClick={onOpenInvite}>
+          对方不接受直接添加？改用邀请链接
+        </button>
+        <div className="wx-dialog__actions">
+          <button type="button" onClick={onClose}>
+            取消
+          </button>
+          <button type="submit" className="wx-dialog__confirm" disabled={handle.length < 3 || busy}>
+            {busy ? '添加中…' : '添加'}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
 /**
  * 群二维码 / 邀请成员: the one link a phone can scan (design doc §9.9).
  *

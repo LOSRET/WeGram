@@ -1,7 +1,7 @@
 import type { Message, MessageInteraction, MessageReaction } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
-import { mapReplyKeyboard, mapReplyMarkup } from './buttons'
+import { isKeyboardRemoved, mapForceReply, mapReplyKeyboard, mapReplyMarkup } from './buttons'
 import { mapContent } from './content'
 import { serviceText, SERVICE_CONTENT_TYPES } from './service'
 import type { MapperContext } from './context'
@@ -56,9 +56,12 @@ export async function mapMessage(
       ? content.game.short_name
       : undefined
   const buttons = mapReplyMarkup(raw.reply_markup, gameShortName)
-  // A message carries one markup: an inline keyboard under the bubble, or the
-  // bot's custom keyboard above the input — never both.
+  // A message carries one markup: an inline keyboard under the bubble, or one of
+  // the bot's client-side ones above the input — never both (§8.3). A removal is
+  // its own marker: the row has no keyboard to carry, but the grid must go.
   const replyKeyboard = mapReplyKeyboard(raw.reply_markup)
+  const replyKeyboardHidden = isKeyboardRemoved(raw.reply_markup)
+  const forceReply = mapForceReply(raw.reply_markup)
   const albumId = albumIdOf(raw)
   const topicId = topicIdOf(raw)
   const interaction = mapInteraction(raw)
@@ -96,6 +99,8 @@ export async function mapMessage(
     ...(mapped.poll ? { poll: mapped.poll } : {}),
     ...(buttons ? { buttons } : {}),
     ...(replyKeyboard ? { replyKeyboard } : {}),
+    ...(replyKeyboardHidden ? { replyKeyboardHidden: true } : {}),
+    ...(forceReply ? { forceReply } : {}),
     ...(albumId ? { albumId } : {}),
     ...(topicId ? { topicId } : {}),
     ...(raw.reply_to?.message_id ? { replyToId: raw.reply_to.message_id } : {}),

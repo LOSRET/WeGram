@@ -7,6 +7,11 @@ import { useAppStore } from '../../store/useAppStore'
 export interface MessageActions {
   send: (text: string, replyToMessageId: number | undefined) => Promise<void>
   /**
+   * inline 机器人 (§8.3): sends one result the bot built. The answer is the row,
+   * so it takes the same "append, jump if anchored" path a typed message does.
+   */
+  sendInline: (queryId: string, resultId: string) => Promise<void>
+  /**
    * Saves the composer's edit banner. `caption` routes a media row's 说明 to
    * `messages:editCaption`; the answer replaces the row (TDLib re-maps its
    * content), so the transcript keeps the server's own copy.
@@ -62,6 +67,19 @@ export function createMessageActions(
       const store = useAppStore.getState()
       store.applyMessageOps(activeChatId, [{ op: 'new', message: result.message }])
       store.setReplyTo(activeChatId, null)
+      if (wasAnchored) store.requestJumpToLatest(activeChatId)
+    },
+
+    sendInline: async (queryId, resultId) => {
+      const wasAnchored = await loadLatestWindow(activeChatId, activeTopicId)
+      const result = await invoke('bots:inlineSend', {
+        chatId: activeChatId,
+        ...topicParam,
+        queryId,
+        resultId,
+      })
+      const store = useAppStore.getState()
+      store.applyMessageOps(activeChatId, [{ op: 'new', message: result.message }])
       if (wasAnchored) store.requestJumpToLatest(activeChatId)
     },
 

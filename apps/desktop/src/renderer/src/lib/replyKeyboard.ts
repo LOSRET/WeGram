@@ -11,14 +11,19 @@ export interface ActiveReplyKeyboard {
  * The bot keyboard a chat shows right now (§8.3).
  *
  * Telegram keeps the keyboard of the most recent message that has one: a plain
- * reply after it does not clear the grid, and only a newer keyboard (or the
- * keyboard's own `oneTime`) takes it away. The store keeps a transcript
- * oldest-first, so this walks from the end and stops at the first markup.
+ * reply after it does not clear the grid, and only a newer keyboard, the
+ * keyboard's own `oneTime`, or the bot taking it away
+ * (`replyMarkupRemoveKeyboard` → `replyKeyboardHidden`) does. The store keeps a
+ * transcript oldest-first, so this walks from the end and stops at the first row
+ * that has an opinion.
  */
 export function activeReplyKeyboard(messages: readonly Message[]): ActiveReplyKeyboard | null {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index]
     if (!message) continue
+    // The removal row carries no keyboard at all, so the marker itself is the
+    // newest word on the subject — an older grid must not come back.
+    if (message.replyKeyboardHidden) return null
     const keyboard = message.replyKeyboard
     if (!keyboard || keyboard.rows.length === 0) continue
     return { messageId: message.id, keyboard }

@@ -1,5 +1,6 @@
 import type {
   BotCommand,
+  InlineResult,
   Message,
   ReplyKeyboard as ReplyKeyboardLayout,
   ReplyKeyboardButton,
@@ -10,6 +11,9 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { albumSendOf } from '../lib/albumSend'
 import { loadLatestWindow } from '../lib/anchoredWindow'
 import { commandQuery, commandText, filterCommands } from '../lib/botCommands'
+import type { PendingForceReply } from '../lib/forceReply'
+import { parseInlineQuery } from '../lib/inlineQuery'
+import { useInlineQuery } from '../lib/useInlineQuery'
 import { TypingPing } from '../lib/typingPing'
 import { useBotCommands } from '../lib/useBotCommands'
 import { useComposerInput } from '../lib/useComposerInput'
@@ -18,6 +22,7 @@ import { errorMessage, invoke } from '../lib/ipc'
 import { messagePreview } from '../lib/format'
 import { useAppStore } from '../store/useAppStore'
 import { ComposerCard } from './composer/ComposerCard'
+import { InlineResults } from './InlineResults'
 import { ReplyKeyboard } from './ReplyKeyboard'
 
 export interface ComposerEditing {
@@ -49,6 +54,17 @@ interface ComposerProps {
   replyKeyboard?: ReplyKeyboardLayout
   /** A one-time keyboard was used: the pane drops it until a newer one arrives. */
   onKeyboardUsed?: () => void
+  /**
+   * 机器人强制回复 (§8.3): the row the bot waits for an answer to. The reply
+   * banner is the ordinary one — this only names what it is for and lends the
+   * box the bot's placeholder.
+   */
+  forceReply?: PendingForceReply
+  /**
+   * inline 机器人 (§8.3): sends one result of a `@bot query`. The bot builds the
+   * message, so the pane only appends what the adapter answered.
+   */
+  onSendInline?: (queryId: string, resultId: string) => Promise<void>
 }
 
 /**
@@ -71,6 +87,8 @@ export function Composer({
   onCollapse,
   replyKeyboard,
   onKeyboardUsed,
+  forceReply,
+  onSendInline,
 }: ComposerProps) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
@@ -224,6 +242,80 @@ export function Composer({
     return false
   }
 
+  /**
+   * inline 机器人 (§8.3): a message that starts with `@bot ` asks that bot for
+   * results. The draft is derived from the box, never stored, so clearing the
+   * text closes the panel; Esc remembers the query it was dismissed for.
+   */
+  const inlineDraft = editing ? null : parseInlineQuery(text)
+  const { state: inlineState, loadMore: loadMoreInline } = useInlineQuery(chatId, inlineDraft)
+  const [dismissedInline, setDismissedInline] = useState<string | null>(null)
+  const [inlineIndex, setInlineIndex] = useState(0)
+  const inlineKey = inlineDraft ? inlineDraft.username + ' ' + inlineDraft.query : null
+  const inlineOpen =
+    inlineDraft !== null &&
+    inlineKey !== dismissedInline &&
+    (inlineState.loading || inlineState.failed || inlineState.results.length > 0)
+  /** The arrows stay inside the newest list; the count may shrink between pages. */
+  const inlineCount = inlineState.results.length
+  const inlineChoice =
+    inlineCount > 0 ? inlineState.results[Math.min(inlineIndex, inlineCount - 1)] : undefined
+
+  /** A new query starts at its first row. */
+  useEffect(() => {
+    setInlineIndex(0)
+  }, [inlineKey])
+
+  /**
+   * Sends one inline result. The box is cleared afterwards: what the reader typed
+   * was the query `@bot …`, not the message (Telegram does the same).
+   */
+  const pickInline = async (result: InlineResult): Promise<void> => {
+    if (!onSendInline || !inlineState.queryId || busy) return
+    setBusy(true)
+    try {
+      pingerRef.current?.stop()
+      await onSendInline(inlineState.queryId, result.id)
+      setText('')
+    } catch (error) {
+      useAppStore.getState().setError(errorMessage(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * The panel takes the arrows and Enter/Tab before the send rule does, the way
+   * the "/" list does, so picking a result never sends `@bot query` as text. Esc
+   * closes it for that query only.
+   */
+  const inlineKeys = (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
+    if (!inlineOpen) return false
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      if (inlineCount === 0) return false
+      event.preventDefault()
+      setInlineIndex((current) =>
+        event.key === 'ArrowDown'
+          ? (current + 1) % inlineCount
+          : (current - 1 + inlineCount) % inlineCount,
+      )
+      return true
+    }
+    if (event.key === 'Escape') {
+      setDismissedInline(inlineKey)
+      return true
+    }
+    // Ctrl+Enter / Cmd+Enter stay the send gesture even over the panel.
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) return false
+    if (event.key === 'Enter' || event.key === 'Tab') {
+      if (event.nativeEvent.isComposing) return false
+      if (!inlineChoice) return false
+      event.preventDefault()
+      void pickInline(inlineChoice)
+      return true
+    }
+    return false
+  }
   /** Every keystroke also pings (throttled); emptying the box cancels at once. */
   const changeText = (next: string): void => {
     setText(next)
@@ -284,7 +376,8 @@ export function Composer({
   const { inputHandlers } = useComposerInput({
     onSend: () => void submit(),
     onEscape: editing ? onCancelEdit : undefined,
-    onKeyDown: commandKeys,
+    // The two panels cannot be open at once (`/` vs `@`), so one chain is enough.
+    onKeyDown: (event) => commandKeys(event) || inlineKeys(event),
   })
 
   /**
@@ -411,12 +504,13 @@ export function Composer({
     useAppStore.getState().setToast(`${label}还没有接入`)
   }
 
-  // A bot keyboard may name the box (§8.3): its placeholder replaces 输入消息.
+  // A bot may name the box (§8.3): a keyboard's placeholder, or the one a
+  // 强制回复 asks for. A promised answer outranks a keyboard hint.
   const placeholder = editing
     ? editing.caption
       ? '编辑说明，清空后回车可删除'
       : '编辑后回车保存，Esc 取消'
-    : replyKeyboard?.placeholder || '输入消息'
+    : forceReply?.placeholder || replyKeyboard?.placeholder || '输入消息'
 
   return (
     <div className="wx-composer">
@@ -467,6 +561,24 @@ export function Composer({
             </div>
           ))}
         </div>
+      ) : null}
+
+      {/*
+        inline 机器人: the bot's results above the input, drawn like the command
+        list for the same reason — the textarea keeps the keyboard.
+      */}
+      {inlineOpen && inlineDraft ? (
+        <InlineResults
+          username={inlineDraft.username}
+          results={inlineState.results}
+          loading={inlineState.loading}
+          failed={inlineState.failed}
+          activeIndex={inlineIndex}
+          hasMore={inlineState.nextOffset !== ''}
+          onHover={setInlineIndex}
+          onPick={(result) => void pickInline(result)}
+          onLoadMore={loadMoreInline}
+        />
       ) : null}
 
       <ComposerCard

@@ -10,6 +10,7 @@ import type {
 import type { TdObject } from '../client'
 import { asArray } from '../json'
 import { mapChat } from '../map/chat'
+import { displayName } from '../map/user'
 import { chatPlacement } from '../map/placement'
 import type { ActionDeps, PostPermissionDeps } from './deps'
 
@@ -237,6 +238,52 @@ export async function joinChannel(deps: ActionDeps, chatId: number): Promise<Cha
     default:
       throw new AppError('internal', '加入频道失败')
   }
+}
+
+/**
+ * 添加成员 (`addChatMembers`): one person, resolved from an @username.
+ *
+ * A bot is added exactly this way — it has no invite-link flow, and this is the
+ * only call that puts it in a group. TDLib answers the members it could *not*
+ * add, so "added" means none of them is ours; the reasons it gives are the
+ * reader's words (Premium, or a privacy setting that wants the invite link).
+ * Adding needs the `can_invite_users` right; a refusal arrives as an AppError
+ * from the client like every other TDLib error.
+ */
+export async function addChatMember(
+  deps: Pick<ActionDeps, 'invoke'>,
+  input: { chatId: number; username: string },
+): Promise<{ userId: number; title: string }> {
+  const handle = input.username.trim().replace(/^@+/, '')
+  let chat: TdObject | undefined
+  try {
+    chat = (await deps.invoke({ _: 'searchPublicChat', username: handle })) as TdObject
+  } catch {
+    throw new AppError('invalid_payload', `找不到 @${handle}`)
+  }
+  const userId = Number(chat?.type?._ === 'chatTypePrivate' ? chat.type.user_id : 0) || 0
+  if (!userId) throw new AppError('invalid_payload', `@${handle} 不是可以加入群聊的用户`)
+  const answer = (await deps.invoke({
+    _: 'addChatMembers',
+    chat_id: input.chatId,
+    // One at a time: the dialog adds one person, and the reasons are per user.
+    user_ids: [userId],
+  })) as TdObject | undefined
+  const failed = asArray<TdObject>(answer?.failed_to_add_members).find(
+    (entry) => Number(entry?.user_id) === userId,
+  )
+  if (failed) throw new AppError('forbidden', addFailureText(failed, handle))
+  const user = (await deps.invoke({ _: 'getUser', user_id: userId })) as TdObject
+  return { userId, title: displayName(user) || `@${handle}` }
+}
+
+/** Why TDLib refused one member, in the reader's words. */
+function addFailureText(failed: TdObject, handle: string): string {
+  if (failed.premium_would_allow_invite === true) return `添加 @${handle} 需要会员（Premium）`
+  if (failed.premium_required_to_send_messages === true) {
+    return `@${handle} 需要会员（Premium）才能收到邀请`
+  }
+  return `@${handle} 的隐私设置不允许被加入群聊，可以改用邀请链接`
 }
 
 /**

@@ -28,7 +28,11 @@ export interface ChatApiDeps {
 }
 
 export interface TdlibChatApi {
-  listChats(input: { limit: number; offset: number; list?: 'main' | 'archive' }): Promise<ChatSummary[]>
+  listChats(input: {
+    limit: number
+    offset: number
+    list?: 'main' | 'archive'
+  }): Promise<ChatSummary[]>
   getChat(chatId: number): Promise<ChatSummary>
   openChat(chatId: number): Promise<void>
   openPrivateChat(userId: number): Promise<ChatSummary>
@@ -53,6 +57,8 @@ export interface TdlibChatApi {
     topicId?: number,
   ): Promise<ChatPinnedMessage | null>
   inviteLink(chatId: number, temporary?: boolean): Promise<ChatInviteLink | null>
+  /** 添加成员: one person (or bot) resolved from an @username. */
+  addChatMember(chatId: number, username: string): Promise<{ userId: number; title: string }>
 }
 
 export function createChatApi(getDeps: () => ChatApiDeps): TdlibChatApi {
@@ -83,6 +89,7 @@ export function createChatApi(getDeps: () => ChatApiDeps): TdlibChatApi {
     pinnedMessage: (chatId, topicId) => actions.pinnedMessage(actionDeps(), chatId, topicId),
     setPinnedMessage: (chatId, messageId, topicId) =>
       actions.setPinnedMessage(actionDeps(), chatId, messageId, topicId),
+    addChatMember: (chatId, username) => actions.addChatMember(actionDeps(), { chatId, username }),
     inviteLink: (chatId, temporary) =>
       actions.inviteLink(
         { ...actionDeps(), getSelfUserId: getDeps().getSelfUserId },

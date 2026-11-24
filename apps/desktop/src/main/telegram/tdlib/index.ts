@@ -320,6 +320,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   readonly pinnedMessage = this.chatApi.pinnedMessage
   readonly setPinnedMessage = this.chatApi.setPinnedMessage
   readonly inviteLink = this.chatApi.inviteLink
+  readonly addChatMember = this.chatApi.addChatMember
 
   /** 话题 (design doc §9.12); `topic-api.ts`, deps read lazily. */
   private readonly topicApi = createTopicApi(() => ({
@@ -433,10 +434,12 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   readonly reportUser = this.userApi.reportUser
   readonly reportMessage = this.userApi.reportMessage
 
-  /** Bots: the command list and inline-button callbacks; `bot-api.ts`. */
+  /** Bots: commands, inline-button callbacks and inline queries; `bot-api.ts`. */
   private readonly botApi = createBotApi(() => this.actionDeps)
   readonly botCommands = this.botApi.botCommands
   readonly pressCallback = this.botApi.pressCallback
+  readonly inlineQuery = this.botApi.inlineQuery
+  readonly sendInlineResult = this.botApi.sendInlineResult
 
   private readonly webApi = createWebApi(() => this.actionDeps)
   readonly instantView = this.webApi.instantView

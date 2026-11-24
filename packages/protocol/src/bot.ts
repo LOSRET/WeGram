@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { inlineButtonCallbackSchema } from './dto'
+import { inlineButtonCallbackSchema, messageSchema } from './dto'
 
 /**
  * Telegram bots: the two interactions this client makes with one.
@@ -47,6 +47,38 @@ export const callbackAnswerSchema = z.object({
 })
 export type CallbackAnswer = z.infer<typeof callbackAnswerSchema>
 
+/**
+ * One inline query result (`inlineQueryResult*`), as the picker draws it.
+ *
+ * The result itself belongs to the bot and is identified by an opaque id; the
+ * client never builds it. `kind` is the row's word (图片 / 动图 / 文章 …) and the
+ * thumbnail is the file the row paints first, when the bot sent one.
+ */
+export const inlineResultSchema = z.object({
+  /** TDLib `InlineQueryResult.id`; posted back verbatim when the row is sent. */
+  id: z.string().min(1),
+  /** What kind of row this is, in the client's own words. */
+  kind: z.string().min(1),
+  title: z.string(),
+  description: z.string().optional(),
+  /** TDLib `thumbnail.file.id` (photo results use their largest size). */
+  thumbFileId: z.number().int().positive().optional(),
+})
+export type InlineResult = z.infer<typeof inlineResultSchema>
+
+/**
+ * What one inline query answered: the results, the query they belong to, and the
+ * cursor for the next chunk (TDLib's `next_offset`, empty when there is none).
+ */
+export const inlineQueryAnswerSchema = z.object({
+  /** TDLib `inline_query_id`: the int64 travels as a string, it is an id not a count. */
+  queryId: z.string().min(1),
+  /** Empty means "no more results"; otherwise the cursor to ask again with. */
+  nextOffset: z.string(),
+  results: z.array(inlineResultSchema),
+})
+export type InlineQueryAnswer = z.infer<typeof inlineQueryAnswerSchema>
+
 export const botInvokeChannels = [
   /**
    * The commands the chat's bot publishes, for the composer's "/" list. A chat
@@ -59,12 +91,48 @@ export const botInvokeChannels = [
    * URL); the message the bot edits arrives as an ordinary content update.
    */
   'bots:callback',
+  /**
+   * inline 机器人 (`@bot 查询`, design doc §8.3): the results one @username answers.
+   * The bot is named by username because an inline query is the only place a bot
+   * this account has never talked to is reached; main resolves it, checks it is
+   * one, and asks TDLib `getInlineQueryResults`.
+   */
+  'bots:inlineQuery',
+  /**
+   * Sends one inline result into the chat (TDLib `sendInlineQueryResultMessage`).
+   * The bot builds the message, so the answer is the row TDLib created — the
+   * renderer only appends it and lets the send succeeded update re-key it.
+   */
+  'bots:inlineSend',
 ] as const
 
 export const botInvokeSchemas = {
   'bots:commands': {
     request: z.object({ chatId: z.number().int() }),
     response: botCommandsAnswerSchema,
+  },
+  'bots:inlineQuery': {
+    request: z.object({
+      /** The chat the query is being typed in: a bot may answer differently per chat. */
+      chatId: z.number().int(),
+      /** The bot's @username without the '@' (Telegram usernames are 5+ chars). */
+      username: z.string().trim().min(3).max(64),
+      /** What follows the username; an empty query asks for the bot's defaults. */
+      query: z.string().max(512),
+      /** The previous answer's `nextOffset`; omitted for the first chunk. */
+      offset: z.string().optional(),
+    }),
+    response: inlineQueryAnswerSchema,
+  },
+  'bots:inlineSend': {
+    request: z.object({
+      chatId: z.number().int(),
+      topicId: z.number().int().positive().optional(),
+      /** The `queryId` of the answer the result came from. */
+      queryId: z.string().min(1),
+      resultId: z.string().min(1),
+    }),
+    response: z.object({ localId: z.string(), message: messageSchema }),
   },
   'bots:callback': {
     request: z.object({

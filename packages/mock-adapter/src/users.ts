@@ -80,7 +80,7 @@ export function createMockUsers(fixtures: Map<number, Fixture>) {
   const read = (userId: number): UserProfile => {
     const fixture = findFixture(userId)
     const override = overrides.get(userId) ?? {}
-    const { chat, contact } = fixture
+    const { chat, contact, bot } = fixture
     const note = override.note ?? contact?.note
     return {
       userId,
@@ -92,12 +92,24 @@ export function createMockUsers(fixtures: Map<number, Fixture>) {
       ...(note ? { note } : {}),
       commonChats: commonChatsOf(userId).length,
       // Everyone in the fake address book is a contact unless this session
-      // removed them; the card's button then offers 添加为联系人.
-      isContact: override.contact ?? true,
-      // 举报 a human is not a TDLib path: `can_report_user` wants a bot, and the
-      // fake account has none, so the card matches the real client and hides it.
-      canBeReported: false,
+      // removed them; the card's button then offers 添加为联系人. A bot is never
+      // one — TDLib's `getContacts` does not list bots either.
+      isContact: override.contact ?? !bot,
+      // 举报 a human is not a TDLib path (`can_report_user` wants a bot), so the
+      // card mirrors the real client: only the fixture bot is reportable.
+      canBeReported: Boolean(bot),
       blocked: override.blocked ?? false,
+      // 机器人 (§8.3): the profile page's 简介, the welcome text and the commands,
+      // all from the seed's `bot_info` stand-in.
+      ...(bot
+        ? {
+            bot: {
+              ...(bot.shortDescription ? { shortDescription: bot.shortDescription } : {}),
+              ...(bot.description ? { description: bot.description } : {}),
+              commands: bot.commands,
+            },
+          }
+        : {}),
     }
   }
 

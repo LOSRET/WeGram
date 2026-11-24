@@ -5,6 +5,7 @@ import { loadLatestWindow } from '../../lib/anchoredWindow'
 import { topicUnreadMarker, transcriptReadMarkers } from '../../lib/topics'
 import { INFO_PANEL_ANIM_MS } from '../../lib/chatInfo'
 import { editTargetOf } from '../../lib/editTarget'
+import { activeForceReply } from '../../lib/forceReply'
 import { activeReplyKeyboard } from '../../lib/replyKeyboard'
 import { errorMessage, invoke } from '../../lib/ipc'
 import { useAppStore } from '../../store/useAppStore'
@@ -112,7 +113,6 @@ export function ChatPane() {
    */
   const [comments, setComments] = useState<{ message: Message; open: boolean } | null>(null)
   const commentTimerRef = useRef<number | null>(null)
-
 
   const openInfo = useCallback((): void => {
     if (infoTimerRef.current !== null) {
@@ -341,6 +341,31 @@ export function ChatPane() {
   const replyTo = replyToId ? (messages.find((item) => item.id === replyToId) ?? null) : null
   const editingForChat = editing && editing.chatId === activeChatId ? editing : null
   const typing = activeChatId ? Boolean(typingByChat[activeChatId]) : false
+
+  /**
+   * 机器人强制回复 (§8.3): a bot can mark one row as the thing the next message
+   * should answer. The pane offers it as the reply target once — the banner is
+   * the composer's existing one — and remembers an explicit cancel, so dismissing
+   * it does not make it come back on the next store change. A sent answer clears
+   * it by itself: the outgoing row is newer than the marker (lib/forceReply.ts).
+   */
+  const forcedReply = activeForceReply(messages)
+  const [cancelledReply, setCancelledReply] = useState<{
+    chatId: number
+    messageId: number
+  } | null>(null)
+  useEffect(() => {
+    if (activeChatId === null || forcedReply === null) return
+    if (replyToId !== null || editingForChat !== null) return
+    if (
+      cancelledReply !== null &&
+      cancelledReply.chatId === activeChatId &&
+      cancelledReply.messageId === forcedReply.messageId
+    ) {
+      return
+    }
+    useAppStore.getState().setReplyTo(activeChatId, forcedReply.messageId)
+  }, [activeChatId, forcedReply, replyToId, editingForChat, cancelledReply])
 
   const isChannel = chat?.kind === 'channel'
 
@@ -604,8 +629,16 @@ export function ChatPane() {
           onSaveEdit={(messageId, text) =>
             actions.saveEdit(messageId, text, editingForChat?.caption === true)
           }
-          onCancelReply={() => useAppStore.getState().setReplyTo(activeChatId, null)}
+          onCancelReply={() => {
+            // Dismissing a bot's 强制回复 must not bring it back on the next render.
+            if (forcedReply !== null && replyToId === forcedReply.messageId) {
+              setCancelledReply({ chatId: activeChatId, messageId: forcedReply.messageId })
+            }
+            useAppStore.getState().setReplyTo(activeChatId, null)
+          }}
           onCancelEdit={() => useAppStore.getState().setEditing(null)}
+          {...(forcedReply ? { forceReply: forcedReply } : {})}
+          onSendInline={actions.sendInline}
           {...(shownKeyboard ? { replyKeyboard: shownKeyboard } : {})}
           onKeyboardUsed={() => {
             if (replyKeyboard?.keyboard.oneTime) {

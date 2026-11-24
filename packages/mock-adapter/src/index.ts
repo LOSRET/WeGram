@@ -8,6 +8,7 @@ import type {
   ConnectionState,
   Contact,
   CustomEmojiSticker,
+  InlineButtonCallback,
   Message,
   MessageProperties,
   NotificationScope,
@@ -25,7 +26,7 @@ import type {
 import { AdapterEmitter, type TelegramAdapter } from '@wegram/adapter-contract'
 import { MockAssets } from './assets'
 import { MockAvatars } from './avatars'
-import { mockBotCommands, mockCallbackAnswer } from './bots'
+import { createMockBots } from './bots'
 import { createMockChats } from './chats'
 import { createMockComments } from './comments'
 import { createMockTopics } from './topics'
@@ -297,6 +298,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   readonly pinnedMessage = this.chatApi.pinnedMessage
   readonly setPinnedMessage = this.chatApi.setPinnedMessage
   readonly inviteLink = this.chatApi.inviteLink
+  readonly addChatMember = this.chatApi.addMember
 
   /** 话题 (design doc §9.12); their rules live in ./topics.ts. */
   private readonly topicApi = createMockTopics({
@@ -348,16 +350,40 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     return this.users.reportMessage(input)
   }
 
-  /** The fixture bot's commands (composer's "/" list) and its callback answer. */
+  /**
+   * The fixture bot: its commands (the composer's "/" list), a pressed inline
+   * button, and inline queries. `bots.ts` owns the canned answers.
+   */
   async botCommands(chatId: number) {
-    return mockBotCommands(this.fixtures, chatId)
+    return this.bots.commands(chatId)
   }
   async pressCallback(input: {
     chatId: number
     messageId: number
-    callback: Parameters<typeof mockCallbackAnswer>[1]['callback']
+    callback: InlineButtonCallback
   }) {
-    return mockCallbackAnswer(this.fixtures, input)
+    return this.bots.callback(input)
+  }
+  async inlineQuery(input: { chatId: number; username: string; query: string; offset?: string }) {
+    return this.bots.inlineQuery(input)
+  }
+  /**
+   * An inline result is sent by the bot, not by this client: the fake answers the
+   * text it promised and the row goes through the mock's own send path, so the
+   * renderer sees exactly what a real `sendInlineQueryResultMessage` produces.
+   */
+  async sendInlineResult(input: {
+    chatId: number
+    topicId?: number
+    queryId: string
+    resultId: string
+  }) {
+    const text = this.bots.inlineResultText(input)
+    return this.sends.sendText({
+      chatId: input.chatId,
+      ...(input.topicId === undefined ? {} : { topicId: input.topicId }),
+      text,
+    })
   }
 
   /** The mock address book; see `listMockContacts`. */
@@ -385,6 +411,8 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
    * in ./sends.ts and this class only binds them.
    */
   private readonly sends: ReturnType<typeof createMockSends>
+  /** The fixture bot's canned answers (commands / callbacks / inline queries). */
+  private readonly bots = createMockBots(this.fixtures)
   readonly sendText: TelegramAdapter['sendText']
   readonly sendMedia: TelegramAdapter['sendMedia']
   readonly sendAlbum: TelegramAdapter['sendAlbum']

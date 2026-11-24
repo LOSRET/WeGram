@@ -4,6 +4,8 @@ import {
   buttonStyleOf,
   buttonTarget,
   inlineButtonOf,
+  isKeyboardRemoved,
+  mapForceReply,
   mapReplyKeyboard,
   mapReplyMarkup,
 } from './buttons'
@@ -212,5 +214,38 @@ describe('mapReplyKeyboard', () => {
     expect(mapReplyKeyboard({ _: 'replyMarkupInlineKeyboard', rows: [] })).toBeUndefined()
     expect(mapReplyKeyboard({ _: 'replyMarkupShowKeyboard', rows: [] })).toBeUndefined()
     expect(mapReplyKeyboard(undefined)).toBeUndefined()
+  })
+})
+
+/**
+ * The other two things a bot can do to the keyboard area (§8.3): take its grid
+ * away, or ask for a direct answer to one row.
+ */
+describe('isKeyboardRemoved', () => {
+  it('recognises the removal markup only', () => {
+    expect(isKeyboardRemoved({ _: 'replyMarkupRemoveKeyboard' })).toBe(true)
+    expect(isKeyboardRemoved({ _: 'replyMarkupShowKeyboard', rows: [] })).toBe(false)
+    expect(isKeyboardRemoved({ _: 'replyMarkupInlineKeyboard', rows: [] })).toBe(false)
+    expect(isKeyboardRemoved(undefined)).toBe(false)
+  })
+})
+
+describe('mapForceReply', () => {
+  it('maps the placeholder the bot named', () => {
+    expect(
+      mapForceReply({ _: 'replyMarkupForceReply', is_personal: true, placeholder: ' 写下答案 ' }),
+    ).toEqual({ placeholder: '写下答案' })
+  })
+
+  it('maps a marker without a placeholder', () => {
+    expect(
+      mapForceReply({ _: 'replyMarkupForceReply', is_personal: true, placeholder: '' }),
+    ).toEqual({})
+  })
+
+  it('ignores every other markup', () => {
+    expect(mapForceReply({ _: 'replyMarkupShowKeyboard', rows: [] })).toBeUndefined()
+    expect(mapForceReply({ _: 'replyMarkupRemoveKeyboard' })).toBeUndefined()
+    expect(mapForceReply(undefined)).toBeUndefined()
   })
 })

@@ -297,6 +297,29 @@ describe('mapMessage', () => {
     expect(message.buttons).toEqual([[{ text: '打开', url: 'https://x.test' }]])
   })
 
+  it('marks the two client-side markups a bot can send', async () => {
+    // 强制回复: the pane offers the row as the reply target (§8.3).
+    const forced = await mapMessage(makeContext(), 9, {
+      id: 11,
+      date: 10,
+      sender_id: { _: 'messageSenderUser', user_id: 26 },
+      content: { _: 'messageText', text: { text: '请回答' } },
+      reply_markup: { _: 'replyMarkupForceReply', is_personal: true, placeholder: '写下答案' },
+    })
+    expect(forced.forceReply).toEqual({ placeholder: '写下答案' })
+
+    // 撤键盘: the removal row carries no keyboard of its own, only the marker.
+    const removed = await mapMessage(makeContext(), 9, {
+      id: 12,
+      date: 10,
+      sender_id: { _: 'messageSenderUser', user_id: 26 },
+      content: { _: 'messageText', text: { text: '键盘收走了' } },
+      reply_markup: { _: 'replyMarkupRemoveKeyboard', is_personal: true },
+    })
+    expect(removed.replyKeyboardHidden).toBe(true)
+    expect(removed.replyKeyboard).toBeUndefined()
+  })
+
   it('maps a contact message into a card the renderer can draw', async () => {
     const message = await mapMessage(makeContext(), 9, {
       id: 10,

@@ -1,5 +1,6 @@
 import { z } from 'zod'
 
+import { botCommandSchema } from './bot'
 import { chatSummarySchema } from './chat'
 import { messageEntitySchema } from './dto'
 
@@ -15,6 +16,32 @@ import { messageEntitySchema } from './dto'
  * follows the account to every device, which is worth knowing before "clear the
  * cache" is expected to clear it.
  */
+
+/**
+ * What a bot's profile page adds to the person card (§8.3).
+ *
+ * TDLib keeps it all in `userFullInfo.bot_info`, so the card is still the one
+ * `users:profile` answer; a human has no `bot` field at all.
+ */
+export const botProfileSchema = z.object({
+  /**
+   * TDLib `botInfo.short_description`: the line the official clients print on
+   * the bot's profile page ("what this bot can do"). Absent when it set none.
+   */
+  shortDescription: z.string().optional(),
+  /** TDLib `botInfo.description`: the welcome text a bot chat starts with. */
+  description: z.string().optional(),
+  /** The bot's commands, the same list the composer's "/" menu draws. */
+  commands: z.array(botCommandSchema),
+  /**
+   * TDLib `botInfo.menu_button` when it names a link instead of the command list
+   * (`botMenuButton`). A Web App menu travels the same way every Web App button
+   * does — it opens in the browser, not in an app window (§8.3).
+   */
+  menu: z.object({ text: z.string(), url: z.string() }).optional(),
+})
+export type BotProfile = z.infer<typeof botProfileSchema>
+
 export const userProfileSchema = z.object({
   userId: z.number().int(),
   /** First + last name, the same display name the transcript uses. */
@@ -48,6 +75,8 @@ export const userProfileSchema = z.object({
    * client does not consume yet.
    */
   canBeReported: z.boolean(),
+  /** 机器人: present only when the person is a bot (`userTypeBot`). */
+  bot: botProfileSchema.optional(),
 })
 export type UserProfile = z.infer<typeof userProfileSchema>
 

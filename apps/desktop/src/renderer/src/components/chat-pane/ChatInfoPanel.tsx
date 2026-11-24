@@ -12,7 +12,7 @@ import { PlusIcon, QrGlyphIcon } from '../Icon'
 import { OverlayScrollbar } from '../OverlayScrollbar'
 import { SearchField } from '../SearchField'
 import { ChatInfoSearch } from './ChatInfoSearch'
-import { InviteDialog, RenameDialog } from './ChatInfoDialogs'
+import { AddMemberDialog, InviteDialog, RenameDialog } from './ChatInfoDialogs'
 import { DangerRow, InfoRow, LinkRow, ToggleRow } from './ChatInfoRows'
 
 /** Pause after typing before 搜索群成员 asks the server. */
@@ -78,6 +78,8 @@ export function ChatInfoPanel({
   const [renaming, setRenaming] = useState(false)
   const [renameBusy, setRenameBusy] = useState(false)
   const [invite, setInvite] = useState<{ title: string } | null>(null)
+  /** 添加成员: the @username sheet the + tile opens (§8.3). */
+  const [adding, setAdding] = useState(false)
   const [leaving, setLeaving] = useState(false)
   /** 资料卡: a private chat's own face opens the peer's card (the header does too). */
   const [profileOpen, setProfileOpen] = useState(false)
@@ -201,6 +203,7 @@ export function ChatInfoPanel({
       event.stopPropagation()
       if (leaving) setLeaving(false)
       else if (profileOpen) setProfileOpen(false)
+      else if (adding) setAdding(false)
       else if (invite !== null) setInvite(null)
       else if (renaming) setRenaming(false)
       else if (searching) setSearching(false)
@@ -208,7 +211,7 @@ export function ChatInfoPanel({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open, searching, renaming, invite, leaving, profileOpen, onClose])
+  }, [open, searching, renaming, invite, adding, leaving, profileOpen, onClose])
 
   const saveTitle = async (title: string): Promise<void> => {
     setRenameBusy(true)
@@ -319,7 +322,7 @@ export function ChatInfoPanel({
                   <button
                     type="button"
                     className="wx-info__person wx-info__person--add"
-                    onClick={() => setInvite({ title: '邀请成员' })}
+                    onClick={() => setAdding(true)}
                   >
                     <span className="wx-info__add-tile">
                       <PlusIcon size={20} />
@@ -412,6 +415,20 @@ export function ChatInfoPanel({
               busy={renameBusy}
               onSave={(title) => void saveTitle(title)}
               onCancel={() => setRenaming(false)}
+            />,
+            document.body,
+          )
+        : null}
+
+      {adding
+        ? createPortal(
+            <AddMemberDialog
+              chatId={chat.id}
+              onOpenInvite={() => {
+                setAdding(false)
+                setInvite({ title: '邀请成员' })
+              }}
+              onClose={() => setAdding(false)}
             />,
             document.body,
           )

@@ -4,10 +4,15 @@ import type {
   BotCommandsAnswer,
   CallbackAnswer,
   InlineButtonCallback,
+  InlineQueryAnswer,
+  Message,
 } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
 import { asArray } from '../json'
+import { mapInlineResults } from '../map/inline'
+import { mapMessage } from '../map/message'
+import { replyTo, topicRef } from './message-input'
 import type { ActionDeps } from './deps'
 
 /**
@@ -93,6 +98,84 @@ export async function pressCallback(
     ...(answer?.show_alert === true ? { showAlert: true } : {}),
     ...(url ? { url } : {}),
   }
+}
+
+/**
+ * inline 机器人 (§8.3): what one `@bot query` answers.
+ *
+ * The composer only knows the username the reader typed, so the bot is resolved
+ * first (`searchPublicChat` — a server call the first time, its own cache after)
+ * and checked to be a bot: asking a person for inline results is a TDLib error
+ * this client should never produce. `getInlineQueryResults` then answers a page;
+ * `offset` is the previous answer's `nextOffset`.
+ */
+export async function inlineQuery(
+  deps: Pick<ActionDeps, 'invoke'>,
+  input: { chatId: number; username: string; query: string; offset?: string },
+): Promise<InlineQueryAnswer> {
+  const botUserId = await inlineBotUserId(deps, input.username)
+  const answer = (await deps.invoke({
+    _: 'getInlineQueryResults',
+    bot_user_id: botUserId,
+    chat_id: input.chatId,
+    query: input.query,
+    offset: input.offset ?? '',
+  })) as TdObject
+  return mapInlineResults(answer)
+}
+
+/**
+ * Sends one inline result into the chat (`sendInlineQueryResultMessage`).
+ *
+ * The bot builds the message — text, media, sticker, whatever its result said —
+ * so nothing is composed here: TDLib answers the row it created, exactly like a
+ * `sendMessage`, and the renderer appends it and lets the send-succeeded update
+ * re-key it. `hide_via_bot` stays false: the official clients only hide the
+ * "via @bot" line for Telegram's own gif/photo search bots.
+ */
+export async function sendInlineResult(
+  deps: Pick<ActionDeps, 'invoke' | 'mapper'>,
+  input: { chatId: number; topicId?: number; queryId: string; resultId: string },
+): Promise<{ localId: string; message: Message }> {
+  const response = (await deps.invoke({
+    _: 'sendInlineQueryResultMessage',
+    chat_id: input.chatId,
+    topic_id: topicRef(input.topicId),
+    reply_to: replyTo(),
+    options: null,
+    query_id: input.queryId,
+    result_id: input.resultId,
+    hide_via_bot: false,
+  })) as TdObject
+  const message = await mapMessage(deps.mapper, input.chatId, response)
+  return { localId: `td-${message.id}`, message }
+}
+
+/**
+ * The user id behind an inline bot's @username.
+ *
+ * A username that resolves to something other than a private bot is refused
+ * here, with the reader's words, instead of surfacing TDLib's own error.
+ */
+async function inlineBotUserId(
+  deps: Pick<ActionDeps, 'invoke'>,
+  username: string,
+): Promise<number> {
+  const handle = username.replace(/^@/, '').trim()
+  let chat: TdObject | undefined
+  try {
+    chat = (await deps.invoke({ _: 'searchPublicChat', username: handle })) as TdObject
+  } catch {
+    throw new AppError('invalid_payload', `找不到 @${handle}`)
+  }
+  const type = chat?.type
+  const userId = Number(type?._ === 'chatTypePrivate' ? type.user_id : 0) || 0
+  if (!userId) throw new AppError('invalid_payload', `@${handle} 不是机器人`)
+  const user = (await deps.invoke({ _: 'getUser', user_id: userId })) as TdObject
+  if (user?.type?._ !== 'userTypeBot') {
+    throw new AppError('invalid_payload', `@${handle} 不是机器人`)
+  }
+  return userId
 }
 
 function payloadOf(callback: InlineButtonCallback): TdObject {

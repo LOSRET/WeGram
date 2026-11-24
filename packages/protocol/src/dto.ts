@@ -301,6 +301,17 @@ export const replyKeyboardSchema = z.object({
 })
 export type ReplyKeyboard = z.infer<typeof replyKeyboardSchema>
 
+/**
+ * TDLib `replyMarkupForceReply`: the bot wants the next message to answer this
+ * row, not the chat in general. The pane selects the row as the reply target
+ * once and the composer's placeholder becomes the bot's own, when it named one.
+ */
+export const forceReplySchema = z.object({
+  /** TDLib `placeholder`: what the box says while the answer is owed. */
+  placeholder: z.string().optional(),
+})
+export type ForceReply = z.infer<typeof forceReplySchema>
+
 /** A vCard message body: the card a contact message draws. */
 export const contactCardSchema = z.object({
   firstName: z.string(),
@@ -568,6 +579,17 @@ export const messageSchema = z.object({
    * message replaces it (§8.3). Absent for inline keyboards and ordinary rows.
    */
   replyKeyboard: replyKeyboardSchema.optional(),
+  /**
+   * TDLib `replyMarkupRemoveKeyboard`: the bot took its keyboard away. Such a row
+   * carries no `replyKeyboard` of its own, so the pane needs this marker —
+   * without it the newest *older* keyboard would stay on screen forever (§8.3).
+   */
+  replyKeyboardHidden: z.boolean().optional(),
+  /**
+   * The bot asks for a direct answer to this row (TDLib `replyMarkupForceReply`).
+   * The pane offers it as the reply target once; sending the answer clears it.
+   */
+  forceReply: forceReplySchema.optional(),
   /**
    * Telegram media group (album). TDLib keys a group by `message.media_album_id`,
    * an int64 — it crosses IPC as a string, and `'0'` (not in an album) is absent.

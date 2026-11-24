@@ -8,7 +8,8 @@ import { openMention } from '../lib/openMention'
 import { useAppStore } from '../store/useAppStore'
 import { Avatar } from './Avatar'
 import { ReportDialog } from './ReportDialog'
-import { RichText } from './RichText'
+import { RichText, safeHref } from './RichText'
+import { TelegramLink } from './TelegramLink'
 
 interface ProfileCardProps {
   userId: number
@@ -127,6 +128,13 @@ export function ProfileCard({ userId, onOpenChat, onClose }: ProfileCardProps) {
   }
 
   const avatarUrl = profile?.avatarUrl ?? userAvatars[userId]
+  /**
+   * A bot's 简介 is plain text (`botInfo.short_description`), falling back to
+   * the welcome text an empty chat would show; TDLib sends no entities with it.
+   */
+  const botAbout = profile?.bot
+    ? (profile.bot.shortDescription ?? profile.bot.description ?? '')
+    : ''
 
   return (
     <div className="wx-modal-backdrop" onClick={onClose}>
@@ -163,50 +171,98 @@ export function ProfileCard({ userId, onOpenChat, onClose }: ProfileCardProps) {
             <div className="wx-profile__rule" />
 
             <section className="wx-profile__section">
-              <div className="wx-profile__row">
-                <span className="wx-profile__label">备注</span>
-                {/*
+              {/*
+                A bot has no 备注: the note belongs to the address book, and
+                `setUserNote` refuses a non-contact. 添加为联系人 is hidden below
+                for the same reason, so the row would only explain a dead end.
+              */}
+              {!profile.bot ? (
+                <div className="wx-profile__row">
+                  <span className="wx-profile__label">备注</span>
+                  {/*
                   Telegram refuses `setUserNote` for somebody who is not in the
                   address book ("User isn't a contact", measured on the test DC),
                   so the row explains the order instead of offering a write that
                   can only error. 添加为联系人 sits right below it.
                 */}
-                {!profile.isContact && !profile.note ? (
-                  <span className="wx-profile__value">添加为联系人后可写备注</span>
-                ) : editingNote ? (
-                  <div className="wx-profile__note-editor">
-                    <input
-                      className="wx-profile__note-input"
-                      value={noteDraft}
-                      autoFocus
-                      maxLength={1000}
-                      placeholder="添加备注名"
-                      onChange={(event) => setNoteDraft(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          event.preventDefault()
-                          void saveNote()
-                        }
-                        if (event.key === 'Escape') setEditingNote(false)
-                      }}
-                    />
-                    <button
-                      type="button"
-                      className="wx-profile__link"
-                      disabled={busy}
-                      onClick={() => void saveNote()}
-                    >
-                      保存
+                  {!profile.isContact && !profile.note ? (
+                    <span className="wx-profile__value">添加为联系人后可写备注</span>
+                  ) : editingNote ? (
+                    <div className="wx-profile__note-editor">
+                      <input
+                        className="wx-profile__note-input"
+                        value={noteDraft}
+                        autoFocus
+                        maxLength={1000}
+                        placeholder="添加备注名"
+                        onChange={(event) => setNoteDraft(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault()
+                            void saveNote()
+                          }
+                          if (event.key === 'Escape') setEditingNote(false)
+                        }}
+                      />
+                      <button
+                        type="button"
+                        className="wx-profile__link"
+                        disabled={busy}
+                        onClick={() => void saveNote()}
+                      >
+                        保存
+                      </button>
+                    </div>
+                  ) : (
+                    <button type="button" className="wx-profile__link" onClick={startNoteEdit}>
+                      {profile.note ?? '添加备注'}
                     </button>
-                  </div>
-                ) : (
-                  <button type="button" className="wx-profile__link" onClick={startNoteEdit}>
-                    {profile.note ?? '添加备注'}
-                  </button>
-                )}
-              </div>
+                  )}
+                </div>
+              ) : null}
 
-              {profile.bio ? (
+              {/*
+                机器人 (§8.3): the bot's own 简介 replaces the person bio of the
+                same name, and the commands and menu it publishes follow — the
+                same data the composer's "/" list reads, on the card the header
+                opens.
+              */}
+              {profile.bot && botAbout ? (
+                <div className="wx-profile__row">
+                  <span className="wx-profile__label">简介</span>
+                  <span className="wx-profile__value">{botAbout}</span>
+                </div>
+              ) : null}
+
+              {profile.bot && profile.bot.commands.length > 0 ? (
+                <div className="wx-profile__row wx-profile__row--stack">
+                  <span className="wx-profile__label">命令</span>
+                  <ul className="wx-profile__commands">
+                    {profile.bot.commands.map((command) => (
+                      <li className="wx-profile__command" key={command.command}>
+                        <code className="wx-profile__command-name">/{command.command}</code>
+                        {command.description ? (
+                          <span className="wx-profile__command-text">{command.description}</span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {profile.bot?.menu && safeHref(profile.bot.menu.url) ? (
+                <div className="wx-profile__row">
+                  <span className="wx-profile__label">菜单</span>
+                  <TelegramLink
+                    className="wx-profile__link"
+                    href={safeHref(profile.bot.menu.url) ?? ''}
+                  >
+                    {profile.bot.menu.text}
+                  </TelegramLink>
+                </div>
+              ) : null}
+
+              {!profile.bot && profile.bio ? (
                 <div className="wx-profile__row">
                   <span className="wx-profile__label">简介</span>
                   {/*
@@ -294,14 +350,18 @@ export function ProfileCard({ userId, onOpenChat, onClose }: ProfileCardProps) {
                   发消息
                 </button>
               ) : null}
-              <button
-                type="button"
-                className={`wx-profile__action${profile.isContact ? ' wx-profile__action--danger' : ''}`}
-                disabled={busy}
-                onClick={() => void toggleContact()}
-              >
-                {profile.isContact ? '删除联系人' : '添加为联系人'}
-              </button>
+              {/* A bot cannot be an address-book contact (`getContacts` skips
+                  bots), so the card offers 加入黑名单 only. */}
+              {profile.bot ? null : (
+                <button
+                  type="button"
+                  className={`wx-profile__action${profile.isContact ? ' wx-profile__action--danger' : ''}`}
+                  disabled={busy}
+                  onClick={() => void toggleContact()}
+                >
+                  {profile.isContact ? '删除联系人' : '添加为联系人'}
+                </button>
+              )}
               <button
                 type="button"
                 className={`wx-profile__action${profile.blocked ? '' : ' wx-profile__action--danger'}`}

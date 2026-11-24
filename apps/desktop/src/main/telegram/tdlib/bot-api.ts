@@ -1,4 +1,9 @@
-import type { BotCommandsAnswer, CallbackAnswer, InvokeRequest } from '@wegram/protocol'
+import type {
+  BotCommandsAnswer,
+  CallbackAnswer,
+  InvokeRequest,
+  InvokeResponse,
+} from '@wegram/protocol'
 
 import * as actions from './actions'
 import type { ActionDeps } from './actions'
@@ -21,5 +26,14 @@ export function createBotApi(getDeps: () => ActionDeps) {
     /** Presses one inline keyboard button and answers what the bot said back. */
     pressCallback: async (input: InvokeRequest<'bots:callback'>): Promise<CallbackAnswer> =>
       actions.pressCallback(getDeps(), input),
+
+    /** inline 机器人: one `@bot query`, resolved and asked of TDLib. */
+    inlineQuery: async (input: InvokeRequest<'bots:inlineQuery'>) =>
+      actions.inlineQuery(getDeps(), input),
+
+    /** Sends one inline result; the bot itself builds the message. */
+    sendInlineResult: async (
+      input: InvokeRequest<'bots:inlineSend'>,
+    ): Promise<InvokeResponse<'bots:inlineSend'>> => actions.sendInlineResult(getDeps(), input),
   }
 }

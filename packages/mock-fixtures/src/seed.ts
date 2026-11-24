@@ -52,6 +52,15 @@ export interface FixtureSeed {
    * 通讯录 skips a seed carrying this — exactly like TDLib's `getContacts`.
    */
   bot?: {
+    /**
+     * The bot's @username, without the '@'. It is how an inline query names the
+     * bot (§8.3) — the only way a bot this account never talked to is reached.
+     */
+    username?: string
+    /** TDLib `botInfo.short_description`: what the profile page prints (§8.3). */
+    shortDescription?: string
+    /** TDLib `botInfo.description`: the welcome text an empty bot chat shows. */
+    description?: string
     commands: Array<{ command: string; description: string }>
   }
   /**

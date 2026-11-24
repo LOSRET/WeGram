@@ -87,6 +87,12 @@ export const chatInvokeChannels = [
   /** 群公告: the newest pinned message, or `null` when nothing is pinned. */
   'chats:pinned',
   /**
+   * 添加成员: TDLib `addChatMembers` for one person resolved from an @username
+   * (a bot is added exactly this way — it has no invite-link flow). Answers the
+   * added member's id and name; a refusal is an `AppError` with the reader's words.
+   */
+  'chats:addMember',
+  /**
    * 置顶消息 / 取消置顶. `messageId: null` unpins whatever is pinned, so the bar's
    * × does not have to remember the id. Answers the chat's pin afterwards.
    */
@@ -219,6 +225,14 @@ export const chatInvokeSchemas = {
       messageId: z.number().int().nullable(),
     }),
     response: chatPinnedMessageSchema.nullable(),
+  },
+  'chats:addMember': {
+    request: z.object({
+      chatId: z.number().int(),
+      /** The @username, with or without the '@' (a bot's handle is its only id). */
+      username: z.string().trim().min(3).max(64),
+    }),
+    response: z.object({ userId: z.number().int(), title: z.string() }),
   },
   'chats:inviteLink': {
     request: z.object({

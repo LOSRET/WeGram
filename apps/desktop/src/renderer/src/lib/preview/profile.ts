@@ -1,4 +1,4 @@
-import type { ChatReport, ChatSummary, Contact, UserProfile } from '@wegram/protocol'
+import type { BotProfile, ChatReport, ChatSummary, Contact, UserProfile } from '@wegram/protocol'
 
 /**
  * 资料卡 in the browser preview: the same card the mock adapter serves, derived
@@ -74,14 +74,38 @@ function find(contacts: Contact[], userId: number): Contact {
   return contact
 }
 
+/** The fixture bot's card data, injected so this module stays free of the seed. */
+export interface PreviewBotUser {
+  userId: number
+  title: string
+  avatarUrl?: string
+  bot: BotProfile
+}
+
 function read(
   state: PreviewProfileState,
   contacts: Contact[],
   commonChatsFor: (userId: number) => ChatSummary[],
+  botFor: (userId: number) => PreviewBotUser | null,
   userId: number,
 ): UserProfile {
-  const contact = find(contacts, userId)
   const override = state.overrides.get(userId) ?? {}
+  const bot = botFor(userId)
+  if (bot) {
+    // 机器人 (§8.3): no 备注 and no 共同群聊, and 举报 is the one action TDLib's
+    // `can_report_user` allows for a bot.
+    return {
+      userId,
+      title: bot.title,
+      ...(bot.avatarUrl ? { avatarUrl: bot.avatarUrl } : {}),
+      commonChats: 0,
+      isContact: false,
+      canBeReported: true,
+      blocked: override.blocked ?? false,
+      bot: bot.bot,
+    }
+  }
+  const contact = find(contacts, userId)
   const note = override.note
   return {
     userId: contact.userId,
@@ -105,25 +129,26 @@ export function handlePreviewProfile(
   state: PreviewProfileState,
   contacts: Contact[],
   commonChatsFor: (userId: number) => ChatSummary[],
+  botFor: (userId: number) => PreviewBotUser | null,
 ): UserProfile | ChatReport | ChatSummary[] {
   const userId = Number(payload['userId'])
   switch (channel) {
     case 'users:profile':
-      return read(state, contacts, commonChatsFor, userId)
+      return read(state, contacts, commonChatsFor, botFor, userId)
     case 'users:setNote': {
       const current = state.overrides.get(userId) ?? {}
       state.overrides.set(userId, { ...current, note: String(payload['note'] ?? '').trim() })
-      return read(state, contacts, commonChatsFor, userId)
+      return read(state, contacts, commonChatsFor, botFor, userId)
     }
     case 'users:setContact': {
       const current = state.overrides.get(userId) ?? {}
       state.overrides.set(userId, { ...current, contact: Boolean(payload['contact']) })
-      return read(state, contacts, commonChatsFor, userId)
+      return read(state, contacts, commonChatsFor, botFor, userId)
     }
     case 'users:setBlocked': {
       const current = state.overrides.get(userId) ?? {}
       state.overrides.set(userId, { ...current, blocked: Boolean(payload['blocked']) })
-      return read(state, contacts, commonChatsFor, userId)
+      return read(state, contacts, commonChatsFor, botFor, userId)
     }
     case 'users:commonChats': {
       // The fixture ids play TDLib's `offset_chat_id`: continue from that chat.

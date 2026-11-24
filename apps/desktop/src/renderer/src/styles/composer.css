@@ -54,6 +54,113 @@
   color: var(--wx-text-secondary);
 }
 
+/* ---------- inline 机器人 (§8.3) ----------
+   The panel of `@bot query`: the command list's floating card, but every row
+   carries a 40 px thumbnail, the bot's title and its description. A result
+   without cover art keeps the box and prints its kind there instead. */
+
+.wx-inline-results {
+  position: absolute;
+  left: 6px;
+  right: 9px;
+  bottom: 100%;
+  z-index: 70;
+  max-height: 320px;
+  overflow-y: auto;
+  margin-bottom: 6px;
+  padding: 6px;
+  border: 1px solid var(--wx-line);
+  border-radius: 8px;
+  background: var(--wx-card);
+  box-shadow:
+    0 8px 28px rgba(0, 0, 0, 0.16),
+    0 1px 4px rgba(0, 0, 0, 0.08);
+  scrollbar-width: thin;
+}
+
+.wx-inline-results__head {
+  padding: 2px 10px 6px;
+  font-size: 12px;
+  color: var(--wx-text-tertiary);
+}
+
+.wx-inline-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.wx-inline-result--active {
+  background: var(--wx-row-hover);
+}
+
+.wx-inline-result__thumb {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: var(--wx-elevated);
+}
+
+.wx-inline-result__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wx-inline-result__kind {
+  font-size: 11px;
+  color: var(--wx-text-tertiary);
+}
+
+.wx-inline-result__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.wx-inline-result__title {
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--wx-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wx-inline-result__desc {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wx-inline-results__hint {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--wx-text-secondary);
+}
+
+.wx-inline-results__more {
+  width: 100%;
+  margin-top: 4px;
+  padding: 6px;
+  border: none;
+  border-top: 1px solid var(--wx-divider);
+  background: none;
+  color: var(--wx-link);
+  font-size: 12px;
+  cursor: pointer;
+}
+
 /* ---------- 机器人自定义键盘 (§8.3) ----------
    Telegram hangs a bot's reply keyboard under the input; WeChat has no
    counterpart, so the grid borrows the composer's card language: one bordered

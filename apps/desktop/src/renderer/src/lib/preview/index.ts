@@ -24,6 +24,7 @@ import { inlineButtonCallbackSchema } from '@wegram/protocol'
 import { buildInstantView } from '@wegram/mock-fixtures'
 
 import { handlePreviewComments } from './comments'
+import { handlePreviewInline } from './inline'
 import { handlePreviewMedia } from './media'
 import { openPreviewViewer, previewViewerState, previewViewerUnsupported } from './viewer'
 import {
@@ -58,6 +59,7 @@ import {
   deletePreviewChat,
   joinPreviewChannel,
   leavePreviewChat,
+  previewAddMember,
   previewChatMembers,
   previewInviteLink,
   previewJoinState,
@@ -83,6 +85,8 @@ import {
   now,
   media as previewMedia,
   previewBotCommands,
+  previewBotProfile,
+  previewMemberByUsername,
   previewCommonChatsFor,
   previewChangeStickerSet,
   previewCustomEmoji,
@@ -228,7 +232,14 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
   // 资料卡 and its 举报 writes: one guard, so a channel costs an array entry in
   // `profile.ts` instead of another block in this file.
   if (isProfileChannel(channel)) {
-    return handlePreviewProfile(channel, store, previewProfile, contacts, previewCommonChatsFor)
+    return handlePreviewProfile(
+      channel,
+      store,
+      previewProfile,
+      contacts,
+      previewCommonChatsFor,
+      previewBotProfile,
+    )
   }
 
   switch (channel) {
@@ -346,6 +357,12 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'chats:pinned':
     case 'chats:setPinnedMessage':
       return handlePreviewPins(channel, previewChats, previewPins, store)
+    case 'chats:addMember':
+      return previewAddMember(
+        previewChats,
+        { chatId: Number(store.chatId), username: String(store.username ?? '') },
+        previewMemberByUsername,
+      )
     case 'chats:inviteLink':
       return previewInviteLink(Number(store.chatId), Boolean(store.temporary))
     /** 话题: the list, its management calls and 以聊天方式查看 (design doc §9.12). */
@@ -453,6 +470,10 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     /** Bots: the "/" command list and a pressed inline button. */
     case 'bots:commands':
       return previewBotCommands(Number(store.chatId))
+    /** inline 机器人: `@bot query` and sending one of its results; ./inline.ts. */
+    case 'bots:inlineQuery':
+    case 'bots:inlineSend':
+      return handlePreviewInline(channel, store, previewSendContext)
     case 'bots:callback': {
       // Mirrors the mock adapter's two answers: a toast, and an alert dialog. The
       // payload is parsed, not cast: the preview stands in for the IPC boundary.

@@ -71,7 +71,14 @@ export function createUpdateHandler(deps: UpdateDeps): (update: TdObject) => Pro
         return
       }
       case 'updateMessageContent':
-      case 'updateMessageEdited': {
+      case 'updateMessageEdited':
+      /**
+       * A bot swapped the keyboard under its message without touching the text —
+       * what pressing an inline button usually does. `reply_markup` is the only
+       * thing that changed, and every client-side markup (the buttons, the custom
+       * keyboard, its removal and 强制回复) is read from it, so the row is remapped.
+       */
+      case 'updateMessageReplyMarkup': {
         // Remap the whole message instead of patching the text: an edit can change
         // media and a media upload completion can change a caption (§6.1).
         const chatId: number = update.chat_id
@@ -285,7 +292,8 @@ export function createUpdateHandler(deps: UpdateDeps): (update: TdObject) => Pro
        */
       case 'updateForumTopicInfo':
       case 'updateForumTopic':
-        if (Number(update.chat_id) > 0) deps.emit({ type: 'topics', chatId: Number(update.chat_id) })
+        if (Number(update.chat_id) > 0)
+          deps.emit({ type: 'topics', chatId: Number(update.chat_id) })
         return
       /** 以聊天方式查看 / 以话题方式查看 flips the summary's `forum` flag. */
       case 'updateChatViewAsTopics':

@@ -87,7 +87,7 @@ pnpm workspace, W1 + W2 + the W3 main body implemented, plus the private-chat P0
 | Channels | 服务号 bottom card, 加入/申请加入 for an unjoined channel, keyboard switch for admins |
 | Settings | batch A (账号与安全 / 通用 / 网络与代理 / 关于) + batch B's first group 消息通知 (桌面通知 + 私聊/群聊/频道的 免打扰 / 提示音 / 预览); the rest of B and C pending (§9) |
 | Private chat P0/P1 | send failure + 重试, outgoing typing, online/last-seen, delete chat / mark unread, notifications + tray, voice notes (recorded in-renderer, OGG/Opus muxed in-repo), albums, pinned bar, speech-to-text, reactions (display only), block/report, profile card with 备注 + 共同群聊, caption edit, add/remove contact |
-| 机器人 | inline-keyboard callbacks end to end (`bots:callback` → `getCallbackQueryAnswer`; answer as toast / alert dialog / URL), the composer's `/` command list (`bots:commands`, lazily asked) and clickable `botCommand` entities that send the command; a fixture bot chat serves both in the mock/preview |
+| 机器人 | inline-keyboard callbacks end to end (`bots:callback` → `getCallbackQueryAnswer`; answer as toast / alert dialog / URL), the composer's `/` command list (`bots:commands`, lazily asked), clickable `botCommand` entities that send the command, the custom reply keyboard with its removal, 强制回复 (the row is offered as the reply target), the bot's profile card (简介 / commands / menu button), inline bots (`@bot query` → `bots:inlineQuery` / `bots:inlineSend`, a result panel above the input) and 添加成员 (`chats:addMember` → `addChatMembers`), which is how a bot joins a group; the fixture bot (`@wegram_helper`) serves all of it in the mock/preview |
 | Proxy | 跟随系统代理 by default, `proxy:refresh` / `evt:proxy`, probe + 30 s retry, DPAPI-sealed secrets |
 | Packaging | `.github/workflows/release.yml`: version bump on `main` → NSIS installer → GitHub Release (proven by v0.1.0–v0.1.2); the installer has never been installed or signed |
 
@@ -1548,7 +1548,7 @@ One-off duplication audits merged the real duplicates and left the look-alikes a
 | 12 | Preload size | 187 kB because it imports the protocol index (zod); splitting a channels-only entry point would fix it |
 | 13 | Popovers | modals, the forward list and the sticker grid still use native thin scrollbars; converting to `<OverlayScrollbar>` is mechanical |
 | 14 | `tdlib:smoke` coverage | it checks only the first channel for `messageSenderChat`; anonymous-admin groups have no fixture |
-| 15 | 机器人 breadth | done 2026-11-24: callback buttons, the `/` command list, clickable `botCommand` and the custom reply keyboard (`replyMarkupShowKeyboard` → `Message.replyKeyboard`, grid under the input, text keys send, request/WebApp keys refuse; `one_time` hides after one press). Still open: a bot's profile page (`botInfo.description` / commands / menu button), inline bots (`@bot query`), `forceReply` (the composer's reply banner already covers it), WebApp buttons (小程序 is a stated non-goal), adding a bot to a group (no `addChatMembers` anywhere) and the guard bot when joining (kept as a readable error) |
+| 15 | 机器人 breadth | done 2026-11-24: callback buttons, the `/` command list, clickable `botCommand`, the custom reply keyboard (`replyMarkupShowKeyboard` → `Message.replyKeyboard`, grid under the input, text keys send, request/WebApp keys refuse; `one_time` hides after one press) with its removal (`replyMarkupRemoveKeyboard` → `replyKeyboardHidden`), 强制回复 (`replyMarkupForceReply` → the row becomes the reply target, placeholder included) the bot's profile card (`users:profile` carries `bot`: short_description / description / commands / menu button), inline bots (`@bot query` → `bots:inlineQuery` / `bots:inlineSend`, results panel, paging through `next_offset`) and 添加成员 (`chats:addMember` → `addChatMembers`, the only way a bot joins a group). Still open: WebApp buttons (they open as links; 小程序 is a stated non-goal), `switchInline` buttons (inert — they need the inline picker mid-conversation) and the guard bot when joining (kept as a readable error) |
 
 ### 9.3 Open product decisions
 
@@ -1897,6 +1897,59 @@ claim is. Nothing here replaces §1 (state) or §9 (gaps).
 - Verified with real TDLib on the test DC: `pnpm tdlib:test-dc:bot` maps BotFather's 27
   commands and presses a real `/mybots` callback button (empty answer, no 502). `pnpm verify`
   green.
+
+**2026-11-24 — 机器人:撤键盘、强制回复与资料卡**
+- **撤键盘**(`replyMarkupRemoveKeyboard`): the removal row carries no keyboard of its own, so
+  "the newest row with a keyboard" kept an older grid on screen forever. It maps to its own
+  marker (`Message.replyKeyboardHidden`) and `lib/replyKeyboard.ts` stops at it — a newer
+  keyboard after it shows again.
+- **强制回复**(`replyMarkupForceReply` → `Message.forceReply`, placeholder included):
+  `lib/forceReply.ts` decides from the newest row backwards — the marker means "an answer is
+  still owed", an outgoing row means "already answered". `ChatPane` sets that row as the reply
+  target (the composer's existing 回复 banner), remembers an explicit cancel by chat + message
+  id so it does not come back, and the composer's placeholder becomes the bot's.
+- **换键盘不编辑正文**(`updateMessageReplyMarkup`) now remaps the row instead of being ignored:
+  the buttons, the grid, its removal and 强制回复 all live in `reply_markup`, so a bot that only
+  swaps its keyboard used to leave stale buttons until a reload.
+- **资料卡**(§8.3): `users:profile` carries `bot` when TDLib's `user.type` is `userTypeBot` —
+  `botInfo.short_description` (the 简介, falling back to `description`), `description`, the
+  command list the composer also reads, and a `botMenuButton`'s text + link. `ProfileCard` draws
+  简介 / 命令 / 菜单 for a bot and hides 备注 and 添加为联系人 (a bot is not an address-book
+  contact); 举报 stays, and the mock still reports the fixture bot only.
+- Fixture chat 13 gained `shortDescription` / `description`, so the card is visible in the mock
+  and the browser preview; the preview reads the bot from the seed (`previewBotProfile`), since
+  a bot is not in `contacts`.
+- Tests: `buttons.test.ts` (removal + force reply mappers), `message.test.ts` (both markups on a
+  row), `replyKeyboard.test.ts` (removal drops the grid, a newer keyboard returns), the new
+  `forceReply.test.ts`, `mock-adapter/users.test.ts` (bot card). Verified by running the five
+  verify steps directly — `scripts/check-version.mjs`, `eslint . --max-warnings 0`, `tsc --noEmit`
+  per package, `vitest run` (908 tests) and `electron-vite build` — because pnpm cannot open its
+  store lock under this session's file sandbox. The bot card was not clicked through in a window:
+  the preview check needs a browser grant that was not approved.
+**2026-11-24 — 机器人:inline 查询与加群**
+- **inline 机器人**(`@bot 查询`): `lib/inlineQuery.ts` parses the box (the message must
+  *start* with the handle and a separating space; a bare `@name` is still being typed),
+  `useInlineQuery` debounces 250 ms and guards with a sequence number, and
+  `bots:inlineQuery` resolves the handle (`searchPublicChat`, refused unless it is a bot)
+  before `getInlineQueryResults`. `map/inline.ts` folds TDLib's twelve result shapes into
+  one row (kind word + title + description + thumbnail file id) — an unknown type is
+  dropped rather than drawn as an empty row that sends something.
+- The panel (`components/InlineResults.tsx`) floats over the input like the command list,
+  fetches thumbnails through `lib/media`, offers 加载更多 while `next_offset` is non-empty,
+  and takes ↑/↓/Enter/Tab/Esc through the composer's key interceptor. Picking a result
+  posts `bots:inlineSend` → `sendInlineQueryResultMessage` (the bot builds the message) and
+  clears the box — what was typed was the query, not the message.
+- **添加成员**: `chats:addMember` → `addChatMembers` for one person resolved from an
+  @username. A bot has no invite-link flow, so this is the only way it joins a group;
+  `failed_to_add_members` becomes a reason in words (Premium, privacy setting) and the
+  sheet keeps its 改用邀请链接 exit. The 聊天信息 panel's + 添加 tile opens it (it used to
+  open the invite link directly); channels keep the QR/invite rows and are not offered here.
+- Fixtures: the bot chat gained `bot.username` (`@wegram_helper`), and the mock/preview
+  answer three article results built from the query — the mock keeps a query-id → results
+  map, the preview encodes the query in the id, so neither needs a bot server.
+- Tests: `inlineQuery.test.ts` (parse rules), `map/inline.test.ts` (photo/contact/sticker/
+  voice + unknown types + missing id), `mock-adapter/chats.test.ts` (bot by handle, person
+  by handle, unknown handle, private chat). 925 tests, lint 0 warnings, build OK.
 
 
 

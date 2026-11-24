@@ -3,6 +3,7 @@ import { sortChatList } from '@wegram/mock-session'
 import type { FakeCommentFlags } from '@wegram/mock-session'
 import type {
   AppInfo,
+  BotProfile,
   ChatSummary,
   ChatTopic,
   Contact,
@@ -198,6 +199,66 @@ export function previewBotCommands(chatId: number): {
     return seed.bot ? { isBot: true, commands: seed.bot.commands } : { isBot: false, commands: [] }
   }
   return { isBot: false, commands: [] }
+}
+
+/**
+ * 机器人 (§8.3): the fixture bot's profile-page data. A bot is not in the address
+ * book, so the preview's 资料卡 cannot take it from `contacts` — it is read off
+ * the same seed the mock adapter serves, so the two fakes cannot disagree.
+ */
+export function previewBotProfile(userId: number): {
+  userId: number
+  title: string
+  avatarUrl?: string
+  bot: BotProfile
+} | null {
+  for (const seed of seeds.values()) {
+    if (seed.chat.userId !== userId || !seed.bot) continue
+    const { shortDescription, description, commands } = seed.bot
+    return {
+      userId,
+      title: seed.chat.title,
+      ...(seed.chat.avatarUrl ? { avatarUrl: seed.chat.avatarUrl } : {}),
+      bot: {
+        ...(shortDescription ? { shortDescription } : {}),
+        ...(description ? { description } : {}),
+        commands,
+      },
+    }
+  }
+  return null
+}
+
+/**
+ * The fixture bot's @username, or an empty string when the seed carries none.
+ * The inline picker is addressed by handle, so the preview needs it (§8.3).
+ */
+export function previewBotUsername(): string {
+  for (const seed of seeds.values()) {
+    const username = seed.bot?.username?.trim().toLowerCase()
+    if (username) return username
+  }
+  return ''
+}
+
+/**
+ * 添加成员 (§8.3): the fixture person or bot behind an @username, or null. The
+ * preview resolves the same handles the mock adapter does, so the two cannot
+ * disagree about who can be added.
+ */
+export function previewMemberByUsername(
+  username: string,
+): { userId: number; title: string } | null {
+  const handle = username.trim().replace(/^@+/, '').toLowerCase()
+  if (!handle) return null
+  for (const seed of seeds.values()) {
+    const userId = seed.chat.userId
+    if (!userId || seed.chat.kind !== 'private') continue
+    const person = seed.contact?.username?.toLowerCase() === handle
+    const bot = seed.bot?.username?.toLowerCase() === handle
+    if (person || bot) return { userId, title: seed.chat.title }
+  }
+  return null
 }
 
 export function previewCommonChatsFor(userId: number): ChatSummary[] {

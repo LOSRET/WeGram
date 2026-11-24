@@ -220,6 +220,33 @@ export function canMockGetMembers(store: MockChatStore, chatId: number): boolean
   return fixture.chat.kind === 'group'
 }
 
+/**
+ * 添加成员 (§8.3): a handle the fixture knows — a person's `contact.username` or
+ * the bot's own — answered as who was added. The fixture has no member table
+ * (the grid is the people who posted), so nothing changes on screen but the
+ * toast; the real `addChatMembers` runs in the TDLib adapter.
+ */
+export function addMockChatMember(
+  store: MockChatStore,
+  chatId: number,
+  username: string,
+): { userId: number; title: string } {
+  const fixture = requireFixture(store, chatId)
+  if (fixture.chat.kind === 'private') {
+    throw new AppError('invalid_payload', '私聊不能添加成员')
+  }
+  const handle = username.trim().replace(/^@+/, '').toLowerCase()
+  for (const candidate of store.fixtures.values()) {
+    const person = candidate.contact?.username?.toLowerCase() === handle
+    const bot = candidate.bot?.username?.toLowerCase() === handle
+    if (!(person || bot)) continue
+    const userId = candidate.chat.userId ?? 0
+    if (!userId) continue
+    return { userId, title: candidate.chat.title }
+  }
+  throw new AppError('invalid_payload', `找不到 @${handle}`)
+}
+
 /** 群聊名称; the fixture has no permissions, so a rename always applies. */
 export function setMockTitle(store: MockChatStore, chatId: number, title: string): ChatSummary {
   const fixture = requireFixture(store, chatId)
@@ -255,7 +282,11 @@ export function mockInviteLink(chatId: number, temporary = false): ChatInviteLin
  * straight onto its methods, which keeps its class body inside the line budget.
  */
 export interface MockChatApi {
-  listChats(input: { limit: number; offset: number; list?: 'main' | 'archive' }): Promise<ChatSummary[]>
+  listChats(input: {
+    limit: number
+    offset: number
+    list?: 'main' | 'archive'
+  }): Promise<ChatSummary[]>
   prefetchAvatars(chatIds: number[]): Promise<void>
   getChat(chatId: number): Promise<ChatSummary>
   openChat(chatId: number): Promise<void>
@@ -281,6 +312,7 @@ export interface MockChatApi {
     topicId?: number,
   ): Promise<ChatPinnedMessage | null>
   inviteLink(chatId: number, temporary?: boolean): Promise<ChatInviteLink | null>
+  addMember(chatId: number, username: string): Promise<{ userId: number; title: string }>
   userStatus(userId: number): Promise<PeerStatus | null>
 }
 
@@ -319,11 +351,11 @@ export function createMockChats(
     deleteChat: async (chatId) => deleteMockChat(store, chatId),
     setChatUnread: async (chatId, unread) => setMockChatUnread(store, chatId, unread),
     members: async (chatId, limit, query) => mockChatMembers(store, chatId, limit, query),
+    addMember: async (chatId, username) => addMockChatMember(store, chatId, username),
     setTitle: async (chatId, title) => setMockTitle(store, chatId, title),
     leave: async (chatId) => leaveMockChat(store, chatId),
     pinnedMessage: async (chatId, topicId) =>
-      pins.get(pinKey(chatId, topicId)) ??
-      (topicId === undefined ? mockPinnedMessage() : null),
+      pins.get(pinKey(chatId, topicId)) ?? (topicId === undefined ? mockPinnedMessage() : null),
     setPinnedMessage: async (chatId, messageId, topicId) => {
       const fixture = requireFixture(store, chatId)
       if (messageId === null) {

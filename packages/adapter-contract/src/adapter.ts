@@ -34,6 +34,7 @@ import type {
   InvokeRequest,
   InvokeResponse,
   InstantView,
+  InlineQueryAnswer,
 } from '@wegram/protocol'
 
 export type AdapterKind = 'mock' | 'tdlib'
@@ -253,6 +254,12 @@ export interface TelegramAdapter {
    */
   inviteLink(chatId: number, temporary?: boolean): Promise<ChatInviteLink | null>
   /**
+   * 添加成员 (§8.3/§9.9): one person — or a bot, which has no invite-link flow —
+   * resolved from their @username and put into the group with `addChatMembers`.
+   * Answers who was added; a refusal is an AppError with the reason in words.
+   */
+  addChatMember(chatId: number, username: string): Promise<{ userId: number; title: string }>
+  /**
    * 话题列表 (design doc §9.12): one page of a forum's topics with TDLib's own
    * cursor (date + last message + topic id). `query` searches the names on the
    * server. A non-forum chat answers an empty page.
@@ -328,6 +335,19 @@ export interface TelegramAdapter {
    * content update, so nothing else is answered.
    */
   pressCallback(input: InvokeRequest<'bots:callback'>): Promise<CallbackAnswer>
+  /**
+   * inline 机器人 (§8.3): `@bot query` in the composer. The bot is resolved from
+   * the username the reader typed, checked to be a bot, and asked with
+   * `getInlineQueryResults`; `offset` continues a paged answer.
+   */
+  inlineQuery(input: InvokeRequest<'bots:inlineQuery'>): Promise<InlineQueryAnswer>
+  /**
+   * Sends one inline result (`sendInlineQueryResultMessage`). The bot builds the
+   * message, so the answer is the row TDLib created — never composed here.
+   */
+  sendInlineResult(
+    input: InvokeRequest<'bots:inlineSend'>,
+  ): Promise<InvokeResponse<'bots:inlineSend'>>
 
   history(
     input: InvokeRequest<'messages:history'>,

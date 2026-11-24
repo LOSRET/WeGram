@@ -131,6 +131,28 @@ export function previewOpenUsername(
   return { ...chat }
 }
 
+/**
+ * 添加成员 (§8.3): the handle is resolved by the caller (the fixtures know who
+ * owns one) and a group answers who was added. The fixture has no member table,
+ * so nothing changes on screen — same as the mock adapter.
+ */
+export function previewAddMember(
+  store: PreviewChatStore,
+  input: { chatId: number; username: string },
+  resolve: (username: string) => { userId: number; title: string } | null,
+): { userId: number; title: string } {
+  const chat = findChat(store, Number(input.chatId))
+  if (chat.kind === 'private') throw { code: 'invalid_payload', message: '私聊不能添加成员' }
+  const member = resolve(String(input.username ?? ''))
+  if (!member) {
+    const handle = String(input.username ?? '')
+      .trim()
+      .replace(/^@+/, '')
+    throw { code: 'invalid_payload', message: `找不到 @${handle}` }
+  }
+  return member
+}
+
 /** The fixture has no member table: the people who posted are the members. */
 export function previewChatMembers(
   store: PreviewChatStore,

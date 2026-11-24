@@ -42,9 +42,17 @@ components/AlertDialog.tsx  a bot's alert answer (TDLib `callbackQueryAnswer.sho
                          one-button sheet; its free text keeps line breaks
 lib/botCommands.ts     (pure, unit-tested) the composer's "/" trigger and the command filter
 lib/useBotCommands.ts  the bot command list, asked lazily once per chat (`bots:commands`)
-lib/replyKeyboard.ts   (pure, unit-tested) which message's custom keyboard a chat shows
+lib/replyKeyboard.ts   (pure, unit-tested) which message's custom keyboard a chat shows, and
+                      which removal takes it away
+lib/forceReply.ts      (pure, unit-tested) 强制回复: the row a bot waits for an answer to
+lib/inlineQuery.ts     (pure, unit-tested) `@bot query`: the handle and the query it carries
+lib/useInlineQuery.ts  inline results: 250 ms debounce, `next_offset` paging, and a stale
+                      answer can never paint over a newer one
 components/ReplyKeyboard.tsx  a bot's custom reply keyboard under the composer: text keys
                         send their label, request/WebApp keys are drawn but refuse (§8.3)
+components/InlineResults.tsx  a bot's inline results above the composer (`@bot query`):
+                        thumbnail / title / description per row, arrows + Enter, and
+                        加载更多 while `next_offset` says there is more
 components/composer/       ComposerCard: the ONE bordered input card (§8.4 + §9.8) — text,
                          the 表情/收藏/文件/截图/语音 tool row, 发送, the attach menu and the
                          ExpressionPicker. Both composers render it; a caller only says where
@@ -72,7 +80,7 @@ components/chat-pane/     render tree + useChatHistory (history/ modules) + mess
                          ChatInfoPanel (聊天信息, §9.9: a 314 px OVERLAY sheet — transform
                          only, the transcript keeps its width — with 搜索群成员 and the
                          member grid for groups, a private chat's face opening 资料卡,
-                         群聊名称 / 群公告 / 群二维码 / 退出群聊 (频道
+                         群聊名称 / 群公告 / 群二维码 / 添加成员 / 退出群聊 (频道
                          名称 / 频道公告 / 频道二维码 / 退出频道 on a channel, whose member
                          grid only an administrator gets — chats:canGetMembers) and the
                          shared mute/pin/clear rows; 群二维码 opens screens/QrWindow.tsx, the
@@ -113,7 +121,8 @@ components/ProfileCard.tsx  资料卡: the person sheet a private chat's title a
                         contact — TDLib answers "User isn't a contact" / 共同群聊 fetched on
                         demand / 添加或删除联系人 / 加入黑名单 / 举报 for a bot only —
                         `canBeReported` is TDLib's `chat.can_be_reported`, all through
-                        `users:*`)
+                        `users:*`; a bot additionally draws 简介 / 命令 / 菜单 from
+                        `UserProfile.bot`, and hides 备注 + 添加为联系人)
 components/ReportDialog.tsx  举报: the phased reportChat state machine (reasons →
                         possibly more reasons [a bot's report does this] → maybe a
                         comment → filed), shared by the 资料卡's 举报 and the
@@ -424,7 +433,19 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   takes the newest row that carries one (an ordinary reply does not clear it), a one-time
   keyboard is hidden by remembering that row's id in `ChatPane` — never by a per-chat flag —
   and its text keys take the same send path. A request/WebApp key is drawn dimmed and must
-  never post its label as a message.
+  never post its label as a message. The keyboard ends in three ways only: a newer keyboard,
+  the one-time hide above, and `replyKeyboardHidden` (TDLib `replyMarkupRemoveKeyboard`) — the
+  removal row carries no keyboard at all, so it must be its own marker or the older grid stays
+  forever. **强制回复** (`Message.forceReply`) is `lib/forceReply.ts`'s decision: walking backwards,
+  the marker means "an answer is still owed" and an outgoing row means "already answered"; the
+  pane then sets that row as the reply target (the ordinary 回复 banner) and remembers a cancel
+  by chat + message id so it does not reappear. Its placeholder outranks the keyboard's.
+  **inline 机器人 is the same "derived from the box" rule**: `lib/inlineQuery.ts` decides when
+  the text is `@bot query` (the message must *start* with the handle), the panel's rows come
+  from `bots:inlineQuery` and never from the transcript, and picking one posts
+  `bots:inlineSend` → the bot's own message, then clears the box. Both popovers take keys
+  through the composer's ONE interceptor (`commandKeys || inlineKeys`); they can never be open
+  together, because `/` and `@` are different first characters.
 - **表情回应 are displayed, never offered.** `MessageRow` draws the chips from
   `Message.reactions` (`updateMessageReactions` replaces the whole list, so the
   `reactions` op replaces rather than merges); a custom-emoji reaction is its

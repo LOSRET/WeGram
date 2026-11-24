@@ -33,6 +33,29 @@ function fixture(overrides: Partial<Fixture['contact']> = {}): Map<number, Fixtu
   return map
 }
 
+/** The fixture bot: a private chat whose person is a bot, not a contact. */
+function botFixture(): Map<number, Fixture> {
+  const map = fixture()
+  map.set(13, {
+    chat: {
+      id: 13,
+      title: 'WeGram 助手',
+      kind: 'private',
+      userId: 26,
+      unread: 0,
+      pinned: false,
+      muted: false,
+    },
+    messages: [],
+    bot: {
+      shortDescription: '演示机器人',
+      description: '你好，我是 WeGram 助手。',
+      commands: [{ command: 'start', description: '重新开始' }],
+    },
+  })
+  return map
+}
+
 describe('createMockUsers', () => {
   it('reads the card off the fixture contact', async () => {
     const users = createMockUsers(fixture())
@@ -47,6 +70,23 @@ describe('createMockUsers', () => {
       blocked: false,
       // A human is not reportable from a profile; TDLib's flag wants a bot.
       canBeReported: false,
+    })
+  })
+
+  it('reads a bot card with its 简介, commands and 举报 (§8.3)', async () => {
+    const users = createMockUsers(botFixture())
+
+    await expect(users.profile({ userId: 26 })).resolves.toMatchObject({
+      userId: 26,
+      title: 'WeGram 助手',
+      // A bot is never an address-book contact, and TDLib lets a bot be reported.
+      isContact: false,
+      canBeReported: true,
+      bot: {
+        shortDescription: '演示机器人',
+        description: '你好，我是 WeGram 助手。',
+        commands: [{ command: 'start', description: '重新开始' }],
+      },
     })
   })
 

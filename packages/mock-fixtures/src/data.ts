@@ -492,9 +492,7 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
           title: 'WeGram v0.3.1 更新说明',
           description: '链接预览卡片、即时预览入口，以及三处滚动修复。',
           instantView: true,
-          media: [
-            { kind: 'photo', media: mediaOf(7101, { width: 1200, height: 800 }) },
-          ],
+          media: [{ kind: 'photo', media: mediaOf(7101, { width: 1200, height: 800 }) }],
         },
       },
     ],
@@ -609,6 +607,11 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
       lastReadOutboxMessageId: 0,
     },
     bot: {
+      // The handle `@wegram_helper query` addresses in the composer (§8.3).
+      username: 'wegram_helper',
+      // The profile card's 简介 and the text an empty chat would show (§8.3).
+      shortDescription: 'WeGram 助手：演示机器人命令、按钮和自定义键盘。',
+      description: '你好，我是 WeGram 助手。点下面的按钮试试。',
       commands: [
         { command: 'start', description: '重新开始' },
         { command: 'help', description: '看看我能做什么' },

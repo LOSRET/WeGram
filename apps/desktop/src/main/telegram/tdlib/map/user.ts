@@ -1,6 +1,7 @@
-import type { MessageEntity, Self, UserProfile } from '@wegram/protocol'
+import type { BotCommand, BotProfile, MessageEntity, Self, UserProfile } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
+import { asArray } from '../json'
 import type { MapperContext } from './context'
 import { mapEntities } from './entities'
 
@@ -43,6 +44,7 @@ export function mapUserProfile(
   const note = textOf(full?.note)
   const avatarUrl = ctx.userAvatarUrls.get(user.id)
   const commonChats = Number(full?.group_in_common_count ?? 0)
+  const bot = botProfile(user, full)
   return {
     userId: user.id,
     title: contactName(user),
@@ -57,7 +59,50 @@ export function mapUserProfile(
     // `block_list` is null when the person is not blocked; a non-null list is one.
     blocked: Boolean(full?.block_list && typeof full.block_list === 'object'),
     canBeReported,
+    ...(bot ? { bot } : {}),
   }
+}
+
+/**
+ * 机器人: what a bot's profile page adds to the card (§8.3).
+ *
+ * Everything lives in `userFullInfo.bot_info`; a human has no `userTypeBot` and
+ * therefore no bot section at all. The menu button only travels when it names a
+ * link — `botMenuButtonCommands` / `default` mean "the command list", which the
+ * card already draws as 命令.
+ */
+function botProfile(user: TdObject, full: TdObject | undefined): BotProfile | undefined {
+  if (user.type?._ !== 'userTypeBot') return undefined
+  const info = full?.bot_info
+  const commands: BotCommand[] = asArray<TdObject>(info?.commands).flatMap((raw) => {
+    const command = String(raw?.command ?? '')
+      .trim()
+      .replace(/^\//, '')
+    if (!command) return []
+    return [
+      {
+        command,
+        description: typeof raw?.description === 'string' ? raw.description : '',
+      },
+    ]
+  })
+  const shortDescription = textOf(info?.short_description)
+  const description = textOf(info?.description)
+  const menu = menuButtonOf(info?.menu_button)
+  return {
+    ...(shortDescription ? { shortDescription } : {}),
+    ...(description ? { description } : {}),
+    commands,
+    ...(menu ? { menu } : {}),
+  }
+}
+
+/** A bot's `botMenuButton` as a link; the command-flavoured kinds carry none. */
+function menuButtonOf(menu: TdObject | undefined): { text: string; url: string } | undefined {
+  if (menu?._ !== 'botMenuButton') return undefined
+  const text = typeof menu.text === 'string' ? menu.text.trim() : ''
+  const url = typeof menu.url === 'string' ? menu.url.trim() : ''
+  return text && url ? { text, url } : undefined
 }
 
 /** A TDLib `formattedText`'s plain text, or undefined when it carries none. */

@@ -1,4 +1,5 @@
 import type {
+  ForceReply,
   InlineButton,
   InlineButtonStyle,
   ReplyKeyboard,
@@ -128,6 +129,29 @@ export function mapReplyKeyboard(markup: TdObject | undefined): ReplyKeyboard | 
     ...(markup.one_time === true ? { oneTime: true } : {}),
     ...(placeholder ? { placeholder } : {}),
   }
+}
+
+/**
+ * TDLib `replyMarkupRemoveKeyboard`: the bot took its custom keyboard away.
+ *
+ * The removal row carries no keyboard of its own, so "no `reply_markup` here"
+ * alone cannot express it — without this marker the newest *older* keyboard keeps
+ * winning and the grid would stay under the input forever (§8.3).
+ */
+export function isKeyboardRemoved(markup: TdObject | undefined): boolean {
+  return markup?._ === 'replyMarkupRemoveKeyboard'
+}
+
+/**
+ * TDLib `replyMarkupForceReply`: the bot asks for a direct answer to this row.
+ *
+ * Only the placeholder travels — the reply target *is* the row, and the pane
+ * offers it as the reply target (the composer's banner already draws one).
+ */
+export function mapForceReply(markup: TdObject | undefined): ForceReply | undefined {
+  if (markup?._ !== 'replyMarkupForceReply') return undefined
+  const placeholder = typeof markup.placeholder === 'string' ? markup.placeholder.trim() : ''
+  return placeholder ? { placeholder } : {}
 }
 
 /**

@@ -13,10 +13,7 @@ import { writeVoiceNote } from '../media/voice-file'
 import { resolveProxySecrets, toStoredProxy } from '../proxy'
 import type { ProxyController } from '../proxy-controller'
 import { closeQrWindow, getQrWindow, openQrWindow, qrTarget } from '../qr-window'
-import {
-  instantViewWindowState,
-  openInstantViewWindow,
-} from '../instant-view-window'
+import { instantViewWindowState, openInstantViewWindow } from '../instant-view-window'
 import type { SettingsStore } from '../store/settings'
 import type { UiDatabase } from '../store/ui-db'
 import type { TelegramAdapter } from '../telegram/adapter'
@@ -209,6 +206,7 @@ export function createHandlers({
     'chats:pinned': (payload) => adapter.pinnedMessage(payload.chatId, payload.topicId),
     'chats:setPinnedMessage': (payload) =>
       adapter.setPinnedMessage(payload.chatId, payload.messageId, payload.topicId),
+    'chats:addMember': (payload) => adapter.addChatMember(payload.chatId, payload.username),
     'chats:inviteLink': (payload) => adapter.inviteLink(payload.chatId, payload.temporary),
     /** 话题 (design doc §9.12): the list, its cursor and the management calls. */
     'chats:topics': (payload) => adapter.topics(payload),
@@ -240,6 +238,8 @@ export function createHandlers({
     /** Bots: the "/" command list of a bot chat, and pressing an inline button. */
     'bots:commands': (payload) => adapter.botCommands(payload.chatId),
     'bots:callback': (payload) => adapter.pressCallback(payload),
+    'bots:inlineQuery': (payload) => adapter.inlineQuery(payload),
+    'bots:inlineSend': (payload) => adapter.sendInlineResult(payload),
     /** 即时预览: the reader window's target, and the page it draws (design doc §8.9). */
     'web:open': (payload) => {
       openInstantViewWindow(payload, BrowserWindow.getFocusedWindow())
