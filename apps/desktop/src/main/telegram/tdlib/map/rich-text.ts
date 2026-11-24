@@ -80,11 +80,12 @@ function appendRichText(node: TdObject | undefined, out: CollectedText, depth: n
   if (node._ === 'richTextUrl') {
     const start = out.text.length
     appendRichText(inner, out, depth + 1)
+    // Synthesised the way TDLib sends one: the target belongs to the *type*
+    // object, which is what `mapEntities` reads (see its comment).
     out.entities.push({
       offset: start,
       length: out.text.length - start,
-      type: { _: 'textEntityTypeTextUrl' },
-      url: typeof node.url === 'string' ? node.url : '',
+      type: { _: 'textEntityTypeTextUrl', url: typeof node.url === 'string' ? node.url : '' },
     })
     return
   }

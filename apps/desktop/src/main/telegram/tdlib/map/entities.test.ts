@@ -15,9 +15,13 @@ describe('mapEntities', () => {
       { type: { _: 'textEntityTypeStrikethrough' }, offset: 3, length: 1 },
       { type: { _: 'textEntityTypeCode' }, offset: 4, length: 1 },
       { type: { _: 'textEntityTypePre' }, offset: 5, length: 1 },
-      { type: { _: 'textEntityTypePreCode' }, offset: 6, length: 1, language: 'ts' },
+      { type: { _: 'textEntityTypePreCode', language: 'ts' }, offset: 6, length: 1 },
       { type: { _: 'textEntityTypeUrl' }, offset: 7, length: 1 },
-      { type: { _: 'textEntityTypeTextUrl' }, offset: 8, length: 1, url: 'https://example.com' },
+      {
+        type: { _: 'textEntityTypeTextUrl', url: 'https://example.com' },
+        offset: 8,
+        length: 1,
+      },
       { type: { _: 'textEntityTypeMention' }, offset: 9, length: 1 },
       { type: { _: 'textEntityTypeHashtag' }, offset: 10, length: 1 },
       { type: { _: 'textEntityTypeSpoiler' }, offset: 11, length: 1 },
@@ -52,6 +56,35 @@ describe('mapEntities', () => {
       length: 1,
       customEmojiId: '900',
     })
+  })
+
+  /**
+   * TDLib keeps each entity's own parameters inside its **type** object
+   * (`textEntityTypeTextUrl.url`, `textEntityTypePreCode.language`,
+   * `textEntityTypeMentionName.user_id`), never beside offset/length. Reading the
+   * entity's own `url` left every "text shown instead of a raw URL" a dead span:
+   * the words rendered and the click did nothing (reported 2026-11-24).
+   */
+  it('takes a hidden link target from the type object', () => {
+    expect(
+      mapEntities([
+        {
+          type: { _: 'textEntityTypeTextUrl', url: 'https://t.me/somechannel' },
+          offset: 0,
+          length: 4,
+        },
+        // An entity-shaped url beside the offset is not where TDLib puts it.
+        {
+          type: { _: 'textEntityTypeTextUrl' },
+          offset: 4,
+          length: 4,
+          url: 'https://ignored.test',
+        },
+      ]),
+    ).toEqual([
+      { type: 'textUrl', offset: 0, length: 4, url: 'https://t.me/somechannel' },
+      { type: 'textUrl', offset: 4, length: 4 },
+    ])
   })
 
   it('keeps the user id of a mentionName entity', () => {

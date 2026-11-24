@@ -133,6 +133,13 @@ change belongs in the adapter.
   share it): the store drops the transcript, queued ops, paging state, unread marker and
   the active selection. Leaving `messagesByChat` behind makes a later id collision draw
   a deleted chat.
+- **A text entity's parameters live inside its `type` object, never beside `offset`/`length`.**
+  TDLib sends `textEntityTypeTextUrl { url }`, `textEntityTypePreCode { language }`,
+  `textEntityTypeMentionName { user_id }` and `textEntityTypeCustomEmoji { custom_emoji_id }`.
+  `map/entities.ts` read the entity's own `url`/`language`, so every Telegram hidden link
+  ("text shown instead of a raw URL") arrived without its target and rendered as dead
+  text — the reported "链接点不了" (2026-11-24). `map/rich-text.ts` synthesises the same
+  shape for `richTextUrl`; a fix in one place must move the field into the type in both.
 - **A handler's data must be exactly `InvokeResponse<C>` — the handler map is typed
   that way.** Responses are not zod-validated in the router, so a shape mismatch reaches
   the renderer silently. One did: `chats:inviteLink` was declared `{ link: string }` but
