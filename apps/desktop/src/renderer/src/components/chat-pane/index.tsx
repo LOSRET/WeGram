@@ -2,6 +2,8 @@ import type { ChatJoinState, LinkPreview, Message } from '@wegram/protocol'
 import { useCallback, useEffect, useState } from 'react'
 
 import { loadLatestWindow } from '../../lib/anchoredWindow'
+import { botStartText } from '../../lib/botStart'
+import { useBotStartInfo } from '../../lib/useBotStartInfo'
 import { topicUnreadMarker, transcriptReadMarkers } from '../../lib/topics'
 import { INFO_PANEL_ANIM_MS } from '../../lib/chatInfo'
 import { editTargetOf } from '../../lib/editTarget'
@@ -16,6 +18,7 @@ import { MessageList } from '../message-list'
 import { ProfileCard } from '../ProfileCard'
 import { StickerSetBox } from '../StickerSetBox'
 import { ChannelBar } from './ChannelBar'
+import { BotStartPlaceholder } from './BotStartPlaceholder'
 import { ChatHeader } from './ChatHeader'
 import { ChatInfoPanel } from './ChatInfoPanel'
 import { usePinnedMessage } from './usePinnedMessage'
@@ -53,6 +56,7 @@ export function ChatPane() {
   const messagesByChat = useAppStore((state) => state.messagesByChat)
   const hasMoreByChat = useAppStore((state) => state.hasMoreByChat)
   const replyToByChat = useAppStore((state) => state.replyToByChat)
+  const botStartParametersByChat = useAppStore((state) => state.botStartParametersByChat)
   const editing = useAppStore((state) => state.editing)
   const typingByChat = useAppStore((state) => state.typingByChat)
   const unreadMarkers = useAppStore((state) => state.unreadMarkers)
@@ -107,6 +111,8 @@ export function ChatPane() {
   const [profileUserId, setProfileUserId] = useState<number | null>(null)
   /** 贴纸包: the set a clicked sticker message belongs to (design doc §8.5). */
   const [stickerSetId, setStickerSetId] = useState<string | null>(null)
+  /** 机器人首次会话: one 开始 press at a time, like the composer's send. */
+  const [startingBot, setStartingBot] = useState(false)
 
   /** The full-pane discussion view (design doc §9.8); it keeps its message while it slides. */
   const comments = useSlidingPanel<Message>(COMMENT_PANEL_ANIM_MS)
@@ -241,6 +247,27 @@ export function ChatPane() {
     loadNewer,
   } = useChatHistory(topicsOpen ? null : activeChatId, topicId)
   const messages = activeChatId ? (messagesByChat[activeChatId] ?? []) : []
+
+  /**
+   * 机器人首次会话 (§8.3): only a private chat whose first page is known empty
+   * asks for bot info. The answer's description replaces the ordinary empty
+   * state, and its 开始 button sends `/start` through `messageActions.send`.
+   */
+  const emptyPrivateChat =
+    chat?.kind === 'private' &&
+    chat.lastMessageAt === undefined &&
+    !topicsOpen &&
+    !transcriptStale &&
+    !loadingHistory &&
+    anchorKnown &&
+    messages.length === 0
+  const botStart = useBotStartInfo(chat?.id ?? null, emptyPrivateChat)
+
+  useEffect(() => {
+    if (activeChatId !== null && messages.length > 0) {
+      useAppStore.getState().clearBotStartParameter(activeChatId)
+    }
+  }, [activeChatId, messages.length])
 
   /**
    * 机器人自定义键盘 (§8.3): the grid under the input belongs to the newest row of
@@ -467,6 +494,18 @@ export function ChatPane() {
   const readMarkers = transcriptReadMarkers(topic ?? chat)
   const actions = createMessageActions(activeChatId, topicId)
 
+  const startBot = async (): Promise<void> => {
+    if (startingBot) return
+    setStartingBot(true)
+    try {
+      await actions.send(botStartText(botStartParametersByChat[activeChatId]), undefined)
+    } catch (cause) {
+      useAppStore.getState().setError(errorMessage(cause))
+    } finally {
+      setStartingBot(false)
+    }
+  }
+
   return (
     <main className={`wx-chat${comments ? ' wx-chat--comments' : ''}`}>
       <ChatHeader
@@ -503,12 +542,24 @@ export function ChatPane() {
       ) : !anchorKnown ? (
         <AnchorPendingPlaceholder />
       ) : messages.length === 0 ? (
-        <EmptyTranscriptPlaceholder
-          onReload={reload}
-          // A topic's emptiness is its own: a brand-new one is empty while the
-          // chat around it has messages.
-          unsynced={(topic !== null ? topic.lastMessageAt : chat.lastMessageAt) !== undefined}
-        />
+        botStart.checking || botStart.isBot ? (
+          <BotStartPlaceholder
+            chatId={activeChatId}
+            title={chat.title}
+            {...(chat.avatarUrl === undefined ? {} : { avatarUrl: chat.avatarUrl })}
+            description={botStart.description}
+            checking={botStart.checking}
+            busy={startingBot}
+            onStart={() => void startBot()}
+          />
+        ) : (
+          <EmptyTranscriptPlaceholder
+            onReload={reload}
+            // A topic's emptiness is its own: a brand-new one is empty while the
+            // chat around it has messages.
+            unsynced={(topic !== null ? topic.lastMessageAt : chat.lastMessageAt) !== undefined}
+          />
+        )
       ) : (
         <MessageList
           key={`${activeChatId}:${topicId ?? 0}`}

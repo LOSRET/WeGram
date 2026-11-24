@@ -44,6 +44,7 @@ export const createChatsSlice: SliceCreator<ChatActions> = (set, get) => ({
     const hasNewerByChat = { ...state.hasNewerByChat }
     const olderPagesByChat = { ...state.olderPagesByChat }
     const unreadMarkers = { ...state.unreadMarkers }
+    const botStartParametersByChat = { ...state.botStartParametersByChat }
     for (const chatId of routed.removed) {
       delete messagesByChat[chatId]
       delete pendingOps[chatId]
@@ -51,6 +52,7 @@ export const createChatsSlice: SliceCreator<ChatActions> = (set, get) => ({
       delete hasNewerByChat[chatId]
       delete olderPagesByChat[chatId]
       delete unreadMarkers[chatId]
+      delete botStartParametersByChat[chatId]
     }
     const activeChatId =
       state.activeChatId !== null && routed.removed.includes(state.activeChatId)
@@ -65,9 +67,23 @@ export const createChatsSlice: SliceCreator<ChatActions> = (set, get) => ({
       hasNewerByChat,
       olderPagesByChat,
       unreadMarkers,
+      botStartParametersByChat,
       activeChatId,
     })
   },
+
+  setBotStartParameter: (chatId, parameter) =>
+    set((state) => ({
+      botStartParametersByChat: { ...state.botStartParametersByChat, [chatId]: parameter },
+    })),
+
+  clearBotStartParameter: (chatId) =>
+    set((state) => {
+      if (state.botStartParametersByChat[chatId] === undefined) return state
+      const botStartParametersByChat = { ...state.botStartParametersByChat }
+      delete botStartParametersByChat[chatId]
+      return { botStartParametersByChat }
+    }),
 
   /**
    * A chat switch also leaves any topic behind: a forum opens on its topic list

@@ -1,3 +1,5 @@
+import type { BotCommandsAnswer } from '@wegram/protocol'
+
 import type { FixtureSeed } from './seed'
 
 /**
@@ -73,11 +75,10 @@ export function firstBotSeed(seeds: SeedIndex): FixtureSeed | null {
  * `bots:commands` for one chat: the fixture bot publishes its list, anything else
  * answers "no commands", exactly like TDLib does for a human chat.
  */
-export function botCommandsAnswer(seed: FixtureSeed | null): {
-  isBot: boolean
-  commands: Array<{ command: string; description: string }>
-} {
-  return seed?.bot ? { isBot: true, commands: seed.bot.commands } : { isBot: false, commands: [] }
+export function botCommandsAnswer(seed: FixtureSeed | null): BotCommandsAnswer {
+  return seed?.bot
+    ? { isBot: true, commands: seed.bot.commands, description: seed.bot.description ?? '' }
+    : { isBot: false, commands: [] }
 }
 
 /**

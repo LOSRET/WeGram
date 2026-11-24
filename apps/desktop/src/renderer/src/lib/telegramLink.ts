@@ -9,9 +9,11 @@
  * Invite links (`t.me/+hash`, `t.me/joinchat/…`) and the non-message pages
  * (`/addstickers`, `/share`, `/proxy`…) deliberately answer `null`: this client
  * cannot join a group from a link, so those keep the shell's external-link policy.
+ * A username link may also carry a bot's validated `start` payload; that is kept
+ * on the target for the first-open screen rather than discarded with the query.
  */
 export type TelegramLinkTarget =
-  | { kind: 'username'; username: string; messageId?: number }
+  | { kind: 'username'; username: string; messageId?: number; startParameter?: string }
   | { kind: 'user'; userId: number }
   | { kind: 'chat'; chatId: number; messageId?: number }
 
@@ -93,9 +95,13 @@ function fromPath(url: URL): TelegramLinkTarget | null {
   if (!USERNAME.test(name)) return null
   const messageId = linkedMessageId(rest[0])
   if (rest[0] !== undefined && messageId === undefined) return null
-  return messageId === undefined
-    ? { kind: 'username', username: name }
-    : { kind: 'username', username: name, messageId }
+  const startParameter = startParameterOf(url)
+  return {
+    kind: 'username',
+    username: name,
+    ...(messageId === undefined ? {} : { messageId }),
+    ...(startParameter === undefined ? {} : { startParameter }),
+  }
 }
 
 /** `tg://` actions the official clients emit: resolve, user and openmessage. */
@@ -105,9 +111,13 @@ function fromTg(url: URL): TelegramLinkTarget | null {
     const username = url.searchParams.get('domain') ?? ''
     if (!USERNAME.test(username)) return null
     const messageId = linkedMessageId(url.searchParams.get('post') ?? undefined)
-    return messageId === undefined
-      ? { kind: 'username', username }
-      : { kind: 'username', username, messageId }
+    const startParameter = startParameterOf(url)
+    return {
+      kind: 'username',
+      username,
+      ...(messageId === undefined ? {} : { messageId }),
+      ...(startParameter === undefined ? {} : { startParameter }),
+    }
   }
   if (action === 'user') {
     const userId = positiveInt(url.searchParams.get('id'))
@@ -124,6 +134,12 @@ function fromTg(url: URL): TelegramLinkTarget | null {
       : { kind: 'chat', chatId, messageId }
   }
   return null
+}
+
+/** Telegram bot start payloads are 1-64 base64url characters. */
+function startParameterOf(url: URL): string | undefined {
+  const value = url.searchParams.get('start')
+  return value && /^[A-Za-z0-9_-]{1,64}$/.test(value) ? value : undefined
 }
 
 function internalChatId(value: string | undefined): number | null {

@@ -86,8 +86,8 @@ function botProfile(user: TdObject, full: TdObject | undefined): BotProfile | un
       },
     ]
   })
-  const shortDescription = textOf(info?.short_description)
-  const description = textOf(info?.description)
+  const shortDescription = botText(info?.short_description)
+  const description = botText(info?.description)
   const menu = menuButtonOf(info?.menu_button)
   return {
     ...(shortDescription ? { shortDescription } : {}),
@@ -103,6 +103,25 @@ function menuButtonOf(menu: TdObject | undefined): { text: string; url: string }
   const text = typeof menu.text === 'string' ? menu.text.trim() : ''
   const url = typeof menu.url === 'string' ? menu.url.trim() : ''
   return text && url ? { text, url } : undefined
+}
+
+/**
+ * Bot-info text as plain copy. TDLib builds have returned both a string and a
+ * formattedText object for these fields; accepting both keeps the empty-chat
+ * introduction from disappearing on either shape.
+ */
+export function botText(value: unknown): string | undefined {
+  const text =
+    typeof value === 'string'
+      ? value
+      : typeof value === 'object' &&
+          value !== null &&
+          'text' in value &&
+          typeof value.text === 'string'
+        ? value.text
+        : ''
+  const trimmed = text.trim()
+  return trimmed || undefined
 }
 
 /** A TDLib `formattedText`'s plain text, or undefined when it carries none. */

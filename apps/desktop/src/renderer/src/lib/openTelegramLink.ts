@@ -27,6 +27,10 @@ export function openTelegramLink(target: TelegramLinkTarget): void {
       const chat = await resolveChat(target)
       const store = useAppStore.getState()
       store.applyChatOps([{ op: 'upsert', chat }])
+      if (target.kind === 'username') {
+        if (target.startParameter === undefined) store.clearBotStartParameter(chat.id)
+        else store.setBotStartParameter(chat.id, target.startParameter)
+      }
       const messageId = target.kind === 'user' ? undefined : target.messageId
       // A private chat has no public post links; TDLib would answer no page.
       if (messageId !== undefined && chat.kind !== 'private') {

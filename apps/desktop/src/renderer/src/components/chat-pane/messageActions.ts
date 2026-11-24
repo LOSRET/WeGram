@@ -67,6 +67,7 @@ export function createMessageActions(
       const store = useAppStore.getState()
       store.applyMessageOps(activeChatId, [{ op: 'new', message: result.message }])
       store.setReplyTo(activeChatId, null)
+      store.clearBotStartParameter(activeChatId)
       if (wasAnchored) store.requestJumpToLatest(activeChatId)
     },
 

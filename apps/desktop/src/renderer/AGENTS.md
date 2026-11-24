@@ -46,6 +46,9 @@ components/AlertDialog.tsx  a bot's alert answer (TDLib `callbackQueryAnswer.sho
                          one-button sheet; its free text keeps line breaks
 lib/botCommands.ts     (pure, unit-tested) the composer's "/" trigger and the command filter
 lib/useBotCommands.ts  the bot command list, asked lazily once per chat (`bots:commands`)
+lib/botStart.ts        (pure, unit-tested) `/start` plus an optional deep-link payload
+lib/useBotStartInfo.ts the empty bot chat's `botInfo.description`, asked only after a
+                      private chat's first page is known empty
 lib/replyKeyboard.ts   (pure, unit-tested) which message's custom keyboard a chat shows, and
                       which removal takes it away
 lib/forceReply.ts      (pure, unit-tested) 强制回复: the row a bot waits for an answer to
@@ -70,6 +73,7 @@ lib/voice/            语音消息's audio path: oggOpus.ts (pure, unit-tested �
                       (getUserMedia → AudioContext 48 kHz → ScriptProcessor → WebCodecs
                       AudioEncoder → muxed OGG bytes).
 components/chat-pane/     render tree + useChatHistory (history/ modules) + messageActions +
+                         BotStartPlaceholder (empty bot chat's introduction + 开始) +
                          useMarkRead (已读上报 effect) + usePeerStatus (在线/最后上线 for a
                          private chat's header) + topics/useChatTopics (话题 cursor paging,
                          搜索话题, evt:topics debounced re-read) + chat-list/TopicDialog (the
@@ -486,6 +490,12 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   `bots:inlineSend` → the bot's own message, then clears the box. Both popovers take keys
   through the composer's ONE interceptor (`commandKeys || inlineKeys`); they can never be open
   together, because `/` and `@` are different first characters.
+  **The first-open bot screen is an empty state, not a second send path.** It appears only
+  after a private chat's first page is empty *and* `lastMessageAt` is absent, so a cold cache
+  for a non-empty bot chat can never offer 开始. `bots:commands` carries
+  `botInfo.description`; `BotStartPlaceholder` draws it and 开始 calls
+  `messageActions.send('/start …')`. A `start` deep-link payload is validated base64url,
+  kept per chat in memory, and cleared by the first successful send.
 - **表情回应 are displayed, never offered.** `MessageRow` draws the chips from
   `Message.reactions` (`updateMessageReactions` replaces the whole list, so the
   `reactions` op replaces rather than merges); a custom-emoji reaction is its

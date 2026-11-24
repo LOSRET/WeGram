@@ -72,7 +72,7 @@ telegram/tdlib/send-api.ts  createSendApi: the message seam methods (send/edit/d
                     index.ts at the same budget when 语音消息's send landed
 telegram/tdlib/bot-api.ts  createBotApi: the bot seam methods (bots:commands / bots:callback /
                     bots:inlineQuery / bots:inlineSend), split out the way user-api.ts was;
-                    actions/bots.ts holds the TDLib requests (bot_info.commands,
+                    actions/bots.ts holds the TDLib requests (bot_info.commands + description,
                     getCallbackQueryAnswer, searchPublicChat + getInlineQueryResults,
                     sendInlineQueryResultMessage), and map/inline.ts folds the twelve
                     inlineQueryResult* shapes into one row. A bot's profile page is not a bot

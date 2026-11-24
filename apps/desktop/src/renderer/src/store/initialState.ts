@@ -25,6 +25,7 @@ export const DATA_DEFAULTS: AppData = {
   jumpToLatest: null,
   locate: null,
   replyToByChat: {},
+  botStartParametersByChat: {},
   typingByChat: {},
   peerStatusByUser: {},
   editing: null,

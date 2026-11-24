@@ -29,6 +29,22 @@ describe('telegramLinkTarget', () => {
       })
     })
 
+    it('keeps a valid bot start payload and ignores malformed ones', () => {
+      expect(telegramLinkTarget('https://t.me/wegram_helper?start=invite_abc-123')).toEqual({
+        kind: 'username',
+        username: 'wegram_helper',
+        startParameter: 'invite_abc-123',
+      })
+      expect(telegramLinkTarget('https://t.me/wegram_helper?start=has%20space')).toEqual({
+        kind: 'username',
+        username: 'wegram_helper',
+      })
+      expect(telegramLinkTarget('https://t.me/wegram_helper?start=')).toEqual({
+        kind: 'username',
+        username: 'wegram_helper',
+      })
+    })
+
     it('shifts a link post number into the id space TDLib pages from', () => {
       // 24 is a real post number, but not a TDLib message id (the low 20 bits of
       // a MessageId are the type tag), so sending it raw made TDLib answer 400
@@ -99,6 +115,14 @@ describe('telegramLinkTarget', () => {
         messageId: tdlibId(701),
       })
       expect(telegramLinkTarget('tg://resolve?domain=')).toBeNull()
+    })
+
+    it('reads a bot start payload from tg://resolve', () => {
+      expect(telegramLinkTarget('tg://resolve?domain=wegram_helper&start=ref_42')).toEqual({
+        kind: 'username',
+        username: 'wegram_helper',
+        startParameter: 'ref_42',
+      })
     })
 
     it('reads a user by id', () => {

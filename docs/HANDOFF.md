@@ -88,7 +88,7 @@ pnpm workspace, W1 + W2 + the W3 main body implemented, plus the private-chat P0
 | Channels | 服务号 bottom card, 加入/申请加入 for an unjoined channel, keyboard switch for admins |
 | Settings | batch A (账号与安全 / 通用 / 网络与代理 / 关于) + batch B's first group 消息通知 (桌面通知 + 私聊/群聊/频道的 免打扰 / 提示音 / 预览); the rest of B and C pending (§9) |
 | Private chat P0/P1 | send failure + 重试, outgoing typing, online/last-seen, delete chat / mark unread, notifications + tray, voice notes (recorded in-renderer, OGG/Opus muxed in-repo), albums, pinned bar, speech-to-text, reactions (display only), block/report, profile card with 备注 + 共同群聊, caption edit, add/remove contact |
-| 机器人 | inline-keyboard callbacks end to end (`bots:callback` → `getCallbackQueryAnswer`; answer as toast / alert dialog / URL), the composer's `/` command list (`bots:commands`, lazily asked), clickable `botCommand` entities that send the command, the custom reply keyboard with its removal, 强制回复 (the row is offered as the reply target), the bot's profile card (简介 / commands / menu button), inline bots (`@bot query` → `bots:inlineQuery` / `bots:inlineSend`, a result panel above the input) and 添加成员 (`chats:addMember` → `addChatMembers`), which is how a bot joins a group; the fixture bot (`@wegram_helper`) serves all of it in the mock/preview |
+| 机器人 | inline-keyboard callbacks end to end (`bots:callback` → `getCallbackQueryAnswer`; answer as toast / alert dialog / URL), the composer's `/` command list (`bots:commands`, lazily asked), clickable `botCommand` entities that send the command, the custom reply keyboard with its removal, 强制回复 (the row is offered as the reply target), the bot's profile card (简介 / commands / menu button), inline bots (`@bot query` → `bots:inlineQuery` / `bots:inlineSend`, a result panel above the input), 添加成员 (`chats:addMember` → `addChatMembers`), which is how a bot joins a group, and the first-open screen (empty bot chat → `botInfo.description` + 开始 → ordinary `/start` send, including a validated one-shot deep-link payload); the fixture bot (`@wegram_helper`) serves all of it in the mock/preview |
 | Proxy | 跟随系统代理 by default, `proxy:refresh` / `evt:proxy`, probe + 30 s retry, DPAPI-sealed secrets |
 | Packaging | `.github/workflows/release.yml`: version bump on `main` → NSIS installer → GitHub Release (proven by v0.1.0–v0.1.2); the installer has never been installed or signed |
 
@@ -1414,7 +1414,7 @@ document are updated in the same batch.
 | `telegram/tdlib.ts` (1527) | `tdlib/`: `index` (composition root), `client`, `boot`, `lifecycle`, `avatar-cache`, `updates`, `actions/` (`chats`, `history`, `files`, `send`, `search`, `contacts`, `users`, `message-input`, `errors`, `deps`), `chat-api`, `send-api`, `user-api`, `stickers`, `proxy`, `map/` (`chat`, `message`, `content`, `service`, `media`, `entities`, `buttons`, `rich`, `sticker`, `user`, `status`, `deletion`, `resolvers`) |
 | `renderer/store/useAppStore.ts` (293) | `store/types`, `initialState` (`DATA_DEFAULTS`, the only initial state), `reducers` (`sortChats`/`upsertMessage`/`reduceOps`), `slices/{auth,chats,messages,media,ui}`, `useAppStore` (assembler, import path unchanged) |
 | `MessageList.tsx` (705) | `message-list/index` (composition + render) + `MessageRow`, `Divider`, `useInitialPosition`, `usePrependRestore`, `useAnchorSave`, `useJumpToLatest`, `useLocateScroll`, `useLandingSave`, `useViewportSeen`, `scrollFlags`, `scroller`, `emoji`/`menu`/`unread` (pure) |
-| `ChatPane.tsx` (415) | `chat-pane/index` (render tree + modal state) + `useChatHistory` (+ `history/`: `readFirstPage`, `types`, `useLocateRequest`, `usePrefetchOlder`, `usePaging`), `messageActions` (a factory, not a hook), `ChatHeader`, `ChatInfoPanel/Rows/Dialogs/Search`, `CommentPanel`, `CommentComposer`, `ChannelBar`, `Placeholders`, `labels` |
+| `ChatPane.tsx` (415) | `chat-pane/index` (render tree + modal state) + `useChatHistory` (+ `history/`: `readFirstPage`, `types`, `useLocateRequest`, `usePrefetchOlder`, `usePaging`), `messageActions` (a factory, not a hook), `BotStartPlaceholder`, `ChatHeader`, `ChatInfoPanel/Rows/Dialogs/Search`, `CommentPanel`, `CommentComposer`, `ChannelBar`, `Placeholders`, `labels` |
 | `viewer/MediaViewer.tsx` (586) | `MediaViewer` + `useViewerItem`, `useViewerZoom`, `useViewerNotice`, `ViewerToolbar`, `ViewerGrid`, `viewerActions`, `viewerMenu` (tested) |
 | `ExpressionPicker.tsx` (449) | `ExpressionPicker` + `picker/`: `useStickerSets`, `useActiveStickerSet`, `useRecentEmoji`, `usePickerDismiss`, `EmojiBody`, `SearchBody`, `StickerBody`, `PickerTabs`, `EmojiGrid`, `types` |
 | `Composer.tsx` | `composer/ComposerCard` (the ONE bordered card) + `Composer` (chat send path) + `chat-pane/CommentComposer` (thread send path) |
@@ -2030,6 +2030,25 @@ claim is. Nothing here replaces §1 (state) or §9 (gaps).
 - Tests: `inlineQuery.test.ts` (parse rules), `map/inline.test.ts` (photo/contact/sticker/
   voice + unknown types + missing id), `mock-adapter/chats.test.ts` (bot by handle, person
   by handle, unknown handle, private chat). 925 tests, lint 0 warnings, build OK.
+
+**2026-11-24 — 机器人:首次会话介绍与开始**
+- An empty private bot chat now draws `botInfo.description`, the bot avatar and a bottom
+  开始 button instead of the generic empty state. The gate requires the first history page to
+  be empty **and** `lastMessageAt` to be absent, so a cold cache for a non-empty bot chat still
+  shows 消息还没从服务器同步下来.
+- `bots:commands` carries `description` from the same `userFullInfo.bot_info` read the "/" menu
+  already needs; no channel or adapter method was added. `botText` accepts both the string and
+  formattedText shapes seen across TDLib builds.
+- 开始 calls the ordinary `messageActions.send` with `/start`. `t.me/<bot>?start=…` and
+  `tg://resolve?domain=<bot>&start=…` keep a validated 1–64 character base64url payload in
+  renderer memory; the first successful send consumes it, and chat deletion/logout drops it.
+- `BotStartPlaceholder` owns the render, `useBotStartInfo` owns the lazy lookup and
+  `lib/botStart.ts` owns command composition. The mock/preview bot exposes the same description;
+  clear chat 13's history to see the first-open state.
+- Verified in Firefox at 1280×720 and 900×600 in light/dark themes: introduction + 开始 render,
+  and pressing 开始 posts `/start` and removes the screen. `pnpm verify` green — 127 files /
+  1013 tests, lint 0 warnings, build OK (the existing lottie-web direct-eval build notice remains).
+  The real-TDLib description shape is unit-tested but has not yet been clicked through on a test DC.
 
 
 
