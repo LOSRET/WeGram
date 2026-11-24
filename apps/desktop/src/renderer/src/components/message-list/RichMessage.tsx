@@ -9,6 +9,12 @@ interface RichMessageProps {
   /** Conversation and message the media belongs to (the photo viewer needs both). */
   chatId: number
   messageId: number
+  /**
+   * 即时预览 draws a page wider than a bubble, so its hero pictures ask for a
+   * bigger box; a chat bubble keeps MediaBubble's own 240 × 300.
+   */
+  maxMediaWidth?: number
+  maxMediaHeight?: number
 }
 
 /**
@@ -18,11 +24,24 @@ interface RichMessageProps {
  * `map/rich.ts` has already turned TDLib's page blocks into the protocol union
  * and dropped what a chat bubble cannot draw, so this component only lays out.
  */
-export function RichMessage({ blocks, chatId, messageId }: RichMessageProps) {
+export function RichMessage({
+  blocks,
+  chatId,
+  messageId,
+  maxMediaWidth,
+  maxMediaHeight,
+}: RichMessageProps) {
   return (
     <div className="wx-rich">
       {blocks.map((block, index) => (
-        <Block key={index} block={block} chatId={chatId} messageId={messageId} />
+        <Block
+          key={index}
+          block={block}
+          chatId={chatId}
+          messageId={messageId}
+          maxMediaWidth={maxMediaWidth}
+          maxMediaHeight={maxMediaHeight}
+        />
       ))}
     </div>
   )
@@ -32,9 +51,11 @@ interface BlockProps {
   block: RichBlock
   chatId: number
   messageId: number
+  maxMediaWidth?: number
+  maxMediaHeight?: number
 }
 
-function Block({ block, chatId, messageId }: BlockProps) {
+function Block({ block, chatId, messageId, maxMediaWidth, maxMediaHeight }: BlockProps) {
   switch (block.type) {
     case 'text':
       return <TextBlock role={block.role} size={block.size} text={block.text} />
@@ -43,14 +64,29 @@ function Block({ block, chatId, messageId }: BlockProps) {
     case 'buttons':
       return <InlineButtons rows={block.rows} chatId={chatId} messageId={messageId} />
     case 'list':
-      return <ListBlock items={block.items} chatId={chatId} messageId={messageId} />
+      return (
+        <ListBlock
+          items={block.items}
+          chatId={chatId}
+          messageId={messageId}
+          maxMediaWidth={maxMediaWidth}
+          maxMediaHeight={maxMediaHeight}
+        />
+      )
     case 'table':
       return <TableBlock block={block} />
     case 'quote':
       return (
         <blockquote className="wx-rich__quote">
           {block.blocks.map((child, index) => (
-            <Block key={index} block={child} chatId={chatId} messageId={messageId} />
+            <Block
+              key={index}
+              block={child}
+              chatId={chatId}
+              messageId={messageId}
+              maxMediaWidth={maxMediaWidth}
+              maxMediaHeight={maxMediaHeight}
+            />
           ))}
           {block.credit ? (
             <div className="wx-rich__credit">
@@ -66,7 +102,14 @@ function Block({ block, chatId, messageId }: BlockProps) {
             <RichText text={block.header.text} entities={block.header.entities} />
           </summary>
           {block.blocks.map((child, index) => (
-            <Block key={index} block={child} chatId={chatId} messageId={messageId} />
+            <Block
+              key={index}
+              block={child}
+              chatId={chatId}
+              messageId={messageId}
+              maxMediaWidth={maxMediaWidth}
+              maxMediaHeight={maxMediaHeight}
+            />
           ))}
         </details>
       )
@@ -78,6 +121,7 @@ function Block({ block, chatId, messageId }: BlockProps) {
             kind={block.kind}
             chatId={chatId}
             messageId={messageId}
+            {...mediaLimits(maxMediaWidth, maxMediaHeight)}
           />
           {block.caption ? (
             <figcaption className="wx-rich__caption">
@@ -97,6 +141,7 @@ function Block({ block, chatId, messageId }: BlockProps) {
                   kind={item.kind}
                   chatId={chatId}
                   messageId={messageId}
+                  {...mediaLimits(maxMediaWidth, maxMediaHeight)}
                 />
               </div>
             ))}
@@ -156,10 +201,14 @@ function ListBlock({
   items,
   chatId,
   messageId,
+  maxMediaWidth,
+  maxMediaHeight,
 }: {
   items: RichListItem[]
   chatId: number
   messageId: number
+  maxMediaWidth?: number
+  maxMediaHeight?: number
 }) {
   const ordered = items.some((item) => item.value > 0)
   return (
@@ -169,13 +218,28 @@ function ListBlock({
           <span className="wx-rich__marker">{markerOf(item, ordered, index)}</span>
           <div className="wx-rich__item-body">
             {item.blocks.map((child, childIndex) => (
-              <Block key={childIndex} block={child} chatId={chatId} messageId={messageId} />
+              <Block
+                key={childIndex}
+                block={child}
+                chatId={chatId}
+                messageId={messageId}
+                maxMediaWidth={maxMediaWidth}
+                maxMediaHeight={maxMediaHeight}
+              />
             ))}
           </div>
         </li>
       ))}
     </ol>
   )
+}
+
+/** The MediaBubble props a page asks for; a chat bubble passes none. */
+function mediaLimits(maxWidth?: number, maxHeight?: number): { maxWidth?: number; maxHeight?: number } {
+  return {
+    ...(maxWidth ? { maxWidth } : {}),
+    ...(maxHeight ? { maxHeight } : {}),
+  }
 }
 
 function markerOf(item: RichListItem, ordered: boolean, index: number): string {

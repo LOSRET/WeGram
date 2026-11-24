@@ -18,6 +18,13 @@ settings-window.ts  the 设置 window: frameless 640×558, NOT parented (design 
                     the shell's close, 退出登录 and before-quit close it explicitly
 qr-window.ts        the 群二维码 window: frameless 360×560, parented to the shell (closes
                     with it), owns the chat it draws for qr:info and the window's ×
+instant-view-window.ts  即时预览 (§8.9): the reader as its own top-level window (route
+                    #instantview), one target held in memory for `web:state`, reloaded
+                    to re-target; the shell closes it on quit like the viewer. It borrows
+                    the viewer's chrome: `titleBarStyle: hidden` + its own 40 px strip
+                    (title only; the page tools are a 36 px second row, or the zoom and
+                    the window buttons collide), so no default menu bar, and
+                    `titleBarOverlay` follows the theme
 notifications.ts    desktop toasts from TDLib's notification stream; suppresses the chat
                     the focused shell shows (ui:setActiveChat), flashes the task bar, and
                     stops at once when 设置 → 消息通知's 桌面通知 switch is off (read per
@@ -42,7 +49,8 @@ telegram/tdlib/     lifecycle.ts (create / crash / restart the client, reports B
                     rich, poll, media.ts holds the one media field table)
 telegram/tdlib/actions/  TDLib requests as functions over ActionDeps, grouped into
                     chats / pins / history / files / send / comments / poll / users /
-                    notification-settings (消息通知's per-scope defaults)
+                    notification-settings (消息通知's per-scope defaults) and web
+                    (即时预览's getWebPageInstantView)
                     (index.ts re-exports); message-input.ts holds the one send
                     envelope. pins.ts owns 群公告 + 置顶消息 (one pinned message per
                     chat, and an unpin has to resolve the current id)
@@ -133,6 +141,12 @@ change belongs in the adapter.
   share it): the store drops the transcript, queued ops, paging state, unread marker and
   the active selection. Leaving `messagesByChat` behind makes a later id collision draw
   a deleted chat.
+- **A link preview is part of `messageText`, not a content type** (TDLib 1.8.70 has no
+  `messageWebPage`): the preview rides in `content.link_preview` (`linkPreview`), the message
+  stays kind `text`, and `map/content.ts`'s `mapLinkPreview` flattens every
+  `linkPreviewType*` into the protocol's `LinkPreview` — an album link keeps its media list,
+  the single-cover types contribute one item, and a type this client draws nothing for
+  still yields the card's words.
 - **A text entity's parameters live inside its `type` object, never beside `offset`/`length`.**
   TDLib sends `textEntityTypeTextUrl { url }`, `textEntityTypePreCode { language }`,
   `textEntityTypeMentionName { user_id }` and `textEntityTypeCustomEmoji { custom_emoji_id }`.

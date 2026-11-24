@@ -41,6 +41,10 @@
   --wx-poll-wrong: #fa5151;
   --wx-poll-correct-weak: rgba(7, 193, 96, 0.16);
   --wx-poll-wrong-weak: rgba(250, 81, 81, 0.16);
+  /* 即时预览's title strip. It must match the native window-controls overlay
+     (main/instant-view-window.ts titleBarOverlay), or the strip reads as a seam. */
+  --wx-iv-win-bar: #f2f2f2;
+
   /* Channel post (see styles/channel.css): the block's inner hairline, drawn in
      the bubble's own ink so it reads on the grey bubble and on the green own one. */
   --wx-channel-rule: rgba(0, 0, 0, 0.12);
@@ -188,6 +192,7 @@
 }
 
 [data-theme='dark'] {
+  --wx-iv-win-bar: #2f2f30;
   /* Re-measured 2026-11-18 off the running client (Windows dark mode) by
      capturing the window with PrintWindow and taking a pixel histogram per
      surface, so every value below is the client's own ink. The dark theme is a

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   mapContent,
+  mapLinkPreview,
   mediaUrls,
   pickLargest,
   pickSmallestAtLeast,
@@ -57,6 +58,66 @@ describe('mapContent', () => {
 
     expect(mapped.media).toMatchObject({ fileId: 7 })
     expect(mapped.media).not.toHaveProperty('thumbFileId')
+  })
+
+  it('maps an album link preview with its cover and Instant View flag', () => {
+    const preview = mapLinkPreview({
+      url: 'https://telegra.ph/x',
+      display_url: 'telegra.ph/x',
+      site_name: 'WeGram 频道',
+      title: '更新说明',
+      description: { text: '链接预览' },
+      author: '编辑部',
+      instant_view_version: 2,
+      show_media_above_description: true,
+      type: {
+        _: 'linkPreviewTypeAlbum',
+        media: [
+          { _: 'linkPreviewAlbumMediaPhoto', photo: { sizes: [{ width: 640, height: 480, photo: { id: 9 } }] } },
+          {
+            _: 'linkPreviewAlbumMediaVideo',
+            video: { video: { id: 10 }, duration: 5, width: 320, height: 180 },
+          },
+        ],
+      },
+    })
+
+    expect(preview).toMatchObject({
+      url: 'https://telegra.ph/x',
+      displayUrl: 'telegra.ph/x',
+      siteName: 'WeGram 频道',
+      title: '更新说明',
+      description: '链接预览',
+      author: '编辑部',
+      instantView: true,
+      mediaAboveText: true,
+    })
+    expect(preview?.media?.map((item) => [item.kind, item.media.fileId])).toEqual([
+      ['photo', 9],
+      ['video', 10],
+    ])
+  })
+
+  it('falls back to an article link\'s single hero photo, without Instant View', () => {
+    const preview = mapLinkPreview({
+      url: 'https://example.com/a',
+      type: {
+        _: 'linkPreviewTypeArticle',
+        photo: { sizes: [{ width: 640, height: 400, photo: { id: 3 } }] },
+      },
+    })
+
+    expect(preview).toMatchObject({ url: 'https://example.com/a', instantView: false })
+    expect(preview?.media).toEqual([{ kind: 'photo', media: expect.objectContaining({ fileId: 3 }) }])
+  })
+
+  it('drops a preview with no URL, and a cover TDLib never materialised', () => {
+    expect(mapLinkPreview(undefined)).toBeUndefined()
+    expect(mapLinkPreview({ url: '' })).toBeUndefined()
+    expect(mapLinkPreview({ url: 'https://e.x', type: { _: 'linkPreviewTypePhoto' } })).toEqual({
+      url: 'https://e.x',
+      instantView: false,
+    })
   })
 
   it('maps a video with its metadata and document fallback fields', () => {

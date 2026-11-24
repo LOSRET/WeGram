@@ -41,6 +41,7 @@ import { createChatApi } from './chat-api'
 import { createSendApi } from './send-api'
 import { createTopicApi } from './topic-api'
 import { createUserApi } from './user-api'
+import { createWebApi } from './web-api'
 import { createUpdateHandler } from './updates'
 
 export interface TdlibAdapterOptions {
@@ -436,6 +437,9 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   private readonly botApi = createBotApi(() => this.actionDeps)
   readonly botCommands = this.botApi.botCommands
   readonly pressCallback = this.botApi.pressCallback
+
+  private readonly webApi = createWebApi(() => this.actionDeps)
+  readonly instantView = this.webApi.instantView
 
   async searchGlobal(input: { q: string; limit: number }): Promise<ChatSummary[]> {
     return actions.searchGlobal(this.actionDeps, input)

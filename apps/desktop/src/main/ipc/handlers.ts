@@ -13,6 +13,10 @@ import { writeVoiceNote } from '../media/voice-file'
 import { resolveProxySecrets, toStoredProxy } from '../proxy'
 import type { ProxyController } from '../proxy-controller'
 import { closeQrWindow, getQrWindow, openQrWindow, qrTarget } from '../qr-window'
+import {
+  instantViewWindowState,
+  openInstantViewWindow,
+} from '../instant-view-window'
 import type { SettingsStore } from '../store/settings'
 import type { UiDatabase } from '../store/ui-db'
 import type { TelegramAdapter } from '../telegram/adapter'
@@ -236,6 +240,12 @@ export function createHandlers({
     /** Bots: the "/" command list of a bot chat, and pressing an inline button. */
     'bots:commands': (payload) => adapter.botCommands(payload.chatId),
     'bots:callback': (payload) => adapter.pressCallback(payload),
+    /** 即时预览: the reader window's target, and the page it draws (design doc §8.9). */
+    'web:open': (payload) => {
+      openInstantViewWindow(payload, BrowserWindow.getFocusedWindow())
+    },
+    'web:state': () => instantViewWindowState(),
+    'web:instantView': (payload) => adapter.instantView(payload.url),
     'users:report': (payload) =>
       adapter.reportUser(payload.userId, {
         ...(payload.optionId === undefined ? {} : { optionId: payload.optionId }),

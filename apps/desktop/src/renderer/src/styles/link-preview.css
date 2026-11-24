@@ -1,0 +1,197 @@
+/* ==========================================================================
+   链接预览 — Telegram's link preview / 即时预览 card.
+
+   A text message can carry its link's preview (TDLib `messageText.link_preview`).
+   Telegram draws it as a card under the text: the site name, the title, the
+   description and the link's own cover, tinted with a colour sampled from that
+   cover, with the ⚡ 即时预览 bar when the page supports Instant View.
+
+   The card lives inside the bubble, so it must not inherit the bubble's pre-wrap
+   or its ink. Its one content-derived value is a hue (`--wx-lp-h`, set inline by
+   LinkPreviewCard, see lib/linkPreview.ts); every *theme* colour mixed with it is
+   a `tokens.css` variable, so light and dark keep their own base.
+   ========================================================================== */
+
+.wx-link-preview {
+  display: flex;
+  flex-direction: column;
+  width: 262px;
+  max-width: 100%;
+  margin-top: 6px;
+  overflow: hidden;
+  border-left: 3px solid var(--wx-lp-bar);
+  border-radius: 8px;
+  background: var(--wx-lp-surface);
+  --wx-lp-accent: hsl(var(--wx-lp-h, 340) 62% 38%);
+  --wx-lp-bar: hsl(var(--wx-lp-h, 340) 56% 52%);
+  --wx-lp-surface: color-mix(in srgb, hsl(var(--wx-lp-h, 340) 76% 52%) 11%, var(--wx-elevated));
+  --wx-lp-line: color-mix(in srgb, var(--wx-text) 9%, transparent);
+  --wx-lp-ink: var(--wx-text);
+  white-space: normal;
+  text-align: left;
+}
+
+/* Telegram's own night palette keeps the card dark, not a light tint. */
+[data-theme='dark'] .wx-link-preview {
+  --wx-lp-accent: hsl(var(--wx-lp-h, 340) 68% 68%);
+  --wx-lp-bar: hsl(var(--wx-lp-h, 340) 56% 58%);
+  --wx-lp-surface: color-mix(in srgb, hsl(var(--wx-lp-h, 340) 70% 50%) 16%, var(--wx-elevated));
+}
+
+.wx-link-preview__body {
+  display: flex;
+  flex-direction: column;
+  color: inherit;
+  text-decoration: none;
+}
+
+.wx-link-preview__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+
+.wx-link-preview__site {
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  color: var(--wx-lp-accent);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wx-link-preview__title {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 13.5px;
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--wx-lp-ink);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.wx-link-preview__desc {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 12.5px;
+  line-height: 17px;
+  color: var(--wx-text-secondary);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* The cover: one hero picture, or the first four cells of an album link. The
+   cell reserves its box from the picture's own ratio (the inline aspect-ratio),
+   so the card never jumps once the file lands. */
+.wx-link-preview__media {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2px;
+}
+
+.wx-link-preview__media--grid {
+  grid-template-columns: 1fr 1fr;
+}
+
+.wx-link-preview__cell {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  /* The inline aspect-ratio sets the height; the width must be stated, or a
+     max-height clamp makes the browser shrink the box to keep the ratio — which
+     is exactly the strip of tint down the card's right side this card had. */
+  width: 100%;
+  min-height: 64px;
+  background: color-mix(in srgb, var(--wx-text) 7%, transparent);
+}
+
+/* A hero cover fills the card's width at its own ratio; the height stops at 320 px
+   so a tall page cannot swallow the transcript, and `cover` takes the remainder by
+   cropping a little instead of leaving the tint visible the way the official card
+   does with `contain`. Grid cells are always `cover`. */
+.wx-link-preview__cell--hero {
+  max-height: 320px;
+}
+
+.wx-link-preview__thumb,
+.wx-link-preview__image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+
+.wx-link-preview__play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding-left: 2px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.42);
+  color: #fff;
+  font-size: 14px;
+}
+
+.wx-link-preview__duration {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 11px;
+  line-height: 14px;
+}
+
+/* ⚡ 即时预览: the Instant View bar, under the card's own hairline. It is the
+   card's second target (the body opens the page), never nested inside it. */
+.wx-link-preview__instant {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  padding: 7px 10px;
+  border-top: 1px solid var(--wx-lp-line);
+  color: var(--wx-lp-accent);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 17px;
+  text-decoration: none;
+}
+
+/* The bar is a real <button> when the reader exists and an <a> when it does not:
+   a button's UA border and background must not repaint the card's hairline. */
+button.wx-link-preview__instant {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--wx-lp-line);
+  background: transparent;
+  color: var(--wx-lp-accent);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.wx-link-preview__instant:hover {
+  background: color-mix(in srgb, var(--wx-lp-accent) 9%, transparent);
+}
+
+.wx-link-preview__bolt {
+  font-size: 12px;
+}
+
+/* The body's own hover: the whole text block and cover read as one target. */
+.wx-link-preview__body:hover .wx-link-preview__title {
+  color: var(--wx-lp-accent);
+}

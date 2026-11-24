@@ -19,6 +19,7 @@ import type {
   Self,
   StickerSet,
   StickerSetSummary,
+  InstantView,
 } from '@wegram/protocol'
 
 import { AdapterEmitter, type TelegramAdapter } from '@wegram/adapter-contract'
@@ -37,6 +38,7 @@ import { applyRead } from './effects'
 import type { MockSendDeps } from './media'
 import { beginMockStream, downloadMockFile, mockDownloadedPrefix } from './files'
 import { buildFixtures } from './fixtures'
+import { buildInstantView } from '@wegram/mock-fixtures'
 import {
   mockHistory,
   mockHistoryAround,
@@ -405,6 +407,15 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
 
   async getStickerSet(setId: string): Promise<StickerSet> {
     return getMockStickerSet(this.assets, this.stickerSetState, setId)
+  }
+
+  /**
+   * 即时预览 (design doc §8.9): every link answers the same demo page. The blocks
+   * are built by `@wegram/mock-fixtures`, so the browser preview shows the same
+   * page through the same renderer.
+   */
+  async instantView(url: string): Promise<InstantView> {
+    return buildInstantView(url, (fileId, extra) => this.assets.mediaOf(fileId, extra))
   }
 
   async changeStickerSet(

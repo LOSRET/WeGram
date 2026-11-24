@@ -1,0 +1,201 @@
+/* ==========================================================================
+   即时预览 — the standalone reader window (design doc §8.9).
+
+   Telegram opens an Instant View page in its own window, with a toolbar, page zoom
+   and 在浏览器打开. This sheet styles that window: the toolbar, the reading column
+   and the page's states. The article itself is the transcript's `RichMessage`
+   (the blocks are the same `PageBlock` tree), scaled by `--wx-iv-zoom`.
+   ========================================================================== */
+
+.wx-iv-win {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--wx-pane);
+  color: var(--wx-text);
+}
+
+.wx-iv-win--empty {
+  align-items: center;
+  justify-content: center;
+  color: var(--wx-text-secondary);
+  font-size: 13px;
+}
+
+/* Row 1 — the title strip. It carries the native window controls (the window is
+   titleBarStyle: hidden, like the viewer), so it is 40 px, leaves 150 px on the
+   right for the three buttons, and is the drag region. The page controls live on
+   row 2: one 40 px strip cannot hold a title, a zoom cluster and a link without
+   them colliding. */
+.wx-iv-win__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  height: 40px;
+  padding: 0 150px 0 14px;
+  background: var(--wx-iv-win-bar);
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+/* Row 2 — the page tools: zoom on the left, 在浏览器打开 on the right. */
+.wx-iv-win__tools {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 36px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--wx-pane-line);
+  background: var(--wx-pane);
+  user-select: none;
+}
+
+.wx-iv-win__titles {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.wx-iv-win__title {
+  margin: 0;
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wx-iv-win__site {
+  overflow: hidden;
+  font-size: 10.5px;
+  line-height: 13px;
+  color: var(--wx-text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Page zoom, the client's 100% − + 重置 from its ⋮ menu. `zoom` scales the article
+   (and its layout), not the toolbar. */
+.wx-iv-win__zoom {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+  color: var(--wx-text-secondary);
+  font-size: 12px;
+}
+
+.wx-iv-win__zoom-button {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--wx-text);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.wx-iv-win__zoom-button:hover:enabled,
+.wx-iv-win__zoom-reset:hover:enabled {
+  background: var(--wx-row-hover);
+}
+
+.wx-iv-win__zoom-button:disabled,
+.wx-iv-win__zoom-reset:disabled {
+  color: var(--wx-text-tertiary);
+  cursor: default;
+}
+
+.wx-iv-win__zoom-value {
+  min-width: 42px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.wx-iv-win__zoom-reset {
+  margin-left: 6px;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--wx-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.wx-iv-win__open {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--wx-brand-text);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.wx-iv-win__open:hover {
+  text-decoration: underline;
+}
+
+.wx-iv-win__host {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.wx-iv-win__scroll {
+  position: absolute;
+  inset: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 28px 40px 56px;
+}
+
+/* The reading column: a page fits this, not a bubble. The zoom reaches the
+   article through `--wx-iv-zoom` (set on the wrapper by InstantViewWindow). */
+.wx-iv-win__page {
+  max-width: 700px;
+  margin: 0 auto;
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.wx-iv-page__article {
+  zoom: var(--wx-iv-zoom, 1);
+}
+
+.wx-iv-page__hint {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  padding: 64px 0;
+  color: var(--wx-text-secondary);
+  font-size: 13px;
+}
+
+.wx-iv-page__retry {
+  padding: 5px 16px;
+  border: 1px solid var(--wx-line-strong);
+  border-radius: 15px;
+  background: var(--wx-elevated);
+  color: var(--wx-text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.wx-iv-page__retry:hover {
+  background: var(--wx-row-hover);
+}
+
+.wx-iv-page__note {
+  margin: 18px 0 0;
+  color: var(--wx-text-tertiary);
+  font-size: 12px;
+}

@@ -27,6 +27,10 @@ import { createLogger } from './util'
 import { closeSettingsWindow, setSettingsTheme } from './settings-window'
 import { closeViewer, hideViewerWithShell, setViewerTheme, showViewerWithShell } from './viewer'
 import {
+  closeInstantViewWindow,
+  setInstantViewTheme,
+} from './instant-view-window'
+import {
   applyTitleBarTheme,
   createMainWindow,
   raiseShellAboveViewer,
@@ -110,6 +114,7 @@ async function bootstrap(): Promise<void> {
   // A viewer opened before the first theme change must still get a dark strip,
   // so seed the module with the stored theme instead of defaulting to light.
   setViewerTheme(storedTheme(db))
+  setInstantViewTheme(storedTheme(db))
 
   // Recordings nobody can still be uploading are dead weight (see voice-file.ts).
   void pruneVoiceNotes(join(userDataDir, 'voice')).then((removed) => {
@@ -344,6 +349,7 @@ async function bootstrap(): Promise<void> {
 function applyTheme(theme: 'light' | 'dark'): void {
   applyTitleBarTheme(mainWindow, theme)
   setViewerTheme(theme)
+  setInstantViewTheme(theme)
   setSettingsTheme(theme)
   bus?.publish('evt:theme', { theme })
 }
@@ -392,6 +398,7 @@ function showMainWindow(theme: 'light' | 'dark', closeLogin: 'immediate' | 'afte
     if (getCloseBehavior(uiDb) === 'tray') {
       event.preventDefault()
       closeSettingsWindow()
+      closeInstantViewWindow()
       hideViewerWithShell()
       win.hide()
     }
@@ -402,6 +409,7 @@ function showMainWindow(theme: 'light' | 'dark', closeLogin: 'immediate' | 'afte
     // die with this one, and `window-all-closed` would never fire if they lingered.
     closeViewer()
     closeSettingsWindow()
+    closeInstantViewWindow()
   })
   if (closeLogin === 'immediate') {
     // First sign-in: the login window must not linger on the profile step. The

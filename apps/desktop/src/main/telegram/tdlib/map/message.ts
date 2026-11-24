@@ -89,6 +89,7 @@ export async function mapMessage(
     text,
     ...(mapped.entities.length ? { entities: mapped.entities } : {}),
     ...(mapped.media ? { media: mapped.media } : {}),
+    ...(mapped.linkPreview ? { linkPreview: mapped.linkPreview } : {}),
     ...(mapped.transcription ? { transcription: mapped.transcription } : {}),
     ...(mapped.rich?.length ? { rich: mapped.rich } : {}),
     ...(mapped.contact ? { contact: mapped.contact } : {}),

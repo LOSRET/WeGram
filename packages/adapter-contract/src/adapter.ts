@@ -33,6 +33,7 @@ import type {
   UserProfile,
   InvokeRequest,
   InvokeResponse,
+  InstantView,
 } from '@wegram/protocol'
 
 export type AdapterKind = 'mock' | 'tdlib'
@@ -240,6 +241,11 @@ export interface TelegramAdapter {
     /** A forum topic's own pin (design doc §9.12); absent is the chat's pin. */
     topicId?: number,
   ): Promise<ChatPinnedMessage | null>
+  /**
+   * 即时预览: the Instant View page of a link, as rich-message blocks (design doc
+   * §8.9). A page without one, or one TDLib cannot reach, is an `AppError`.
+   */
+  instantView(url: string): Promise<InstantView>
   /**
    * 群二维码: a link a phone can open. `temporary` asks for the client's
    * short-lived code (a fresh 7-day link, where the account may create one);

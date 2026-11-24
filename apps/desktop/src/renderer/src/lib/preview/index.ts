@@ -21,6 +21,8 @@ import type {
 
 import { inlineButtonCallbackSchema } from '@wegram/protocol'
 
+import { buildInstantView } from '@wegram/mock-fixtures'
+
 import { handlePreviewComments } from './comments'
 import { handlePreviewMedia } from './media'
 import { openPreviewViewer, previewViewerState, previewViewerUnsupported } from './viewer'
@@ -50,6 +52,7 @@ import {
   type PreviewTopicStore,
 } from './topics'
 import { handlePreviewQr, type PreviewQrStore } from './qr'
+import { previewInstantViewState } from './web'
 import {
   clearPreviewHistory,
   deletePreviewChat,
@@ -78,6 +81,7 @@ import {
   messagesByChat,
   msg,
   now,
+  media as previewMedia,
   previewBotCommands,
   previewCommonChatsFor,
   previewChangeStickerSet,
@@ -539,6 +543,27 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'media:send':
     case 'media:sendAlbum':
       return handlePreviewMedia(channel, store, (url) => window.open(url, '_blank', 'noopener'))
+    /**
+     * 即时预览 opens its own window in the client; the browser preview has no second
+     * native window, so the reader route opens as a popup whose hash carries the
+     * target (see ./web.ts for `web:state`).
+     */
+    case 'web:open': {
+      const url = typeof store['url'] === 'string' ? store['url'] : ''
+      const params = new URLSearchParams({ url })
+      if (typeof store['title'] === 'string') params.set('title', store['title'])
+      if (typeof store['siteName'] === 'string') params.set('siteName', store['siteName'])
+      window.open(`#instantview?${params.toString()}`, '_blank', 'popup,width=760,height=900')
+      return undefined
+    }
+    case 'web:state':
+      return previewInstantViewState()
+    /** 即时预览: the same demo page the mock adapter serves (design doc §8.9). */
+    case 'web:instantView':
+      return buildInstantView(
+        String((store as { url?: unknown }).url ?? 'https://telegra.ph/WeGram-v031-11-24'),
+        previewMedia,
+      )
     case 'stickers:sets':
       return previewStickerSets()
     case 'stickers:set':

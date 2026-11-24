@@ -1,4 +1,4 @@
-import type { Message, MessageEntity, Poll, RichBlock } from '@wegram/protocol'
+import type { LinkPreviewMedia, Message, MessageEntity, Poll, RichBlock } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
 import { asArray } from '../json'
@@ -52,14 +52,19 @@ export function mapContent(content: TdObject): {
   rich?: RichBlock[]
   contact?: Message['contact']
   poll?: Poll
+  linkPreview?: Message['linkPreview']
 } {
   switch (content._) {
     case 'messageText': {
       const formatted = content.text ?? {}
+      // A link's preview rides on the text, not in the content: the message stays
+      // a text row and the card is one more block of the same bubble.
+      const linkPreview = mapLinkPreview(content.link_preview)
       return {
         kind: 'text',
         text: formatted.text ?? '',
         entities: mapEntities(formatted.entities),
+        ...(linkPreview ? { linkPreview } : {}),
       }
     }
     case 'messagePhoto': {
@@ -342,6 +347,66 @@ export function mapContent(content: TdObject): {
     }
     default:
       return { kind: 'service', text: '', entities: [] }
+  }
+}
+
+/**
+ * Telegram's link preview (TDLib `linkPreview`): the card under a text message.
+ *
+ * The type union is where the card's media lives — an album link carries a list,
+ * an article a single hero picture, an animation a clip played as its poster — so
+ * every shape flattens into one `media` list and the renderer owns the layout. A
+ * type this client draws no picture for (a sticker set, a user, a poll) still
+ * yields a preview: the card then shows its words alone, like the official client.
+ */
+export function mapLinkPreview(preview: TdObject | undefined): Message['linkPreview'] {
+  const url = typeof preview?.url === 'string' ? preview.url : ''
+  if (!preview || !url) return undefined
+  const type = preview.type ?? {}
+  const items: LinkPreviewMedia[] = []
+  const push = (item: LinkPreviewMedia | undefined): void => {
+    if (item && item.media.fileId > 0) items.push(item)
+  }
+  switch (type._) {
+    case 'linkPreviewTypeAlbum':
+      for (const media of asArray<TdObject>(type.media)) {
+        if (media?._ === 'linkPreviewAlbumMediaPhoto') {
+          push({ kind: 'photo', media: photoMedia(media.photo) })
+        } else if (media?._ === 'linkPreviewAlbumMediaVideo') {
+          push({ kind: 'video', media: videoMedia(media.video, 'video') })
+        }
+      }
+      break
+    case 'linkPreviewTypePhoto':
+    case 'linkPreviewTypeArticle':
+      push({ kind: 'photo', media: photoMedia(type.photo) })
+      break
+    case 'linkPreviewTypeVideo':
+      push({ kind: 'video', media: videoMedia(type.video, 'video') })
+      break
+    case 'linkPreviewTypeAnimation':
+      push({ kind: 'video', media: videoMedia(type.animation, 'animation') })
+      break
+    default:
+      break
+  }
+  const siteName = typeof preview.site_name === 'string' ? preview.site_name : ''
+  const displayUrl = typeof preview.display_url === 'string' ? preview.display_url : ''
+  const title = typeof preview.title === 'string' ? preview.title : ''
+  const description =
+    typeof preview.description?.text === 'string' ? preview.description.text : ''
+  const author = typeof preview.author === 'string' ? preview.author : ''
+  return {
+    url,
+    ...(displayUrl ? { displayUrl } : {}),
+    ...(siteName ? { siteName } : {}),
+    ...(title ? { title } : {}),
+    ...(description ? { description } : {}),
+    ...(author ? { author } : {}),
+    // 1 and 2 are the versions Telegram ships; anything > 0 means the bar exists.
+    instantView: Number(preview.instant_view_version) > 0,
+    ...(items.length > 0 ? { media: items } : {}),
+    ...(preview.show_media_above_description === true ? { mediaAboveText: true } : {}),
   }
 }
 

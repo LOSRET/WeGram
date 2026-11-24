@@ -1,5 +1,5 @@
 import { useVirtualizer } from '@tanstack/react-virtual'
-import type { ChatSummary, Message, MessageProperties } from '@wegram/protocol'
+import type { ChatSummary, LinkPreview, Message, MessageProperties } from '@wegram/protocol'
 import { useCallback, useMemo, useRef, useState } from 'react'
 
 import { isSameDay } from '../../lib/format'
@@ -93,6 +93,8 @@ export interface MessageListProps {
   /** 置顶消息: the id this chat has pinned, so the menu can say 取消置顶. */
   pinnedMessageId: number | null
   onTogglePin: (message: Message) => void
+  /** 即时预览: a link card's ⚡ bar, opened by the pane's reader (§8.9). */
+  onOpenInstantView?: (preview: LinkPreview) => void
 }
 
 interface MenuState {
@@ -153,6 +155,7 @@ export function MessageList({
   onTranscribe,
   onOpenStickerSet,
   onBotCommand,
+  onOpenInstantView,
   pinnedMessageId,
   onTogglePin,
 }: MessageListProps) {
@@ -364,6 +367,7 @@ export function MessageList({
                   onResend={onResend}
                   onOpenStickerSet={onOpenStickerSet}
                   onBotCommand={onBotCommand}
+                  {...(onOpenInstantView ? { onOpenInstantView } : {})}
                 />
               </div>
             )

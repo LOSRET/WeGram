@@ -34,6 +34,10 @@
 @import './rich-text.css';
 @import './rich-message.css';
 @import './cards.css';
+/* 链接预览: Telegram's preview / 即时预览 card under a text message. */
+@import './link-preview.css';
+/* 即时预览: the link reader, sliding over the chat column. */
+@import './instant-view.css';
 @import './poll.css';
 /* 资料卡: the person sheet the header title and 更多资料 open. */
 @import './profile.css';

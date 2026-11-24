@@ -1,4 +1,4 @@
-import type { ChatJoinState, Message } from '@wegram/protocol'
+import type { ChatJoinState, LinkPreview, Message } from '@wegram/protocol'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { loadLatestWindow } from '../../lib/anchoredWindow'
@@ -113,6 +113,7 @@ export function ChatPane() {
   const [comments, setComments] = useState<{ message: Message; open: boolean } | null>(null)
   const commentTimerRef = useRef<number | null>(null)
 
+
   const openInfo = useCallback((): void => {
     if (infoTimerRef.current !== null) {
       window.clearTimeout(infoTimerRef.current)
@@ -160,6 +161,24 @@ export function ChatPane() {
       setComments((current) => (current && !current.open ? null : current))
     }, COMMENT_PANEL_ANIM_MS)
   }, [])
+
+  /**
+   * 即时预览 (design doc §8.9) opens the reader as its own window, like the client:
+   * the pane only hands over the link and the preview's words.
+   */
+  const openInstantView = useCallback(
+    (preview: LinkPreview): void => {
+      closeInfo()
+      void invoke('web:open', {
+        url: preview.url,
+        ...(preview.title ? { title: preview.title } : {}),
+        ...(preview.siteName ? { siteName: preview.siteName } : {}),
+      }).catch((failure: unknown) => {
+        useAppStore.getState().setError(errorMessage(failure))
+      })
+    },
+    [closeInfo],
+  )
 
   useEffect(
     () => () => {
@@ -549,6 +568,7 @@ export function ChatPane() {
           onForward={setForwarding}
           onCopy={actions.copy}
           onOpenComments={openComments}
+          onOpenInstantView={openInstantView}
           onOpenStickerSet={setStickerSetId}
           /**
            * A `/command` in the transcript runs it: the same send path a typed

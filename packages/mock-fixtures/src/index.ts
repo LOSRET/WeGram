@@ -1,4 +1,5 @@
 export { buildFixtureSeeds, DEMO_STICKER_SET_ID } from './data'
+export { buildInstantView } from './instantView'
 export { pollMessage } from './polls'
 export type { PollMessageOptions } from './polls'
 export type { FixtureOptions, FixtureSeed, SeedMedia } from './seed'

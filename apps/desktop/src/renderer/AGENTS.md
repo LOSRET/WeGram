@@ -15,6 +15,9 @@ screens/SettingsWindow.tsx  the 设置 window (`#settings`, design doc §9.11): 
                          640×558 sheet with its own nav (账号与安全 / 通用 / 消息通知 / 网络与
                          代理 / 关于 — §9.11.3's order) and `components/settings/` panels; it owns
                          no shell state and repaints from `evt:theme`
+screens/InstantViewWindow.tsx  即时预览's own window (`#instantview`, design doc §8.9):
+                         toolbar (title, page zoom, 在浏览器打开) + `components/instant-view/
+                         InstantViewPage.tsx` (the `web:instantView` fetch + RichMessage)
 screens/QrWindow.tsx     the 群二维码 window (`#qr`, design doc §9.9): a frameless 360×560
                          sheet with the member collage, 群聊：…, the code, its validity
                          line and 转发给朋友 / 复制图片 / 保存图片. It owns no shell state
@@ -29,7 +32,8 @@ components/message-list/  virtualiser + MessageRow + Divider + the scroll hooks:
                          useInitialPosition / usePrependRestore / useAnchorSave /
                          useLandingSave / useJumpToLatest / useLocateScroll / useViewportSeen;
                          RichMessage (page blocks), ContactCard (vCards), PollBubble (the
-                         vote/quiz card, §9.10), InlineButtons,
+                         vote/quiz card, §9.10), InlineButtons, LinkPreviewCard (a text
+                         message's link preview / 即时预览 card, §8.9),
                          CommentBar (评论 N 条 handle, §9.8), ChannelMeta (a channel post's
                          views/time footer; the one-bubble channel composition is
                          styles/channel.css), PremiumStickerEffect (a Premium sticker's
@@ -199,6 +203,7 @@ lib/chatInfo.ts      (pure, unit-tested) the panel's slide length + which faces 
 lib/qrImage.ts       the 群二维码 window's PNG: same qrMatrix/qrDrawing the SVG uses,
                      rasterised with the quiet zone for clipboard/save/forward
 lib/history.ts       (pure, unit-tested) the ONE "may this empty page be cached" rule
+lib/linkPreview.ts    (pure, unit-tested) the 链接预览 card's one content-derived value: its hue
 lib/media.ts          per-owner request dedupe + cancel + the media URL/progress hooks
 lib/mediaVariant.ts   (pure, unit-tested) which photo size covers a box
 lib/mediaPriority.ts  (pure, unit-tested) the TDLib download priority ladder

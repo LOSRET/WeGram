@@ -189,6 +189,52 @@ export const messageMediaSchema = z.object({
 export type MessageMedia = z.infer<typeof messageMediaSchema>
 
 /**
+ * One media item of a link preview (TDLib `linkPreviewTypeAlbum.media`).
+ *
+ * Telegram's card draws the link's own media — a gallery link's first photos, an
+ * article's hero picture — and a video only as its poster: nothing plays inside
+ * the card, so the preview offers the same kinds a bubble does, not more.
+ */
+export const linkPreviewMediaSchema = z.object({
+  kind: z.enum(['photo', 'video']),
+  media: messageMediaSchema,
+})
+export type LinkPreviewMedia = z.infer<typeof linkPreviewMediaSchema>
+
+/**
+ * The link preview Telegram attaches to a text message (TDLib `messageText.link_preview`).
+ *
+ * It is not a message kind of its own: the message stays a text row and this
+ * rides beside `text`/`entities`, which is why the tags of a bot post and the
+ * card of the page it links to draw in one bubble. `instantView` is TDLib's
+ * `instant_view_version > 0` — the one flag that makes the card's 即时预览 bar
+ * appear. The bar and the card body both open the link itself for now; the
+ * in-app Instant View reader is a later batch (design doc §8.9).
+ */
+export const linkPreviewSchema = z.object({
+  /** The link itself; the card opens it when no Instant View exists. */
+  url: z.string(),
+  /** What Telegram would show instead of the raw URL (`display_url`). */
+  displayUrl: z.string().optional(),
+  /** The site's name (TDLib `site_name`), drawn at the card's top in the accent. */
+  siteName: z.string().optional(),
+  title: z.string().optional(),
+  description: z.string().optional(),
+  /** Page author (TDLib `author`); the card falls back to it for the site line. */
+  author: z.string().optional(),
+  /** TDLib `instant_view_version > 0`: 即时预览 is available for this page. */
+  instantView: z.boolean(),
+  /** Up to a few items; the card lays them out as one hero picture or a grid. */
+  media: z.array(linkPreviewMediaSchema).optional(),
+  /**
+   * TDLib `show_media_above_description`: the page asked for its picture first
+   * (an article's hero image), instead of the title-then-picture order.
+   */
+  mediaAboveText: z.boolean().optional(),
+})
+export type LinkPreview = z.infer<typeof linkPreviewSchema>
+
+/**
  * What pressing an inline button sends back to its bot (TDLib `inlineKeyboardButtonTypeCallback*`).
  *
  * `data` is the base64 payload TDLib handed over, posted back verbatim; a game
@@ -502,6 +548,12 @@ export const messageSchema = z.object({
   text: z.string(),
   entities: z.array(messageEntitySchema).optional(),
   media: messageMediaSchema.optional(),
+  /**
+   * The link preview Telegram put under this text (TDLib `messageText.link_preview`).
+   * The message stays kind 'text': the card is a block of the same bubble, drawn
+   * after the text (or before it when the page asked for media first).
+   */
+  linkPreview: linkPreviewSchema.optional(),
   /** Body of a kind 'rich' message; text still carries its flattened words. */
   rich: z.array(richBlockSchema).optional(),
   /** Body of a kind 'contact' message. */

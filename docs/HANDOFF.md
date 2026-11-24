@@ -75,12 +75,13 @@ pnpm workspace, W1 + W2 + the W3 main body implemented, plus the private-chat P0
 |---|---|
 | Shell | WeChat 4.x three-column shell (native 32 px `titleBarOverlay`), rail with four real sections, 通讯录, 收藏/朋友圈 placeholders, overlay scrollbars on both long panes, 设置 as its own window |
 | Chat list | virtualised 65 px rows (sizer + overscan 8), **paged on approach** (100-row slices, `mergeChats` by id) and **on-demand row photos** (`chats:prefetchAvatars` for the visible window), search pill → global search, chat right-click menu (置顶/免打扰/标为未读/删除聊天), unread dot, 已归档会话 row + archive page |
-| Transcript | virtualised list, anchored prepend, load-around anchors, day/unread separators, real sender photos, read receipts, typing + presence, reply/edit/delete/forward, polls, comments bar, channel post composition, pinned bar, reaction chips |
+| Transcript | virtualised list, anchored prepend, load-around anchors, day/unread separators, real sender photos, read receipts, typing + presence, reply/edit/delete/forward, polls, comments bar, channel post composition, pinned bar, reaction chips, link preview cards |
 | Media | photo/document send+receive with progress, `wx-media://` Range streaming (including a file TDLib is still downloading), viewer window for photos **and** videos, 表情 panel, 贴纸包盒子, album send, caption edit |
 | Stickers / emoji | WebP `<img>`, TGS → lottie-web (transcript) or one ThorVG canvas (grids), WebM `<video>`, animated-emoji messages (no bubble, one pass, click sound), premium sticker effects, custom emoji entities, Apple emoji as a CBDT colour font |
 | Polls | `PollBubble` + `lib/poll.ts`, `messages:vote` / `messages:addPollOption`, option order vs position |
 | Login | own frameless 280×373 window: TDLib QR (local `qrcode`), 用手机号登录 fallback via `auth:reset`, profile step only for a restored session |
 | 通讯录 | TDLib address book (`getContacts` + `getUser`), pinyin initials via ICU, contact card with 备注/DC/phone, 发消息 creates the private chat |
+| 链接预览 | a text message's link preview (Message.linkPreview from TDLib messageText.link_preview): cover photo + site/title/description, tinted from a stable hue of the URL, and the ⚡ 即时预览 bar that opens the reader as its own window (`web:open` → `main/instant-view-window.ts`, route `#instantview`; `web:instantView` → TDLib `getWebPageInstantView`, mapped into the rich-block union and drawn by `RichMessage`; zoom in the toolbar; design doc §8.9) |
 | Comments | 评论 N 条 handle on channel posts, Telegram discussion view panel (paged, anchored, joins to send), the full composer card as its input |
 | 聊天信息 | overlaying 314 px sheet: private/group/channel layouts, member search, rename, pinned announcement, invite QR in its own 360×560 window, clear, leave |
 | Channels | 服务号 bottom card, 加入/申请加入 for an unjoined channel, keyboard switch for admins |

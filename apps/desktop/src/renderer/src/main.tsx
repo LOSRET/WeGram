@@ -9,6 +9,7 @@ import { MediaViewer } from '@renderer/components/viewer/MediaViewer'
 import { installPreviewBridge } from '@renderer/lib/preview-bridge'
 import { queryClient } from '@renderer/lib/query'
 import { LoginWindow } from '@renderer/screens/LoginWindow'
+import { InstantViewWindow } from '@renderer/screens/InstantViewWindow'
 import { QrWindow } from '@renderer/screens/QrWindow'
 import { SettingsWindow } from '@renderer/screens/SettingsWindow'
 
@@ -33,6 +34,8 @@ createRoot(container).render(
         <LoginWindow />
       ) : route.startsWith('#qr') ? (
         <QrWindow />
+      ) : route.startsWith('#instantview') ? (
+        <InstantViewWindow />
       ) : route.startsWith('#settings') ? (
         <SettingsWindow />
       ) : (

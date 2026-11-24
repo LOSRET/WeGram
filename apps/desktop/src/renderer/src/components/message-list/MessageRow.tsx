@@ -1,4 +1,4 @@
-import type { ChatSummary, Message } from '@wegram/protocol'
+import type { ChatSummary, LinkPreview, Message } from '@wegram/protocol'
 import { memo, useState, type MouseEvent, type ReactNode } from 'react'
 
 import { hasCommentBar, isCommentablePost } from '../../lib/comments'
@@ -21,6 +21,7 @@ import { RichText } from '../RichText'
 import { StickerRenderer } from '../StickerRenderer'
 import { AlbumBubble } from './AlbumBubble'
 import { CommentBar } from './CommentBar'
+import { LinkPreviewCard } from './LinkPreviewCard'
 import { PremiumStickerEffect } from './PremiumStickerEffect'
 import { isEmojiOnly } from './emoji'
 
@@ -74,6 +75,8 @@ export interface MessageRowProps {
    * rows from its own thread and has no send path of its own.
    */
   onBotCommand?: (command: string) => void
+  /** 即时预览 (§8.9): a link card's ⚡ bar opens the page in the reader. */
+  onOpenInstantView?: (preview: LinkPreview) => void
 }
 
 /**
@@ -116,6 +119,7 @@ export const MessageRow = memo(
     onResend,
     onOpenStickerSet,
     onBotCommand,
+    onOpenInstantView,
   }: MessageRowProps) {
     /**
      * A premium sticker's effect plays once; a tap on the sticker replays it, so
@@ -359,8 +363,16 @@ export const MessageRow = memo(
                   />
                 </div>
               ) : null}
+              {/* Telegram's link preview is a block of the same bubble, under the
+                  text (or above it when the page asked for its picture first). */}
+              {first.linkPreview ? (
+                <LinkPreviewCard
+                  preview={first.linkPreview}
+                  {...(onOpenInstantView ? { onOpenInstantView } : {})}
+                />
+              ) : null}
               {channelMeta()}
-              {!album && !mediaKind && !first.text ? (
+              {!album && !mediaKind && !first.text && !first.linkPreview ? (
                 <span className="wx-bubble__empty">[不支持的消息]</span>
               ) : null}
               {channel ? commentBar : null}
@@ -447,5 +459,7 @@ export const MessageRow = memo(
     previous.onOpenComments === next.onOpenComments &&
     previous.onResend === next.onResend &&
     previous.onOpenStickerSet === next.onOpenStickerSet &&
+    previous.onBotCommand === next.onBotCommand &&
+    previous.onOpenInstantView === next.onOpenInstantView &&
     sameRow(previous.messages, next.messages),
 )

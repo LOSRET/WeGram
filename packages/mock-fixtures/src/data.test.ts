@@ -120,6 +120,16 @@ describe('the fake account', () => {
     expect(channel?.commentAccess).toEqual({ joined: false, canComment: false })
   })
 
+  it('carries one link preview, with the Instant View flag and its cover', () => {
+    const post = seeds.get(6)?.messages.find((message) => message.id === 603)
+    expect(post?.linkPreview).toMatchObject({
+      url: 'https://telegra.ph/WeGram-v031-11-24',
+      siteName: 'WeGram 频道',
+      instantView: true,
+    })
+    expect(post?.linkPreview?.media?.[0]?.media.fileId).toBe(7101)
+  })
+
   it('stores phones the way TDLib hands them over', () => {
     const phones = [...seeds.values()]
       .map((seed) => seed.contact?.phone)

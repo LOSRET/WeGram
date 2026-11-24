@@ -30,7 +30,7 @@ import { richText } from './rich-text'
 const MAX_DEPTH = 8
 
 export function mapRichMessage(raw: TdObject | undefined): { blocks: RichBlock[]; text: string } {
-  const blocks = mapBlocks(raw?.blocks, 0)
+  const blocks = mapPageBlocks(raw?.blocks, 0)
   return { blocks, text: flattenBlocks(blocks) }
 }
 
@@ -41,7 +41,14 @@ export function richPreview(raw: TdObject | undefined): string {
 
 /* ---------- page blocks ---------- */
 
-function mapBlocks(raw: unknown, depth: number): RichBlock[] {
+/**
+ * TDLib's `PageBlock` list as the protocol's rich blocks.
+ *
+ * Shared by the rich-message mapper and 即时预览 (`web:instantView`): TDLib's
+ * `webPageInstantView.blocks` is the same union, so an Instant View page is drawn
+ * by the one `RichMessage` renderer instead of a second block walker.
+ */
+export function mapPageBlocks(raw: unknown, depth = 0): RichBlock[] {
   if (!Array.isArray(raw) || depth > MAX_DEPTH) return []
   const out: RichBlock[] = []
   for (const block of raw as TdObject[]) {
@@ -132,7 +139,7 @@ function listBlock(block: TdObject, depth: number): RichBlock | null {
     label: typeof item.label === 'string' ? item.label : '',
     value: Number(item.value ?? 0),
     ...(item.has_checkbox ? { checked: Boolean(item.is_checked) } : {}),
-    blocks: mapBlocks(item.blocks, depth + 1),
+    blocks: mapPageBlocks(item.blocks, depth + 1),
   }))
   return items.length ? { type: 'list', items } : null
 }
@@ -170,7 +177,7 @@ function alignOf(value: unknown): RichAlign {
 }
 
 function quoteBlock(block: TdObject, depth: number): RichBlock | null {
-  const blocks = mapBlocks(block.blocks, depth + 1)
+  const blocks = mapPageBlocks(block.blocks, depth + 1)
   if (!blocks.length) return null
   const credit = block.credit ? richText(block.credit) : undefined
   return {
@@ -193,7 +200,7 @@ function pullQuoteBlock(block: TdObject): RichBlock | null {
 }
 
 function detailsBlock(block: TdObject, depth: number): RichBlock | null {
-  const blocks = mapBlocks(block.blocks, depth + 1)
+  const blocks = mapPageBlocks(block.blocks, depth + 1)
   if (!blocks.length) return null
   return { type: 'details', header: richText(block.header), blocks, open: Boolean(block.is_open) }
 }

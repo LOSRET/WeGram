@@ -443,9 +443,9 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
       unread: 0,
       pinned: false,
       muted: false,
-      lastMessageText: '其余频道只显示静音和只读提示',
-      lastMessageAt: at(90),
-      lastReadInboxMessageId: 602,
+      lastMessageText: 'v0.3.1 的更新说明写好了：链接预览现在有了。',
+      lastMessageAt: at(45),
+      lastReadInboxMessageId: 603,
       lastReadOutboxMessageId: 0,
     },
     canPost: true,
@@ -471,6 +471,31 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
         date: at(90),
         kind: 'text',
         text: '其余频道只显示静音和只读提示',
+      },
+      // 链接预览 (Telegram's card under a text message). The fixture carries the
+      // Instant View flag but no page behind it: the bar is drawn and opens the
+      // URL, which is what the card does for a page this client cannot render yet.
+      {
+        id: 603,
+        chatId: 6,
+        senderId: 0,
+        senderChatId: 6,
+        senderName: 'WeGram 频道',
+        outgoing: false,
+        date: at(45),
+        kind: 'text',
+        text: 'v0.3.1 的更新说明写好了：链接预览现在有了。',
+        linkPreview: {
+          url: 'https://telegra.ph/WeGram-v031-11-24',
+          displayUrl: 'telegra.ph/WeGram-v031',
+          siteName: 'WeGram 频道',
+          title: 'WeGram v0.3.1 更新说明',
+          description: '链接预览卡片、即时预览入口，以及三处滚动修复。',
+          instantView: true,
+          media: [
+            { kind: 'photo', media: mediaOf(7101, { width: 1200, height: 800 }) },
+          ],
+        },
       },
     ],
   })

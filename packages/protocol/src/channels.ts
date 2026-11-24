@@ -11,6 +11,7 @@ import { presenceInvokeChannels, presenceInvokeSchemas } from './presence'
 import { userInvokeChannels, userInvokeSchemas } from './user'
 import { reportInvokeChannels, reportInvokeSchemas } from './report'
 import { botInvokeChannels, botInvokeSchemas } from './bot'
+import { webInvokeChannels, webInvokeSchemas } from './web'
 import { chatInvokeChannels, chatInvokeSchemas } from './chats'
 import { qrInvokeChannels, qrInvokeSchemas } from './qr'
 import { pollInvokeChannels, pollInvokeSchemas } from './poll'
@@ -70,6 +71,8 @@ export const invokeChannels = [
   ...chatInvokeChannels,
   /** 群二维码 is its own window; see ./qr.ts. */
   ...qrInvokeChannels,
+  /** 即时预览's in-app reader; see ./web.ts. */
+  ...webInvokeChannels,
   /** Vote and add an option on a poll (see ./poll.ts). */
   ...pollInvokeChannels,
   /**
@@ -371,6 +374,7 @@ export const invokeSchemas = {
   ...userInvokeSchemas,
   ...reportInvokeSchemas,
   ...botInvokeSchemas,
+  ...webInvokeSchemas,
   'search:global': {
     request: z.object({ q: z.string().min(1), limit: z.number().int().positive().max(50) }),
     response: z.array(chatSummarySchema),
