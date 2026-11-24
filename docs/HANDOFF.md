@@ -43,6 +43,7 @@ Companions this document does **not** replace:
 | touch the TDLib adapter or paging | §6 (every entry was measured against a real account) |
 | implement a private-chat gap | §7 (API map + status) then §8 (layering recipe) |
 | split / move files | §8 and the "Agent-maintainable code" rules in `CLAUDE.md` |
+| continue the duplication cleanup | §8.4 (what is merged, and what must not be) then §8.6 (what is left, with why) |
 | report work as done | `pnpm verify` green; say exactly what you ran and what you skipped |
 
 The rule that matters most in this repo: **only what `pnpm verify` proves counts as done**,
@@ -1514,6 +1515,55 @@ One-off duplication audits merged the real duplicates and left the look-alikes a
   (`slice(set, get, api)`); a node-env test importing any `.tsx` that reaches media/lottie
   drags the whole stack in; `pnpm format` must not reach `spikes/` or `*.md`
   (`.prettierignore`); closing the launcher's console kills the app (minimise it).
+
+### 8.6 Duplication audit leftovers (measured 2026-11-24)
+
+The three passes in §8.4 closed the duplicates that had already drifted. What is left
+was re-measured with the same tool (normalised token windows, 22 tokens, preview vs
+mock-adapter): **21%** shared structure, and most of it is the part that has to stay
+separate. Written down so the next session does not re-audit from zero — each item says
+why it was left, not just that it exists.
+
+**Worth doing, small (in rough value order):**
+
+- **The one-field writes** (`packages/mock-adapter/src/chats.ts`,
+  `renderer/src/lib/preview/chats.ts`): `setMuted` / `setPinned` / `setArchived` /
+  `setChatUnread` / `setTitle` are four lines each
+  (assign → announce → copy). A `writeChatFlag(chat, flag, value, announce)` in
+  `@wegram/mock-session` saves ~30 lines; it only works if it mutates, because the row *is*
+  the store's object in both fakes. Left because the value is cosmetic.
+- **The fixture byte generators**: `createToneWav` (`mock-assets.ts`, `Buffer`) and `beepWav`
+  (`preview/fixtures.ts`, `DataView` + `btoa`) implement the same 0.18 s 880 Hz envelope, and
+  `PREMIUM_EFFECT_TGS` is copied into the preview as a base64 literal (its comment admits it).
+  A `Uint8Array` version in `@wegram/mock-fixtures` plus thin `Buffer` / data-URL wrappers makes
+  one copy; the package stays process-free.
+- **The virtualised conversation block** (`components/ChatList.tsx` vs
+  `components/chat-list/ArchivePage.tsx`): sizer, slots and `ChatRow` are the same; only
+  `scrollMargin` / `listOffset` and the empty line differ. A `chat-list/ChatListBody` is the
+  extraction — do it alone, the scroll margins cost a session once (renderer/AGENTS.md).
+- **Debounce + newest-wins** (`lib/useGlobalSearch.ts`, `lib/useMessageSearch.ts`, and the
+  cursor half of `chat-pane/topics/useChatTopics.ts`): same 260 ms + request-id skeleton over
+  different state shapes. One `lib/useDebouncedQuery` would fold them; not urgent.
+- **`let cancelled = false` load-once** (29 call sites): `useIpcQuery(fn, deps)` would remove
+  the boilerplate, but a few sites have bespoke "keep the old rows while the page loads"
+  semantics, so each would need a flag.
+
+**Deliberately not merged — do not redo:**
+
+- the preview's invoke switch vs `main/ipc/handlers.ts` (the preview may not import main), §8.4;
+- `TdlibChatApi` / `MockChatApi` restating the seam's 21 signatures: a `Pick<TelegramAdapter, …>`
+  tuple could derive them, but the seam's forwarding chain is intentionally explicit;
+- the two fakes' event types (`AdapterEvent` vs `EventChannel`) and store shapes (fixture map vs
+  arrays): that is exactly why `@wegram/mock-session` takes structural types;
+- `map/media.ts`'s three builder spreads (`thumbFileId` / `minithumbnail` / `mediaUrls`): it is
+  the one media field table §8.4 asked for, and a shared base would hide which fields differ;
+- the message-properties literal (mock vs preview): the **rule** behind `canBeEdited` is shared
+  now (`CAPTION_MESSAGE_KINDS`); the ten-field object is a protocol answer assembled per store.
+
+The measured remainder is therefore thin store wrappers, switch cases and per-fake event
+types — not rules. If a future change makes two of those disagree, that is a bug, not a
+sign to merge them.
+
 
 ---
 

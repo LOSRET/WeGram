@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 >
 > **Then read the layer notes** for the directory you are about to touch — they are short and they hold the rules that are specific to that layer: `packages/protocol/AGENTS.md`, `apps/desktop/src/main/AGENTS.md`, `apps/desktop/src/renderer/AGENTS.md`.
 >
-> **Restructuring or splitting files? Read `docs/HANDOFF.md` §8 first** — what already moved and why, the conventions the code now enforces mechanically, and the one batch still pending (`packages/protocol`). The split rules themselves are in "Agent-maintainable code" below.
+> **Restructuring or splitting files? Read `docs/HANDOFF.md` §8 first** — what already moved and why, the conventions the code now enforces mechanically, the one batch still pending (`packages/protocol`), and §8.6's list of what duplication is left and why (§8.4 says what must not be merged again). The split rules themselves are in "Agent-maintainable code" below.
 >
 > **`pnpm verify` is the one command that decides whether a change is done** (lint → typecheck → test → build). It must pass before you report success.
 
