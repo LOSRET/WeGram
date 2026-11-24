@@ -7,6 +7,7 @@ import { activateChat } from '../lib/openChat'
 import { openMention } from '../lib/openMention'
 import { useAppStore } from '../store/useAppStore'
 import { Avatar } from './Avatar'
+import { Modal } from './Modal'
 import { ReportDialog } from './ReportDialog'
 import { RichText, safeHref } from './RichText'
 import { TelegramLink } from './TelegramLink'
@@ -137,12 +138,13 @@ export function ProfileCard({ userId, onOpenChat, onClose }: ProfileCardProps) {
     : ''
 
   return (
-    <div className="wx-modal-backdrop" onClick={onClose}>
-      <div
-        className="wx-modal wx-profile"
-        role="dialog"
-        aria-label="详细资料"
-        onClick={(event) => event.stopPropagation()}
+    <>
+      <Modal
+        className="wx-profile"
+        label="详细资料"
+        onClose={onClose}
+        /* Esc cancels the 备注 editor first; with no editor it closes the card. */
+        onEscape={editingNote ? () => setEditingNote(false) : undefined}
       >
         <header className="wx-profile__head">
           <h2 className="wx-profile__heading">详细资料</h2>
@@ -391,11 +393,12 @@ export function ProfileCard({ userId, onOpenChat, onClose }: ProfileCardProps) {
         ) : (
           <div className="wx-profile__loading">正在读取资料…</div>
         )}
-      </div>
+      </Modal>
 
+      {/* The 举报 sheet is its own modal: closing it must not close the card. */}
       {reportOpen ? (
         <ReportDialog target={{ kind: 'user', userId }} onClose={() => setReportOpen(false)} />
       ) : null}
-    </div>
+    </>
   )
 }

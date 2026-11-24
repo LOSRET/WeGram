@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Avatar } from '@renderer/components/Avatar'
 import { CloseIcon } from '@renderer/components/Icon'
 import { QrCode } from '@renderer/components/QrCode'
+import { useEscapeKey } from '@renderer/lib/useEscapeKey'
 import { errorMessage, invoke } from '@renderer/lib/ipc'
 import { qrPngBase64 } from '@renderer/lib/qrImage'
 
@@ -143,16 +144,13 @@ export function QrWindow() {
   }
 
   /** Esc closes the picker first, then the window — the same ordering as 聊天信息. */
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key !== 'Escape') return
-      event.stopPropagation()
+  useEscapeKey(
+    () => {
       if (picking !== null) setPicking(null)
       else void invoke('qr:close')
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [picking])
+    },
+    { stopPropagation: true },
+  )
 
   const channel = info?.chat.kind === 'channel'
   const faces = (info?.members ?? []).slice(0, 6)

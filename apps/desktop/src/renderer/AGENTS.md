@@ -38,6 +38,10 @@ components/message-list/  virtualiser + MessageRow + Divider + the scroll hooks:
                          views/time footer; the one-bubble channel composition is
                          styles/channel.css), PremiumStickerEffect (a Premium sticker's
                          second TGS, painted once at 1.49× the sticker and replayed on tap)
+components/Modal.tsx     the ONE modal shell: backdrop + centred sheet, click-outside
+                         closes, Esc closes (class `wx-modal` + the caller's variant),
+                         role=dialog/aria-label, and a form variant for sheets with
+                         inputs; every sheet in the app renders through it
 components/AlertDialog.tsx  a bot's alert answer (TDLib `callbackQueryAnswer.show_alert`) as a
                          one-button sheet; its free text keeps line breaks
 lib/botCommands.ts     (pure, unit-tested) the composer's "/" trigger and the command filter
@@ -213,6 +217,9 @@ lib/useSlidingPanel.ts  the ONE slide-panel state machine (open/close, the 20 ms
                       mount-closed entry, the delayed unmount after the CSS slide,
                       the reopen-during-slide-out race) + `useEnterOnOpen`; 聊天信息,
                       评论, 已归档会话 and 话题 all use it
+lib/useEscapeKey.ts   the ONE Escape listener: a stack of mounted layers, only the
+                      newest acts, so Esc unwinds one layer at a time (modal over
+                      panel over page) instead of closing all of them
 lib/scrollGeometry.ts (pure, unit-tested) the ONE "is the reader at the bottom" rule
 lib/jumpSettle.ts    (pure, unit-tested) "has the jump to the newest message landed?"
 lib/chatInfo.ts      (pure, unit-tested) the panel's slide length + which faces its
@@ -288,10 +295,17 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   owner's reference presses the sheet on top of the messages, and a width animation
   re-lays-out every virtualised row on every frame (an earlier version did, and was
   wrong). `INFO_PANEL_ANIM_MS` is pinned to the stylesheet by
-  `style-contract.test.ts`. A channel reuses the group panel; its member block is
-  administrator-only, so the panel asks `chats:canGetMembers` (`supergroupFullInfo.
+  `style-contract.test.ts`. The machine is `lib/useSlidingPanel.ts` now: a new slide
+  uses it instead of writing another timer pair. A channel reuses the group panel;
+  its member block is administrator-only, so the panel asks `chats:canGetMembers` (`supergroupFullInfo.
   can_get_members`) and draws 搜索群成员 + the grid only when that answers true — a
   subscriber would otherwise see the channel's own face pretending to be a member.
+- **Esc belongs to the topmost layer.** `lib/useEscapeKey.ts` keeps the mounted
+  listeners on a stack and only the newest one acts; two plain `window` listeners
+  cannot express that (`stopPropagation` does not stop other listeners on the same
+  target), and the old copies closed a dialog *and* the sheet under it. A layer that
+  opens over another registers later, which is the order Esc should unwind. `Modal`
+  uses it; `ChatInfoPanel` uses it for the search view and the panel itself.
 - **A programmatic `scrollTop` write desyncs `@tanstack/react-virtual`** (it
   re-reads its offset only on real scroll events). After every programmatic
   scroll, dispatch one `scroll` event so the virtualizer re-measures — otherwise

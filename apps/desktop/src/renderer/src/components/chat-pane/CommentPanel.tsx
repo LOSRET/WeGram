@@ -11,6 +11,7 @@ import {
 import { resolveCommentLanding } from '../../lib/commentAnchor'
 import { messagePreview } from '../../lib/format'
 import { selfIdentity } from '../../lib/self'
+import { useEscapeKey } from '../../lib/useEscapeKey'
 import { errorMessage, invoke } from '../../lib/ipc'
 import { useEnterOnOpen } from '../../lib/useSlidingPanel'
 import { ViewerSource } from '../../lib/viewerSource'
@@ -305,15 +306,7 @@ export function CommentPanel({
     backRef.current?.focus({ preventScroll: true })
   }, [])
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key !== 'Escape') return
-      event.stopPropagation()
-      onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  useEscapeKey(onClose, { stopPropagation: true })
 
   // Prepend compensation and the initial landing both live here: after the DOM
   // has the new rows, not before.

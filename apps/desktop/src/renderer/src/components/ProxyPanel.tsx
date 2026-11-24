@@ -1,3 +1,4 @@
+import { Modal } from './Modal'
 import { ProxyForm } from './proxy/ProxyForm'
 
 interface ProxyPanelProps {
@@ -18,16 +19,14 @@ interface ProxyPanelProps {
  */
 export function ProxyPanel({ onClose, onError }: ProxyPanelProps) {
   return (
-    <div className="wx-modal-backdrop" onClick={onClose}>
-      <div className="wx-modal" onClick={(event) => event.stopPropagation()}>
-        <div className="wx-modal__header">
-          <span>设置 · 代理</span>
-          <button className="wx-icon-button" onClick={onClose} title="关闭">
-            ×
-          </button>
-        </div>
-        <ProxyForm onError={onError} />
+    <Modal label="设置 · 代理" onClose={onClose}>
+      <div className="wx-modal__header">
+        <span>设置 · 代理</span>
+        <button className="wx-icon-button" onClick={onClose} title="关闭">
+          ×
+        </button>
       </div>
-    </div>
+      <ProxyForm onError={onError} />
+    </Modal>
   )
 }

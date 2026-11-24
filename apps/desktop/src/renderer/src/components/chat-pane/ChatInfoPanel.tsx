@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import { INFO_MEMBER_LIMIT, personTiles } from '../../lib/chatInfo'
+import { useEscapeKey } from '../../lib/useEscapeKey'
 import { errorMessage, invoke } from '../../lib/ipc'
 import { useEnterOnOpen } from '../../lib/useSlidingPanel'
 import { useAppStore } from '../../store/useAppStore'
@@ -185,23 +186,15 @@ export function ChatInfoPanel({
     }
   }, [chat.id, chat.kind, hasChatRows])
 
-  // Esc closes whatever is on top: a dialog, the search view, then the panel.
-  useEffect(() => {
-    if (!open) return
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key !== 'Escape') return
-      event.stopPropagation()
-      if (leaving) setLeaving(false)
-      else if (profileOpen) setProfileOpen(false)
-      else if (adding) setAdding(false)
-      else if (invite !== null) setInvite(null)
-      else if (renaming) setRenaming(false)
-      else if (searching) setSearching(false)
+  // Esc closes what has no Esc of its own (the search view), then the panel. A
+  // dialog, the 资料卡 and the leave confirm are Modals: theirs runs first.
+  useEscapeKey(
+    () => {
+      if (searching) setSearching(false)
       else onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, searching, renaming, invite, adding, leaving, profileOpen, onClose])
+    },
+    { enabled: open, stopPropagation: true },
+  )
 
   const saveTitle = async (title: string): Promise<void> => {
     setRenameBusy(true)

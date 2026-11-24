@@ -2,6 +2,7 @@ import type { StickerSet } from '@wegram/protocol'
 import { useCallback, useEffect, useState, type MouseEvent } from 'react'
 
 import { copyText } from '../lib/clipboard'
+import { useEscapeKey } from '../lib/useEscapeKey'
 import { errorMessage, invoke } from '../lib/ipc'
 import type { MentionTarget } from '../lib/mention'
 import { mentionEntitiesOf } from '../lib/mentionText'
@@ -63,18 +64,8 @@ export function StickerSetBox({ setId, onClose }: { setId: string; onClose: () =
   }, [setId])
 
   // A box opened from the transcript is modal enough that Esc must close it, and
-  // it must not fall through to the pane behind it.
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key !== 'Escape') return
-      event.stopPropagation()
-      onClose()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => {
-      document.removeEventListener('keydown', onKeyDown)
-    }
-  }, [onClose])
+  // the shared stack keeps that Esc from also closing the pane behind it.
+  useEscapeKey(onClose, { stopPropagation: true })
 
   const toast = (text: string): void => {
     useAppStore.getState().setToast(text)

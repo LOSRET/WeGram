@@ -8,6 +8,7 @@ import { NetworkPanel } from '@renderer/components/settings/NetworkPanel'
 import { NotificationPanel } from '@renderer/components/settings/NotificationPanel'
 import { SettingsNav } from '@renderer/components/settings/SettingsNav'
 import type { SettingsSection } from '@renderer/components/settings/SettingsNav'
+import { useEscapeKey } from '@renderer/lib/useEscapeKey'
 import { errorMessage, invoke } from '@renderer/lib/ipc'
 
 type SectionKey = 'account' | 'general' | 'notifications' | 'network' | 'about'
@@ -64,15 +65,7 @@ export function SettingsWindow() {
   )
 
   // Esc closes this window only; the shell stays exactly where it is.
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key !== 'Escape') return
-      event.preventDefault()
-      void invoke('settings:close')
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  useEscapeKey(() => void invoke('settings:close'), { preventDefault: true })
 
   // The writable half only: `canLaunchAtLogin` is an answer from main, never
   // something this window sends back (design doc §9.11.4).

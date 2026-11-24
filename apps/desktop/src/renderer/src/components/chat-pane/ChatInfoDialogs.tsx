@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { copyText } from '../../lib/clipboard'
 import { errorMessage, invoke } from '../../lib/ipc'
 import { useAppStore } from '../../store/useAppStore'
+import { Modal } from '../Modal'
 import { QrCode } from '../QrCode'
 
 /**
@@ -31,35 +32,35 @@ export function RenameDialog({
   const [value, setValue] = useState(initial)
   const trimmed = value.trim()
   return (
-    <div className="wx-modal-backdrop" onClick={onCancel}>
-      <form
-        className="wx-modal wx-modal--small wx-info-dialog"
-        onClick={(event) => event.stopPropagation()}
-        onSubmit={(event) => {
-          event.preventDefault()
-          if (trimmed !== '' && !busy) onSave(trimmed)
-        }}
-      >
-        <div className="wx-dialog__title">{title}</div>
-        <input
-          className="wx-input"
-          value={value}
-          autoFocus
-          maxLength={128}
-          spellCheck={false}
-          onChange={(event) => setValue(event.target.value)}
-        />
-        <p className="wx-info-dialog__hint">{hint}。</p>
-        <div className="wx-dialog__actions">
-          <button type="button" onClick={onCancel}>
-            取消
-          </button>
-          <button type="submit" className="wx-dialog__confirm" disabled={trimmed === '' || busy}>
-            {busy ? '保存中…' : '保存'}
-          </button>
-        </div>
-      </form>
-    </div>
+    <Modal
+      as="form"
+      className="wx-modal--small wx-info-dialog"
+      label={title}
+      onClose={onCancel}
+      onSubmit={(event) => {
+        event.preventDefault()
+        if (trimmed !== '' && !busy) onSave(trimmed)
+      }}
+    >
+      <div className="wx-dialog__title">{title}</div>
+      <input
+        className="wx-input"
+        value={value}
+        autoFocus
+        maxLength={128}
+        spellCheck={false}
+        onChange={(event) => setValue(event.target.value)}
+      />
+      <p className="wx-info-dialog__hint">{hint}。</p>
+      <div className="wx-dialog__actions">
+        <button type="button" onClick={onCancel}>
+          取消
+        </button>
+        <button type="submit" className="wx-dialog__confirm" disabled={trimmed === '' || busy}>
+          {busy ? '保存中…' : '保存'}
+        </button>
+      </div>
+    </Modal>
   )
 }
 
@@ -101,40 +102,40 @@ export function AddMemberDialog({
     }
   }
   return (
-    <div className="wx-modal-backdrop" onClick={onClose}>
-      <form
-        className="wx-modal wx-modal--small wx-info-dialog"
-        onClick={(event) => event.stopPropagation()}
-        onSubmit={(event) => {
-          event.preventDefault()
-          void submit()
-        }}
-      >
-        <div className="wx-dialog__title">添加成员</div>
-        <input
-          className="wx-input"
-          value={value}
-          autoFocus
-          maxLength={64}
-          spellCheck={false}
-          placeholder="@用户名"
-          onChange={(event) => setValue(event.target.value)}
-        />
-        <p className="wx-info-dialog__hint">输入对方的 @用户名，机器人也用这个。</p>
-        {error ? <p className="wx-info-dialog__error">{error}</p> : null}
-        <button type="button" className="wx-info-dialog__link" onClick={onOpenInvite}>
-          对方不接受直接添加？改用邀请链接
+    <Modal
+      as="form"
+      className="wx-modal--small wx-info-dialog"
+      label="添加成员"
+      onClose={onClose}
+      onSubmit={(event) => {
+        event.preventDefault()
+        void submit()
+      }}
+    >
+      <div className="wx-dialog__title">添加成员</div>
+      <input
+        className="wx-input"
+        value={value}
+        autoFocus
+        maxLength={64}
+        spellCheck={false}
+        placeholder="@用户名"
+        onChange={(event) => setValue(event.target.value)}
+      />
+      <p className="wx-info-dialog__hint">输入对方的 @用户名，机器人也用这个。</p>
+      {error ? <p className="wx-info-dialog__error">{error}</p> : null}
+      <button type="button" className="wx-info-dialog__link" onClick={onOpenInvite}>
+        对方不接受直接添加？改用邀请链接
+      </button>
+      <div className="wx-dialog__actions">
+        <button type="button" onClick={onClose}>
+          取消
         </button>
-        <div className="wx-dialog__actions">
-          <button type="button" onClick={onClose}>
-            取消
-          </button>
-          <button type="submit" className="wx-dialog__confirm" disabled={handle.length < 3 || busy}>
-            {busy ? '添加中…' : '添加'}
-          </button>
-        </div>
-      </form>
-    </div>
+        <button type="submit" className="wx-dialog__confirm" disabled={handle.length < 3 || busy}>
+          {busy ? '添加中…' : '添加'}
+        </button>
+      </div>
+    </Modal>
   )
 }
 /**
@@ -193,35 +194,30 @@ export function InviteDialog({
   }
 
   return (
-    <div className="wx-modal-backdrop" onClick={onClose}>
-      <div
-        className="wx-modal wx-modal--small wx-info-dialog"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="wx-dialog__title">{title}</div>
-        {loading ? (
-          <div className="wx-info-invite__state">正在获取邀请链接…</div>
-        ) : error !== null ? (
-          <div className="wx-info-invite__state">{error}</div>
-        ) : link === null ? (
-          <div className="wx-info-invite__state">
-            这个群没有可用的邀请链接。公开群，或拥有邀请权限的账号，才拿得到。
-          </div>
-        ) : (
-          <div className="wx-info-invite">
-            <QrCode value={link} size={168} label="群二维码" />
-            <div className="wx-info-invite__link">{link}</div>
-            <button type="button" className="wx-button" onClick={() => void copy()}>
-              {copied ? '已复制' : '复制链接'}
-            </button>
-          </div>
-        )}
-        <div className="wx-dialog__actions">
-          <button type="button" onClick={onClose}>
-            完成
+    <Modal className="wx-modal--small wx-info-dialog" label={title} onClose={onClose}>
+      <div className="wx-dialog__title">{title}</div>
+      {loading ? (
+        <div className="wx-info-invite__state">正在获取邀请链接…</div>
+      ) : error !== null ? (
+        <div className="wx-info-invite__state">{error}</div>
+      ) : link === null ? (
+        <div className="wx-info-invite__state">
+          这个群没有可用的邀请链接。公开群，或拥有邀请权限的账号，才拿得到。
+        </div>
+      ) : (
+        <div className="wx-info-invite">
+          <QrCode value={link} size={168} label="群二维码" />
+          <div className="wx-info-invite__link">{link}</div>
+          <button type="button" className="wx-button" onClick={() => void copy()}>
+            {copied ? '已复制' : '复制链接'}
           </button>
         </div>
+      )}
+      <div className="wx-dialog__actions">
+        <button type="button" onClick={onClose}>
+          完成
+        </button>
       </div>
-    </div>
+    </Modal>
   )
 }

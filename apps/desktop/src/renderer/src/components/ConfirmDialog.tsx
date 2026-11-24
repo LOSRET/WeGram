@@ -1,3 +1,5 @@
+import { Modal } from './Modal'
+
 interface ConfirmDialogProps {
   title: string
   description?: string
@@ -17,20 +19,18 @@ export function ConfirmDialog({
   onCancel,
 }: ConfirmDialogProps) {
   return (
-    <div className="wx-modal-backdrop" onClick={onCancel}>
-      <div className="wx-modal wx-modal--small" onClick={(event) => event.stopPropagation()}>
-        <div className="wx-dialog__title">{title}</div>
-        {description ? <div className="wx-dialog__body">{description}</div> : null}
-        <div className="wx-dialog__actions">
-          <button onClick={onCancel}>取消</button>
-          <button
-            className={`wx-dialog__confirm${danger ? ' wx-dialog__confirm--danger' : ''}`}
-            onClick={onConfirm}
-          >
-            {confirmLabel}
-          </button>
-        </div>
+    <Modal className="wx-modal--small" label={title} onClose={onCancel}>
+      <div className="wx-dialog__title">{title}</div>
+      {description ? <div className="wx-dialog__body">{description}</div> : null}
+      <div className="wx-dialog__actions">
+        <button onClick={onCancel}>取消</button>
+        <button
+          className={`wx-dialog__confirm${danger ? ' wx-dialog__confirm--danger' : ''}`}
+          onClick={onConfirm}
+        >
+          {confirmLabel}
+        </button>
       </div>
-    </div>
+    </Modal>
   )
 }

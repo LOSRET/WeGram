@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { errorMessage, invoke } from '../lib/ipc'
 import { useAppStore } from '../store/useAppStore'
 import { ChevronRightIcon } from './Icon'
+import { Modal } from './Modal'
 
 /**
  * What the sheet reports. One sheet serves both entry points — the 资料卡's
@@ -115,69 +116,62 @@ export function ReportDialog({ target, onClose }: ReportDialogProps) {
   const needsComment = report?.textRequired === true
 
   return (
-    <div className="wx-modal-backdrop" onClick={onClose}>
-      <div
-        className="wx-modal wx-report"
-        role="dialog"
-        aria-label="举报"
-        onClick={(event) => event.stopPropagation()}
-      >
-        {/* Telegram's title comes from the answer (`reportChatResultOptionRequired`
+    <Modal className="wx-report" label="举报" onClose={onClose}>
+      {/* Telegram's title comes from the answer (`reportChatResultOptionRequired`
             carries it); the comment phase keeps the one the reasons came with. */}
-        <h2 className="wx-report__title">{report?.title ?? '举报'}</h2>
+      <h2 className="wx-report__title">{report?.title ?? '举报'}</h2>
 
-        {needsComment ? (
-          <div className="wx-report__step">
-            <p className="wx-report__hint">
-              {report?.textOptional ? '这个举报可以补充说明。' : '这个举报需要补充说明。'}
-            </p>
-            <textarea
-              className="wx-report__comment"
-              value={comment}
-              autoFocus
-              maxLength={4000}
-              placeholder={report?.textOptional ? '补充说明（可选）' : '补充说明'}
-              onChange={(event) => setComment(event.target.value)}
-            />
-          </div>
-        ) : report?.options?.length ? (
-          <div className="wx-report__options">
-            {report.options.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                className="wx-report__option"
-                disabled={busy}
-                onClick={() => void submit(option.id)}
-              >
-                <span className="wx-report__option-text">{option.text}</span>
-                <ChevronRightIcon size={14} className="wx-report__chevron" />
-              </button>
-            ))}
-          </div>
-        ) : (
-          <p className="wx-report__hint wx-report__step">正在读取举报原因…</p>
-        )}
-
-        <div className="wx-report__footer">
-          {needsComment ? (
-            <button
-              type="button"
-              className="wx-report__submit"
-              disabled={
-                // TDLib's `is_optional`: this step may be submitted without a comment.
-                busy || (report?.textOptional !== true && comment.trim().length === 0)
-              }
-              onClick={() => void submit(report?.optionId ?? '', comment)}
-            >
-              举报
-            </button>
-          ) : null}
-          <button type="button" className="wx-report__close" onClick={onClose}>
-            关闭
-          </button>
+      {needsComment ? (
+        <div className="wx-report__step">
+          <p className="wx-report__hint">
+            {report?.textOptional ? '这个举报可以补充说明。' : '这个举报需要补充说明。'}
+          </p>
+          <textarea
+            className="wx-report__comment"
+            value={comment}
+            autoFocus
+            maxLength={4000}
+            placeholder={report?.textOptional ? '补充说明（可选）' : '补充说明'}
+            onChange={(event) => setComment(event.target.value)}
+          />
         </div>
+      ) : report?.options?.length ? (
+        <div className="wx-report__options">
+          {report.options.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              className="wx-report__option"
+              disabled={busy}
+              onClick={() => void submit(option.id)}
+            >
+              <span className="wx-report__option-text">{option.text}</span>
+              <ChevronRightIcon size={14} className="wx-report__chevron" />
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="wx-report__hint wx-report__step">正在读取举报原因…</p>
+      )}
+
+      <div className="wx-report__footer">
+        {needsComment ? (
+          <button
+            type="button"
+            className="wx-report__submit"
+            disabled={
+              // TDLib's `is_optional`: this step may be submitted without a comment.
+              busy || (report?.textOptional !== true && comment.trim().length === 0)
+            }
+            onClick={() => void submit(report?.optionId ?? '', comment)}
+          >
+            举报
+          </button>
+        ) : null}
+        <button type="button" className="wx-report__close" onClick={onClose}>
+          关闭
+        </button>
       </div>
-    </div>
+    </Modal>
   )
 }

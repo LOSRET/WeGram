@@ -1,3 +1,5 @@
+import { Modal } from './Modal'
+
 interface AlertDialogProps {
   title?: string
   /** The bot's text, free-form: line breaks are kept (see the CSS class). */
@@ -15,16 +17,14 @@ interface AlertDialogProps {
  */
 export function AlertDialog({ title, message, onClose }: AlertDialogProps) {
   return (
-    <div className="wx-modal-backdrop" onClick={onClose}>
-      <div className="wx-modal wx-modal--small" onClick={(event) => event.stopPropagation()}>
-        <div className="wx-dialog__title">{title ?? '提示'}</div>
-        <div className="wx-dialog__body wx-dialog__body--alert">{message}</div>
-        <div className="wx-dialog__actions">
-          <button className="wx-dialog__confirm" onClick={onClose}>
-            确定
-          </button>
-        </div>
+    <Modal className="wx-modal--small" label={title ?? '提示'} onClose={onClose}>
+      <div className="wx-dialog__title">{title ?? '提示'}</div>
+      <div className="wx-dialog__body wx-dialog__body--alert">{message}</div>
+      <div className="wx-dialog__actions">
+        <button className="wx-dialog__confirm" onClick={onClose}>
+          确定
+        </button>
       </div>
-    </div>
+    </Modal>
   )
 }
