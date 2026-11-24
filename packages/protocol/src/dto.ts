@@ -223,6 +223,38 @@ export const inlineButtonSchema = z.object({
 })
 export type InlineButton = z.infer<typeof inlineButtonSchema>
 
+/**
+ * One key of a bot's custom reply keyboard (TDLib `keyboardButton`).
+ *
+ * `sendsText` is the one distinction the client needs: a `keyboardButtonTypeText`
+ * posts its own label as a message, while the request kinds (phone number,
+ * location, poll, users, chat) and a Web App key ask the *client* for something
+ * this one cannot produce — the grid still draws them, but pressing one refuses
+ * instead of sending "分享手机号" as text (§8.3).
+ */
+export const replyKeyboardButtonSchema = z.object({
+  text: z.string().min(1),
+  sendsText: z.boolean(),
+})
+export type ReplyKeyboardButton = z.infer<typeof replyKeyboardButtonSchema>
+
+/**
+ * A bot's custom keyboard (TDLib `replyMarkupShowKeyboard`), drawn under the
+ * input while the newest message of the chat carries one. `rows` is TDLib's own
+ * row grouping; the key widths a bot sends are hints the card ignores.
+ */
+export const replyKeyboardSchema = z.object({
+  rows: z.array(z.array(replyKeyboardButtonSchema)),
+  /**
+   * TDLib `one_time`: the client hides the keyboard after one of its keys was
+   * used. Non-one-time keyboards stay until a newer message replaces them.
+   */
+  oneTime: z.boolean().optional(),
+  /** TDLib `input_field_placeholder`: the box's placeholder while this keyboard is up. */
+  placeholder: z.string().optional(),
+})
+export type ReplyKeyboard = z.infer<typeof replyKeyboardSchema>
+
 /** A vCard message body: the card a contact message draws. */
 export const contactCardSchema = z.object({
   firstName: z.string(),
@@ -478,6 +510,12 @@ export const messageSchema = z.object({
   poll: pollSchema.optional(),
   /** Inline keyboard under the bubble: rows of buttons (TDLib `reply_markup`). */
   buttons: z.array(z.array(inlineButtonSchema)).optional(),
+  /**
+   * The bot's custom reply keyboard (`replyMarkupShowKeyboard`) when this message
+   * is the newest one carrying it; the pane keeps showing the grid until a newer
+   * message replaces it (§8.3). Absent for inline keyboards and ordinary rows.
+   */
+  replyKeyboard: replyKeyboardSchema.optional(),
   /**
    * Telegram media group (album). TDLib keys a group by `message.media_album_id`,
    * an int64 — it crosses IPC as a string, and `'0'` (not in an album) is absent.

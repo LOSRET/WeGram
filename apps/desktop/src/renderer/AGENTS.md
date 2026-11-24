@@ -38,6 +38,9 @@ components/AlertDialog.tsx  a bot's alert answer (TDLib `callbackQueryAnswer.sho
                          one-button sheet; its free text keeps line breaks
 lib/botCommands.ts     (pure, unit-tested) the composer's "/" trigger and the command filter
 lib/useBotCommands.ts  the bot command list, asked lazily once per chat (`bots:commands`)
+lib/replyKeyboard.ts   (pure, unit-tested) which message's custom keyboard a chat shows
+components/ReplyKeyboard.tsx  a bot's custom reply keyboard under the composer: text keys
+                        send their label, request/WebApp keys are drawn but refuse (§8.3)
 components/composer/       ComposerCard: the ONE bordered input card (§8.4 + §9.8) — text,
                          the 表情/收藏/文件/截图/语音 tool row, 发送, the attach menu and the
                          ExpressionPicker. Both composers render it; a caller only says where
@@ -412,6 +415,11 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   URL, and a `password` button refuses with a toast because there is no 2FA prompt to ask with.
   A `botCommand` entity and the composer's "/" list both send through the existing send path
   (`messageActions.send` / the composer's own submit) — never a second `messages:send` call site.
+  **The custom reply keyboard belongs to a message, not to the chat.** `lib/replyKeyboard.ts`
+  takes the newest row that carries one (an ordinary reply does not clear it), a one-time
+  keyboard is hidden by remembering that row's id in `ChatPane` — never by a per-chat flag —
+  and its text keys take the same send path. A request/WebApp key is drawn dimmed and must
+  never post its label as a message.
 - **表情回应 are displayed, never offered.** `MessageRow` draws the chips from
   `Message.reactions` (`updateMessageReactions` replaces the whole list, so the
   `reactions` op replaces rather than merges); a custom-emoji reaction is its

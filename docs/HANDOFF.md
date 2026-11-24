@@ -1547,7 +1547,7 @@ One-off duplication audits merged the real duplicates and left the look-alikes a
 | 12 | Preload size | 187 kB because it imports the protocol index (zod); splitting a channels-only entry point would fix it |
 | 13 | Popovers | modals, the forward list and the sticker grid still use native thin scrollbars; converting to `<OverlayScrollbar>` is mechanical |
 | 14 | `tdlib:smoke` coverage | it checks only the first channel for `messageSenderChat`; anonymous-admin groups have no fixture |
-| 15 | 机器人 breadth | done 2026-11-24: callback buttons, the `/` command list and clickable `botCommand`. Still open: a bot's profile page (`botInfo.description` / commands / menu button), inline bots (`@bot query`), the custom reply keyboard (`replyMarkupShowKeyboard` / `forceReply`), WebApp buttons (小程序 is a stated non-goal), adding a bot to a group (no `addChatMembers` anywhere) and the guard bot when joining (kept as a readable error) |
+| 15 | 机器人 breadth | done 2026-11-24: callback buttons, the `/` command list, clickable `botCommand` and the custom reply keyboard (`replyMarkupShowKeyboard` → `Message.replyKeyboard`, grid under the input, text keys send, request/WebApp keys refuse; `one_time` hides after one press). Still open: a bot's profile page (`botInfo.description` / commands / menu button), inline bots (`@bot query`), `forceReply` (the composer's reply banner already covers it), WebApp buttons (小程序 is a stated non-goal), adding a bot to a group (no `addChatMembers` anywhere) and the guard bot when joining (kept as a readable error) |
 
 ### 9.3 Open product decisions
 

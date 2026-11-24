@@ -25,7 +25,7 @@ describe('the fake account', () => {
     expect(forum?.messages.every((message) => typeof message.topicId === 'number')).toBe(true)
   })
 
-  it('carries a bot with its commands, an inline keyboard and a command entity', () => {
+  it('carries a bot with its commands, both keyboards and a command entity', () => {
     const bot = seeds.get(13)
     expect(bot?.chat.kind).toBe('private')
     expect(bot?.bot?.commands.map((command) => command.command)).toEqual([
@@ -39,6 +39,17 @@ describe('the fake account', () => {
       callback: { type: 'data', data: 'settings' },
     })
     expect(keyboard?.entities).toEqual([{ type: 'botCommand', offset: 3, length: 5 }])
+    // The custom reply keyboard hangs off the newest row, and only its text keys
+    // are sendable (§8.3).
+    const grid = bot?.messages.find((message) => message.id === 1303)?.replyKeyboard
+    expect(grid?.rows).toEqual([
+      [
+        { text: '今日推荐', sendsText: true },
+        { text: '设置提醒', sendsText: true },
+      ],
+      [{ text: '分享手机号', sendsText: false }],
+    ])
+    expect(grid?.placeholder).toBe('点下面的按钮，或输入 /help')
     // The bot is not an address-book contact, so no contact fields travel.
     expect(bot?.contact).toBeUndefined()
   })

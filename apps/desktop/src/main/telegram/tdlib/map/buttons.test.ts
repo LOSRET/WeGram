@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { buttonStyleOf, buttonTarget, inlineButtonOf, mapReplyMarkup } from './buttons'
+import {
+  buttonStyleOf,
+  buttonTarget,
+  inlineButtonOf,
+  mapReplyKeyboard,
+  mapReplyMarkup,
+} from './buttons'
 
 /**
  * Buttons are read from two TDLib shapes (reply markup and rich page rows) but
@@ -140,5 +146,71 @@ describe('mapReplyMarkup', () => {
     expect(mapReplyMarkup({ _: 'replyMarkupShowKeyboard', rows: [] })).toBeUndefined()
     expect(mapReplyMarkup(undefined)).toBeUndefined()
     expect(mapReplyMarkup({ _: 'replyMarkupInlineKeyboard', rows: [[]] })).toBeUndefined()
+  })
+})
+
+/**
+ * The custom reply keyboard is the other markup a bot sends (§8.3). Its keys are
+ * drawn either way, but only a text key may be sent as a message: the request
+ * kinds ask for a phone number / a location, which this client cannot produce.
+ */
+describe('mapReplyKeyboard', () => {
+  it('maps the rows, the one-time flag and the placeholder', () => {
+    expect(
+      mapReplyKeyboard({
+        _: 'replyMarkupShowKeyboard',
+        rows: [
+          [
+            { _: 'keyboardButton', text: '今日推荐', type: { _: 'keyboardButtonTypeText' } },
+            { _: 'keyboardButton', text: ' 设置提醒 ', type: { _: 'keyboardButtonTypeText' } },
+          ],
+          [
+            {
+              _: 'keyboardButton',
+              text: '分享手机号',
+              type: { _: 'keyboardButtonTypeRequestPhoneNumber' },
+            },
+          ],
+        ],
+        is_persistent: false,
+        resize_keyboard: true,
+        one_time: true,
+        input_field_placeholder: '点下面的按钮，或输入 /help',
+      }),
+    ).toEqual({
+      rows: [
+        [
+          { text: '今日推荐', sendsText: true },
+          { text: '设置提醒', sendsText: true },
+        ],
+        [{ text: '分享手机号', sendsText: false }],
+      ],
+      oneTime: true,
+      placeholder: '点下面的按钮，或输入 /help',
+    })
+  })
+
+  it('drops blank keys and empty rows instead of drawing holes', () => {
+    expect(
+      mapReplyKeyboard({
+        _: 'replyMarkupShowKeyboard',
+        rows: [
+          [{ _: 'keyboardButton', text: '   ', type: { _: 'keyboardButtonTypeText' } }],
+          [{ _: 'keyboardButton', text: '重试', type: { _: 'keyboardButtonTypeText' } }],
+        ],
+      }),
+    ).toEqual({ rows: [[{ text: '重试', sendsText: true }]] })
+  })
+
+  it('keeps a key without a text type inert, and ignores other markups', () => {
+    expect(
+      mapReplyKeyboard({
+        _: 'replyMarkupShowKeyboard',
+        rows: [[{ _: 'keyboardButton', text: '打开小程序' }]],
+      }),
+    ).toEqual({ rows: [[{ text: '打开小程序', sendsText: false }]] })
+    expect(mapReplyKeyboard({ _: 'replyMarkupInlineKeyboard', rows: [] })).toBeUndefined()
+    expect(mapReplyKeyboard({ _: 'replyMarkupShowKeyboard', rows: [] })).toBeUndefined()
+    expect(mapReplyKeyboard(undefined)).toBeUndefined()
   })
 })

@@ -1,4 +1,10 @@
-import type { BotCommand, Message, Sticker } from '@wegram/protocol'
+import type {
+  BotCommand,
+  Message,
+  ReplyKeyboard as ReplyKeyboardLayout,
+  ReplyKeyboardButton,
+  Sticker,
+} from '@wegram/protocol'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 
 import { albumSendOf } from '../lib/albumSend'
@@ -12,6 +18,7 @@ import { errorMessage, invoke } from '../lib/ipc'
 import { messagePreview } from '../lib/format'
 import { useAppStore } from '../store/useAppStore'
 import { ComposerCard } from './composer/ComposerCard'
+import { ReplyKeyboard } from './ReplyKeyboard'
 
 export interface ComposerEditing {
   messageId: number
@@ -35,6 +42,13 @@ interface ComposerProps {
    * way the 服务号 card swaps places with the input.
    */
   onCollapse?: () => void
+  /**
+   * The bot's custom reply keyboard to draw under the card (§8.3), when the chat's
+   * newest message carries one. Absent for every ordinary conversation.
+   */
+  replyKeyboard?: ReplyKeyboardLayout
+  /** A one-time keyboard was used: the pane drops it until a newer one arrives. */
+  onKeyboardUsed?: () => void
 }
 
 /**
@@ -55,6 +69,8 @@ export function Composer({
   onCancelReply,
   onCancelEdit,
   onCollapse,
+  replyKeyboard,
+  onKeyboardUsed,
 }: ComposerProps) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
@@ -240,6 +256,30 @@ export function Composer({
     }
   }
 
+  /**
+   * A key of the bot's custom keyboard (§8.3): a text key is an ordinary message,
+   * so it takes the chat's own send path — the box keeps whatever the reader had
+   * typed and the reply stays attached. A key that asks for a phone number, a
+   * location or a chat is refused instead of posting its label as text.
+   */
+  const pressKeyboard = async (button: ReplyKeyboardButton): Promise<void> => {
+    if (!button.sendsText) {
+      useAppStore.getState().setToast('这类按钮暂未支持')
+      return
+    }
+    if (busy) return
+    setBusy(true)
+    try {
+      pingerRef.current?.stop()
+      await onSend(button.text, replyTo?.id)
+      onKeyboardUsed?.()
+    } catch (error) {
+      useAppStore.getState().setError(errorMessage(error))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   /** Enter sends, Shift+Enter breaks the line, IME never sends (§8.4). */
   const { inputHandlers } = useComposerInput({
     onSend: () => void submit(),
@@ -371,6 +411,13 @@ export function Composer({
     useAppStore.getState().setToast(`${label}还没有接入`)
   }
 
+  // A bot keyboard may name the box (§8.3): its placeholder replaces 输入消息.
+  const placeholder = editing
+    ? editing.caption
+      ? '编辑说明，清空后回车可删除'
+      : '编辑后回车保存，Esc 取消'
+    : replyKeyboard?.placeholder || '输入消息'
+
   return (
     <div className="wx-composer">
       {editing ? (
@@ -427,13 +474,7 @@ export function Composer({
         onChange={changeText}
         onBlur={() => pingerRef.current?.stop()}
         textareaRef={textareaRef}
-        placeholder={
-          editing
-            ? editing.caption
-              ? '编辑说明，清空后回车可删除'
-              : '编辑后回车保存，Esc 取消'
-            : '输入消息'
-        }
+        placeholder={placeholder}
         inputHandlers={inputHandlers}
         busy={busy}
         editing={Boolean(editing)}
@@ -446,6 +487,15 @@ export function Composer({
         onNotice={notWired}
         {...(onCollapse ? { onCollapse } : {})}
       />
+
+      {/* The bot's keyboard hangs under the input, the way Telegram draws it. */}
+      {replyKeyboard ? (
+        <ReplyKeyboard
+          keyboard={replyKeyboard}
+          busy={busy}
+          onPress={(button) => void pressKeyboard(button)}
+        />
+      ) : null}
     </div>
   )
 }

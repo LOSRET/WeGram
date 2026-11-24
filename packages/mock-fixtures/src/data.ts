@@ -564,9 +564,10 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
   })
 
   /**
-   * A bot chat: the commands it publishes (the composer's "/" list) and the
-   * inline keyboard under its last message (§8.3). Both fakes serve it, so the
-   * button plumbing and the command list are visible without a Telegram account.
+   * A bot chat: the commands it publishes (the composer's "/" list), the inline
+   * keyboard under one message and the custom reply keyboard under the newest one
+   * (§8.3). Both fakes serve it, so the button plumbing, the command list and the
+   * grid are visible without a Telegram account.
    */
   fixtures.set(13, {
     chat: {
@@ -577,9 +578,9 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
       unread: 0,
       pinned: false,
       muted: false,
-      lastMessageText: '输入 /help 查看全部命令。',
-      lastMessageAt: at(5),
-      lastReadInboxMessageId: 1302,
+      lastMessageText: '也可以用下面的键盘直接回复我。',
+      lastMessageAt: at(1),
+      lastReadInboxMessageId: 1303,
       lastReadOutboxMessageId: 0,
     },
     bot: {
@@ -631,6 +632,29 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
           // A callback the mock answers with `show_alert`: the one-button dialog.
           [{ text: '弹窗提醒', callback: { type: 'data', data: 'alert' } }, { text: '复制示例' }],
         ],
+      },
+      // The custom reply keyboard (§8.3): text keys that send their own label, and
+      // one that asks for a phone number — drawn, but refused on press because this
+      // client cannot produce it.
+      {
+        id: 1303,
+        chatId: 13,
+        senderId: 26,
+        senderName: 'WeGram 助手',
+        outgoing: false,
+        date: at(1),
+        kind: 'text',
+        text: '也可以用下面的键盘直接回复我。',
+        replyKeyboard: {
+          rows: [
+            [
+              { text: '今日推荐', sendsText: true },
+              { text: '设置提醒', sendsText: true },
+            ],
+            [{ text: '分享手机号', sendsText: false }],
+          ],
+          placeholder: '点下面的按钮，或输入 /help',
+        },
       },
     ],
   })

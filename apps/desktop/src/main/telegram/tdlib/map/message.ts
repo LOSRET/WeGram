@@ -1,7 +1,7 @@
 import type { Message, MessageInteraction, MessageReaction } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
-import { mapReplyMarkup } from './buttons'
+import { mapReplyKeyboard, mapReplyMarkup } from './buttons'
 import { mapContent } from './content'
 import { serviceText, SERVICE_CONTENT_TYPES } from './service'
 import type { MapperContext } from './context'
@@ -56,6 +56,9 @@ export async function mapMessage(
       ? content.game.short_name
       : undefined
   const buttons = mapReplyMarkup(raw.reply_markup, gameShortName)
+  // A message carries one markup: an inline keyboard under the bubble, or the
+  // bot's custom keyboard above the input — never both.
+  const replyKeyboard = mapReplyKeyboard(raw.reply_markup)
   const albumId = albumIdOf(raw)
   const topicId = topicIdOf(raw)
   const interaction = mapInteraction(raw)
@@ -91,6 +94,7 @@ export async function mapMessage(
     ...(mapped.contact ? { contact: mapped.contact } : {}),
     ...(mapped.poll ? { poll: mapped.poll } : {}),
     ...(buttons ? { buttons } : {}),
+    ...(replyKeyboard ? { replyKeyboard } : {}),
     ...(albumId ? { albumId } : {}),
     ...(topicId ? { topicId } : {}),
     ...(raw.reply_to?.message_id ? { replyToId: raw.reply_to.message_id } : {}),

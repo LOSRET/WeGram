@@ -5,6 +5,7 @@ import { loadLatestWindow } from '../../lib/anchoredWindow'
 import { topicUnreadMarker, transcriptReadMarkers } from '../../lib/topics'
 import { INFO_PANEL_ANIM_MS } from '../../lib/chatInfo'
 import { editTargetOf } from '../../lib/editTarget'
+import { activeReplyKeyboard } from '../../lib/replyKeyboard'
 import { errorMessage, invoke } from '../../lib/ipc'
 import { useAppStore } from '../../store/useAppStore'
 import { Composer } from '../Composer'
@@ -258,6 +259,29 @@ export function ChatPane() {
     loadNewer,
   } = useChatHistory(topicsOpen ? null : activeChatId, topicId)
   const messages = activeChatId ? (messagesByChat[activeChatId] ?? []) : []
+
+  /**
+   * 机器人自定义键盘 (§8.3): the grid under the input belongs to the newest row of
+   * the transcript that carries one, so a bot's keyboard survives the replies
+   * sent with it. A one-time keyboard disappears once it was used, which
+   * `usedKeyboard` records by chat and by carrying message — a newer keyboard
+   * therefore shows up again.
+   */
+  // A flat scan from the end, so it stops at the first keyboard it finds; the
+  // pane re-renders on store changes, not on scroll, so this stays cheap.
+  const replyKeyboard = activeReplyKeyboard(messages)
+  const [usedKeyboard, setUsedKeyboard] = useState<{ chatId: number; messageId: number } | null>(
+    null,
+  )
+  const shownKeyboard =
+    replyKeyboard !== null &&
+    !(
+      usedKeyboard !== null &&
+      usedKeyboard.chatId === activeChatId &&
+      usedKeyboard.messageId === replyKeyboard.messageId
+    )
+      ? replyKeyboard.keyboard
+      : null
 
   /**
    * 在线 / 最后上线 belongs to a private chat's peer; a group or channel has nobody
@@ -562,6 +586,12 @@ export function ChatPane() {
           }
           onCancelReply={() => useAppStore.getState().setReplyTo(activeChatId, null)}
           onCancelEdit={() => useAppStore.getState().setEditing(null)}
+          {...(shownKeyboard ? { replyKeyboard: shownKeyboard } : {})}
+          onKeyboardUsed={() => {
+            if (replyKeyboard?.keyboard.oneTime) {
+              setUsedKeyboard({ chatId: activeChatId, messageId: replyKeyboard.messageId })
+            }
+          }}
           {...(isChannel ? { onCollapse: () => setChannelInputChatId(null) } : {})}
         />
       ) : (

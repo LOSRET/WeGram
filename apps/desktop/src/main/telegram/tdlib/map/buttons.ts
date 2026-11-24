@@ -1,4 +1,9 @@
-import type { InlineButton, InlineButtonStyle } from '@wegram/protocol'
+import type {
+  InlineButton,
+  InlineButtonStyle,
+  ReplyKeyboard,
+  ReplyKeyboardButton,
+} from '@wegram/protocol'
 
 import type { TdObject } from '../client'
 import { asArray } from '../json'
@@ -75,7 +80,8 @@ export function inlineButtonOf(
 
 /**
  * Rows of a message's inline keyboard. Other markup kinds are client-side
- * keyboards (`replyMarkupShowKeyboard`) or layout hints, never bubble buttons.
+ * keyboards (`replyMarkupShowKeyboard`, read by `mapReplyKeyboard`) or layout
+ * hints, never bubble buttons.
  */
 export function mapReplyMarkup(
   markup: TdObject | undefined,
@@ -93,4 +99,44 @@ export function mapReplyMarkup(
     if (buttons.length) mapped.push(buttons)
   }
   return mapped.length ? mapped : undefined
+}
+
+/**
+ * A bot's custom reply keyboard (`replyMarkupShowKeyboard`), the grid the pane
+ * draws under the input (§8.3).
+ *
+ * Only the parts this client acts on travel: the rows, `one_time` (hide after a
+ * press) and `input_field_placeholder` (the box's placeholder). `resize_keyboard`
+ * is a sizing hint the card already ignores, and TDLib's newer `is_personal` has
+ * no meaning for a client that never shows a keyboard to anyone else.
+ */
+export function mapReplyKeyboard(markup: TdObject | undefined): ReplyKeyboard | undefined {
+  if (markup?._ !== 'replyMarkupShowKeyboard') return undefined
+  const rows: TdObject[] = asArray(markup.rows)
+  const mapped: ReplyKeyboardButton[][] = []
+  for (const row of rows) {
+    const buttons = asArray(row)
+      .map(replyKeyboardButtonOf)
+      .filter((button): button is ReplyKeyboardButton => button !== null)
+    if (buttons.length) mapped.push(buttons)
+  }
+  if (!mapped.length) return undefined
+  const placeholder =
+    typeof markup.input_field_placeholder === 'string' ? markup.input_field_placeholder.trim() : ''
+  return {
+    rows: mapped,
+    ...(markup.one_time === true ? { oneTime: true } : {}),
+    ...(placeholder ? { placeholder } : {}),
+  }
+}
+
+/**
+ * One `keyboardButton`. Its `type` decides whether the label is a message to send:
+ * only `keyboardButtonTypeText` means that, so everything else (a phone number, a
+ * location, a poll, a chat, a Web App) travels as "drawn but refuses".
+ */
+function replyKeyboardButtonOf(button: TdObject | undefined): ReplyKeyboardButton | null {
+  const text = typeof button?.text === 'string' ? button.text.trim() : ''
+  if (!text) return null
+  return { text, sendsText: button?.type?._ === 'keyboardButtonTypeText' }
 }

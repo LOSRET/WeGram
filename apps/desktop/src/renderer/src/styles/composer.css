@@ -54,6 +54,60 @@
   color: var(--wx-text-secondary);
 }
 
+/* ---------- 机器人自定义键盘 (§8.3) ----------
+   Telegram hangs a bot's reply keyboard under the input; WeChat has no
+   counterpart, so the grid borrows the composer's card language: one bordered
+   surface, one row per TDLib row, keys sharing the row evenly. A key that asks
+   for a phone number / location / chat cannot be answered by this client, so it
+   is drawn dimmed and dashed rather than hidden — the reader still sees what the
+   bot offers. */
+
+.wx-bot-keyboard {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 240px;
+  margin: 6px 3px 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  user-select: none;
+}
+
+.wx-bot-keyboard__row {
+  display: flex;
+  flex: none;
+  gap: 4px;
+}
+
+.wx-bot-keyboard__key {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 34px;
+  padding: 0 8px;
+  overflow: hidden;
+  border: 1px solid var(--wx-line);
+  border-radius: 6px;
+  background: var(--wx-card);
+  font-size: 13px;
+  color: var(--wx-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wx-bot-keyboard__key:hover:not(:disabled),
+.wx-bot-keyboard__key:active:not(:disabled) {
+  background: var(--wx-row-hover);
+}
+
+.wx-bot-keyboard__key:disabled {
+  color: var(--wx-text-disabled);
+}
+
+.wx-bot-keyboard__key--inert {
+  border-style: dashed;
+  color: var(--wx-text-tertiary);
+}
+
 /* ---------- Channel bar ----------
    A channel swaps the composer for WeChat's 服务号 card: the same bordered card
    language, a menu row in the middle and the keyboard switch at the right end
