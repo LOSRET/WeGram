@@ -94,7 +94,9 @@ components/chat-pane/     render tree + useChatHistory (history/ modules) + mess
                          shared mute/pin/clear rows; 群二维码 opens screens/QrWindow.tsx, the
                          rows live in ChatInfoRows.tsx, and the rename/invite sheets in
                          ChatInfoDialogs.tsx) + ChatInfoSearch
-                         (in-panel 查找聊天内容 over search:inChat, picks a row → locate)
+                         (in-panel 查找聊天内容 over search:inChat, with the 聊天文件
+                         tabs 全部/图片/视频/文件/链接 — a media tab asks TDLib's filter
+                         with an empty box — and picks a row → locate)
 components/contacts/      通讯录: ContactsList (service rows + address book by initial) +
                          ContactDetail (the card)
 components/picker/        the expression panel's data hooks and body components
@@ -213,6 +215,12 @@ lib/typingPing.ts     (pure, unit-tested) 对方正在输入 throttle: one ping,
 lib/presence.ts       (pure, unit-tested) 在线 / 最后上线 copy for the peer-status DTO
 lib/editTarget.ts     (pure, unit-tested) which edit path a row has: 编辑 (text) or
                       编辑说明 (a media caption), and the menu's word for each
+lib/attachKind.ts     (pure, unit-tested) what a picked path becomes: 图片与视频 routes
+                      .mp4/.mov/.webm/... to a video message, everything else to a photo,
+                      and 发送文件 always to a document
+lib/inChatSearch.ts   (pure, unit-tested) 查找聊天内容's 聊天文件 tabs: the 全部/图片/
+                      视频/文件/链接 order, whether a tab has anything to ask (a media tab
+                      answers an empty box), and the idle/empty copy
 lib/albumSend.ts      (pure, unit-tested) when a multi-select becomes ONE Telegram album
 lib/albumLayout.ts    (pure, unit-tested) the album's geometry — tdesktop's
                       `LayoutMediaGroup` ported: aspect-ratio templates for 1–4

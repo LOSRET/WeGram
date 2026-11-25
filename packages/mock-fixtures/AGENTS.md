@@ -10,6 +10,7 @@ Scope: the demo account both fakes serve — the Electron mock adapter
   topic and a closed one, every message carrying its `topicId`), their messages (albums, stickers,
   one premium sticker, one custom emoji, a channel post, the 通讯录 people), comment
   threads on the posts that own one, and the contact fields the address book reads.
+  Chat 3 carries one forwarded row (`forward`) so the 转发自 line is visible without TDLib.
 - `seed.ts` — the dataset's shape (`FixtureSeed`, `FixtureOptions`, `SeedMedia`).
   Split out of `data.ts` when the channel fixtures pushed it to its size budget;
   `FixtureSeed` carries `canPost` and `joined` for channels, `contact.bio` /

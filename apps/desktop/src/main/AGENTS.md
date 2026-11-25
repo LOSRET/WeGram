@@ -83,8 +83,10 @@ telegram/tdlib/user-api.ts  createUserApi: the person seam methods (userStatus, 
 media/              registry.ts (token → path | fileId) / protocol.ts (wx-media://: disk
                     Range streams, plus the branch that tails a download) / stream.ts
                     (the byte pump, pure) / leases.ts (per-file download holders, pure) /
-                    image-size.ts / voice-file.ts (a recorded 语音消息's temporary OGG:
-                    written by the handler, pruned at startup once stale)
+                    image-size.ts / video-meta.ts (an MP4/MOV's size + duration for
+                    inputVideo, read from the ISO BMFF boxes; null → send as a document) /
+                    voice-file.ts (a recorded 语音消息's temporary OGG: written by the
+                    handler, pruned at startup once stale)
 store/              ui-db.ts (all SQL) / settings.ts (proxy + TDLib network options) /
                     prefs.ts (ui.db-backed 关闭主窗口 · 发送消息 · 消息字号 · 桌面通知, read on
                     demand)

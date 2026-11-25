@@ -16,10 +16,29 @@ export async function searchGlobal(
   return Promise.all(ids.map((id) => fetchChatSummary(deps, id)))
 }
 
+/** 聊天文件's tabs as TDLib's own search filters; 'url' is a text link/card. */
+export type InChatSearchFilter = 'photo' | 'video' | 'file' | 'url'
+
+const IN_CHAT_FILTERS: Record<InChatSearchFilter, TdObject> = {
+  photo: { _: 'searchMessagesFilterPhoto' },
+  video: { _: 'searchMessagesFilterVideo' },
+  file: { _: 'searchMessagesFilterDocument' },
+  url: { _: 'searchMessagesFilterUrl' },
+}
+
 export async function searchInChat(
   deps: ActionDeps,
-  input: { chatId: number; topicId?: number; q: string; fromMessageId?: number },
+  input: {
+    chatId: number
+    topicId?: number
+    q: string
+    filter?: InChatSearchFilter
+    fromMessageId?: number
+  },
 ): Promise<Message[]> {
+  // No words and no tab is nothing to ask: TDLib would answer the transcript's
+  // newest page for an empty query, which is not a search.
+  if (input.q === '' && !input.filter) return []
   const response = await deps.invoke({
     _: 'searchChatMessages',
     chat_id: input.chatId,
@@ -30,7 +49,7 @@ export async function searchInChat(
     from_message_id: input.fromMessageId ?? 0,
     offset: 0,
     limit: 50,
-    filter: { _: 'searchMessagesFilterEmpty' },
+    filter: input.filter ? IN_CHAT_FILTERS[input.filter] : { _: 'searchMessagesFilterEmpty' },
   })
   const rawMessages: TdObject[] = asArray(response.messages)
   return Promise.all(rawMessages.map((raw) => mapMessage(deps.mapper, input.chatId, raw)))

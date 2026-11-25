@@ -87,7 +87,7 @@ pnpm workspace, W1 + W2 + the W3 main body implemented, plus the private-chat P0
 | 聊天信息 | overlaying 314 px sheet: private/group/channel layouts, member search, rename, pinned announcement, invite QR in its own 360×560 window, clear, leave |
 | Channels | 服务号 bottom card, 加入/申请加入 for an unjoined channel, keyboard switch for admins |
 | Settings | batch A (账号与安全 / 通用 / 网络与代理 / 关于) + batch B's first group 消息通知 (桌面通知 + 私聊/群聊/频道的 免打扰 / 提示音 / 预览); the rest of B and C pending (§9) |
-| Private chat P0/P1 | send failure + 重试, outgoing typing, online/last-seen, delete chat / mark unread, notifications + tray, voice notes (recorded in-renderer, OGG/Opus muxed in-repo), albums, pinned bar, speech-to-text, reactions (display only), block/report, profile card with 备注 + 共同群聊, caption edit, add/remove contact |
+| Private chat P0/P1 | send failure + 重试, outgoing typing, online/last-seen, delete chat / mark unread, notifications + tray, voice notes (recorded in-renderer, OGG/Opus muxed in-repo), albums, **video messages (single clip, MP4/MOV metadata read locally)**, **转发来源 on received forwards**, **聊天文件 tabs in 查找聊天内容**, pinned bar, speech-to-text, reactions (display only), block/report, profile card with 备注 + 共同群聊, caption edit, add/remove contact |
 | 机器人 | inline-keyboard callbacks end to end (`bots:callback` → `getCallbackQueryAnswer`; answer as toast / alert dialog / URL), the composer's `/` command list (`bots:commands`, lazily asked), clickable `botCommand` entities that send the command, the custom reply keyboard with its removal, 强制回复 (the row is offered as the reply target), the bot's profile card (简介 / commands / menu button), inline bots (`@bot query` → `bots:inlineQuery` / `bots:inlineSend`, a result panel above the input), 添加成员 (`chats:addMember` → `addChatMembers`), which is how a bot joins a group, and the first-open screen (empty bot chat → `botInfo.description` + 开始 → ordinary `/start` send, including a validated one-shot deep-link payload); the fixture bot (`@wegram_helper`) serves all of it in the mock/preview |
 | Proxy | 跟随系统代理 by default, `proxy:refresh` / `evt:proxy`, probe + 30 s retry, DPAPI-sealed secrets |
 | Packaging | `.github/workflows/release.yml`: version bump on `main` → NSIS installer → GitHub Release (proven by v0.1.0–v0.1.2); the installer has never been installed or signed |
@@ -100,6 +100,7 @@ pnpm workspace, W1 + W2 + the W3 main body implemented, plus the private-chat P0
 | The UI behaves | mock Electron passes (`launch-detached.ps1 -NoSandbox -Mock`) and the browser preview; the numbers in §5 were measured off those windows |
 | Paging / scroll / FPS | CDP against the real account: 5000 messages at 60 fps, **0.0 px** drift when prepending, 60 pages with no duplicates |
 | The read path against real TDLib | `pnpm tdlib:smoke` (read-only) + real-account Electron sessions |
+| 视频消息 / 转发来源 / 聊天文件 (2026-11-25) | mock + browser preview + unit tests only — the video write path and the empty-query media filter have not run against real TDLib yet (§9.1) |
 | **Writes** to Telegram | the §9.1 matrix now runs on the test DCs: `pnpm tdlib:test-dc` (text / edit / photo / voice / delete) and `pnpm tdlib:test-dc:writes` (album, caption edit, pin, 标为未读, 备注, 联系人, 拉黑, 举报, 转文字, 删除聊天) — last run 9 pass / 3 partial / 1 skip / 0 fail. The partials and the skip are named in §9.1 |
 | The QR login with a real phone | **not yet** — mapping, encoding and fallback are mock-verified only |
 | 机器人 commands + callbacks against real TDLib | `pnpm tdlib:test-dc:bot` (test DCs): BotFather's 27 commands map through `bot_info.commands`, and pressing the `/mybots` inline button answers a callback query (empty answer, no 502) — run 2026-11-24 |
@@ -1309,6 +1310,8 @@ is actually in the tree today, not what the 2026-11-22 audit found missing.
 | P1 | Voice notes | **done** (mock + test DC); waveform empty | `inputMessageVoiceNote` + `inputVoiceNote` + `chatActionRecordingVoiceNote` |
 | P1 | Reactions | **display done**; picker needs the owner | `addMessageReaction`/`removeMessageReaction`/`setMessageReactions`, `getMessageAvailableReactions`, `updateMessageReactions` |
 | P1 | Peer profile card | **done** — card, 共同群聊 list, 聊天信息 face | `getUserFullInfo` (bio, note, `group_in_common_count`, `block_list`), `getGroupsInCommon` |
+| P1 | 视频消息发送 | **done (2026-11-25)** — `media:send {kind:'video'}`, MP4/MOV metadata read in main, 转发自 line on the row; the picker's 图片与视频 entry routes by extension and 发送文件 still sends a document | `inputMessageVideo` + `inputVideo`; unreadable clips fall back to `inputMessageDocument` |
+| P1 | 转发来源 | **done (2026-11-25)** — `Message.forward` (name + origin ids), "转发自 X" line above the bubble, the fakes' forward copies keep the original origin | `message.forward_info.origin`: `messageOriginUser` / `HiddenUser` / `Chat` / `Channel` |
 | P1 | Block / unblock | **done** (资料卡 加入黑名单 / 取消拉黑) | `setMessageSenderBlockList` (null unblocks), `getBlockedMessageSenders` |
 | P1 | Report chat / message | **done for the API-allowed paths**; a human's only path is the chat action bar (unwired) | `reportChat` (two-phase), `chat.can_be_reported`, `messageProperties.can_report_chat` |
 | P1 | Add/remove contact, 备注 | **done** | `addContact` + `importedContact`, `removeContacts`, `setUserNote` |
@@ -1319,7 +1322,7 @@ is actually in the tree today, not what the 2026-11-22 audit found missing.
 | P2 | Location / venue / live location / contact card / poll / dice **sending** | received only (locations flatten to `📍 lat, lon`) | `inputMessageLocation`, `inputMessageLiveLocation`, `inputMessageVenue`, `inputMessageContact`, `inputMessagePoll`, `inputMessageDice` |
 | P2 | Message effects | none | `getMessageEffect` + `messageSendOptions.effect_id` |
 | P2 | Scheduled / silent send | none | `messageSchedulingStateSendAtDate`, `...SendWhenOnline`, `disable_notification` |
-| P2 | Shared media / search filters | text search only | `searchChatMessages(filter: Photo/Video/Document/Url)` |
+| P2 | Shared media / search filters | **in-chat 聊天文件 done (2026-11-25)** — 查找聊天内容 has 全部/图片/视频/文件/链接, the filter rides `search:inChat`; **global search is still text-only** | `searchChatMessages(filter: Photo/Video/Document/Url)`; the global `searchMessages` filter is still `Empty` |
 | P2 | Archived chats | **done (2026-11-23)** — `chats:list { list: 'archive' }`, `chats:setArchived`, 已归档会话 row + page; **global search still reads the main list** | `chatListArchive`, `addChatToList`, `chat.action_bar.can_unarchive` |
 | P2 | More 举报 entries | chat + message wired; spam banners, photo and reaction reports not | `chatActionBarReportSpam`, `chatActionBarReportAddBlock`, `reportChatPhoto`, `reportMessageReactions` |
 | P2 | Draft cloud sync | local `ui.db` only | `setChatDraftMessage` + `updateChatDraftMessage` |
@@ -1343,8 +1346,10 @@ tests: `markedUnread` was never mapped (so 标为未读 set nothing), `setUserCo
 `is_contact` before TDLib flipped it (~1.2 s), and 备注 was offered to a non-contact (TDLib
 refuses it). Still unproven: `resendMessages` (no failed row can be produced — see §6.7),
 `getGroupsInCommon` (this account's only group has no second member, so it needs a second
-test account), and whether `sendChatAction` actually reaches the peer (the adapter swallows
-its errors by design, so only the call path is proven).
+test account), whether `sendChatAction` actually reaches the peer (the adapter swallows
+its errors by design, so only the call path is proven), and the 2026-11-25 batch —
+`inputMessageVideo` on a test DC (mock + MP4 parser only so far), and an in-chat media
+tab's empty-query `searchChatMessages` filter against real TDLib (mock/preview only).
 
 ### 7.3 Recipe: adding one send type (the pattern for most P1/P2 items)
 
@@ -1617,7 +1622,7 @@ sign to merge them.
 | 1 | Search-face virtualisation | The conversation list is virtualised (2026-11-18) and, since 2026-11-23, pages on approach and prefetches the visible window's photos — measured on this account: 321 chats, 100/100/100/21 with no overlap. What is left is the search face: conversation hits and message hits still `.map` their page instead of virtualising it (they are paged, so the count is bounded — mechanical, not urgent) |
 | 2 | Reactions picker | display is done; WeChat has no reactions, so it needs the owner's sign-off (§9.3) |
 | 3 | Settings batches B and C | **B1 消息通知 landed 2026-11-23** (desktop switch + three scopes), **B2 通用补全 landed the same day** (消息字号 four steps through `data-msg-size` / `--wx-msg-scale`; 开机自启 read from and written to the OS login item, packaged builds only). B still open: six 隐私 rules + 黑名单, 登录设备, 存储统计/清理, 自动下载, 角标未读数. C: 两步验证, 本地锁, 全局快捷键, 检查更新, 保存目录, 贴纸管理, 恢复默认. Each adds panels to the same nav table; prefer per-domain channels over growing `settings:set` (消息通知's are `notifications:get` / `setScope` / `setDesktop` in `packages/protocol/src/notification.ts`). 清理缓存 must invalidate `media/registry.ts` tokens or bubbles keep retrying deleted files |
-| 4 | Private-chat P2 list | translate (`translateText`), scheduled/silent send, shared-media tabs, draft cloud sync, multi-select forward, location/contact/poll sending, message effects, chat background, screenshot, 收藏 → Saved Messages |
+| 4 | Private-chat P2 list | translate (`translateText`), scheduled/silent send, draft cloud sync, multi-select forward, location/contact/poll sending, message effects, chat background, screenshot, 收藏 → Saved Messages (the in-chat 聊天文件 tabs landed 2026-11-25; the **global** search filters are still #5) |
 | 5 | Search depth | missing 应用/贴文/图片/视频/音频/链接 filters, 联系人 hits, archived chats (global search still reads `chatListMain`) |
 | 6 | Viewer breadth | no 编辑, no AI block, no 查看原视频, no pin button anywhere |
 | 7 | Composer parity | the 收藏 cube and 剪刀 (screenshot) still toast; the ＋ card's three entries are unwired; no drag & drop / paste; captions are supported by the adapter (`media:send` takes `caption`) but not surfaced at send time |
@@ -2050,6 +2055,35 @@ claim is. Nothing here replaces §1 (state) or §9 (gaps).
   1013 tests, lint 0 warnings, build OK (the existing lottie-web direct-eval build notice remains).
   The real-TDLib description shape is unit-tested but has not yet been clicked through on a test DC.
 
-
-
+**2026-11-25 — 私聊:转发来源 / 视频消息 / 聊天文件**
+- **转发来源**: `Message.forward` (`messageForwardSchema`) is the mapped
+  `message.forward_info.origin` — `map/message.ts`'s `mapForward` resolves the four
+  TDLib origins (user / hidden user / chat / channel) into a printable name plus the ids
+  a later "open the original" needs, and drops an origin it cannot name. `MessageRow`
+  draws one grey `转发自 X` line above the bubble (`styles/message-rows.css`). The fakes'
+  forward copies now set the field through `forwardedOrigin` in `@wegram/mock-session`,
+  so forwarding in the mock/preview shows the line too and a forward-of-a-forward keeps
+  the original origin. Fixture: chat 3 (`妈`) message 301 is forwarded from chat 6.
+- **视频消息**: `media:send` takes `video` now, and `media:pick` asks for `media`
+  (图片与视频) or `file`. `lib/attachKind.ts` maps a picked path by extension; an mp4
+  becomes `inputMessageVideo` with duration/width/height read from the file's ISO BMFF
+  boxes (`main/media/video-meta.ts`; `moov` limits, 16.16 sizes, 90°/270° matrix swap),
+  and an unreadable clip (WebM/MKV, damaged MP4) falls back to a document. The mock
+  adapter takes the same facts through an injected `probeVideoMeta`; `发送文件` still
+  sends a document, and albums stay photos-only. The comment composer carries video too
+  (`comment.ts`'s `mediaKind`).
+- **聊天文件**: `search:inChat` gained `filter` (photo / video / file / url) and allows
+  an empty `q` with a filter; `actions/search.ts` maps it onto
+  `searchMessagesFilterPhoto / Video / Document / Url`. 查找聊天内容 now has the tabs
+  全部 / 图片 / 视频 / 文件 / 链接 (`lib/inChatSearch.ts`, `ChatInfoSearch.tsx`, styles in
+  `chat-info.css`); a media tab asks for everything of its kind, 全部 keeps the
+  text-only rule. The fakes share the filter rule in `mock-session/search.ts`.
+- Verified with the direct commands (pnpm cannot open its store lock in this session):
+  `node scripts/check-version.mjs`; `eslint . --max-warnings 0`; per-package `tsc`
+  (protocol / adapter-contract / mock-session / mock-fixtures / mock-adapter and the
+  desktop node + web projects); `vitest run --pool=threads` — **135 files / 1052 tests**;
+  `electron-vite build` (the pre-existing lottie-web direct-eval notice remains).
+  Not yet: a real-TDLib run of `inputMessageVideo` or of an empty-query media filter,
+  and a window/preview click-through of the three surfaces (the mock and the preview
+  render them, and the fixtures/preview paths are the same code).
 

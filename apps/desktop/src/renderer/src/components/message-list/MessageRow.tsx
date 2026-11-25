@@ -197,6 +197,12 @@ export const MessageRow = memo(
      * pending answer keeps its partial text so the words appear while they land.
      */
     const transcription = mediaKind === 'voice' && !album ? first.transcription : undefined
+    /**
+     * 转发来源: Telegram prints "Forwarded from X" above the bubble; WeChat has no
+     * such line. It sits where the group sender line does, and is drawn once for
+     * an album (its items share the forward).
+     */
+    const forward = first.forward
     const showSender = !first.outgoing && chat.kind !== 'private'
     const channelBubble = channel ? ' wx-bubble--channel' : ''
     /**
@@ -277,6 +283,7 @@ export const MessageRow = memo(
           {showSender && first.senderName && first.senderName !== self.name ? (
             <span className="wx-sender">{first.senderName}</span>
           ) : null}
+          {forward ? <span className="wx-forward">转发自 {forward.fromName}</span> : null}
           {isSticker && media ? (
             <>
               <div

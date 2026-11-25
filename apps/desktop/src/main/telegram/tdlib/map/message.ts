@@ -1,4 +1,4 @@
-import type { Message, MessageInteraction, MessageReaction } from '@wegram/protocol'
+import type { Message, MessageForward, MessageInteraction, MessageReaction } from '@wegram/protocol'
 
 import type { TdObject } from '../client'
 import { isKeyboardRemoved, mapForceReply, mapReplyKeyboard, mapReplyMarkup } from './buttons'
@@ -68,6 +68,7 @@ export async function mapMessage(
   const forceReply = mapForceReply(raw.reply_markup)
   const albumId = albumIdOf(raw)
   const topicId = topicIdOf(raw)
+  const forward = await mapForward(ctx, raw)
   const interaction = mapInteraction(raw)
   const reactions = mapReactions(raw)
   let text = mapped.text
@@ -109,10 +110,60 @@ export async function mapMessage(
     ...(albumId ? { albumId } : {}),
     ...(topicId ? { topicId } : {}),
     ...(raw.reply_to?.message_id ? { replyToId: raw.reply_to.message_id } : {}),
+    ...(forward ? { forward } : {}),
     ...(raw.edit_date ? { edited: true } : {}),
     ...sending,
     ...(interaction ? { interaction } : {}),
     ...(reactions ? { reactions } : {}),
+  }
+}
+
+/**
+ * 转发来源 (TDLib `message.forward_info`).
+ *
+ * Telegram sends the origin in four shapes; three of them carry an id (a user, a
+ * chat, a channel post), while `messageOriginHiddenUser` deliberately has only a
+ * name — the original author hid the account — so the row prints that name and
+ * nothing can open it. An origin this client does not know — a newer TDLib variant, or a
+ * `messageForwardInfo` without an origin — is dropped rather than drawn as
+ * "转发自 未知": a half-truth is worse than the plain bubble the row had before.
+ */
+export async function mapForward(
+  ctx: MapperContext,
+  raw: TdObject,
+): Promise<MessageForward | null> {
+  const info = raw.forward_info
+  if (!info || typeof info !== 'object') return null
+  const stamp = Number(info.date) > 0 ? { date: Number(info.date) } : {}
+  const origin = info.origin
+  switch (origin?._) {
+    case 'messageOriginUser': {
+      const userId = Number(origin.sender_user_id ?? 0)
+      if (!userId) return null
+      return { fromName: await ctx.resolveUserName(userId), fromUserId: userId, ...stamp }
+    }
+    case 'messageOriginHiddenUser': {
+      const name = typeof origin.sender_name === 'string' ? origin.sender_name.trim() : ''
+      return name ? { fromName: name, ...stamp } : null
+    }
+    case 'messageOriginChat': {
+      const chatId = Number(origin.sender_chat_id ?? 0)
+      if (!chatId) return null
+      return { fromName: await ctx.resolveChatTitle(chatId), fromChatId: chatId, ...stamp }
+    }
+    case 'messageOriginChannel': {
+      const chatId = Number(origin.chat_id ?? 0)
+      if (!chatId) return null
+      const messageId = Number(origin.message_id ?? 0)
+      return {
+        fromName: await ctx.resolveChatTitle(chatId),
+        fromChatId: chatId,
+        ...(messageId > 0 ? { fromMessageId: messageId } : {}),
+        ...stamp,
+      }
+    }
+    default:
+      return null
   }
 }
 

@@ -52,6 +52,14 @@ over the budget is a signal to split the domain out, not to raise the cap.
   `main/security/secrets.ts`.
 - Types are inferred from schemas (`z.infer`); do not hand-write a parallel
   interface, and do not use `z.any()` — a field with no shape hides adapter bugs.
+- **A media kind is a different send, not a label.** `media:pick` asks for `'media'`
+  (the 图片与视频 dialog filter) or `'file'`; `media:send` then takes `photo` / `video` /
+  `file`, and the renderer's `lib/attachKind.ts` is what maps a picked path to one.
+  A comment's `mediaKind` carries the same three. `Message.forward` is the mapped
+  `message.forward_info.origin` — name plus the ids a later "open the original" needs.
+- **`search:inChat` may carry an empty `q` together with a `filter`.** The 聊天文件 tabs
+  (photo / video / file / url) ask "everything of this kind"; an empty query with no
+  filter must mean "nothing", never the whole transcript.
 
 ## Verify
 

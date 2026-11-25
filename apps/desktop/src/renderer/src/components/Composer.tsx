@@ -10,6 +10,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 
 import { albumSendOf } from '../lib/albumSend'
 import { loadLatestWindow } from '../lib/anchoredWindow'
+import { sendKindForPath } from '../lib/attachKind'
 import { commandQuery, commandText, filterCommands } from '../lib/botCommands'
 import type { PendingForceReply } from '../lib/forceReply'
 import { parseInlineQuery } from '../lib/inlineQuery'
@@ -390,7 +391,7 @@ export function Composer({
    * rule for when that applies is `lib/albumSend.ts`. Everything else is one
    * message per file.
    */
-  const attach = async (kind: 'photo' | 'file'): Promise<void> => {
+  const attach = async (kind: 'media' | 'file'): Promise<void> => {
     if (busy) return
     try {
       const picked = await invoke('media:pick', { kind })
@@ -398,7 +399,18 @@ export function Composer({
       setBusy(true)
       const wasAnchored = await loadLatestWindow(chatId, topicId)
       const replyToId = replyTo?.id
-      const album = albumSendOf(picked.paths, kind)
+      // One send per file: a clip picked through 图片与视频 is a video message, a
+      // picture a photo, and 发送文件 always a document (lib/attachKind.ts).
+      const sends = picked.paths.map((filePath) => ({
+        filePath,
+        kind: sendKindForPath(filePath, kind),
+      }))
+      // An album is still photos only: its grid is the one Telegram folds, and a
+      // document or a clip inside it would be a separate bubble anyway.
+      const photos = sends.every((item) => item.kind === 'photo')
+        ? sends.map((item) => item.filePath)
+        : null
+      const album = photos ? albumSendOf(photos, 'photo') : null
       if (album) {
         const result = await invoke('media:sendAlbum', {
           chatId,
@@ -411,12 +423,12 @@ export function Composer({
           result.messages.map((message) => ({ op: 'new' as const, message })),
         )
       } else {
-        for (const filePath of picked.paths) {
+        for (const item of sends) {
           const result = await invoke('media:send', {
             chatId,
             ...(topicId === null ? {} : { topicId }),
-            filePath,
-            kind,
+            filePath: item.filePath,
+            kind: item.kind,
             ...(replyToId === undefined ? {} : { replyTo: replyToId }),
           })
           useAppStore.getState().applyMessageOps(chatId, [{ op: 'new', message: result.message }])
@@ -424,10 +436,19 @@ export function Composer({
       }
       if (replyToId !== undefined) onCancelReply()
       if (wasAnchored) useAppStore.getState().requestJumpToLatest(chatId)
+      const single = sends[0]?.kind
       useAppStore
         .getState()
         .setToast(
-          album ? `已发送 ${album.length} 张图片` : kind === 'photo' ? '已发送图片' : '已发送文件',
+          album
+            ? `已发送 ${album.length} 张图片`
+            : sends.length > 1
+              ? '已发送'
+              : single === 'video'
+                ? '已发送视频'
+                : kind === 'file'
+                  ? '已发送文件'
+                  : '已发送图片',
         )
     } catch (error) {
       useAppStore.getState().setError(errorMessage(error))

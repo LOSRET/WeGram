@@ -559,6 +559,29 @@ export const messageInteractionSchema = z.object({
 })
 export type MessageInteraction = z.infer<typeof messageInteractionSchema>
 
+/**
+ * 转发来源 — TDLib `message.forward_info.origin`.
+ *
+ * The transcript draws it as the bubble's "转发自 …" line. The ids are kept so a
+ * later "open the original" gesture does not need another mapping pass: a user
+ * origin can open the person, a chat origin the group, and a channel origin has
+ * the post id that names the original message. A `messageOriginHiddenUser` has
+ * only its name — that is all Telegram sends.
+ */
+export const messageForwardSchema = z.object({
+  /** The words the row prints: the original author, or the chat it came from. */
+  fromName: z.string(),
+  /** Set when the original author is a user. */
+  fromUserId: z.number().int().optional(),
+  /** Set when the message came out of a chat (a group) or a channel. */
+  fromChatId: z.number().int().optional(),
+  /** `messageOriginChannel.message_id`: the original post, channel origins only. */
+  fromMessageId: z.number().int().optional(),
+  /** `messageForwardInfo.date`: when the original message was sent, unix seconds. */
+  date: z.number().int().optional(),
+})
+export type MessageForward = z.infer<typeof messageForwardSchema>
+
 export const messageSchema = z.object({
   id: z.number().int(),
   chatId: z.number().int(),
@@ -639,6 +662,8 @@ export const messageSchema = z.object({
    */
   topicId: z.number().int().positive().optional(),
   replyToId: z.number().int().optional(),
+  /** 转发来源: absent unless the message was forwarded (see `messageForwardSchema`). */
+  forward: messageForwardSchema.optional(),
   edited: z.boolean().optional(),
   /**
    * TDLib `message.sending_state`, only present while a message is on its way or

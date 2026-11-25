@@ -297,7 +297,18 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
       lastReadOutboxMessageId: 0,
     },
     messages: [
-      text(3, 301, 26, '降温了，多穿点', false),
+      // 转发来源: 妈 passed a channel's post on. The fixture carries the mapped
+      // shape (a name + the origin ids), which is what TDLib's forward_info
+      // becomes — the row prints "转发自 WeGram 频道" above its bubble.
+      {
+        ...text(3, 301, 26, '降温了，多穿点', false),
+        forward: {
+          fromName: 'WeGram 频道',
+          fromChatId: 6,
+          fromMessageId: 621,
+          date: at(1500),
+        },
+      },
       text(3, 302, 25, '晚上回来吃饭吗', false),
       ...serviceMessages(at),
     ],

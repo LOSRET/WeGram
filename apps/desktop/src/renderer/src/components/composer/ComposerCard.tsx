@@ -41,7 +41,7 @@ export interface ComposerCardProps {
   sendBlocked?: boolean
   onSend: () => void
   onSendSticker: (sticker: Sticker) => void
-  onAttach: (kind: 'photo' | 'file') => void
+  onAttach: (kind: 'media' | 'file') => void
   /**
    * 语音消息's send path. Absent where a recording has nowhere to go (the comment
    * composer), which leaves the mic tool reporting "还没有接入" like before.
@@ -275,10 +275,10 @@ export function ComposerCard({
             className="wx-context-menu__item"
             onClick={() => {
               closeAttach()
-              onAttach('photo')
+              onAttach('media')
             }}
           >
-            发送图片
+            发送图片或视频
           </button>
           <button
             className="wx-context-menu__item"

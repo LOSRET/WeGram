@@ -1,5 +1,6 @@
 import type { ChatSummary, EventChannel, Message } from '@wegram/protocol'
 
+import { forwardedOrigin } from '@wegram/mock-session'
 import { stickerMedia } from '../stickerMedia'
 import { ME, PREVIEW_STICKERS, media, msg, now } from './fixtures'
 import { previewMessageProperties, previewTranscribe, type PreviewMessagesStore } from './messages'
@@ -103,6 +104,8 @@ export function handlePreviewSend(
             ...original,
             id: ctx.takeId(),
             chatId: Number(store.toChatId),
+            // 转发来源: same rule as the mock adapter, from @wegram/mock-session.
+            forward: forwardedOrigin(original),
             ...(typeof store.toTopicId === 'number'
               ? { topicId: store.toTopicId }
               : { topicId: undefined }),

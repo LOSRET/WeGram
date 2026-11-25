@@ -456,6 +456,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     chatId: number
     topicId?: number
     q: string
+    filter?: 'photo' | 'video' | 'file' | 'url'
     fromMessageId?: number
   }): Promise<Message[]> {
     return actions.searchInChat(this.actionDeps, input)

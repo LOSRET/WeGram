@@ -273,6 +273,38 @@ button.wx-info__person--face:hover .wx-info__avatar {
   height: 30px;
 }
 
+/* 聊天文件: the tab strip under the search field (全部 / 图片 / 视频 / 文件 / 链接).
+   Pills rather than an underline, so five labels fit the 314 px sheet; the
+   active one takes the brand's weak tint, like the client's selected rows. */
+.wx-info__search-tabs {
+  display: flex;
+  gap: 2px;
+  flex: 0 0 auto;
+  padding: 0 14px 8px 40px;
+}
+
+.wx-info__search-tab {
+  flex: none;
+  padding: 4px 9px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--wx-text-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.wx-info__search-tab:hover {
+  background: var(--wx-row-hover);
+  color: var(--wx-text);
+}
+
+.wx-info__search-tab.is-active {
+  background: var(--wx-brand-weak);
+  color: var(--wx-brand-text);
+  font-weight: 500;
+}
+
 .wx-info__search-body {
   position: relative;
   display: flex;

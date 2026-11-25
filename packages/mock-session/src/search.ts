@@ -25,14 +25,54 @@ export function searchChatRows<T extends { title: string }>(
   return chats.filter((chat) => chat.title.toLowerCase().includes(needle)).slice(0, limit)
 }
 
-/** 查找聊天内容: a case-insensitive substring match inside one transcript. */
-export function searchMessageRows<T extends { text: string }>(
+/** The 聊天文件 tabs: a message kind each, plus 'url' for a text link or a card. */
+export type MessageSearchFilter = 'photo' | 'video' | 'file' | 'url'
+
+/** The fields the in-chat rules read; both fakes' rows satisfy this structurally. */
+interface SearchableRow {
+  text: string
+  kind?: string
+  entities?: readonly { type: string }[]
+  linkPreview?: unknown
+}
+
+function matchesFilter(message: SearchableRow, filter: MessageSearchFilter): boolean {
+  switch (filter) {
+    case 'photo':
+      return message.kind === 'photo'
+    case 'video':
+      return message.kind === 'video'
+    case 'file':
+      return message.kind === 'file'
+    case 'url':
+      // A bare URL entity and a preview card are both "a link" to the reader; a
+      // hidden textUrl is one too (the words carry the target).
+      return (
+        message.linkPreview !== undefined ||
+        (message.entities?.some((entity) => entity.type === 'url' || entity.type === 'textUrl') ??
+          false)
+      )
+  }
+}
+
+/**
+ * 查找聊天内容: a case-insensitive substring match inside one transcript.
+ *
+ * With a filter this is the panel's 图片 / 视频 / 文件 / 链接 tab: an empty box
+ * means "everything of that kind", exactly like TDLib's filter with an empty
+ * query. Without one, an empty box searches for nothing (the text tab's rule).
+ */
+export function searchMessageRows<T extends SearchableRow>(
   messages: readonly T[],
   q: string,
+  filter?: MessageSearchFilter,
 ): T[] {
-  const needle = q.toLowerCase()
-  if (needle === '') return []
-  return messages.filter((message) => message.text.toLowerCase().includes(needle))
+  const needle = q.trim().toLowerCase()
+  if (needle === '' && filter === undefined) return []
+  return messages.filter((message) => {
+    if (filter !== undefined && !matchesFilter(message, filter)) return false
+    return needle === '' || message.text.toLowerCase().includes(needle)
+  })
 }
 
 export interface ScopeSearchEntry<C, M> {
@@ -65,10 +105,7 @@ export interface ScopeSearchPage<C, M> {
 export function searchMessagesInScope<
   C extends { id: number; kind: string },
   M extends { id: number; date: number; text: string },
->(
-  entries: Iterable<ScopeSearchEntry<C, M>>,
-  input: ScopeSearchInput,
-): ScopeSearchPage<C, M> {
+>(entries: Iterable<ScopeSearchEntry<C, M>>, input: ScopeSearchInput): ScopeSearchPage<C, M> {
   const needle = input.q.trim().toLowerCase()
   const wantChannel = input.scope === 'channel'
   const key = wantChannel ? 'channel' : 'private'

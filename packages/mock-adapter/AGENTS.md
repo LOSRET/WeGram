@@ -36,6 +36,8 @@ credentials (development only), plus the real PNG/WebP/TGS/WebM media it generat
   thread's post build the same rows (§9.8: a comment can carry what the composer
   produced), so both go through `buildMediaMessage` / `buildStickerMessage`; the
   caller appends the row (transcript or thread) and starts the upload simulation.
+  A `video` row takes its size/duration from the injected `probeVideoMeta` when main
+  provides one, exactly like a photo's pixel size.
 - `transcript.ts` — the one "append and announce" writer; `effects.ts` — read marker and
   transfer simulation; `traffic.ts` — ambient incoming messages.
 - Paging, read, comment, chat-list-order, 话题, search, poll and 资料卡 rules come
@@ -44,9 +46,10 @@ credentials (development only), plus the real PNG/WebP/TGS/WebM media it generat
 
 ## Rules
 
-- Injected, never imported: the `wx-media://` registry and the image-size probe are
-  main-process concerns, so `MockAdapterOptions` takes `registerMedia` and
-  `probeImageSize`; main wires `media/registry.ts` + `media/image-size.ts` into them.
+- Injected, never imported: the `wx-media://` registry, the image-size probe and the
+  video-meta probe are main-process concerns, so `MockAdapterOptions` takes
+  `registerMedia`, `probeImageSize` and (optionally) `probeVideoMeta`; main wires
+  `media/registry.ts` + `media/image-size.ts` + `media/video-meta.ts` into them.
   Adding another app-side dependency means another injected callback.
 - Implement `TelegramAdapter` from `@wegram/adapter-contract` — never import
   `apps/desktop` code. The class is what the type check holds to the seam.

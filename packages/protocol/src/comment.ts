@@ -72,7 +72,7 @@ export const commentContentSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('media'),
     filePath: z.string().min(1),
-    mediaKind: z.enum(['photo', 'file']),
+    mediaKind: z.enum(['photo', 'video', 'file']),
     caption: z.string().optional(),
   }),
 ])

@@ -487,3 +487,84 @@ describe('mapReactions', () => {
     ).toBeUndefined()
   })
 })
+
+describe('mapForward', () => {
+  const base = {
+    id: 1,
+    date: 10,
+    sender_id: { _: 'messageSenderUser', user_id: 42 },
+    content: { _: 'messageText', text: { text: 'forwarded' } },
+  }
+
+  const withForward = (origin: unknown, date = 1_700_000_000) => ({
+    ...base,
+    forward_info: { _: 'messageForwardInfo', origin, date },
+  })
+
+  it('names a forwarded person and keeps the user id', async () => {
+    const message = await mapMessage(
+      makeContext(),
+      7,
+      withForward({ _: 'messageOriginUser', sender_user_id: 99 }),
+    )
+
+    expect(message.forward).toEqual({
+      fromName: 'user-99',
+      fromUserId: 99,
+      date: 1_700_000_000,
+    })
+  })
+
+  it('carries the name of a hidden origin but no id', async () => {
+    const message = await mapMessage(
+      makeContext(),
+      7,
+      withForward({ _: 'messageOriginHiddenUser', sender_name: '  匿名用户  ' }),
+    )
+
+    expect(message.forward).toEqual({ fromName: '匿名用户', date: 1_700_000_000 })
+  })
+
+  it('resolves a chat origin through the chat title', async () => {
+    const message = await mapMessage(
+      makeContext(),
+      7,
+      withForward({ _: 'messageOriginChat', sender_chat_id: 55, author_signature: '' }),
+    )
+
+    expect(message.forward).toEqual({
+      fromName: 'chat-55',
+      fromChatId: 55,
+      date: 1_700_000_000,
+    })
+  })
+
+  it('keeps a channel origin post id so the original stays nameable', async () => {
+    const message = await mapMessage(
+      makeContext(),
+      7,
+      withForward({ _: 'messageOriginChannel', chat_id: 55, message_id: 621 }),
+    )
+
+    expect(message.forward).toEqual({
+      fromName: 'chat-55',
+      fromChatId: 55,
+      fromMessageId: 621,
+      date: 1_700_000_000,
+    })
+  })
+
+  it('drops an origin it cannot name instead of printing 未知', async () => {
+    const hidden = await mapMessage(
+      makeContext(),
+      7,
+      withForward({ _: 'messageOriginHiddenUser', sender_name: '   ' }),
+    )
+    const unknown = await mapMessage(makeContext(), 7, withForward(undefined))
+    const missing = await mapMessage(makeContext(), 7, base)
+
+    expect(hidden).not.toHaveProperty('forward')
+    expect(unknown).not.toHaveProperty('forward')
+    expect(missing).not.toHaveProperty('forward')
+  })
+})

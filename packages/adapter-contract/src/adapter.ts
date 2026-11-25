@@ -39,7 +39,12 @@ import type {
 
 export type AdapterKind = 'mock' | 'tdlib'
 
-export type MediaKind = 'photo' | 'file'
+/**
+ * What a local file becomes: a picture, a video message or a document. The
+ * adapter picks the TDLib content from it; 'video' falls back to a document when
+ * the clip's metadata cannot be read.
+ */
+export type MediaKind = 'photo' | 'video' | 'file'
 
 /**
  * The comment contract lives in packages/protocol (`comment.ts`); the adapter
@@ -424,7 +429,7 @@ export interface TelegramAdapter {
    */
   transcribeMessage(input: InvokeRequest<'messages:transcribe'>): Promise<void>
 
-  /** Sends a local file as a photo or a document (design doc §1: media upload). */
+  /** Sends a local file as a photo, a video message or a document (design doc §1). */
   sendMedia(input: InvokeRequest<'media:send'>): Promise<{ localId: string; message: Message }>
   /**
    * 相册: several local photos in one Telegram album (TDLib `sendMessageAlbum`).

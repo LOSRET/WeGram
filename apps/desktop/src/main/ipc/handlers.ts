@@ -284,8 +284,26 @@ export function createHandlers({
       const owner = BrowserWindow.getFocusedWindow()
       const options: Electron.OpenDialogOptions = {
         properties: ['openFile', 'multiSelections'],
-        ...(payload.kind === 'photo'
-          ? { filters: [{ name: '图片', extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif'] }] }
+        ...(payload.kind === 'media'
+          ? {
+              filters: [
+                {
+                  name: '图片和视频',
+                  extensions: [
+                    'jpg',
+                    'jpeg',
+                    'png',
+                    'webp',
+                    'gif',
+                    'mp4',
+                    'm4v',
+                    'mov',
+                    'webm',
+                    'mkv',
+                  ],
+                },
+              ],
+            }
           : {}),
       }
       const result = owner

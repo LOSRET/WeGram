@@ -1,6 +1,7 @@
 import type { InvokeRequest, Message, Sticker } from '@wegram/protocol'
 import { useRef, useState } from 'react'
 
+import { sendKindForPath } from '../../lib/attachKind'
 import { errorMessage, invoke } from '../../lib/ipc'
 import { useComposerInput } from '../../lib/useComposerInput'
 import { useAppStore } from '../../store/useAppStore'
@@ -60,11 +61,11 @@ export function CommentComposer({
   }
 
   /** Same picker + upload as the chat composer; the file lands in the thread. */
-  const attach = async (kind: 'photo' | 'file'): Promise<void> => {
+  const attach = async (kind: 'media' | 'file'): Promise<void> => {
     try {
       const picked = await invoke('media:pick', { kind })
       for (const filePath of picked.paths) {
-        await post({ kind: 'media', filePath, mediaKind: kind })
+        await post({ kind: 'media', filePath, mediaKind: sendKindForPath(filePath, kind) })
       }
     } catch (error) {
       useAppStore.getState().setError(errorMessage(error))

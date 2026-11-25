@@ -25,6 +25,38 @@ describe('searchMessageRows', () => {
     expect(searchMessageRows(rows, 'release').map((row) => row.id)).toEqual([1])
     expect(searchMessageRows(rows, '')).toEqual([])
   })
+
+  it('keeps only the kind a 聊天文件 tab names, even with an empty box', () => {
+    const rows = [
+      { id: 1, date: 1, text: '[图片]', kind: 'photo' },
+      { id: 2, date: 2, text: '[视频]', kind: 'video' },
+      { id: 3, date: 3, text: '合同.pdf', kind: 'file' },
+      { id: 4, date: 4, text: '看这个 https://t.me/x', kind: 'text' },
+    ]
+    expect(searchMessageRows(rows, '', 'photo').map((row) => row.id)).toEqual([1])
+    expect(searchMessageRows(rows, '', 'video').map((row) => row.id)).toEqual([2])
+    expect(searchMessageRows(rows, '', 'file').map((row) => row.id)).toEqual([3])
+    expect(searchMessageRows(rows, '', 'url')).toEqual([])
+  })
+
+  it('narrows a tab by the words when the reader types', () => {
+    const rows = [
+      { id: 1, date: 1, text: '海边', kind: 'photo' },
+      { id: 2, date: 2, text: '海报', kind: 'photo' },
+    ]
+    expect(searchMessageRows(rows, '海', 'photo').map((row) => row.id)).toEqual([1, 2])
+    expect(searchMessageRows(rows, '海报', 'photo').map((row) => row.id)).toEqual([2])
+  })
+
+  it('treats a link entity and a preview card as the 链接 tab', () => {
+    const rows = [
+      { id: 1, date: 1, text: '看这个', kind: 'text', entities: [{ type: 'url' }] },
+      { id: 2, date: 2, text: '再看这个', kind: 'text', entities: [{ type: 'textUrl' }] },
+      { id: 3, date: 3, text: '卡片', kind: 'text', linkPreview: { url: 'https://a' } },
+      { id: 4, date: 4, text: '普通', kind: 'text' },
+    ]
+    expect(searchMessageRows(rows, '', 'url').map((row) => row.id)).toEqual([1, 2, 3])
+  })
 })
 
 describe('searchMessagesInScope', () => {

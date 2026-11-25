@@ -59,6 +59,15 @@ describe('the fake account', () => {
     expect(album.map((message) => message.kind)).toEqual(['photo', 'video'])
   })
 
+  it('carries a forwarded row with its origin', () => {
+    const message = seeds.get(3)?.messages.find((item) => item.id === 301)
+    expect(message?.forward).toMatchObject({
+      fromName: 'WeGram 频道',
+      fromChatId: 6,
+      fromMessageId: 621,
+    })
+  })
+
   it('carries the two centered service rows the transcript draws', () => {
     const rows = seeds.get(3)?.messages.filter((message) => message.kind === 'service') ?? []
     expect(rows.map((message) => message.text)).toEqual(['未接听语音通话', '妈发送的图片已过期'])

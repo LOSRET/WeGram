@@ -22,6 +22,16 @@ export interface MockSendDeps {
   assets: MockAssets
   registerMedia: (filePath: string) => string
   probeImageSize: (filePath: string) => Promise<{ width: number; height: number } | null>
+  /**
+   * A video's facts, injected the way the image probe is. Optional so the unit
+   * tests' deps stay small: without it a sent clip is a row with no dimensions,
+   * which is exactly the fallback the real adapter has for an unreadable file.
+   */
+  probeVideoMeta?: (filePath: string) => Promise<{
+    width: number
+    height: number
+    duration: number
+  } | null>
   nextFileId: () => number
 }
 
@@ -53,6 +63,8 @@ export async function buildMediaMessage(
 ): Promise<BuiltMedia> {
   const info = await stat(input.filePath)
   const size = input.kind === 'photo' ? await deps.probeImageSize(input.filePath) : null
+  const video =
+    input.kind === 'video' ? ((await deps.probeVideoMeta?.(input.filePath)) ?? null) : null
   const fileId = deps.nextFileId()
   const file: MockFile = {
     fileId,
@@ -72,18 +84,26 @@ export async function buildMediaMessage(
     size: file.size,
     localUrl: file.url,
     ...(size ? { width: size.width, height: size.height } : {}),
+    ...(video
+      ? {
+          width: video.width,
+          height: video.height,
+          ...(video.duration > 0 ? { duration: video.duration } : {}),
+        }
+      : {}),
   }
   const message = outgoingMessage({
     id: input.id,
     chatId: input.chatId,
-    kind: input.kind === 'photo' && size ? 'photo' : 'file',
+    kind: input.kind === 'video' ? 'video' : input.kind === 'photo' && size ? 'photo' : 'file',
     text: input.caption ?? '',
     media,
     replyTo: input.replyTo,
   })
+  const label = message.kind === 'photo' ? '图片' : message.kind === 'video' ? '视频' : '文件'
   return {
     message,
-    preview: `[${message.kind === 'photo' ? '图片' : '文件'}] ${file.name}`,
+    preview: `[${label}] ${file.name}`,
     fileId,
     size: info.size,
   }

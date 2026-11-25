@@ -66,6 +66,7 @@ import {
   previewCanPost,
   previewJoinState,
   previewOpenUsername,
+  previewSearchFilter,
   handlePreviewPins,
   searchPreviewAllMessages,
   searchPreviewChats,
@@ -434,7 +435,13 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'search:global':
       return searchPreviewChats(chats, String(store.q ?? ''), Number(store.limit ?? 20))
     case 'search:inChat': {
-      const hits = searchPreviewMessages(previewChats, Number(store.chatId), String(store.q ?? ''))
+      const filter = previewSearchFilter(store['filter'])
+      const hits = searchPreviewMessages(
+        previewChats,
+        Number(store.chatId),
+        String(store.q ?? ''),
+        filter,
+      )
       // 搜索话题内消息: the composer's search is scoped to the open topic.
       return store.topicId === undefined
         ? hits

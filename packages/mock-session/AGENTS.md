@@ -28,8 +28,12 @@ Pure rules that both fakes must answer identically:
   `createTopic`, `topicEditPatch`, `setTopicFlag`, `removeTopic`, `topicListPage`,
   `topicRead`, `sumTopicUnread` and `DEFAULT_TOPIC_ICONS`.
 - `search.ts` — `searchChatRows` (the 聊天 / 频道 title match; an empty box finds
-  nothing), `searchMessageRows` (in-chat substring) and `searchMessagesInScope`
+  nothing), `searchMessageRows` (in-chat substring, plus the 聊天文件 `filter` where an
+  empty box means "everything of that kind") and `searchMessagesInScope`
   (the merged per-scope stream, its numeric cursor and `total`).
+- `forward.ts` — `forwardedOrigin`: the 转发来源 a fake's forward copy carries (the
+  original's own origin when it has one, else the sender), so the demo's forwards do
+  not look like the sender wrote them.
 - `profile.ts` — `REPORT_OPTIONS` / `reportAnswer` (the phased 举报 sheet) and
   `composeProfile` / `pageCommonChats` for the 资料卡 (备注 overrides, a bot is
   never a contact and is the only reportable person).

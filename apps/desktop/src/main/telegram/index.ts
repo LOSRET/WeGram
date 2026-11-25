@@ -5,6 +5,7 @@ import type { ProxyConfig } from '@wegram/protocol'
 
 import { probeImageSize } from '../media/image-size'
 import { registerMediaFile } from '../media/registry'
+import { probeVideoMeta } from '../media/video-meta'
 import type { TelegramAdapter } from './adapter'
 import { TdlibAdapter } from './tdlib'
 
@@ -42,6 +43,7 @@ export function createAdapter(options: CreateAdapterOptions): TelegramAdapter {
       mediaDir: join(options.userDataDir, 'mock-media'),
       registerMedia: registerMediaFile,
       probeImageSize,
+      probeVideoMeta,
     })
 
   // WEGRAM_ADAPTER=mock forces the fake adapter even when credentials exist:

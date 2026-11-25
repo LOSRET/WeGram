@@ -40,6 +40,7 @@ import type { MockSendDeps } from './media'
 import { beginMockStream, downloadMockFile, mockDownloadedPrefix } from './files'
 import { buildFixtures } from './fixtures'
 import { buildInstantView } from '@wegram/mock-fixtures'
+import { forwardedOrigin } from '@wegram/mock-session'
 import {
   mockHistory,
   mockHistoryAround,
@@ -72,6 +73,15 @@ export interface MockAdapterOptions {
   registerMedia: (filePath: string) => string
   /** Reads an image's pixel size, or null for a format we cannot parse. */
   probeImageSize: (filePath: string) => Promise<{ width: number; height: number } | null>
+  /**
+   * Reads a video's display size and duration; absent in tests, which is the
+   * same "no dimensions" a clip in a format the probe cannot parse gets.
+   */
+  probeVideoMeta?: (filePath: string) => Promise<{
+    width: number
+    height: number
+    duration: number
+  } | null>
 }
 
 /**
@@ -426,6 +436,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
       assets: this.assets,
       registerMedia: this.options.registerMedia,
       probeImageSize: this.options.probeImageSize,
+      ...(this.options.probeVideoMeta ? { probeVideoMeta: this.options.probeVideoMeta } : {}),
       nextFileId: () => this.nextFileId++,
     }
   }
@@ -494,6 +505,9 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
         ...original,
         id: this.nextMessageId++,
         chatId: input.toChatId,
+        // 转发来源: the copy names where the words came from, like TDLib's
+        // forward_info on the new message (see @wegram/mock-session/forward).
+        forward: forwardedOrigin(original),
         ...(input.toTopicId === undefined ? { topicId: undefined } : { topicId: input.toTopicId }),
       })
     }
@@ -530,6 +544,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     chatId: number
     topicId?: number
     q: string
+    filter?: 'photo' | 'video' | 'file' | 'url'
     fromMessageId?: number
   }): Promise<Message[]> {
     const found = searchMessages(this.fixtures, input)

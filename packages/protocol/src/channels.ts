@@ -384,7 +384,18 @@ export const invokeSchemas = {
       chatId: z.number().int(),
       /** 搜索话题内消息: passes TDLib's topic_id to searchChatMessages. */
       topicId: z.number().int().positive().optional(),
-      q: z.string().min(1),
+      /**
+       * The box's text. Empty is legitimate with a `filter`: the 聊天信息 panel's
+       * 图片 / 视频 / 文件 / 链接 tabs are "everything of this kind", which TDLib
+       * answers as an empty query under that filter. Without a filter an empty
+       * query answers [] instead of the whole transcript.
+       */
+      q: z.string().max(512),
+      /**
+       * 聊天文件: the shared-media tab. TDLib's own filters, so the adapter never
+       * guesses from a message's body; 'url' covers a text link and a preview card.
+       */
+      filter: z.enum(['photo', 'video', 'file', 'url']).optional(),
       fromMessageId: z.number().int().optional(),
     }),
     response: z.array(messageSchema),
@@ -394,9 +405,17 @@ export const invokeSchemas = {
     request: searchMessagesRequestSchema,
     response: searchMessagesResponseSchema,
   },
-  /** Opens the native file dialog; an empty list means the user cancelled. */
+  /**
+   * Opens the native file dialog; an empty list means the user cancelled.
+   *
+   * 'media' is the WeChat 图片与视频 entry — the picker filters to pictures and
+   * clips, and main decides per file whether it becomes a photo or a video
+   * message (the extension rule lives in the renderer's `lib/attachKind.ts`,
+   * which hands the final `kind` to `media:send`). 'file' stays unfiltered: a
+   * file the reader chose in 发送文件 is a document, even when it could play.
+   */
   'media:pick': {
-    request: z.object({ kind: z.enum(['photo', 'file']) }),
+    request: z.object({ kind: z.enum(['media', 'file']) }),
     response: z.object({ paths: z.array(z.string()) }),
   },
   'media:download': {
@@ -457,7 +476,13 @@ export const invokeSchemas = {
       chatId: z.number().int(),
       topicId: z.number().int().positive().optional(),
       filePath: z.string().min(1),
-      kind: z.enum(['photo', 'file']),
+      /**
+       * 'photo' is `inputMessagePhoto` (TDLib needs its pixel size and refuses a
+       * picture it cannot measure); 'video' is `inputMessageVideo` (MP4 metadata
+       * is read in main, and an unreadable clip falls back to a document);
+       * 'file' is `inputMessageDocument`, unfiltered.
+       */
+      kind: z.enum(['photo', 'video', 'file']),
       caption: z.string().optional(),
       replyTo: z.number().int().optional(),
     }),

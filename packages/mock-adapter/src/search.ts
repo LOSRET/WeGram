@@ -26,11 +26,16 @@ export function searchChats(
 
 export function searchMessages(
   fixtures: Map<number, Fixture>,
-  input: { chatId: number; q: string; fromMessageId?: number },
+  input: {
+    chatId: number
+    q: string
+    filter?: 'photo' | 'video' | 'file' | 'url'
+    fromMessageId?: number
+  },
 ): Message[] {
   const fixture = fixtures.get(input.chatId)
   if (!fixture) throw new AppError('internal', `Unknown mock chat ${input.chatId}`)
-  return searchMessageRows(fixture.messages, input.q)
+  return searchMessageRows(fixture.messages, input.q, input.filter)
 }
 
 /**

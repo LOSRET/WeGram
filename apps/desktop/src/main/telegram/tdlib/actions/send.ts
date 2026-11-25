@@ -2,6 +2,7 @@ import { AppError } from '@wegram/protocol'
 import type { Message } from '@wegram/protocol'
 
 import { probeImageSize } from '../../../media/image-size'
+import { probeVideoMeta } from '../../../media/video-meta'
 import type { MediaKind } from '../../adapter'
 import type { TdObject } from '../client'
 import { asArray } from '../json'
@@ -201,12 +202,15 @@ export async function resendMessages(
 }
 
 /**
- * The `inputMessagePhoto` / `inputMessageDocument` body for a local file.
+ * The `inputMessagePhoto` / `inputMessageVideo` / `inputMessageDocument` body for
+ * a local file.
  *
  * Photos go through `inputMessagePhoto` so the server builds the usual size
- * ladder; everything else is a document. The pixel size must be known before a
- * photo can be sent (TDLib wants it), so an unparsable image falls back to a
- * document instead of producing a broken bubble.
+ * ladder; a video becomes a playable video message through `inputMessageVideo`,
+ * whose dimensions and duration TDLib wants and which main reads from the MP4
+ * itself (`media/video-meta.ts`); everything else is a document. A picture or a
+ * clip this client cannot measure falls back to a document instead of producing
+ * a broken bubble — that is the same rule, one fallback per kind.
  *
  * Shared with the comment thread (§9.8): a comment carries the same file into
  * the discussion group.
@@ -216,6 +220,30 @@ export async function mediaContent(input: {
   kind: MediaKind
   caption?: string
 }): Promise<TdObject> {
+  if (input.kind === 'video') {
+    const meta = await probeVideoMeta(input.filePath)
+    if (meta) {
+      return {
+        _: 'inputMessageVideo',
+        video: {
+          _: 'inputVideo',
+          video: { _: 'inputFileLocal', path: input.filePath },
+          thumbnail: null,
+          cover: null,
+          start_timestamp: 0,
+          added_sticker_file_ids: [],
+          duration: meta.duration,
+          width: meta.width,
+          height: meta.height,
+          supports_streaming: true,
+        },
+        caption: formattedText(input.caption),
+        show_caption_above_media: false,
+        self_destruct_type: null,
+        has_spoiler: false,
+      }
+    }
+  }
   const size = input.kind === 'photo' ? await probeImageSize(input.filePath) : null
   return input.kind === 'photo' && size
     ? {

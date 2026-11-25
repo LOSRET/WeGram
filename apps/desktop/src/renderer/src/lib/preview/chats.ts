@@ -10,6 +10,7 @@ import {
   searchMessageRows,
   searchMessagesInScope,
 } from '@wegram/mock-session'
+import type { MessageSearchFilter } from '@wegram/mock-session'
 import type {
   ChatInviteLink,
   ChatJoinResult,
@@ -277,13 +278,27 @@ export function searchPreviewAllMessages(
   )
 }
 
-/** In-chat search: the fakes' shared substring rule over the transcript. */
+/** The 聊天文件 tab a payload names, narrowed where it enters the preview. */
+export function previewSearchFilter(value: unknown): MessageSearchFilter | undefined {
+  switch (value) {
+    case 'photo':
+    case 'video':
+    case 'file':
+    case 'url':
+      return value
+    default:
+      return undefined
+  }
+}
+
+/** In-chat search: the fakes' shared substring / 聊天文件 filter rule. */
 export function searchPreviewMessages(
   store: PreviewChatStore,
   chatId: number,
   q: string,
+  filter?: MessageSearchFilter,
 ): Message[] {
-  return searchMessageRows(store.messagesByChat[chatId] ?? [], q)
+  return searchMessageRows(store.messagesByChat[chatId] ?? [], q, filter)
 }
 
 /**

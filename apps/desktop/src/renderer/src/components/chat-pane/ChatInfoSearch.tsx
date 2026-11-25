@@ -2,6 +2,14 @@ import type { Message } from '@wegram/protocol'
 import { useEffect, useRef, useState } from 'react'
 
 import { formatMessageTime, messagePreview } from '../../lib/format'
+import {
+  IN_CHAT_TABS,
+  inChatEmptyText,
+  inChatIdleText,
+  inChatTabLabel,
+  shouldSearchInChat,
+  type InChatTab,
+} from '../../lib/inChatSearch'
 import { errorMessage, invoke } from '../../lib/ipc'
 import { Avatar } from '../Avatar'
 import { OverlayScrollbar } from '../OverlayScrollbar'
@@ -40,9 +48,15 @@ interface ChatInfoSearchProps {
  * (TDLib's own index) rather than filtering the loaded page. A hit closes the
  * panel and locates the row through the pane's existing locate path, which can
  * fetch a window around a message the reader has never scrolled to.
+ *
+ * The tabs are 聊天文件: 全部 is the text search the panel always had, and the four
+ * kinds run TDLib's media filters. A media tab with an empty box asks for
+ * "everything of this kind" (`shouldSearchInChat`), which is the list the client
+ * shows behind 图片 / 视频 / 文件 / 链接.
  */
 export function ChatInfoSearch({ chatId, onBack, onPick }: ChatInfoSearchProps) {
   const [query, setQuery] = useState('')
+  const [tab, setTab] = useState<InChatTab>('all')
   /** `null` = nothing searched yet, so an empty box does not read as "no results". */
   const [results, setResults] = useState<Message[] | null>(null)
   const [loading, setLoading] = useState(false)
@@ -56,7 +70,7 @@ export function ChatInfoSearch({ chatId, onBack, onPick }: ChatInfoSearchProps) 
     const q = query.trim()
     requestRef.current += 1
     const request = requestRef.current
-    if (q === '') {
+    if (!shouldSearchInChat(q, tab)) {
       setResults(null)
       setError(null)
       setLoading(false)
@@ -64,7 +78,11 @@ export function ChatInfoSearch({ chatId, onBack, onPick }: ChatInfoSearchProps) 
     }
     setLoading(true)
     const timer = window.setTimeout(() => {
-      void invoke('search:inChat', { chatId, q })
+      void invoke('search:inChat', {
+        chatId,
+        q,
+        ...(tab === 'all' ? {} : { filter: tab }),
+      })
         .then((found) => {
           if (request !== requestRef.current) return
           // Newest first, like TDLib's own search: the reader is looking for the
@@ -81,7 +99,9 @@ export function ChatInfoSearch({ chatId, onBack, onPick }: ChatInfoSearchProps) 
         })
     }, SEARCH_DELAY_MS)
     return () => window.clearTimeout(timer)
-  }, [query, chatId])
+  }, [query, chatId, tab])
+
+  const fieldPlaceholder = tab === 'all' ? '搜索聊天记录' : `搜索本聊天的${inChatTabLabel(tab)}`
 
   return (
     <div className="wx-info__search">
@@ -92,21 +112,41 @@ export function ChatInfoSearch({ chatId, onBack, onPick }: ChatInfoSearchProps) 
         <SearchField
           value={query}
           onValueChange={setQuery}
-          placeholder="搜索聊天记录"
+          placeholder={fieldPlaceholder}
           autoFocus
           className="wx-info__search-field"
         />
+      </div>
+      <div className="wx-info__search-tabs" role="tablist" aria-label="查找聊天内容">
+        {IN_CHAT_TABS.map((entry) => (
+          <button
+            key={entry.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === entry.key}
+            className={`wx-info__search-tab${tab === entry.key ? ' is-active' : ''}`}
+            onClick={() => {
+              setTab(entry.key)
+              // The old tab's hits are not this tab's answer: drop them at once,
+              // or the list shows 图片 rows under the 文件 tab while it loads.
+              setResults(null)
+              setError(null)
+            }}
+          >
+            {entry.label}
+          </button>
+        ))}
       </div>
       <div className="wx-info__search-body" ref={hostRef}>
         <div className="wx-info__search-scroll" ref={scrollRef}>
           {error !== null ? (
             <p className="wx-info__note wx-info__note--search">{error}</p>
-          ) : results === null ? (
-            <p className="wx-info__note wx-info__note--search">输入关键词，搜索本聊天的聊天记录</p>
-          ) : loading && results.length === 0 ? (
+          ) : loading && (results === null || results.length === 0) ? (
             <p className="wx-info__note wx-info__note--search">正在搜索…</p>
+          ) : results === null ? (
+            <p className="wx-info__note wx-info__note--search">{inChatIdleText(tab)}</p>
           ) : results.length === 0 ? (
-            <p className="wx-info__note wx-info__note--search">没有找到相关聊天记录</p>
+            <p className="wx-info__note wx-info__note--search">{inChatEmptyText(tab)}</p>
           ) : (
             <ul className="wx-info__results">
               {results.map((message) => (

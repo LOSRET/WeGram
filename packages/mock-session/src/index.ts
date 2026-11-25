@@ -46,8 +46,15 @@ export type {
   TopicReadable,
   TopicRecord,
 } from './topics'
+export { forwardedOrigin } from './forward'
+export type { ForwardableRow, ForwardedOrigin } from './forward'
 export { searchChatRows, searchMessageRows, searchMessagesInScope } from './search'
-export type { ScopeSearchEntry, ScopeSearchInput, ScopeSearchPage } from './search'
+export type {
+  MessageSearchFilter,
+  ScopeSearchEntry,
+  ScopeSearchInput,
+  ScopeSearchPage,
+} from './search'
 export {
   applyChatCleared,
   canFakeGetMembers,
