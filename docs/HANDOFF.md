@@ -87,7 +87,7 @@ pnpm workspace, W1 + W2 + the W3 main body implemented, plus the private-chat P0
 | 聊天信息 | overlaying 314 px sheet: private/group/channel layouts, member search, rename, pinned announcement, invite QR in its own 360×560 window, clear, leave |
 | Channels | 服务号 bottom card, 加入/申请加入 for an unjoined channel, keyboard switch for admins |
 | Settings | batch A (账号与安全 / 通用 / 网络与代理 / 关于) + batch B's first group 消息通知 (桌面通知 + 私聊/群聊/频道的 免打扰 / 提示音 / 预览); the rest of B and C pending (§9) |
-| Private chat P0/P1 | send failure + 重试, outgoing typing, online/last-seen, delete chat / mark unread, notifications + tray, voice notes (recorded in-renderer, OGG/Opus muxed in-repo), albums, **video messages (single clip, MP4/MOV metadata read locally)**, **转发来源 on received forwards**, **聊天文件 tabs in 查找聊天内容**, pinned bar, speech-to-text, reactions (display only), block/report, profile card with 备注 + 共同群聊, caption edit, add/remove contact |
+| Private chat P0/P1 | send failure + 重试, outgoing typing, online/last-seen, delete chat / mark unread, notifications + tray, voice notes (recorded in-renderer, OGG/Opus muxed in-repo), albums (**mixed photos + videos**), **video messages (MP4/MOV metadata read locally)**, **取消上传 for a pending send**, **转发来源 on received forwards**, **聊天文件 tabs in 查找聊天内容**, pinned bar, speech-to-text, reactions (display only), block/report, profile card with 备注 + 共同群聊, caption edit, add/remove contact |
 | 机器人 | inline-keyboard callbacks end to end (`bots:callback` → `getCallbackQueryAnswer`; answer as toast / alert dialog / URL), the composer's `/` command list (`bots:commands`, lazily asked), clickable `botCommand` entities that send the command, the custom reply keyboard with its removal, 强制回复 (the row is offered as the reply target), the bot's profile card (简介 / commands / menu button), inline bots (`@bot query` → `bots:inlineQuery` / `bots:inlineSend`, a result panel above the input), 添加成员 (`chats:addMember` → `addChatMembers`), which is how a bot joins a group, and the first-open screen (empty bot chat → `botInfo.description` + 开始 → ordinary `/start` send, including a validated one-shot deep-link payload); the fixture bot (`@wegram_helper`) serves all of it in the mock/preview |
 | Proxy | 跟随系统代理 by default, `proxy:refresh` / `evt:proxy`, probe + 30 s retry, DPAPI-sealed secrets |
 | Packaging | `.github/workflows/release.yml`: version bump on `main` → NSIS installer → GitHub Release (proven by v0.1.0–v0.1.2); the installer has never been installed or signed |
@@ -100,7 +100,7 @@ pnpm workspace, W1 + W2 + the W3 main body implemented, plus the private-chat P0
 | The UI behaves | mock Electron passes (`launch-detached.ps1 -NoSandbox -Mock`) and the browser preview; the numbers in §5 were measured off those windows |
 | Paging / scroll / FPS | CDP against the real account: 5000 messages at 60 fps, **0.0 px** drift when prepending, 60 pages with no duplicates |
 | The read path against real TDLib | `pnpm tdlib:smoke` (read-only) + real-account Electron sessions |
-| 视频消息 / 转发来源 / 聊天文件 (2026-11-25) | mock + browser preview + unit tests only — the video write path and the empty-query media filter have not run against real TDLib yet (§9.1) |
+| 视频消息 / 转发来源 / 聊天文件 / 混合相册 / 取消上传 (2026-11-25) | mock + browser preview + unit tests only — the video write paths (single, mixed album) and the empty-query media filter have not run against real TDLib yet (§9.1); 取消上传 relies on `deleteMessages` cancelling a pending upload, also unproven there |
 | **Writes** to Telegram | the §9.1 matrix now runs on the test DCs: `pnpm tdlib:test-dc` (text / edit / photo / voice / delete) and `pnpm tdlib:test-dc:writes` (album, caption edit, pin, 标为未读, 备注, 联系人, 拉黑, 举报, 转文字, 删除聊天) — last run 9 pass / 3 partial / 1 skip / 0 fail. The partials and the skip are named in §9.1 |
 | The QR login with a real phone | **not yet** — mapping, encoding and fallback are mock-verified only |
 | 机器人 commands + callbacks against real TDLib | `pnpm tdlib:test-dc:bot` (test DCs): BotFather's 27 commands map through `bot_info.commands`, and pressing the `/mybots` inline button answers a callback query (empty answer, no 502) — run 2026-11-24 |
@@ -1315,7 +1315,8 @@ is actually in the tree today, not what the 2026-11-22 audit found missing.
 | P1 | Block / unblock | **done** (资料卡 加入黑名单 / 取消拉黑) | `setMessageSenderBlockList` (null unblocks), `getBlockedMessageSenders` |
 | P1 | Report chat / message | **done for the API-allowed paths**; a human's only path is the chat action bar (unwired) | `reportChat` (two-phase), `chat.can_be_reported`, `messageProperties.can_report_chat` |
 | P1 | Add/remove contact, 备注 | **done** | `addContact` + `importedContact`, `removeContacts`, `setUserNote` |
-| P1 | Album send | **done** — 2–10 photos, one call | `sendMessageAlbum` (returns `Messages`) |
+| P1 | Album send | **done** — 2–10 photos **and videos, mixed**, one call; a video the probe cannot measure is sent as separate messages so the album never holds a document | `sendMessageAlbum` (returns `Messages`) |
+| P0 | 取消上传 | **done (2026-11-25)** — 取消上传 under a pending media row and as the pending row's only menu item; TDLib's `deleteMessages` on a pending message cancels its upload, the mock stops its transfer and drops the row | `deleteMessages` (`revoke:false`); no `cancelUploadFile` exists in 1.8.70 |
 | P1 | Caption edit | **done** — menu 编辑 / 编辑说明 | `editMessageCaption` |
 | P1 | Speech-to-text | **done** for received voice notes | `recognizeSpeech` + `can_recognize_speech` + `speech_recognition_result` |
 | P1 | Pinned message bar | **bar done**, product call open (WeChat has no such bar) | `pinChatMessage`/`unpinChatMessage` + `can_be_pinned` |
@@ -1348,8 +1349,10 @@ refuses it). Still unproven: `resendMessages` (no failed row can be produced —
 `getGroupsInCommon` (this account's only group has no second member, so it needs a second
 test account), whether `sendChatAction` actually reaches the peer (the adapter swallows
 its errors by design, so only the call path is proven), and the 2026-11-25 batch —
-`inputMessageVideo` on a test DC (mock + MP4 parser only so far), and an in-chat media
-tab's empty-query `searchChatMessages` filter against real TDLib (mock/preview only).
+`inputMessageVideo` (single and in a mixed album) on a test DC (mock + MP4 parser only so
+far), whether `deleteMessages` on a still-uploading message really cancels its transfer
+(取消上传's whole contract), and an in-chat media tab's empty-query `searchChatMessages`
+filter against real TDLib (mock/preview only).
 
 ### 7.3 Recipe: adding one send type (the pattern for most P1/P2 items)
 
@@ -2086,4 +2089,20 @@ claim is. Nothing here replaces §1 (state) or §9 (gaps).
   Not yet: a real-TDLib run of `inputMessageVideo` or of an empty-query media filter,
   and a window/preview click-through of the three surfaces (the mock and the preview
   render them, and the fixtures/preview paths are the same code).
+
+**2026-11-25 — 私聊:混合相册与取消上传**
+- **混合相册**: 图片与视频一次多选不再拆开发。`media:sendAlbum` 的 item 只允许
+  photo / video(`channels.ts` 收窄,文档不能进相册),composer 把每条的 kind 交给
+  `lib/albumSend.ts` 的新规则(2–10 条、可混照片与视频、含文档则逐条发)。TDLib 端
+  `sendAlbum` 逐条构建内容;若某个 video 的量测失败而退回 `inputMessageDocument`,
+  整批改走逐条 `sendMessage` —— 相册里混进文档会破坏 transcript 的折叠键。
+- **取消上传**: 新增 `messages:cancelSend`(`send.ts`),待上传的媒体行下出现
+  「取消上传」,右键菜单对该行也只给这一项。TDLib 1.8.70 没有 `cancelUploadFile`,取消
+  就是在消息仍 pending 时 `deleteMessages(revoke:false)`:消息还没到服务器,删除的同时
+  传输被取消。mock 删除文件条目让 `simulateTransfer` 下一步停下并移除行,预览直接删行。
+- 顺带修正: `probeImageSize` / `probeVideoMeta` 的 `open` 移进 try —— 文件在选完
+  之后消失时应退回「按文档发」,而不是从发送路径抛 ENOENT(单测覆盖)。
+- 验证: 七个 tsconfig 的 `tsc --noEmit`、`eslint . --max-warnings 0`、
+  `vitest run --pool=threads`(全量)、`electron-vite build`。仍未经真实 TDLib 验证:
+  `deleteMessages` 是否真能取消上传、混合相册在测试 DC 的落盘表现。
 

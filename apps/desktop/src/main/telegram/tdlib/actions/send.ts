@@ -85,6 +85,26 @@ export async function deleteMessages(
   })
 }
 
+/**
+ * 取消上传: remove a message that is still being uploaded.
+ *
+ * TDLib 1.8.70 has no "cancel this send" call and no `cancelUploadFile`; deleting
+ * a pending message is the supported path, and MessagesManager cancels the file's
+ * upload as part of it. `revoke: false` on purpose: nothing was delivered, and a
+ * revoke would demand a server round trip for a message that does not exist yet.
+ */
+export async function cancelSend(
+  deps: ActionDeps,
+  input: { chatId: number; messageId: number },
+): Promise<void> {
+  await deps.invoke({
+    _: 'deleteMessages',
+    chat_id: input.chatId,
+    message_ids: [input.messageId],
+    revoke: false,
+  })
+}
+
 export async function forwardMessages(
   deps: ActionDeps,
   input: { fromChatId: number; messageIds: number[]; toChatId: number; toTopicId?: number },
@@ -340,29 +360,53 @@ export async function sendMedia(
 }
 
 /**
- * 相册: several local files as one Telegram album (`sendMessageAlbum`).
+ * 相册: several local photos and videos as one Telegram album
+ * (`sendMessageAlbum`).
  *
  * Telegram has no "message with several media": an album is 2–10 messages
  * sharing `media_album_id`, sent in one call and answered as `Messages`. Every
  * answer is mapped like a normal send, so the rows carry the album id and the
- * transcript folds them back into one bubble (design doc §8.6).
+ * transcript folds them back into one bubble (design doc §8.6). Photos and videos
+ * can be mixed; the content builders are the single-send ones, so an album video
+ * is the same `inputMessageVideo`.
  *
- * The content builders are the single-send ones: a photo sent as an album item
- * is the same `inputMessagePhoto`. TDLib requires one shared
- * `show_caption_above_media` across the group, which the builders already fix to
- * false for every photo — so the constraint cannot be violated by a caller.
+ * TDLib requires one shared `show_caption_above_media` across the group, which
+ * both builders fix to false, so that constraint cannot be violated by a caller.
+ *
+ * A video whose metadata cannot be read would fall back to a *document*, and a
+ * document row breaks the transcript's fold (and its album key would collide with
+ * the photo rows). Such a batch is therefore sent as separate messages, each with
+ * the document fallback the single-send path already has.
  */
 export async function sendAlbum(
   deps: ActionDeps,
   input: {
     chatId: number
     topicId?: number
-    items: Array<{ filePath: string; kind: MediaKind; caption?: string }>
+    items: Array<{ filePath: string; kind: 'photo' | 'video'; caption?: string }>
     replyTo?: number
   },
 ): Promise<{ localIds: string[]; messages: Message[] }> {
   const contents: TdObject[] = []
-  for (const item of input.items) contents.push(await mediaContent(item))
+  let albumSafe = true
+  for (const item of input.items) {
+    const content = await mediaContent(item)
+    if (item.kind === 'video' && content._ !== 'inputMessageVideo') albumSafe = false
+    contents.push(content)
+  }
+  if (!albumSafe) {
+    const messages: Message[] = []
+    for (const item of input.items) {
+      const sent = await sendMedia(deps, {
+        chatId: input.chatId,
+        ...(input.topicId === undefined ? {} : { topicId: input.topicId }),
+        ...item,
+        ...(input.replyTo === undefined ? {} : { replyTo: input.replyTo }),
+      })
+      messages.push(sent.message)
+    }
+    return { localIds: messages.map((message) => `td-${message.id}`), messages }
+  }
   const response = await deps.invoke({
     _: 'sendMessageAlbum',
     chat_id: input.chatId,

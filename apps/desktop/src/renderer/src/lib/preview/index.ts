@@ -569,6 +569,7 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'messages:forward':
     case 'messages:sendSticker':
     case 'messages:sendVoice':
+    case 'messages:cancelSend':
       return handlePreviewSend(channel, store, previewSendContext)
     case 'media:pick':
     case 'media:download':

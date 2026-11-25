@@ -25,6 +25,11 @@ export interface MessageActions {
    * arrives as `replace` / `replaceId` / another `failed`.
    */
   resend: (message: Message) => Promise<void>
+  /**
+   * 取消上传: drop a message that is still uploading. Deleting it is what cancels
+   * the transfer in TDLib; the row leaves the transcript at once.
+   */
+  cancelSend: (message: Message) => Promise<void>
   /** 转文字: no optimistic state — the transcript arrives as a content update. */
   transcribe: (message: Message) => Promise<void>
 }
@@ -135,6 +140,20 @@ export function createMessageActions(
             : {}),
         })
         useAppStore.getState().setToast('已转发')
+      } catch (error) {
+        useAppStore.getState().setError(errorMessage(error))
+      }
+    },
+
+    cancelSend: async (message) => {
+      try {
+        await invoke('messages:cancelSend', { chatId: message.chatId, messageId: message.id })
+        useAppStore
+          .getState()
+          .applyMessageOps(message.chatId, [
+            { op: 'delete', chatId: message.chatId, messageIds: [message.id] },
+          ])
+        useAppStore.getState().setToast('已取消上传')
       } catch (error) {
         useAppStore.getState().setError(errorMessage(error))
       }

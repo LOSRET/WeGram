@@ -67,6 +67,11 @@ export interface MessageRowProps {
    */
   onResend?: (message: Message) => void
   /**
+   * 取消上传: stop a message whose media is still uploading. Optional like
+   * `onResend`: the comment panel's rows have no send path to cancel.
+   */
+  onCancelSend?: (message: Message) => void
+  /**
    * A sticker opens the box of the set it belongs to (design doc §8.5). Optional
    * for a presentational row that has no pack box to open.
    */
@@ -119,6 +124,7 @@ export const MessageRow = memo(
     onOpenMenu,
     onOpenComments,
     onResend,
+    onCancelSend,
     onOpenStickerSet,
     onBotCommand,
     onOpenInstantView,
@@ -462,6 +468,18 @@ export const MessageRow = memo(
               bubble: under it, on the transcript's own background, so the buttons
               read as their own control strip instead of part of the body. */}
           {buttons ? <InlineButtons rows={buttons} chatId={chat.id} messageId={first.id} /> : null}
+          {/* 取消上传: visible while a media row is still uploading, for the same
+              reason 未发送 is: a transfer the reader can no longer stop is worse than
+              a momentary button under a bubble. */}
+          {last.outgoing && last.sendingState === 'pending' && onCancelSend && mediaKind ? (
+            <button
+              className="wx-message__cancel"
+              title="取消上传"
+              onClick={() => onCancelSend(last)}
+            >
+              取消上传
+            </button>
+          ) : null}
           {/* 未发送: always visible, unlike the hover meta — a failed message that
               looks delivered is the one bug this row exists to prevent. */}
           {last.sendingState === 'failed' && onResend ? (
@@ -511,6 +529,7 @@ export const MessageRow = memo(
     previous.onOpenMenu === next.onOpenMenu &&
     previous.onOpenComments === next.onOpenComments &&
     previous.onResend === next.onResend &&
+    previous.onCancelSend === next.onCancelSend &&
     previous.onOpenStickerSet === next.onOpenStickerSet &&
     previous.onBotCommand === next.onBotCommand &&
     previous.onOpenInstantView === next.onOpenInstantView &&

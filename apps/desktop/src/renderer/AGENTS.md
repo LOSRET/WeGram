@@ -465,6 +465,12 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   row button (`.wx-message__retry`), not inside the opacity-0 meta line: a failed row
   that looks delivered is the bug the marker exists to prevent. The 重试 action is also
   the first item of the message menu, gated on `canRetry`.
+- **取消上传 owns the pending row, not the failed one.** While `sendingState === 'pending'`
+  a media row draws 取消上传 under the bubble (`.wx-message__cancel`, same always-visible
+  slot as 未发送), and the context menu returns only that item — 删除 would call the same
+  `deleteMessages` and read as a second, scarier word for it. The action posts
+  `messages:cancelSend` and deletes the row optimistically; never flip it to 'failed'
+  locally (that would offer 重试 for a message the reader just discarded).
 - **对方正在输入 is throttled in `lib/typingPing.ts`, and its IPC call never raises an
   error.** One ping, one refresh per 3.5 s, cancel on empty / send / blur / chat switch.
   Do not move the throttle into the composer's onChange or add a per-keystroke call.

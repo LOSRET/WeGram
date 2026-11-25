@@ -60,6 +60,10 @@ over the budget is a signal to split the domain out, not to raise the cap.
 - **`search:inChat` may carry an empty `q` together with a `filter`.** The 聊天文件 tabs
   (photo / video / file / url) ask "everything of this kind"; an empty query with no
   filter must mean "nothing", never the whole transcript.
+- **An album holds photos and videos only** (`media:sendAlbum`), because that is the set
+  the transcript folds; a document is sent one message at a time. `messages:cancelSend`
+  is the 取消上传 row: a *pending* message, removed locally — there is no
+  `cancelUploadFile` in TDLib 1.8.70.
 
 ## Verify
 

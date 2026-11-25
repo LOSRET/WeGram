@@ -93,6 +93,15 @@ export function handlePreviewSend(
       ).filter((item) => !ids.includes(item.id))
       return undefined
     }
+    case 'messages:cancelSend': {
+      // 取消上传: the preview has no bytes in flight; dropping the row is the whole
+      // effect, matching what TDLib's deletion does to a pending message.
+      const chatId = Number(store.chatId)
+      ctx.messagesByChat[chatId] = (ctx.messagesByChat[chatId] ?? []).filter(
+        (message) => message.id !== Number(store.messageId),
+      )
+      return undefined
+    }
     case 'messages:forward': {
       const ids = store.messageIds as number[]
       const source = ctx.messagesByChat[Number(store.fromChatId)] ?? []

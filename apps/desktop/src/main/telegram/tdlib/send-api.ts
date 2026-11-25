@@ -68,6 +68,12 @@ export function createSendApi(getDeps: () => ActionDeps) {
     resendMessages: async (chatId: number, messageIds: number[]): Promise<void> =>
       actions.resendMessages(getDeps(), chatId, messageIds),
 
+    /** 取消上传: removes a pending message; TDLib cancels its upload with it. */
+    cancelSend: async (input: {
+      chatId: number
+      messageId: number
+    }): Promise<void> => actions.cancelSend(getDeps(), input),
+
     sendMedia: async (input: {
       chatId: number
       topicId?: number
@@ -77,11 +83,11 @@ export function createSendApi(getDeps: () => ActionDeps) {
       replyTo?: number
     }): Promise<{ localId: string; message: Message }> => actions.sendMedia(getDeps(), input),
 
-    /** 相册: several photos in one album; see `actions/send.ts sendAlbum`. */
+    /** 相册: photos and videos in one album; see `actions/send.ts sendAlbum`. */
     sendAlbum: async (input: {
       chatId: number
       topicId?: number
-      items: Array<{ filePath: string; kind: MediaKind; caption?: string }>
+      items: Array<{ filePath: string; kind: 'photo' | 'video'; caption?: string }>
       replyTo?: number
     }): Promise<{ localIds: string[]; messages: Message[] }> => actions.sendAlbum(getDeps(), input),
 

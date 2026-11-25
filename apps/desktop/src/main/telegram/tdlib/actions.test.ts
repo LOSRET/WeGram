@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   beginStream,
+  cancelSend,
   editCaption,
   canGetMembers,
   canPost,
@@ -361,10 +362,12 @@ describe('sendAlbum', () => {
 
     const result = await sendAlbum(deps, {
       chatId: 1,
-      // Documents on purpose: a photo item would probe a real file for its size.
+      // Missing files on purpose: the image probe answers null, so each photo
+      // falls back to a document — a document *video* would take the separate
+      // path below, which is the only fallback that changes the call shape.
       items: [
-        { filePath: 'C:/a.pdf', kind: 'file' },
-        { filePath: 'C:/b.pdf', kind: 'file' },
+        { filePath: 'C:/a.jpg', kind: 'photo' },
+        { filePath: 'C:/b.jpg', kind: 'photo' },
       ],
       replyTo: 5,
     })
@@ -385,6 +388,45 @@ describe('sendAlbum', () => {
     expect(result.messages.map((message) => message.id)).toEqual([901, 902])
     expect(result.messages.map((message) => message.albumId)).toEqual(['270', '270'])
     expect(result.localIds).toEqual(['td-901', 'td-902'])
+  })
+
+  it('sends a batch as separate messages when a video cannot be measured', async () => {
+    let nextId = 900
+    const { deps, calls } = makeDeps((method) => {
+      if (method._ === 'sendMessage') return rawMessage(++nextId, 'sent')
+      if (method._ === 'sendMessageAlbum') throw new Error('album must not be used')
+      return null
+    })
+
+    const result = await sendAlbum(deps, {
+      chatId: 1,
+      items: [
+        { filePath: 'C:/a.jpg', kind: 'photo' },
+        // No such file: the video probe answers null, so mediaContent builds a
+        // document. A document row cannot fold into the album (and would reuse
+        // its key), so the whole batch goes out one message at a time.
+        { filePath: 'C:/b.mp4', kind: 'video' },
+      ],
+    })
+
+    expect(calls.map((call) => call._)).toEqual(['sendMessage', 'sendMessage'])
+    expect(result.messages).toHaveLength(2)
+    expect(result.messages.every((message) => message.albumId === undefined)).toBe(true)
+    expect(result.localIds).toEqual(['td-901', 'td-902'])
+  })
+})
+
+describe('cancelSend', () => {
+  it('deletes the pending message locally, without a revoke', async () => {
+    const { deps, calls } = makeDeps(() => ({ _: 'ok' }))
+
+    await cancelSend(deps, { chatId: 1, messageId: 77 })
+
+    // TDLib cancels the upload when its message is deleted; revoke would ask the
+    // server about a message that was never delivered.
+    expect(calls).toEqual([
+      { _: 'deleteMessages', chat_id: 1, message_ids: [77], revoke: false },
+    ])
   })
 })
 

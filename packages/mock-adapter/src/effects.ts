@@ -36,6 +36,9 @@ export async function simulateTransfer(
   const steps = [0.12, 0.38, 0.71]
   for (const step of steps) {
     await new Promise((resolve) => setTimeout(resolve, 180))
+    // 取消上传 removes the file from the asset map; a transfer nobody can see any
+    // more must stop instead of emitting progress for a deleted row.
+    if (!deps.files.has(fileId)) return
     deps.emit({
       type: 'file',
       fileId,

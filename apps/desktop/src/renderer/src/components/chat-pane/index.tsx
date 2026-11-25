@@ -619,6 +619,9 @@ export function ChatPane() {
           onResend={(message) => {
             void actions.resend(message)
           }}
+          onCancelSend={(message) => {
+            void actions.cancelSend(message)
+          }}
           onTranscribe={(message) => {
             void actions.transcribe(message)
           }}

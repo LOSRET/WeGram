@@ -446,8 +446,10 @@ export const invokeSchemas = {
   },
   /**
    * 相册: several local files as ONE Telegram album (`sendMessageAlbum`), so they
-   * arrive as a folded bubble instead of N messages. 2–10 items, photos only —
-   * that is the set the transcript folds back into one row (design doc §8.6).
+   * arrive as a folded bubble instead of N messages. 2–10 items, photos **and
+   * videos** — the exact set the transcript folds back into one row (design doc
+   * §8.6). A document cannot join: a document row would break the fold, so it is
+   * sent one message at a time (the picker filters to photo/video anyway).
    */
   'media:sendAlbum': {
     request: z.object({
@@ -457,7 +459,7 @@ export const invokeSchemas = {
         .array(
           z.object({
             filePath: z.string().min(1),
-            kind: z.enum(['photo', 'file']),
+            kind: z.enum(['photo', 'video']),
             caption: z.string().optional(),
           }),
         )

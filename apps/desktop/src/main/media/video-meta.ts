@@ -1,4 +1,4 @@
-import { open } from 'node:fs/promises'
+import { open, type FileHandle } from 'node:fs/promises'
 
 export interface VideoMeta {
   width: number
@@ -23,8 +23,11 @@ const MOOV_LIMIT = 8 * 1024 * 1024
  * a document instead of a broken video.
  */
 export async function probeVideoMeta(filePath: string): Promise<VideoMeta | null> {
-  const handle = await open(filePath, 'r')
+  // Open inside the try, like the image probe: a clip that vanished between the
+  // picker and the send must become a document, not throw out of the send.
+  let handle: FileHandle | null = null
   try {
+    handle = await open(filePath, 'r')
     const { size } = await handle.stat()
     let offset = 0
     while (offset + 8 <= size) {
@@ -62,7 +65,7 @@ export async function probeVideoMeta(filePath: string): Promise<VideoMeta | null
   } catch {
     return null
   } finally {
-    await handle.close()
+    if (handle) await handle.close()
   }
 }
 

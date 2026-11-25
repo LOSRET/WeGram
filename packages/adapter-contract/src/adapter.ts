@@ -418,6 +418,12 @@ export interface TelegramAdapter {
    */
   resendMessages(chatId: number, messageIds: number[]): Promise<void>
   /**
+   * 取消上传: stops a message that is still uploading. TDLib has no "cancel this
+   * send" call — deleting a pending message is the supported path, and its upload
+   * goes with it. The row disappears; nothing reaches the peer.
+   */
+  cancelSend(input: InvokeRequest<'messages:cancelSend'>): Promise<void>
+  /**
    * TDLib's per-message capabilities (`getMessageProperties`, an offline call).
    * The context menu asks when it opens: the edit window, protected content and
    * the delete-for-me / delete-for-everyone split are TDLib's rules, not ours.
@@ -432,9 +438,11 @@ export interface TelegramAdapter {
   /** Sends a local file as a photo, a video message or a document (design doc §1). */
   sendMedia(input: InvokeRequest<'media:send'>): Promise<{ localId: string; message: Message }>
   /**
-   * 相册: several local photos in one Telegram album (TDLib `sendMessageAlbum`).
-   * The answer carries every item, in transcript order, each mapped like any
-   * other message — the album id is what makes the transcript fold them.
+   * 相册: several local photos and/or videos in one Telegram album (TDLib
+   * `sendMessageAlbum`). The answer carries every item, in transcript order, each
+   * mapped like any other message — the album id is what makes the transcript
+   * fold them. A video whose metadata cannot be read falls back to sending the
+   * batch as separate messages, because a document would break the fold.
    */
   sendAlbum(
     input: InvokeRequest<'media:sendAlbum'>,

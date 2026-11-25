@@ -10,6 +10,8 @@ export interface MessageMenuHandlers {
   onEdit: (message: Message) => void
   onDelete: (message: Message, forBoth: boolean) => void
   onResend: (message: Message) => void
+  /** 取消上传: stop a message whose media is still going out. */
+  onCancelSend: (message: Message) => void
   /** 转文字: asks for the voice note's transcript (the text arrives as an op). */
   onTranscribe: (message: Message) => void
   /** 置顶消息 / 取消置顶 for this chat's one pinned message. */
@@ -45,6 +47,12 @@ export function buildMessageMenuItems(
   { canReply, properties, pinnedMessageId }: MessageMenuOptions,
 ): MenuItem[] {
   const items: MenuItem[] = []
+  // 取消上传: a row that is still uploading is not on the server yet, so stopping it
+  // is the only action that means anything. 删除 would land on the same TDLib call,
+  // which is why the pending row does not offer both.
+  if (message.sendingState === 'pending') {
+    return [{ label: '取消上传', onSelect: () => handlers.onCancelSend(message) }]
+  }
   // 未发送 rows get 重试 first: it is the only action that can still deliver them.
   if (message.sendingState === 'failed' && message.canRetry !== false) {
     items.push({ label: '重试', onSelect: () => handlers.onResend(message) })

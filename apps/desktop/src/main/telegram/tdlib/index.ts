@@ -413,6 +413,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   readonly markRead = this.sendApi.markRead
   readonly sendTyping = this.sendApi.sendTyping
   readonly resendMessages = this.sendApi.resendMessages
+  readonly cancelSend = this.sendApi.cancelSend
   readonly sendMedia = this.sendApi.sendMedia
   readonly sendAlbum = this.sendApi.sendAlbum
   readonly sendSticker = this.sendApi.sendSticker

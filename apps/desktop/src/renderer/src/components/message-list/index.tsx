@@ -84,6 +84,8 @@ export interface MessageListProps {
   onOpenComments: (message: Message) => void
   /** 重试 a message TDLib marked `failed` with `can_retry`. */
   onResend: (message: Message) => void
+  /** 取消上传: stop a message whose media is still uploading. */
+  onCancelSend: (message: Message) => void
   /** 转文字: ask for a voice note's transcript. */
   onTranscribe: (message: Message) => void
   /** 贴纸: clicking a sticker opens the box of the pack it belongs to (§8.5). */
@@ -152,6 +154,7 @@ export function MessageList({
   onCopy,
   onOpenComments,
   onResend,
+  onCancelSend,
   onTranscribe,
   onOpenStickerSet,
   onBotCommand,
@@ -365,6 +368,7 @@ export function MessageList({
                   onOpenMenu={openMenu}
                   onOpenComments={onOpenComments}
                   onResend={onResend}
+                  onCancelSend={onCancelSend}
                   onOpenStickerSet={onOpenStickerSet}
                   onBotCommand={onBotCommand}
                   {...(onOpenInstantView ? { onOpenInstantView } : {})}
@@ -413,6 +417,7 @@ export function MessageList({
               onEdit,
               onDelete,
               onResend,
+              onCancelSend,
               onTranscribe,
               onTogglePin,
               onReport: (message) => setReport(message),

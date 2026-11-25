@@ -1,6 +1,16 @@
+import { join } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
-import { parseImageSize } from './image-size'
+import { parseImageSize, probeImageSize } from './image-size'
+
+describe('probeImageSize', () => {
+  it('answers null for a file it cannot open, so the send becomes a document', async () => {
+    await expect(
+      probeImageSize(join(process.cwd(), 'definitely-missing-image.png')),
+    ).resolves.toBeNull()
+  })
+})
 
 /**
  * `inputPhoto` needs the real pixel size: a wrong guess sends a broken photo to

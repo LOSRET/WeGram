@@ -272,6 +272,7 @@ export function createHandlers({
     'messages:typing': (payload) =>
       adapter.sendTyping(payload.chatId, payload.typing, payload.action, payload.topicId),
     'messages:resend': (payload) => adapter.resendMessages(payload.chatId, payload.messageIds),
+    'messages:cancelSend': (payload) => adapter.cancelSend(payload),
     'messages:vote': (payload) => adapter.votePoll(payload),
     'messages:addPollOption': (payload) => adapter.addPollOption(payload),
     'messages:refreshPoll': (payload) => adapter.refreshPoll(payload),

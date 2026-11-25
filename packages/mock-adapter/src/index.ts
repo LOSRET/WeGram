@@ -155,6 +155,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     })
     this.sendText = this.sends.sendText
     this.sendMedia = this.sends.sendMedia
+    this.cancelSend = this.sends.cancelSend
     this.sendAlbum = this.sends.sendAlbum
     this.sendSticker = this.sends.sendSticker
     this.sendVoiceNote = this.sends.sendVoice
@@ -426,6 +427,7 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   private readonly bots = createMockBots(this.fixtures)
   readonly sendText: TelegramAdapter['sendText']
   readonly sendMedia: TelegramAdapter['sendMedia']
+  readonly cancelSend: TelegramAdapter['cancelSend']
   readonly sendAlbum: TelegramAdapter['sendAlbum']
   readonly sendSticker: TelegramAdapter['sendSticker']
   readonly sendVoiceNote: TelegramAdapter['sendVoiceNote']

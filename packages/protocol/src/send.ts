@@ -21,6 +21,12 @@ export const sendInvokeChannels = [
    * The adapter calls `resendMessages`; the resulting states arrive as ops.
    */
   'messages:resend',
+  /**
+   * 取消上传: stop a message whose media is still uploading and remove its row.
+   * A pending message is not on the server yet, so TDLib deletes it locally and
+   * cancels the transfer with it (`deleteMessages` with `revoke: false`).
+   */
+  'messages:cancelSend',
 ] as const
 
 export const sendInvokeSchemas = {
@@ -43,6 +49,13 @@ export const sendInvokeSchemas = {
     request: z.object({
       chatId: z.number().int(),
       messageIds: z.array(z.number().int()).min(1),
+    }),
+    response: z.void(),
+  },
+  'messages:cancelSend': {
+    request: z.object({
+      chatId: z.number().int(),
+      messageId: z.number().int(),
     }),
     response: z.void(),
   },

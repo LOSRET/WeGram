@@ -405,12 +405,10 @@ export function Composer({
         filePath,
         kind: sendKindForPath(filePath, kind),
       }))
-      // An album is still photos only: its grid is the one Telegram folds, and a
-      // document or a clip inside it would be a separate bubble anyway.
-      const photos = sends.every((item) => item.kind === 'photo')
-        ? sends.map((item) => item.filePath)
-        : null
-      const album = photos ? albumSendOf(photos, 'photo') : null
+      // 2–10 photos and/or videos become ONE album (lib/albumSend.ts); a selection
+      // with a document is sent one message at a time, because a document row
+      // cannot join the fold.
+      const album = albumSendOf(sends)
       if (album) {
         const result = await invoke('media:sendAlbum', {
           chatId,
@@ -441,7 +439,7 @@ export function Composer({
         .getState()
         .setToast(
           album
-            ? `已发送 ${album.length} 张图片`
+            ? `已发送 ${album.length} 项`
             : sends.length > 1
               ? '已发送'
               : single === 'video'

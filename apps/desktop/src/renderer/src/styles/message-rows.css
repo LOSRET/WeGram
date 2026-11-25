@@ -114,6 +114,24 @@
   cursor: default;
 }
 
+/* 取消上传: the same always-visible slot as 未发送, in the secondary tone — it is
+   an escape hatch while the transfer runs, not an error. */
+.wx-message__cancel {
+  align-self: flex-end;
+  margin: 2px 4px 0 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--wx-text-secondary);
+  font-size: 11px;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.wx-message__cancel:hover {
+  color: var(--wx-text);
+}
+
 .wx-message-more {
   align-self: center;
   border: none;

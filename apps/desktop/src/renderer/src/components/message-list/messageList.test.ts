@@ -172,6 +172,7 @@ describe('buildMessageMenuItems', () => {
     onEdit: () => undefined,
     onDelete: (_message: Message, _forBoth: boolean) => undefined,
     onResend: (_message: Message) => undefined,
+    onCancelSend: (_message: Message) => undefined,
     onTranscribe: (_message: Message) => undefined,
     onTogglePin: (_message: Message) => undefined,
     onReport: (_message: Message) => undefined,
@@ -205,6 +206,14 @@ describe('buildMessageMenuItems', () => {
       '删除',
     ])
     expect(labels(message(1), props({ canBeCopied: false }))).not.toContain('复制')
+  })
+
+  it('offers only 取消上传 while a message is still sending', () => {
+    expect(labels(message(1, { sendingState: 'pending', outgoing: true }))).toEqual(['取消上传'])
+    // A failed row has already stopped: it keeps 重试, never 取消上传.
+    const failed = labels(message(1, { sendingState: 'failed', canRetry: true }))
+    expect(failed).not.toContain('取消上传')
+    expect(failed).toContain('重试')
   })
 
   it('offers the edit path the row can actually run', () => {

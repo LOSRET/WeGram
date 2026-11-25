@@ -1,6 +1,16 @@
+import { join } from 'node:path'
+
 import { describe, expect, it } from 'vitest'
 
-import { parseMp4Meta } from './video-meta'
+import { parseMp4Meta, probeVideoMeta } from './video-meta'
+
+describe('probeVideoMeta', () => {
+  it('answers null for a file it cannot open, so the send becomes a document', async () => {
+    await expect(
+      probeVideoMeta(join(process.cwd(), 'definitely-missing-clip.mp4')),
+    ).resolves.toBeNull()
+  })
+})
 
 /** One ISO BMFF box: a 32-bit size, a four-character type, then the payload. */
 function box(type: string, payload: Buffer): Buffer {

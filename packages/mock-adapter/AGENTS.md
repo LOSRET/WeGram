@@ -27,11 +27,12 @@ credentials (development only), plus the real PNG/WebP/TGS/WebM media it generat
 - `users.ts` — 资料卡 for the fixture people: reads the seed into the shared card
   composition, keeps this session's 备注 / 添加删除联系人 / 拉黑 overrides in a map
   (nothing persists) and answers 共同群聊 and the phased 举报 from the shared rules.
-- `sends.ts` — the outgoing path (text / one media file / 相册 / sticker / 语音消息 ->
-  the voice row `buildVoiceMessage` in `media.ts`) as one
-  `createMockSends` factory: build the row, append it, start the fake upload. It is
-  constructed in `MockAdapter`'s constructor rather than as a field initializer,
-  because it reads `assets`.
+- `sends.ts` — the outgoing path (text / one media file / 相册, photos and videos /
+  sticker / 语音消息 -> the voice row `buildVoiceMessage` in `media.ts`) as one
+  `createMockSends` factory: build the row, append it, start the fake upload. It also
+  owns 取消上传: deleting the pending row and its file entry stops `simulateTransfer`
+  at its next step. Constructed in `MockAdapter`'s constructor rather than as a
+  field initializer, because it reads `assets`.
 - `media.ts` — the outgoing media/sticker row builders. A chat's send and a comment
   thread's post build the same rows (§9.8: a comment can carry what the composer
   produced), so both go through `buildMediaMessage` / `buildStickerMessage`; the

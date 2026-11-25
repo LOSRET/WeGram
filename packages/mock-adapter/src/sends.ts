@@ -158,6 +158,23 @@ export function createMockSends(store: MockSendStore) {
     return { localId: `mock-${built.message.id}`, message: built.message }
   }
 
+  /**
+   * 取消上传: the pending row disappears and its file leaves the asset map, which
+   * is what stops this mock's transfer loop at its next step. TDLib does the same
+   * job when deleteMessages removes a message that is still uploading.
+   */
+  const cancelSend = async (input: { chatId: number; messageId: number }): Promise<void> => {
+    const fixture = requireFixture(input.chatId)
+    const target = fixture.messages.find((message) => message.id === input.messageId)
+    if (target?.media) store.sendDeps().assets.files.delete(target.media.fileId)
+    fixture.messages = fixture.messages.filter((message) => message.id !== input.messageId)
+    store.emit({
+      type: 'messages',
+      chatId: input.chatId,
+      ops: [{ op: 'delete', chatId: input.chatId, messageIds: [input.messageId] }],
+    })
+  }
+
   const sendSticker = async (input: {
     chatId: number
     topicId?: number
@@ -174,5 +191,5 @@ export function createMockSends(store: MockSendStore) {
     return { localId: `mock-${built.message.id}`, message: built.message }
   }
 
-  return { sendText, sendMedia, sendAlbum, sendSticker, sendVoice }
+  return { sendText, sendMedia, sendAlbum, sendSticker, sendVoice, cancelSend }
 }

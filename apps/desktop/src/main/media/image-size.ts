@@ -1,4 +1,4 @@
-import { open } from 'node:fs/promises'
+import { open, type FileHandle } from 'node:fs/promises'
 import { extname } from 'node:path'
 
 export interface ImageSize {
@@ -16,15 +16,19 @@ const HEADER_BYTES = 256 * 1024
  * adapter turns into "send as a document" instead of sending a bad photo.
  */
 export async function probeImageSize(filePath: string): Promise<ImageSize | null> {
-  const handle = await open(filePath, 'r')
+  // The open is inside the try too: a file the reader picked and then moved (or a
+  // test fixture that does not exist) must take the "send as a document" path,
+  // not throw out of a send.
+  let handle: FileHandle | null = null
   try {
+    handle = await open(filePath, 'r')
     const buffer = Buffer.alloc(HEADER_BYTES)
     const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0)
     return parseImageSize(buffer.subarray(0, bytesRead), extname(filePath).toLowerCase())
   } catch {
     return null
   } finally {
-    await handle.close()
+    if (handle) await handle.close()
   }
 }
 
