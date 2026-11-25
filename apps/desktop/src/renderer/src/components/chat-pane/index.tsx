@@ -507,7 +507,7 @@ export function ChatPane() {
   }
 
   return (
-    <main className={`wx-chat${comments ? ' wx-chat--comments' : ''}`}>
+    <main className={`wx-chat${comments.panel ? ' wx-chat--comments' : ''}`}>
       <ChatHeader
         title={topic !== null ? topic.title : chat.title}
         {...(topic !== null ? { subtitle: chat.title } : {})}

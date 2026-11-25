@@ -321,6 +321,13 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   (`supergroupFullInfo.can_get_members`) and draws 搜索群成员 + the grid only when
   that answers true — a subscriber would otherwise see the channel's own face
   pretending to be a member.
+- **A panel hook is never a boolean.** `useSlidingPanel` returns its control object
+  (`{ panel, isOpen, open, close, reset }`) whether or not anything is mounted, so
+  `comments ? ' wx-chat--comments' : ''` was always true: the pane kept
+  `overflow: hidden` in every ordinary chat and the 表情 panel's 204 px overhang was
+  cut at the column edge — the card read as "only half", with its 搜索/表情 tabs and
+  the first emoji columns missing. Read the field (`comments.panel`), and treat any
+  class that changes clipping as belonging to the thing it clips.
 - **Esc belongs to the topmost layer.** `lib/useEscapeKey.ts` keeps the mounted
   listeners on a stack and only the newest one acts; two plain `window` listeners
   cannot express that (`stopPropagation` does not stop other listeners on the same
