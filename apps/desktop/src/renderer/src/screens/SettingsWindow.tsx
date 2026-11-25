@@ -8,20 +8,23 @@ import { NetworkPanel } from '@renderer/components/settings/NetworkPanel'
 import { NotificationPanel } from '@renderer/components/settings/NotificationPanel'
 import { SettingsNav } from '@renderer/components/settings/SettingsNav'
 import type { SettingsSection } from '@renderer/components/settings/SettingsNav'
+import { StoragePanel } from '@renderer/components/settings/StoragePanel'
 import { useEscapeKey } from '@renderer/lib/useEscapeKey'
 import { errorMessage, invoke } from '@renderer/lib/ipc'
 
-type SectionKey = 'account' | 'general' | 'notifications' | 'network' | 'about'
+type SectionKey = 'account' | 'general' | 'notifications' | 'storage' | 'network' | 'about'
 
 /**
  * The groups that exist, in design doc §9.11.3's order. Batch A shipped the four
- * around 消息通知; 消息通知 itself is batch B's first group. The remaining three
- * (快捷键 / 数据与存储 / 隐私与安全) are not drawn as dead rows on purpose.
+ * around 消息通知; 消息通知 and 数据与存储 are batch B's first two groups. The
+ * remaining three (快捷键 / 自动下载与保存位置 / 隐私与安全) are not drawn as dead
+ * rows on purpose.
  */
 const SECTIONS: readonly (SettingsSection & { key: SectionKey })[] = [
   { key: 'account', label: '账号与安全' },
   { key: 'general', label: '通用' },
   { key: 'notifications', label: '消息通知' },
+  { key: 'storage', label: '数据与存储' },
   { key: 'network', label: '网络与代理' },
   { key: 'about', label: '关于' },
 ]
@@ -110,6 +113,7 @@ export function SettingsWindow() {
           <GeneralPanel settings={settings} onChange={(next) => void patch(next)} />
         ) : null}
         {section === 'notifications' ? <NotificationPanel /> : null}
+        {section === 'storage' ? <StoragePanel /> : null}
         {section === 'network' ? <NetworkPanel onError={setError} /> : null}
         {section === 'about' ? <AboutPanel /> : null}
       </div>

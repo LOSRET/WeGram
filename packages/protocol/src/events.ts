@@ -61,6 +61,12 @@ export const eventChannels = [
    * shell window first, then publishes this; the viewer window stays open.
    */
   'evt:locate',
+  /**
+   * 数据与存储 deleted cached files (清理缓存, or 缓存上限 trimming). Every
+   * `wx-media://` URL the shell cached may point into a file that no longer
+   * exists, so it drops them and lets the visible bubbles download again.
+   */
+  'evt:mediaCleared',
   'evt:error',
   /**
    * The proxy in force changed by itself — the operating system's proxy appeared,
@@ -106,6 +112,7 @@ export const eventSchemas = {
   ),
   'evt:stickerSets': envelope(z.object({})),
   'evt:topics': envelope(z.object({ chatId: z.number().int() })),
+  'evt:mediaCleared': envelope(z.object({})),
   'evt:locate': envelope(
     z.object({
       chatId: z.number().int(),

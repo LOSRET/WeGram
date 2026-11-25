@@ -185,6 +185,15 @@ export function App() {
           payload.url,
         )
       }),
+      /**
+       * 数据与存储 deleted cached files. Every URL the shell cached may point into
+       * a file that no longer exists, so dropping them is what lets the visible
+       * bubbles (and stickers) download again instead of failing forever.
+       */
+      window.tg.on('evt:mediaCleared', (event) => {
+        track(event.seq)
+        useAppStore.getState().clearMediaUrls()
+      }),
       window.tg.on('evt:stickerSets', (event) => {
         track(event.seq)
         store.noteStickerSetsChanged()

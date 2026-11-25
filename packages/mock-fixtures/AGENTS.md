@@ -24,6 +24,9 @@ Scope: the demo account both fakes serve — the Electron mock adapter
   transcript id.
 - `polls.ts` — `pollMessage` and the group's open multi-answer poll + unanswered
   quiz; the closed poll with results stays inline in `data.ts`.
+- `storage.ts` — 数据与存储's demo cache: four media kinds (~537 MB) plus a 96 MB
+  database, and the trim/clear arithmetic over them. Both fakes show the same numbers;
+  nothing on disk is involved.
 - `services.ts` — the demo's service rows (a missed call, a self-destructed photo):
   the finished text a fixture carries, so the centered notices can be seen without
   TDLib. Split out of `data.ts` for the same size budget.

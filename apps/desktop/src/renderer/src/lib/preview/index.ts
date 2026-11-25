@@ -1,5 +1,6 @@
 import type {
   AppSettings,
+  CacheLimit,
   ChatPinnedMessage,
   AuthState,
   BootState,
@@ -15,13 +16,24 @@ import type {
   ProxyState,
   ProxyTestResult,
   ScopeNotificationSettings,
+  StorageState,
+  StorageUsage,
   TgBridge,
   ViewerItem,
 } from '@wegram/protocol'
 
-import { inlineButtonCallbackSchema } from '@wegram/protocol'
+import {
+  cacheLimitSchema,
+  inlineButtonCallbackSchema,
+  storageMediaKindSchema,
+} from '@wegram/protocol'
 
-import { buildInstantView } from '@wegram/mock-fixtures'
+import {
+  buildInstantView,
+  clearMockStorage,
+  initialMockStorage,
+  trimMockStorage,
+} from '@wegram/mock-fixtures'
 
 import { handlePreviewComments } from './comments'
 import { handlePreviewInline } from './inline'
@@ -180,6 +192,30 @@ const previewNotificationScopes: NotificationScopes = {
   channel: { muted: false, sound: true, showPreview: true },
 }
 let previewDesktopNotifications = true
+/**
+ * 数据与存储 in the preview: the same demo cache the mock adapter serves (both
+ * read it from `@wegram/mock-fixtures`), in memory. Clearing only moves these
+ * numbers — the preview's attachments are data: URLs from the fixtures, so
+ * nothing breaks, where the real shell drops its `wx-media://` URLs on
+ * `evt:mediaCleared`.
+ */
+let previewStorage: StorageUsage = initialMockStorage()
+let previewCacheLimit: CacheLimit = 'unlimited'
+/** The preview has no main process, so its ceiling table lives here. */
+const PREVIEW_LIMIT_BYTES: Record<CacheLimit, number | null> = {
+  unlimited: null,
+  '512mb': 512 * 1024 * 1024,
+  '1gb': 1024 * 1024 * 1024,
+  '2gb': 2 * 1024 * 1024 * 1024,
+  '5gb': 5 * 1024 * 1024 * 1024,
+}
+
+function previewStorageState(): StorageState {
+  return {
+    usage: { ...previewStorage, buckets: previewStorage.buckets.map((bucket) => ({ ...bucket })) },
+    limit: previewCacheLimit,
+  }
+}
 
 /** The preview validates what its own switches send, like the IPC router would. */
 function isScopeNotificationSettings(value: unknown): value is ScopeNotificationSettings {
@@ -460,11 +496,7 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
       return { ...chat }
     }
     case 'chats:openUsername':
-      return previewOpenUsername(
-        chats,
-        String(store.username ?? ''),
-        previewMemberByUsername,
-      )
+      return previewOpenUsername(chats, String(store.username ?? ''), previewMemberByUsername)
     case 'contacts:list':
       return contacts
     case 'users:status': {
@@ -682,6 +714,29 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
         previewNotificationScopes[scope] = { ...settings }
       }
       return undefined
+    }
+    /** 数据与存储: the preview's in-memory cache, with the same two writes. */
+    case 'storage:get':
+      return previewStorageState()
+    case 'storage:setLimit': {
+      const limit = cacheLimitSchema.safeParse(store.limit)
+      if (!limit.success) throw { code: 'invalid_payload', message: '未知的缓存上限' }
+      previewCacheLimit = limit.data
+      const maxBytes = PREVIEW_LIMIT_BYTES[limit.data]
+      if (maxBytes !== null) {
+        const next = trimMockStorage(previewStorage, maxBytes)
+        previewStorage = next.usage
+        if (next.freed.bytes > 0 || next.freed.count > 0) emit('evt:mediaCleared', {})
+      }
+      return previewStorageState()
+    }
+    case 'storage:clear': {
+      const kinds = storageMediaKindSchema.array().min(1).max(5).safeParse(store.kinds)
+      if (!kinds.success) throw { code: 'invalid_payload', message: '请选择要清理的媒体类型' }
+      const next = clearMockStorage(previewStorage, kinds.data)
+      previewStorage = next.usage
+      if (next.freed.bytes > 0 || next.freed.count > 0) emit('evt:mediaCleared', {})
+      return { freedBytes: next.freed.bytes, state: previewStorageState() }
     }
     /**
      * The viewer is its own Electron window, so the browser preview can only

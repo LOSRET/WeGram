@@ -20,6 +20,9 @@ import type {
   Self,
   StickerSet,
   StickerSetSummary,
+  StorageFreed,
+  StorageMediaKind,
+  StorageUsage,
   InstantView,
 } from '@wegram/protocol'
 
@@ -39,7 +42,12 @@ import { applyRead } from './effects'
 import type { MockSendDeps } from './media'
 import { beginMockStream, downloadMockFile, mockDownloadedPrefix } from './files'
 import { buildFixtures } from './fixtures'
-import { buildInstantView } from '@wegram/mock-fixtures'
+import {
+  buildInstantView,
+  clearMockStorage,
+  initialMockStorage,
+  trimMockStorage,
+} from '@wegram/mock-fixtures'
 import { forwardedOrigin } from '@wegram/mock-session'
 import {
   mockHistory,
@@ -123,6 +131,13 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   private readonly stickerSetState = initialMockStickerSetState()
   /** 消息通知's scope defaults; in memory, like every other fixture write. */
   private readonly mockNotifications = createMockNotifications()
+  /**
+   * 数据与存储: a plausible cache for the fixture account (the shared demo numbers
+   * live in `@wegram/mock-fixtures`). The generated media is a few megabytes, but
+   * the group's whole point is rows big enough to trim and clear, so dropping
+   * them changes only these numbers — nothing in `mock-media` is deleted.
+   */
+  private mockStorage: StorageUsage = initialMockStorage()
   private nextMessageId = 5000
   private nextFileId = 9000
   private timer: NodeJS.Timeout | null = null
@@ -610,6 +625,25 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
     settings: ScopeNotificationSettings,
   ): Promise<void> {
     this.mockNotifications.set(scope, settings)
+  }
+
+  async storageUsage(): Promise<StorageUsage> {
+    return {
+      ...this.mockStorage,
+      buckets: this.mockStorage.buckets.map((bucket) => ({ ...bucket })),
+    }
+  }
+
+  async trimStorage(maxBytes: number): Promise<StorageFreed> {
+    const next = trimMockStorage(this.mockStorage, maxBytes)
+    this.mockStorage = next.usage
+    return next.freed
+  }
+
+  async clearStorage(kinds: StorageMediaKind[]): Promise<StorageFreed> {
+    const next = clearMockStorage(this.mockStorage, kinds)
+    this.mockStorage = next.usage
+    return next.freed
   }
 
   /* ---------- fixture plumbing ---------- */

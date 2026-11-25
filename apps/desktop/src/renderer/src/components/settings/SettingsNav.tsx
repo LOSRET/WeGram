@@ -39,6 +39,13 @@ const ICONS: Record<string, ReactNode> = {
       <path d="M6.6 13.2a1.5 1.5 0 0 0 2.8 0" />
     </svg>
   ),
+  storage: (
+    <svg {...iconProps}>
+      <ellipse cx="8" cy="4.2" rx="4.7" ry="1.9" />
+      <path d="M3.3 4.2v7.6c0 1 2.1 1.9 4.7 1.9s4.7-.9 4.7-1.9V4.2" />
+      <path d="M3.3 8c0 1 2.1 1.9 4.7 1.9s4.7-.9 4.7-1.9" />
+    </svg>
+  ),
   network: (
     <svg {...iconProps}>
       <circle cx="8" cy="8" r="5.9" />

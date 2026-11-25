@@ -15,4 +15,9 @@ export const createMediaSlice: SliceCreator<MediaActions> = (set) => ({
       mediaProgress: { ...state.mediaProgress, [fileId]: progress },
       ...(url ? { mediaUrls: { ...state.mediaUrls, [fileId]: url } } : {}),
     })),
+
+  // Returning the unchanged state keeps every subscriber from re-rendering when
+  // there was nothing cached to drop.
+  clearMediaUrls: () =>
+    set((state) => (Object.keys(state.mediaUrls).length === 0 ? state : { mediaUrls: {} })),
 })

@@ -128,6 +128,17 @@ export function closeViewer(): void {
   viewerWindow?.close()
 }
 
+/**
+ * Starts the open strip over. 数据与存储 uses it after 清理缓存 deleted the file the
+ * window is showing: its `wx-media://` URL points into a file that no longer
+ * exists, and a reload is the viewer's existing "read everything again" path
+ * (see `openViewer`). A closed viewer has nothing to do.
+ */
+export function reloadViewer(): void {
+  const win = getViewerWindow()
+  if (win) win.webContents.reload()
+}
+
 export function isViewerWindow(win: BrowserWindow | null): boolean {
   return Boolean(win && win === viewerWindow)
 }

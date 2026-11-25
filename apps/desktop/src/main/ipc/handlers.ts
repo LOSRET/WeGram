@@ -28,11 +28,14 @@ import {
   viewerState,
 } from '../viewer'
 import { closeSettingsWindow, openSettingsWindow } from '../settings-window'
+import { cacheLimitBytes } from '../storage-usage'
 import {
+  getCacheLimit,
   getCloseBehavior,
   getDesktopNotifications,
   getMessageTextSize,
   getSendKey,
+  setCacheLimit,
   setCloseBehavior,
   setDesktopNotifications,
   setMessageTextSize,
@@ -78,6 +81,12 @@ export interface HandlerDeps {
    * desktop notification for the chat the reader is already looking at.
    */
   setActiveChat: (chatId: number | null) => void
+  /**
+   * 数据与存储 deleted cached files: the `wx-media://` URLs the shell and the
+   * viewer cached may point into files that no longer exist. Main publishes
+   * `evt:mediaCleared` and reloads the viewer, whose strip is its own window.
+   */
+  onMediaCleared?: () => void
 }
 
 /**
@@ -99,6 +108,7 @@ export function createHandlers({
   onAuthInteraction,
   onLocate,
   setActiveChat,
+  onMediaCleared,
 }: HandlerDeps): IpcHandlerMap {
   /**
    * The viewer's own downloads (open / save / copy / reveal) outrank the
@@ -518,6 +528,39 @@ export function createHandlers({
      */
     'notifications:setDesktop': (payload) => {
       setDesktopNotifications(uiDb, payload.desktop)
+    },
+
+    /**
+     * 数据与存储 (design doc §9.11.3): TDLib owns the cache, so the panel reads its
+     * per-type statistics and asks it to delete the ticked kinds. The ceiling is
+     * local (`ui.db`): how much disk this machine may spend is not an account
+     * property. Both writes answer a fresh exact read — a per-type row cannot be
+     * patched from an aggregate "freed" number, and the read after the deletion is
+     * what the panel must paint.
+     */
+    'storage:get': async () => ({
+      usage: await adapter.storageUsage(),
+      limit: getCacheLimit(uiDb),
+    }),
+    'storage:setLimit': async ({ limit }) => {
+      const maxBytes = cacheLimitBytes(limit)
+      const freed = maxBytes === null ? null : await adapter.trimStorage(maxBytes)
+      // Stored only after the trim succeeded: a rejected write must not leave the
+      // panel showing one ceiling and the disk enforcing another.
+      setCacheLimit(uiDb, limit)
+      if (freed && (freed.bytes > 0 || freed.count > 0)) onMediaCleared?.()
+      return { usage: await adapter.storageUsage(), limit }
+    },
+    'storage:clear': async ({ kinds }) => {
+      const freed = await adapter.clearStorage(kinds)
+      if (freed.bytes > 0 || freed.count > 0) onMediaCleared?.()
+      return {
+        freedBytes: freed.bytes,
+        state: {
+          usage: await adapter.storageUsage(),
+          limit: getCacheLimit(uiDb),
+        },
+      }
     },
 
     'proxy:get': async () => proxyController.state() ?? proxyController.resolve({ apply: false }),

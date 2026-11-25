@@ -9,6 +9,8 @@ interface SettingsSelectProps<T extends string> {
   value: T
   options: readonly Option<T>[]
   onChange: (next: T) => void
+  /** Holds the control while a write it belongs to is in flight. */
+  disabled?: boolean
 }
 
 /**
@@ -21,12 +23,14 @@ export function SettingsSelect<T extends string>({
   value,
   options,
   onChange,
+  disabled,
 }: SettingsSelectProps<T>) {
   return (
     <span className="wx-set-select">
       <select
         aria-label={label}
         className="wx-set-select__input"
+        disabled={disabled}
         value={value}
         onChange={(event) => {
           // Only a value that came from this control may be written back: the

@@ -17,6 +17,7 @@ import { qrInvokeChannels, qrInvokeSchemas } from './qr'
 import { pollInvokeChannels, pollInvokeSchemas } from './poll'
 import { networkInvokeChannels, networkInvokeSchemas } from './network'
 import { notificationInvokeChannels, notificationInvokeSchemas } from './notification'
+import { storageInvokeChannels, storageInvokeSchemas } from './storage'
 import { customEmojiStickerSchema, stickerSetSchema, stickerSetSummarySchema } from './stickers'
 import {
   appInfoSchema,
@@ -202,6 +203,8 @@ export const invokeChannels = [
   ...networkInvokeChannels,
   /** 消息通知: the local desktop switch and the per-scope defaults; ./notification.ts. */
   ...notificationInvokeChannels,
+  /** 数据与存储: TDLib's cache statistics, 缓存上限 and 清理缓存; ./storage.ts. */
+  ...storageInvokeChannels,
   'app:info',
   /** The login window's 进入 button: main swaps it for the shell window. */
   'login:enter',
@@ -616,6 +619,7 @@ export const invokeSchemas = {
   'proxy:refresh': { request: noPayload, response: proxyStateSchema },
   ...networkInvokeSchemas,
   ...notificationInvokeSchemas,
+  ...storageInvokeSchemas,
   'app:info': { request: noPayload, response: appInfoSchema },
   'login:enter': { request: noPayload, response: noPayload },
   'login:close': { request: noPayload, response: noPayload },

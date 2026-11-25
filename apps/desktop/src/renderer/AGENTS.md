@@ -12,8 +12,9 @@ main.tsx              route by hash: plain = shell, #viewer = viewer, #login = l
 App.tsx               shell only (auth ready) + the ONE place that subscribes to evt:*
 screens/LoginWindow.tsx  the standalone login window: chrome + its four bodies
 screens/SettingsWindow.tsx  the 设置 window (`#settings`, design doc §9.11): a frameless
-                         640×558 sheet with its own nav (账号与安全 / 通用 / 消息通知 / 网络与
-                         代理 / 关于 — §9.11.3's order) and `components/settings/` panels; it owns
+                         640×558 sheet with its own nav (账号与安全 / 通用 / 消息通知 / 数据与
+                         存储 / 网络与代理 / 关于 — §9.11.3's order) and `components/settings/`
+                         panels; it owns
                          no shell state and repaints from `evt:theme`
 screens/InstantViewWindow.tsx  即时预览's own window (`#instantview`, design doc §8.9):
                          toolbar (title, page zoom, 在浏览器打开) + `components/instant-view/
@@ -107,8 +108,12 @@ components/settings/      the 设置 panels: SettingsNav / SettingsGroup / Setti
                          the build may write it) / NotificationPanel
                          (消息通知: 桌面通知 is local, the 私聊/群聊/频道 triples are TDLib's
                          scope defaults — optimistic switches that revert on a rejected
-                         write) / NetworkPanel / AboutPanel (styles/settings.css holds the
-                         measured tokens)
+                         write) / StoragePanel (数据与存储: TDLib's per-type cache usage,
+                         缓存上限 in ui.db, and 清理缓存 with the official dialog's tickable
+                         rows; a deletion arrives as `evt:mediaCleared`, so the store drops
+                         its cached media URLs) /
+                         NetworkPanel / AboutPanel (styles/settings.css holds the measured
+                         tokens)
 components/proxy/         ProxyForm: the one proxy form, shown by the login window's
                          modal (`ProxyPanel`) and inline by 网络与代理 — 跟随系统代理
                          (default) / 手动配置 / 不使用代理 at the top, the manual fields
@@ -249,6 +254,8 @@ lib/qrImage.ts       the 群二维码 window's PNG: same qrMatrix/qrDrawing the 
 lib/history.ts       (pure, unit-tested) the ONE "may this empty page be cached" rule
 lib/linkPreview.ts    (pure, unit-tested) the 链接预览 card's one content-derived value: its hue
 lib/media.ts          per-owner request dedupe + cancel + the media URL/progress hooks
+lib/storage.ts        (pure, unit-tested) 数据与存储's display arithmetic: a row's share of
+                      the clearable media, and the selected rows' total for the button
 lib/mediaVariant.ts   (pure, unit-tested) which photo size covers a box
 lib/mediaPriority.ts  (pure, unit-tested) the TDLib download priority ladder
 lib/emojiSound.ts     an animated emoji's click sound, fetched on the first click
@@ -426,6 +433,12 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   screen of margin) gates the download. Every `media:download` names an **owner**, so
   `media:cancel` stops only that bubble — a video bubble never downloads the clip at all;
   the viewer streams it through `media:stream`.
+- **`evt:mediaCleared` invalidates every cached media URL at once.** 数据与存储 deleted
+  cache files, and TDLib reports only size/count — never file ids — so there is no
+  per-file patch to make: the shell clears `mediaUrls` and the visible bubbles ask for a
+  fresh download. Do not keep an entry "in case the file is still there"; a URL whose
+  file is gone fails forever. The viewer is its own window with its own store, which is
+  why main reloads it instead of sending it this event.
 - **A viewer photo must be allowed to outgrow the canvas.** Tailwind's preflight
   caps every `img` at `max-width: 100 %`, and an `img` is also a flex item (it
   shrinks by default), so the zoomed picture stopped dead at the window width —

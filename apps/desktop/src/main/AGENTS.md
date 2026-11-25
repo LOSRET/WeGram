@@ -88,8 +88,9 @@ media/              registry.ts (token → path | fileId) / protocol.ts (wx-medi
                     voice-file.ts (a recorded 语音消息's temporary OGG: written by the
                     handler, pruned at startup once stale)
 store/              ui-db.ts (all SQL) / settings.ts (proxy + TDLib network options) /
-                    prefs.ts (ui.db-backed 关闭主窗口 · 发送消息 · 消息字号 · 桌面通知, read on
-                    demand)
+                    prefs.ts (ui.db-backed 关闭主窗口 · 发送消息 · 消息字号 · 桌面通知 ·
+                    缓存上限, read on demand)
+storage-usage.ts    数据与存储's pure rule: 缓存上限 → bytes
 proxy*.ts           proxy DTO ↔ stored config
 proxy-controller.ts the ONE place that decides the proxy in force (§6.4): manual →
                     WEGRAM_PROXY (dev) → system → direct, plus the 30 s retry that
@@ -137,6 +138,16 @@ change belongs in the adapter.
 - **The renderer never sees a filesystem path.** Only the adapters may call
   `media/registry.ts` to mint a `wx-media://f/<token>` URL; `media/protocol.ts`
   resolves tokens and never request paths, and it must keep Range support.
+- **The cache belongs to TDLib.** 数据与存储 never deletes a file itself: `actions/storage.ts`
+  reads the exact `getStorageStatistics` (+ fast for the database) and writes through
+  `optimizeStorage`, with `file_types` naming the ticked kinds' TDLib types — that table is
+  what makes 贴纸 clearable while thumbnails, profile photos and wallpapers stay out. Every
+  write answers a fresh exact read; the per-type rows cannot be patched from an aggregate
+  "freed" number. 缓存上限 is a local `ui.db` preference, enforced when it changes and once per
+  signed-in session (`main/index.ts` `applyCacheLimit` — TDLib republishes `ready` for avatar
+  updates, so "once per event" would scan the cache repeatedly). TDLib reports deleted files as
+  size/count only, never ids, so a deletion publishes `evt:mediaCleared` (the shell drops its
+  cached URLs) and reloads the viewer; `media_cache` in `ui.db` stays unused.
 - **`messagesByChat` entries are created only by `setHistory`/`prependHistory`**
   (that is renderer state, but the adapter decides what triggers it): a read
   marker for a chat whose history was never loaded must not look like a loaded

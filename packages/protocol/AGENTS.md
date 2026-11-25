@@ -11,7 +11,8 @@ schemas), `errors.ts` (`AppError`) and the modules split out as those two files 
 `contact.ts` (the 通讯录 `Contact` row), `settings.ts` (proxy,
 app settings, `app:info`), `network.ts` (the TDLib network-option channels —
 `prefer_ipv6`), `notification.ts` (消息通知: the three scope DTOs + the local 桌面通知
-switch, and their `notifications:*` channel table), `viewer.ts` (the 图片和视频 window's payloads),
+switch, and their `notifications:*` channel table), `storage.ts` (数据与存储:
+the cache usage, 缓存上限, 清理缓存 and their `storage:*` channel table), `viewer.ts` (the 图片和视频 window's payloads),
 `chat.ts` (the chat DTOs: kind/summary/member/pinned message/invite link/chat ops),
 `chats.ts` (the chat domain's channel keys and schemas), `qr.ts` (the 群二维码
 window's channels), `poll.ts` (the poll DTO + the vote/add-option/refresh channels),
@@ -28,8 +29,9 @@ report) and `user.ts` (the 资料卡 DTO — including `BotProfile`, the bot-onl
 answer, and the inline query (`@bot query`) result rows — four channels),
 `reaction.ts` (the 表情回应 chip DTO, display-only for now), `properties.ts` (the
 per-message capability answer the context menu reads) and `web.ts` (即时预览: the
-`web:instantView` channel and the rich-block page the reader draws). The channel tables of `chats.ts`, `qr.ts`, `send.ts`, `presence.ts` and
-`network.ts` are spread into the two command tables; `events.ts` owns its own.
+`web:instantView` channel and the rich-block page the reader draws). The channel tables of `chats.ts`, `qr.ts`, `send.ts`, `presence.ts`,
+`network.ts`, `notification.ts` and `storage.ts` are spread into the two command
+tables; `events.ts` owns its own.
 The package is exported straight from source (`src/index.ts`, no build step), so
 `pnpm typecheck` in the consumer is the only build. A new field that pushes `dto.ts`
 over the budget is a signal to split the domain out, not to raise the cap.

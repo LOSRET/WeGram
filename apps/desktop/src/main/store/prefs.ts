@@ -1,5 +1,5 @@
-import { messageTextSizeSchema } from '@wegram/protocol'
-import type { MessageTextSize } from '@wegram/protocol'
+import { cacheLimitSchema, messageTextSizeSchema } from '@wegram/protocol'
+import type { CacheLimit, MessageTextSize } from '@wegram/protocol'
 
 import type { UiDatabase } from './ui-db'
 
@@ -19,6 +19,8 @@ const SEND_KEY = 'sendKey'
 const DESKTOP_NOTIFICATIONS = 'notifications.desktop'
 /** ui.db key holding 消息字号; its value is a {@link MessageTextSize}. */
 const MESSAGE_TEXT_SIZE = 'messageTextSize'
+/** ui.db key holding 缓存上限; its value is a {@link CacheLimit}. */
+const CACHE_LIMIT = 'cacheLimit'
 
 export type CloseBehavior = 'tray' | 'quit'
 export type SendKey = 'enter' | 'ctrlEnter'
@@ -76,4 +78,19 @@ export function getMessageTextSize(uiDb: UiDatabase | null): MessageTextSize {
 
 export function setMessageTextSize(uiDb: UiDatabase, value: MessageTextSize): void {
   uiDb.setSetting(MESSAGE_TEXT_SIZE, value)
+}
+
+/**
+ * 缓存上限: how much disk the downloaded-media cache may take. Local rather than
+ * account state (§9.11.3's 归属规则): the same account may allow a desktop 5 GB and
+ * a laptop 512 MB. An absent or unreadable row is 不限制, which is what every
+ * install had before the group existed — an update must not start deleting.
+ */
+export function getCacheLimit(uiDb: UiDatabase | null): CacheLimit {
+  const parsed = cacheLimitSchema.safeParse(uiDb?.getSetting(CACHE_LIMIT))
+  return parsed.success ? parsed.data : 'unlimited'
+}
+
+export function setCacheLimit(uiDb: UiDatabase, value: CacheLimit): void {
+  uiDb.setSetting(CACHE_LIMIT, value)
 }

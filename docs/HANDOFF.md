@@ -1632,13 +1632,13 @@ sign to merge them.
 |---|---|---|
 | 1 | Search-face virtualisation | The conversation list is virtualised (2026-11-18) and, since 2026-11-23, pages on approach and prefetches the visible window's photos — measured on this account: 321 chats, 100/100/100/21 with no overlap. What is left is the search face: conversation hits and message hits still `.map` their page instead of virtualising it (they are paged, so the count is bounded — mechanical, not urgent) |
 | 2 | Reactions picker | display is done; WeChat has no reactions, so it needs the owner's sign-off (§9.3) |
-| 3 | Settings batches B and C | **B1 消息通知 landed 2026-11-23** (desktop switch + three scopes), **B2 通用补全 landed the same day** (消息字号 four steps through `data-msg-size` / `--wx-msg-scale`; 开机自启 read from and written to the OS login item, packaged builds only). B still open: six 隐私 rules + 黑名单, 登录设备, 存储统计/清理, 自动下载, 角标未读数. C: 两步验证, 本地锁, 全局快捷键, 检查更新, 保存目录, 贴纸管理, 恢复默认. Each adds panels to the same nav table; prefer per-domain channels over growing `settings:set` (消息通知's are `notifications:get` / `setScope` / `setDesktop` in `packages/protocol/src/notification.ts`). 清理缓存 must invalidate `media/registry.ts` tokens or bubbles keep retrying deleted files |
+| 3 | Settings batches B and C | **B1 消息通知 landed 2026-11-23** (desktop switch + three scopes), **B2 通用补全 landed the same day** (消息字号 four steps through `data-msg-size` / `--wx-msg-scale`; 开机自启 read from and written to the OS login item, packaged builds only), **B3 数据与存储 landed 2026-11-25** (存储空间 from the exact `getStorageStatistics`, split into 图片/视频/贴纸和表情符号/GIF/其他媒体; 缓存上限 in `ui.db` enforced on change + once per `ready`; per-type 清理缓存 through `optimizeStorage.file_types`; `evt:mediaCleared` drops the shell's cached `wx-media://` URLs). B still open: six 隐私 rules + 黑名单, 登录设备, 自动下载, 角标未读数. C: 两步验证, 本地锁, 全局快捷键, 检查更新, 保存目录, 贴纸管理, 恢复默认. Each adds panels to the same nav table; prefer per-domain channels over growing `settings:set` (消息通知's are `notifications:get` / `setScope` / `setDesktop` in `packages/protocol/src/notification.ts`, 数据与存储's are `storage:get` / `setLimit` / `clear` in `storage.ts`) |
 | 4 | Private-chat P2 list | translate (`translateText`), scheduled/silent send, draft cloud sync, multi-select forward, location/contact/poll sending, message effects, chat background, screenshot, 收藏 → Saved Messages (the in-chat 聊天文件 tabs landed 2026-11-25; the **global** search filters are still #5) |
 | 5 | Search depth | missing 应用/贴文/图片/视频/音频/链接 filters, 联系人 hits, archived chats (global search still reads `chatListMain`) |
 | 6 | Viewer breadth | no 编辑, no AI block, no 查看原视频, no pin button anywhere |
 | 7 | Composer parity | the 收藏 cube and 剪刀 (screenshot) still toast; the ＋ card's three entries are unwired; no drag & drop / paste; captions are supported by the adapter (`media:send` takes `caption`) but not surfaced at send time |
 | 8 | Chat info follow-ups | a member card on avatar click; a local 备注 (Telegram's is cloud-synced now); a chat-wide in-chat search view (the panel's 查找聊天内容 hosts it today) |
-| 9 | Storage bounds | downloads are TDLib's own cache; the `media_cache` LRU table is still unused, so nothing bounds disk usage |
+| 9 | Storage bounds | downloads are TDLib's own cache; **缓存上限 landed 2026-11-25** (`optimizeStorage(size)`, enforced when the ceiling changes and once per signed-in session), so disk usage is bounded now. The `media_cache` LRU table stays unused on purpose — TDLib owns the files; what is still open is 自动下载 (Wi-Fi/移动/漫游) and 保存位置 |
 | 10 | Sticker breadth | panel lists regular installed sets only (no search/trending/recent); a set cover whose thumbnail is MPEG4 would render as a broken `<img>`; no premium mark in the picker; sending a premium pack without a subscription is left to TDLib's error |
 | 11 | WebM fixtures | `<video>` stickers are implemented but no fixture exercises them (no VP8 encoder here, ffmpeg absent) |
 | 12 | Preload size | 187 kB because it imports the protocol index (zod); splitting a channels-only entry point would fix it |
@@ -2129,4 +2129,32 @@ claim is. Nothing here replaces §1 (state) or §9 (gaps).
   `TDLIB_PROXY=http://127.0.0.1:7892`。探针行默认跑完删除(`WEGRAM_TEST_KEEP=1` 可保留)。
 - 由此 §1.2 / §7.2 / §9.1 里对应的「未经真实 TDLib 验证」改成了已验证;仍未验:
   从真实转发消息映射 `forward`,以及会话内媒体筛选的空查询 `searchChatMessages`。
+
+**2026-11-25 — 设置 B3:数据与存储(缓存)**
+- 设置新增「数据与存储」组(导航在 消息通知 与 网络与代理 之间):已用空间(媒体 / 文件数 /
+  数据库)、缓存上限(不限制 / 512 MB / 1 GB / 2 GB / 5 GB),以及按官方「清理缓存」做的
+  分类型勾选:图片 / 视频 / 贴纸和表情符号 / GIF / 其他媒体,每行显示占比与大小,底部按钮
+  只清理勾选的类型并打印合计。
+- 协议:`packages/protocol/src/storage.ts`(`storage:get` / `setLimit` / `clear`,clear 带
+  `kinds`)加 `evt:mediaCleared`;seam 新增 `storageUsage` / `trimStorage` / `clearStorage`。
+  TDLib 端用精确 `getStorageStatistics`(`chat_limit: 0`,按 file type 汇总)分五行,fast
+  statistics 只取数据库大小;每行是一组 TDLib file type,清理/修剪把这张表交给
+  `optimizeStorage.file_types`,所以贴纸可以清、缩略图/头像/壁纸不会被清。两次写都带
+  `return_deleted_file_statistics`,但面板用的是写之后**重新精确读**的一份(freed 只够打印
+  「已清理 X」);TDLib 的「已用空间」不保证降到 0,面板不假装会。
+- 归属:上限是本地偏好(`ui.db` 的 `cacheLimit`,默认不限制;`main/storage-usage.ts` 只映射
+  字节),执行时刻是改设置时 + 每次会话 `ready` 时一次(头像缓存会重发 `ready`,不能每次
+  都扫盘)。删除真的清掉文件后 `evt:mediaCleared` 让 shell 丢弃缓存的 `wx-media://`,
+  可见气泡重新下载;查看器窗口 reload(它有自己的 store)。
+- mock 与浏览器预览共用 `packages/mock-fixtures/src/storage.ts` 的一份假缓存(四种媒体
+  ~537 MB + 数据库 96 MB),修剪按比例、清理只删勾选的类型,不碰生成的媒体文件;tests:
+  `storage-usage.test.ts`、`actions-storage.test.ts`、`lib/storage.test.ts`、
+  `mock-fixtures/storage.test.ts`、store 的 `clearMediaUrls`。
+- 验证(直接命令,因为本会话的 pnpm 打不开 store lock):`node scripts/check-version.mjs`;
+  `eslint . --max-warnings 0`;七个 tsconfig 的 `tsc --noEmit`;`vitest run --pool=threads`
+  —— **139 files / 1076 tests**;`electron-vite build`(既有 lottie-web direct-eval 提示仍在)。
+  浏览器预览(`#settings`)点过:四行占比 58/27/–/15%,取消勾选「图片」后按钮从 536.7 MB 变
+  227.3 MB,清理后只剩图片 309.4 MB、已用空间 405.4 MB;缓存上限切到 512 MB 后各行按比例
+  缩到合计 512 MB。Electron 窗口与真实 TDLib 的 `optimizeStorage` 尚未点过/跑过(写入路径
+  应放在测试 DC 上跑一次)。
 

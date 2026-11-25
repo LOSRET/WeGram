@@ -29,6 +29,9 @@ import type {
   Self,
   StickerSet,
   StickerSetSummary,
+  StorageFreed,
+  StorageMediaKind,
+  StorageUsage,
   UserAvatar,
   UserProfile,
   InvokeRequest,
@@ -530,6 +533,26 @@ export interface TelegramAdapter {
    * fields it does not show must keep their values.
    */
   setNotificationScope(scope: NotificationScope, settings: ScopeNotificationSettings): Promise<void>
+
+  /**
+   * 数据与存储 (design doc §9.11.3): what the local cache occupies right now.
+   * TDLib answers from its fast statistics — media size/count and the database —
+   * because the exact per-chat walk is not what a settings row needs.
+   */
+  storageUsage(): Promise<StorageUsage>
+  /**
+   * 缓存上限: deletes cached files until the media cache fits `maxBytes`
+   * (TDLib `optimizeStorage`), and answers what went away. TDLib keeps
+   * thumbnails, profile photos, stickers and wallpapers, so a cache can stay
+   * above the ceiling when those are what fills it.
+   */
+  trimStorage(maxBytes: number): Promise<StorageFreed>
+  /**
+   * 清理缓存: the same deletion with every limit at 0, restricted to the ticked
+   * kinds — the official client's per-type clear — and answering the freed bytes
+   * and count (TDLib never says which file ids went).
+   */
+  clearStorage(kinds: StorageMediaKind[]): Promise<StorageFreed>
 }
 
 /** Shared emitter plumbing for the concrete adapters. */

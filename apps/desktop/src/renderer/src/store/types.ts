@@ -254,6 +254,12 @@ export interface AvatarActions {
 export interface MediaActions {
   setMediaUrl: (fileId: number, url: string) => void
   setMediaProgress: (fileId: number, progress: FileProgress, url?: string) => void
+  /**
+   * 数据与存储 deleted cached files (`evt:mediaCleared`): every URL in
+   * `mediaUrls` may point into a file that no longer exists. Dropping them lets
+   * the visible bubbles ask for a fresh download.
+   */
+  clearMediaUrls: () => void
 }
 
 export interface UiActions {

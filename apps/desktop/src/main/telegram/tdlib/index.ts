@@ -18,6 +18,9 @@ import type {
   Self,
   StickerSet,
   StickerSetSummary,
+  StorageFreed,
+  StorageMediaKind,
+  StorageUsage,
 } from '@wegram/protocol'
 
 import { createLogger, toAdapterError } from '../../util'
@@ -552,6 +555,18 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
     settings: ScopeNotificationSettings,
   ): Promise<void> {
     return actions.setNotificationScope(this.actionDeps, scope, settings)
+  }
+
+  async storageUsage(): Promise<StorageUsage> {
+    return actions.storageUsage(this.actionDeps)
+  }
+
+  async trimStorage(maxBytes: number): Promise<StorageFreed> {
+    return actions.trimStorage(this.actionDeps, maxBytes)
+  }
+
+  async clearStorage(kinds: StorageMediaKind[]): Promise<StorageFreed> {
+    return actions.clearStorage(this.actionDeps, kinds)
   }
 
   /**

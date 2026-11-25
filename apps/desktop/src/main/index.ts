@@ -16,7 +16,8 @@ import { ProxyController } from './proxy-controller'
 import { describeProxy, parseProxyUrl } from './proxy-url'
 import { reachableOverTcp, readSystemProxy } from './system-proxy'
 import { SettingsStore } from './store/settings'
-import { getCloseBehavior, getDesktopNotifications } from './store/prefs'
+import { cacheLimitBytes } from './storage-usage'
+import { getCacheLimit, getCloseBehavior, getDesktopNotifications } from './store/prefs'
 import { UiDatabase } from './store/ui-db'
 import { createAdapter } from './telegram'
 import type { TelegramAdapter } from './telegram/adapter'
@@ -25,11 +26,14 @@ import { EventBus } from './telegram/updates'
 import { createTray, destroyTray } from './tray'
 import { createLogger } from './util'
 import { closeSettingsWindow, setSettingsTheme } from './settings-window'
-import { closeViewer, hideViewerWithShell, setViewerTheme, showViewerWithShell } from './viewer'
 import {
-  closeInstantViewWindow,
-  setInstantViewTheme,
-} from './instant-view-window'
+  closeViewer,
+  hideViewerWithShell,
+  reloadViewer,
+  setViewerTheme,
+  showViewerWithShell,
+} from './viewer'
+import { closeInstantViewWindow, setInstantViewTheme } from './instant-view-window'
 import {
   applyTitleBarTheme,
   createMainWindow,
@@ -74,6 +78,12 @@ let quitting = false
  * step until 进入 WeGram. See `syncWindowsToAuth`.
  */
 let authInteracted = false
+/**
+ * 缓存上限 is enforced once per signed-in session. TDLib republishes `ready` when the
+ * avatar cache learns a photo, and walking the cache on each of those would be a
+ * filesystem scan for nothing.
+ */
+let cacheLimitApplied = false
 
 loadDotEnv()
 
@@ -259,7 +269,14 @@ async function bootstrap(): Promise<void> {
   adapter.onEvent((event) => {
     // Windows follow authorization, not the renderer: the shell may only exist
     // while an account is signed in (see syncWindowsToAuth).
-    if (event.type === 'auth') syncWindowsToAuth(event.state)
+    if (event.type === 'auth') {
+      syncWindowsToAuth(event.state)
+      // 缓存上限 needs an authorized client, and the shell may open in the same
+      // turn — trimming here is the one moment the ceiling is enforced without
+      // the reader touching 设置 (see applyCacheLimit).
+      if (event.state.kind === 'ready') applyCacheLimit()
+      else cacheLimitApplied = false
+    }
     if (event.type === 'connection') lastConnection = event.state
     // A desktop notification is an OS concern: it never crosses IPC.
     if (event.type === 'notification') {
@@ -308,6 +325,15 @@ async function bootstrap(): Promise<void> {
        * suppressed while the window is focused (see NotificationCenter).
        */
       setActiveChat: (chatId) => notifications?.setActiveChat(chatId),
+      /**
+       * 数据与存储 deleted cache files. The shell drops every cached
+       * `wx-media://` URL and re-downloads what it is showing; the viewer is a
+       * separate window with its own store, so it starts over instead.
+       */
+      onMediaCleared: () => {
+        bus?.publish('evt:mediaCleared', {})
+        reloadViewer()
+      },
     }),
   )
 
@@ -339,6 +365,23 @@ async function bootstrap(): Promise<void> {
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) openLoginWindow()
+  })
+}
+
+/**
+ * 数据与存储 → 缓存上限, applied once per signed-in session. The setting's own write
+ * trims immediately (`storage:setLimit`); without this second moment a ceiling
+ * chosen once would never matter again and the cache would grow past it forever.
+ * `optimizeStorage` needs an authorized client, which is why this hangs off the
+ * auth event rather than `bootstrap`.
+ */
+function applyCacheLimit(): void {
+  if (cacheLimitApplied || !adapter || !uiDb) return
+  cacheLimitApplied = true
+  const bytes = cacheLimitBytes(getCacheLimit(uiDb))
+  if (bytes === null) return
+  void adapter.trimStorage(bytes).catch((error: unknown) => {
+    logger.warn('cache limit not applied:', error instanceof Error ? error.message : String(error))
   })
 }
 

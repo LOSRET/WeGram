@@ -312,6 +312,18 @@ describe('bot start parameters', () => {
   })
 })
 
+describe('media cache', () => {
+  it('drops every cached URL when 数据与存储 deleted the files behind them', () => {
+    const store = useAppStore.getState()
+    store.setMediaUrl(7, 'wx-media://f/abc')
+    store.setMediaUrl(8, 'wx-media://f/def')
+
+    useAppStore.getState().clearMediaUrls()
+
+    expect(useAppStore.getState().mediaUrls).toEqual({})
+  })
+})
+
 describe('reset', () => {
   it('clears every piece of session data but keeps the actions', () => {
     const store = useAppStore.getState()
