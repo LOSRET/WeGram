@@ -144,6 +144,7 @@ cd apps\desktop; pnpm web       # renderer-only preview at http://localhost:5174
 cd apps\desktop; pnpm tdlib:smoke   # headless real-TDLib check (see below)
 cd apps\desktop; pnpm tdlib:test-dc # READ/WRITE check against Telegram's test data centers
 cd apps\desktop; pnpm tdlib:test-dc:writes # the §9.1 write matrix on the same test session
+cd apps\desktop; pnpm tdlib:test-dc:media  # video / mixed album / 取消上传 (needs a real MP4, see script header)
 cd apps\desktop; pnpm tdlib:test-dc:topics # 话题 end-to-end on a disposable forum (test DC)
 cd apps\desktop; pnpm tdlib:test-dc:bot  # 机器人: BotFather's commands + a real callback query (test DC)
 cd apps\desktop; pnpm ui:db-check   # headless ui.db check (node:sqlite)

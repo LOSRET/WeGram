@@ -221,6 +221,7 @@ cd apps\desktop; pnpm ui:db-check     # headless ui.db check (node:sqlite)
 cd apps\desktop; pnpm tdlib:smoke     # READ-ONLY real TDLib: getMe/getChats/history
 cd apps\desktop; pnpm tdlib:test-dc   # test data centers: send/edit/upload/delete
 cd apps\desktop; pnpm tdlib:test-dc:writes  # the §9.1 write matrix (album/pin/note/contacts/…)
+cd apps\desktop; pnpm tdlib:test-dc:media   # video / mixed album / 取消上传 (needs a real MP4)
 cd apps\desktop; pnpm tdlib:test-dc:topics  # 话题: creates a disposable forum and walks the feature
 pwsh apps\desktop\scripts\launch-detached.ps1 -Mock   # Electron + mock adapter
 ```

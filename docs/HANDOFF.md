@@ -100,8 +100,8 @@ pnpm workspace, W1 + W2 + the W3 main body implemented, plus the private-chat P0
 | The UI behaves | mock Electron passes (`launch-detached.ps1 -NoSandbox -Mock`) and the browser preview; the numbers in §5 were measured off those windows |
 | Paging / scroll / FPS | CDP against the real account: 5000 messages at 60 fps, **0.0 px** drift when prepending, 60 pages with no duplicates |
 | The read path against real TDLib | `pnpm tdlib:smoke` (read-only) + real-account Electron sessions |
-| 视频消息 / 转发来源 / 聊天文件 / 混合相册 / 取消上传 (2026-11-25) | mock + browser preview + unit tests only — the video write paths (single, mixed album) and the empty-query media filter have not run against real TDLib yet (§9.1); 取消上传 relies on `deleteMessages` cancelling a pending upload, also unproven there |
-| **Writes** to Telegram | the §9.1 matrix now runs on the test DCs: `pnpm tdlib:test-dc` (text / edit / photo / voice / delete) and `pnpm tdlib:test-dc:writes` (album, caption edit, pin, 标为未读, 备注, 联系人, 拉黑, 举报, 转文字, 删除聊天) — last run 9 pass / 3 partial / 1 skip / 0 fail. The partials and the skip are named in §9.1 |
+| 视频消息 / 混合相册 / 取消上传 (2026-11-25) | **test DC 5/5 passed** (`pnpm tdlib:test-dc:media`, 2026-11-25): MP4 probe, single `messageVideo` 1920×1080/6 s, mixed album (`messagePhoto` + `messageVideo` sharing one album id), the unreadable-video fallback as separate rows, and a pending row cancelled with nothing delivered. Still mock/unit only: 转发来源 mapping from a real forwarded message, the in-chat 媒体筛选 against real TDLib, and any window click-through |
+| **Writes** to Telegram | the §9.1 matrix now runs on the test DCs: `pnpm tdlib:test-dc` (text / edit / photo / voice / delete), `pnpm tdlib:test-dc:writes` (album, caption edit, pin, 标为未读, 备注, 联系人, 拉黑, 举报, 转文字, 删除聊天) — last run 9 pass / 3 partial / 1 skip / 0 fail — and `pnpm tdlib:test-dc:media` (video / mixed album / 取消上传) — 5 pass / 0 fail, 2026-11-25. The partials and the skip are named in §9.1 |
 | The QR login with a real phone | **not yet** — mapping, encoding and fallback are mock-verified only |
 | 机器人 commands + callbacks against real TDLib | `pnpm tdlib:test-dc:bot` (test DCs): BotFather's 27 commands map through `bot_info.commands`, and pressing the `/mybots` inline button answers a callback query (empty answer, no 502) — run 2026-11-24 |
 | Windows toasts, tray icon | **not yet** on this machine (no Start-Menu shortcut; `Shell_NotifyIcon` refused in the agent session) |
@@ -168,6 +168,7 @@ pnpm web                                                  # renderer preview :51
 pnpm tdlib:smoke                                          # headless real-TDLib read check
 pnpm tdlib:test-dc                                        # write checks on Telegram's test DCs
 pnpm tdlib:test-dc:writes                                 # the §9.1 write matrix (album/pin/note/contacts/…)
+pnpm tdlib:test-dc:media                                  # video / mixed album / 取消上传 (needs a real MP4; see §3.4)
 pnpm tdlib:test-dc:bot                                    # 机器人: BotFather's commands + a real callback query
 pnpm ui:db-check                                          # headless ui.db check (node:sqlite)
 pwsh scripts\launch-detached.ps1 -NoSandbox -Mock         # mock adapter in the real shell
@@ -222,14 +223,18 @@ the app first, and a torn/VSS copy of the DB loses authorization. If no test DC 
 available, say so and mark the write path **unverified** — never probe writes against the
 real session.
 
-**Two scripts, one session.** `pnpm tdlib:test-dc` proves the baseline chain (text → edit →
+**Three scripts, one session.** `pnpm tdlib:test-dc` proves the baseline chain (text → edit →
 photo → voice → delete); `pnpm tdlib:test-dc:writes` drives the §9.1 matrix — album + caption
 edit, pin, 标为未读, 备注, 联系人, 拉黑, 举报, 转文字, 重试, 删除聊天 — one
 PASS / PARTIAL / SKIP / FAIL line per path (`PARTIAL` = the call and TDLib's answer were
 exercised but this account has no fixture for the round trip; `SKIP` = the API refuses on
 that target). `WEGRAM_TEST_KEEP=1` leaves the probe rows behind; otherwise they are deleted.
 Both share `scripts/testdc/harness.ts` for the credential / session / number guards, so
-neither can drift onto the real session. The script recreates the 777000 fixture chat when a
+neither can drift onto the real session. `pnpm tdlib:test-dc:media` covers the 2026-11-25
+media paths: a single `inputMessageVideo`, a mixed photo + video album, the unreadable-video
+album fallback and 取消上传 (a still-pending row). It needs a **real H.264 MP4** — the repo
+ships none — via `WEGRAM_TEST_VIDEO` or `.cache/testdc-probe.mp4`; the header carries the
+public-sample download command. The script recreates the 777000 fixture chat when a
 previous run's 删除聊天 check removed it, and deletes the *bot's* chat rather than a real
 conversation.
 
@@ -1348,11 +1353,12 @@ tests: `markedUnread` was never mapped (so 标为未读 set nothing), `setUserCo
 refuses it). Still unproven: `resendMessages` (no failed row can be produced — see §6.7),
 `getGroupsInCommon` (this account's only group has no second member, so it needs a second
 test account), whether `sendChatAction` actually reaches the peer (the adapter swallows
-its errors by design, so only the call path is proven), and the 2026-11-25 batch —
-`inputMessageVideo` (single and in a mixed album) on a test DC (mock + MP4 parser only so
-far), whether `deleteMessages` on a still-uploading message really cancels its transfer
-(取消上传's whole contract), and an in-chat media tab's empty-query `searchChatMessages`
-filter against real TDLib (mock/preview only).
+its errors by design, so only the call path is proven). **Closed by
+`pnpm tdlib:test-dc:media` (2026-11-25, 5/5):** `inputMessageVideo` (single and inside a
+mixed photo+video album, server metadata read back), the unreadable-video album fallback,
+and 取消上传 — a still-pending row deleted with nothing delivered. Still unproven: 转发来源
+mapped from a real forwarded message, and an in-chat media tab's empty-query
+`searchChatMessages` filter against real TDLib (mock/preview only).
 
 ### 7.3 Recipe: adding one send type (the pattern for most P1/P2 items)
 
@@ -1590,7 +1596,9 @@ sign to merge them.
    `toggleChatIsMarkedAsUnread`, `setUserNote`, `addContact`/`removeContacts`,
    `setMessageSenderBlockList`, `reportChat` (bot, two phases, filed),
    `deleteChatHistory` and `recognizeSpeech`; the baseline script keeps text/edit/photo/voice/
-   delete. Three defects surfaced and are fixed (§1.2, §7.2). What is still open:
+   delete. Three defects surfaced and are fixed (§1.2, §7.2). The 2026-11-25 media batch is
+   closed as well — `pnpm tdlib:test-dc:media` ran 5/5 (single video, mixed album,
+   unreadable-video fallback, 取消上传 pending deletion; §1.2). What is still open:
    - `resendMessages`: no failed row can be produced — a dead proxy leaves the message
      `pending` for 120 s (§6.7). Either accept the compile/mock proof or build a
      server-rejection fixture.
@@ -2103,6 +2111,22 @@ claim is. Nothing here replaces §1 (state) or §9 (gaps).
 - 顺带修正: `probeImageSize` / `probeVideoMeta` 的 `open` 移进 try —— 文件在选完
   之后消失时应退回「按文档发」,而不是从发送路径抛 ENOENT(单测覆盖)。
 - 验证: 七个 tsconfig 的 `tsc --noEmit`、`eslint . --max-warnings 0`、
-  `vitest run --pool=threads`(全量)、`electron-vite build`。仍未经真实 TDLib 验证:
-  `deleteMessages` 是否真能取消上传、混合相册在测试 DC 的落盘表现。
+  `vitest run --pool=threads`(全量)、`electron-vite build`。当时仍未经真实 TDLib 验证的
+  `deleteMessages` 取消上传与混合相册落盘,随后被下面的测试 DC 一轮补上(5/5)。
+
+**2026-11-25 — 测试 DC:视频 / 混合相册 / 取消上传(5/5)**
+- 新增 `pnpm tdlib:test-dc:media`(`scripts/tdlib-test-dc-media.ts`),复用
+  `scripts/testdc/harness.ts` 的测试 DC 会话、代理与守卫,5 项全 PASS:
+  - `video-probe`:真实 H.264 MP4 样本读出 1920×1080 / 6 s(我们的 ISO BMFF 解析器);
+  - `video-send`:TDLib 存成 `messageVideo`,服务器回读 1920×1080 / 6 s,DTO 与服务器一致;
+  - `mixed-album`:`messagePhoto` + `messageVideo` 共用同一个 `media_album_id`;
+  - `album-fallback`:把一个 PNG 当 `kind:'video'` 塞进相册,解析失败后整批退回逐条发送
+    ——两条独立消息(file + photo),不带 album id;
+  - `cancel-upload`:8 MB 填充视频发出时仍是 `pending`,`messages:cancelSend` 后 2 秒内行已消失、
+    没有任何内容送达。
+- 脚本需要一个真实 H.264 MP4(仓库不收录):`WEGRAM_TEST_VIDEO` 或
+  `.cache/testdc-probe.mp4`;下载命令在脚本头注释里。测试 DC 代理
+  `TDLIB_PROXY=http://127.0.0.1:7892`。探针行默认跑完删除(`WEGRAM_TEST_KEEP=1` 可保留)。
+- 由此 §1.2 / §7.2 / §9.1 里对应的「未经真实 TDLib 验证」改成了已验证;仍未验:
+  从真实转发消息映射 `forward`,以及会话内媒体筛选的空查询 `searchChatMessages`。
 
