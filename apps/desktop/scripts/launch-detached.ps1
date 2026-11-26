@@ -18,7 +18,9 @@ param(
   # Talk to Telegram's test data centers (separate account space, test session).
   [switch]$TestDc,
   # Optional Chrome DevTools Protocol port, for automated checks of the renderer.
-  [int]$RemoteDebugPort = 0
+  [int]$RemoteDebugPort = 0,
+  # Optional Node inspector port, for automated checks of the main process.
+  [int]$InspectPort = 0
 )
 
 $ErrorActionPreference = 'Stop'
@@ -49,10 +51,12 @@ if ($TestDc) { $lines += 'set WEGRAM_TDLIB_TEST_DC=1' }
 $lines += "cd /d `"$appDir`""
 $sandboxFlag = if ($NoSandbox) { ' --no-sandbox' } else { '' }
 if ($RemoteDebugPort -gt 0) { $sandboxFlag += " --remote-debugging-port=$RemoteDebugPort" }
+# Node's `--inspect` is read before the app path; Chromium switches are not.
+$inspectFlag = if ($InspectPort -gt 0) { " --inspect=$InspectPort" } else { '' }
 if (-not $LogFile) {
   $LogFile = Join-Path $appDir '..\..\.cache\app.log'
 }
-$lines += "`"$electronExe`" .$sandboxFlag > `"$LogFile`" 2>&1"
+$lines += "`"$electronExe`"$inspectFlag .$sandboxFlag > `"$LogFile`" 2>&1"
 Set-Content -Path $wrapper -Value $lines -Encoding OEM
 
 $result = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
