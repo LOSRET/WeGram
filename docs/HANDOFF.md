@@ -714,8 +714,11 @@ self-drawn and there is no title strip. Measured at 125 % (800×698 device px �
 Both columns run the full window height; there is no rule under a title strip, and the top
 40 px is empty drag space on both sides. Group headings are the primary colour at 13 px,
 **not grey**. Do not draw the card's radius/shadow in CSS — they belong to the window. Select
-pills are 28 px high with a 12 px label and a green chevron badge; switches are 40×22 with a
-white knob; the 快捷键 capture control is the same pill with `按下...` as its empty state.
+pills are 28 px high, white with a hairline border, a 12 px label and a green rounded-square
+badge carrying up/down chevrons. The open list is our own portalled listbox (selected row in
+brand green, hover/keyboard row in a light grey) — a native `<select>` popup is drawn by the
+OS, so it ignored the theme and the measured row metrics. Switches are 40×22 with a white
+knob; the 快捷键 capture control is the same pill with `按下...` as its empty state.
 
 **Window rules that are easy to break**: the window has **no parent on purpose** (the shell
 must be able to cover it and it must drag on its own), and nothing closes it for us — the
@@ -2157,4 +2160,15 @@ claim is. Nothing here replaces §1 (state) or §9 (gaps).
   227.3 MB,清理后只剩图片 309.4 MB、已用空间 405.4 MB;缓存上限切到 512 MB 后各行按比例
   缩到合计 512 MB。Electron 窗口与真实 TDLib 的 `optimizeStorage` 尚未点过/跑过(写入路径
   应放在测试 DC 上跑一次)。
+
+**2026-11-26 — 设置的下拉栏按客户端重画**
+- `SettingsSelect` 不再用原生 `<select>`:触发胶囊改成白底细边框 + 选中值 + 绿底上下箭头
+  徽标(原来是把 ✓ 放在灰胶囊上),展开列表是 body 级 portal 的自绘 listbox——选中项品牌
+  绿、悬停/键盘活动行浅灰、右对齐触发胶囊,底部空间不够时按 `lib/popupPlacement` 向上
+  翻转。原生弹层由系统绘制,不跟主题与这里的 28 px / 12 px 度量,所以只做闭合态时看着对。
+- 键盘走 combobox 模式:焦点留在触发器,Arrow/Home/End 移动 `aria-activedescendant`,
+  Enter/Space 选择,Tab/点击外部关闭;Esc 只关列表(`useEscapeKey` 栈),不会连带关设置
+  窗口。纯规则在 `lib/selectKey.ts`(含测试)。
+- 浏览器预览已点过(640×558):通用四行、数据与存储五行的开合、选中、Esc 与底部翻转;
+  未在 Electron 窗口再点。
 

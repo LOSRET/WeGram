@@ -103,7 +103,9 @@ components/contacts/      通讯录: ContactsList (service rows + address book b
 components/picker/        the expression panel's data hooks and body components
 components/ExpressionPicker.tsx  the picker's state + composition
 components/settings/      the 设置 panels: SettingsNav / SettingsGroup / SettingsRow /
-                         SettingsSelect + AccountPanel / GeneralPanel (通用: 外观, 消息字号,
+                         SettingsSelect (the custom dropdown: bordered trigger + green
+                         chevron badge + a portalled listbox; not a native <select>) +
+                         AccountPanel / GeneralPanel (通用: 外观, 消息字号,
                          关闭主窗口, 发送消息, 开机自启 — the OS login item, disabled unless
                          the build may write it) / NotificationPanel
                          (消息通知: 桌面通知 is local, the 私聊/群聊/频道 triples are TDLib's
@@ -211,6 +213,7 @@ lib/useChatAvatarPrefetch.ts  头像按需: coalesces the visible window into
                       chats:prefetchAvatars; the photo comes back as a chats upsert
 lib/self.ts           SelfIdentity + selfIdentity(auth); one placeholder id (1000)
 lib/popupPlacement.ts (pure, unit-tested) "which edge does this card hang from"
+lib/selectKey.ts      (pure, unit-tested) the settings dropdown's Arrow/Home/End movement
 lib/mediaBox.ts       (pure, unit-tested) the reserved media box + percent text
 lib/unreadBoundary.ts (type only) the snapshot a chat opens with; `UnreadMarker` is an alias
 lib/listMetrics.ts    (pure, unit-tested via scripts/style-contract) the virtualised row height

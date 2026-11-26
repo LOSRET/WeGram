@@ -186,27 +186,42 @@
 
 /* ---- controls ------------------------------------------------------------ */
 
+/* The client's dropdown: a bordered trigger with the selected label and a green
+   chevron badge, plus a listbox card of our own. The list cannot be a native
+   <select> popup: the OS draws it, so it ignored the theme and the measured row
+   metrics (design doc §9.11.2). */
 .wx-set-select {
-  position: relative;
   display: inline-flex;
+  min-width: 96px;
 }
 
 .wx-set-select__input {
-  appearance: none;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
   height: 28px;
-  padding: 0 30px 0 10px;
-  border: 0;
+  padding: 0 4px 0 10px;
+  border: 1px solid var(--wx-line-strong);
   border-radius: 6px;
   outline: none;
-  background: var(--wx-set-pill);
+  background: var(--wx-elevated);
   color: var(--wx-text);
   font: inherit;
   font-size: 12px;
+  text-align: left;
   cursor: pointer;
 }
 
-.wx-set-select__input:hover {
-  background: var(--wx-set-pill-hover);
+.wx-set-select__input:hover:not(:disabled) {
+  border-color: var(--wx-text-tertiary);
+}
+
+.wx-set-select__input:focus-visible {
+  border-color: var(--wx-brand);
+  box-shadow: 0 0 0 1px var(--wx-brand);
 }
 
 .wx-set-select__input:disabled {
@@ -214,19 +229,67 @@
   cursor: default;
 }
 
+.wx-set-select__label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .wx-set-select__badge {
-  position: absolute;
-  top: 4px;
-  right: 4px;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
   width: 20px;
   height: 20px;
-  border-radius: 50%;
+  border-radius: 5px;
   background: var(--wx-brand);
   color: #fff;
-  font-size: 11px;
-  line-height: 20px;
-  text-align: center;
   pointer-events: none;
+}
+
+.wx-set-select__badge svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Portalled to the body: the settings body scrolls, and a card inside it would
+   be clipped at the window edge. Popovers keep a native thin scrollbar on
+   purpose (renderer/AGENTS.md). */
+.wx-set-select__popup {
+  position: fixed;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  max-height: 260px;
+  padding: 4px;
+  overflow-y: auto;
+  border: 1px solid var(--wx-line-strong);
+  border-radius: 8px;
+  background: var(--wx-elevated);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16);
+  user-select: none;
+}
+
+.wx-set-select__option {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.wx-set-select__option.is-active {
+  background: var(--wx-row-hover);
+}
+
+.wx-set-select__option[aria-selected='true'] {
+  color: var(--wx-brand-text);
 }
 
 .wx-set-button {
