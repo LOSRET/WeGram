@@ -38,6 +38,8 @@ import type {
   InvokeResponse,
   InstantView,
   InlineQueryAnswer,
+  MiniAppLaunch,
+  MiniAppOpenRequest,
 } from '@wegram/protocol'
 
 export type AdapterKind = 'mock' | 'tdlib'
@@ -356,6 +358,26 @@ export interface TelegramAdapter {
   sendInlineResult(
     input: InvokeRequest<'bots:inlineSend'>,
   ): Promise<InvokeResponse<'bots:inlineSend'>>
+  /**
+   * Mini Apps (§9.4): resolves the signed URL a Web App opens with. Each surface
+   * has its own TDLib call (a reply keyboard asks `getWebAppUrl`, an inline
+   * button / menu button asks `openWebApp`, a `t.me` link asks
+   * `getWebAppLinkUrl`); the adapter hides that difference and answers the URL
+   * plus the bot's name for the window's strip. The URL is signed for this
+   * account and must never cross IPC.
+   */
+  openMiniApp(input: MiniAppOpenRequest): Promise<MiniAppLaunch>
+  /**
+   * Tells TDLib that a Mini App opened through `openWebApp` was closed, so the
+   * bot's launch can be released (`closeWebApp`). A keyboard-button launch has
+   * no id, and an absent id is a no-op.
+   */
+  closeMiniApp(launchId?: string): Promise<void>
+  /**
+   * `WebApp.sendData()`: posts what the Mini App sent back to its bot
+   * (TDLib `sendWebAppData`). An empty `buttonText` is valid for a menu app.
+   */
+  sendMiniAppData(input: { botUserId: number; buttonText: string; data: string }): Promise<void>
 
   history(
     input: InvokeRequest<'messages:history'>,

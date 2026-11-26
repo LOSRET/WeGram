@@ -29,7 +29,7 @@ describe('activeReplyKeyboard', () => {
         message(2),
         message(3, { replyKeyboard: KEYBOARD }),
       ]),
-    ).toEqual({ messageId: 3, keyboard: KEYBOARD })
+    ).toEqual({ messageId: 3, senderId: 26, keyboard: KEYBOARD })
   })
 
   it('keeps the last keyboard when later messages carry none', () => {
@@ -37,7 +37,7 @@ describe('activeReplyKeyboard', () => {
     // keyboard stays the chat's until a newer one replaces it.
     expect(
       activeReplyKeyboard([message(1, { replyKeyboard: KEYBOARD }), message(2), message(3)]),
-    ).toEqual({ messageId: 1, keyboard: KEYBOARD })
+    ).toEqual({ messageId: 1, senderId: 26, keyboard: KEYBOARD })
   })
 
   it('has no keyboard for a chat that never got one', () => {
@@ -53,6 +53,7 @@ describe('activeReplyKeyboard', () => {
       ]),
     ).toEqual({
       messageId: 1,
+      senderId: 26,
       keyboard: KEYBOARD,
     })
   })
@@ -75,6 +76,6 @@ describe('activeReplyKeyboard', () => {
         message(2, { replyKeyboardHidden: true }),
         message(3, { replyKeyboard: KEYBOARD }),
       ]),
-    ).toEqual({ messageId: 3, keyboard: KEYBOARD })
+    ).toEqual({ messageId: 3, senderId: 26, keyboard: KEYBOARD })
   })
 })

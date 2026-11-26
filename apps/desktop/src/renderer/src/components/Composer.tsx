@@ -56,6 +56,12 @@ interface ComposerProps {
   /** A one-time keyboard was used: the pane drops it until a newer one arrives. */
   onKeyboardUsed?: () => void
   /**
+   * A Web App key of the custom keyboard (§9.4). The pane owns the bot's user id
+   * (the keyboard's carrying message names it), so the composer only forwards the
+   * key; a chat's composer always provides this.
+   */
+  onOpenWebApp?: (url: string, buttonText: string) => Promise<void>
+  /**
    * 机器人强制回复 (§8.3): the row the bot waits for an answer to. The reply
    * banner is the ordinary one — this only names what it is for and lends the
    * box the bot's placeholder.
@@ -88,6 +94,7 @@ export function Composer({
   onCollapse,
   replyKeyboard,
   onKeyboardUsed,
+  onOpenWebApp,
   forceReply,
   onSendInline,
 }: ComposerProps) {
@@ -356,6 +363,24 @@ export function Composer({
    * location or a chat is refused instead of posting its label as text.
    */
   const pressKeyboard = async (button: ReplyKeyboardButton): Promise<void> => {
+    if (button.webAppUrl) {
+      if (!onOpenWebApp) {
+        useAppStore.getState().setToast('这类按钮暂未支持')
+        return
+      }
+      if (busy) return
+      setBusy(true)
+      try {
+        pingerRef.current?.stop()
+        await onOpenWebApp(button.webAppUrl, button.text)
+        onKeyboardUsed?.()
+      } catch (error) {
+        useAppStore.getState().setError(errorMessage(error))
+      } finally {
+        setBusy(false)
+      }
+      return
+    }
     if (!button.sendsText) {
       useAppStore.getState().setToast('这类按钮暂未支持')
       return

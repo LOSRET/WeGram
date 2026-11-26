@@ -11,6 +11,7 @@ import type {
   InlineButtonCallback,
   Message,
   MessageProperties,
+  MiniAppOpenRequest,
   NotificationScope,
   NotificationScopes,
   ProxyConfig,
@@ -412,6 +413,22 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
       text,
     })
   }
+  /**
+   * Mini Apps (design doc §9.4): the fake serves its own offline page, so the
+   * window, its strip, the guest web view and the preload bridge are exercised
+   * without a Telegram account. The signed URL a bot would receive does not
+   * exist here.
+   */
+  async openMiniApp(input: MiniAppOpenRequest) {
+    const fixture = this.bots.fixtureForBot(input)
+    return {
+      title: fixture?.chat.title ?? 'WeGram 小程序',
+      botUserId: input.source === 'link' ? (fixture?.chat.userId ?? 1) : input.botUserId,
+      url: this.bots.demoSignedUrl(),
+    }
+  }
+  async closeMiniApp(): Promise<void> {}
+  async sendMiniAppData(): Promise<void> {}
 
   /** The mock address book; see `listMockContacts`. */
   async listContacts(): Promise<Contact[]> {

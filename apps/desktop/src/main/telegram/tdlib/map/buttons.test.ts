@@ -24,8 +24,10 @@ describe('buttonTarget', () => {
     expect(buttonTarget({ _: 'inlineKeyboardButtonTypeLoginUrl', url: 'https://l.test' })).toEqual({
       url: 'https://l.test',
     })
+    // A Mini App travels under its own field: its URL must go through
+    // `openWebApp` before the page may load (design doc §9.4).
     expect(buttonTarget({ _: 'inlineKeyboardButtonTypeWebApp', url: 'https://w.test' })).toEqual({
-      url: 'https://w.test',
+      webAppUrl: 'https://w.test',
     })
   })
 
@@ -173,6 +175,13 @@ describe('mapReplyKeyboard', () => {
               type: { _: 'keyboardButtonTypeRequestPhoneNumber' },
             },
           ],
+          [
+            {
+              _: 'keyboardButton',
+              text: '首页',
+              type: { _: 'keyboardButtonTypeWebApp', url: 'https://w.test/app' },
+            },
+          ],
         ],
         is_persistent: false,
         resize_keyboard: true,
@@ -186,6 +195,7 @@ describe('mapReplyKeyboard', () => {
           { text: '设置提醒', sendsText: true },
         ],
         [{ text: '分享手机号', sendsText: false }],
+        [{ text: '首页', sendsText: false, webAppUrl: 'https://w.test/app' }],
       ],
       oneTime: true,
       placeholder: '点下面的按钮，或输入 /help',

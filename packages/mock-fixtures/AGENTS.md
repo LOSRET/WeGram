@@ -8,6 +8,7 @@ Scope: the demo account both fakes serve — the Electron mock adapter
 
 - `data.ts` — `buildFixtureSeeds`: chats 1–13 (12 is the 论坛群 fixture: General, a pinned
   topic and a closed one, every message carrying its `topicId`), their messages (albums, stickers,
+  the bot's inline and reply keyboards both carrying a `webAppUrl` key + its profile 菜单,
   one premium sticker, one custom emoji, a channel post, the 通讯录 people), comment
   threads on the posts that own one, and the contact fields the address book reads.
   Chat 3 carries one forwarded row (`forward`) so the 转发自 line is visible without TDLib.

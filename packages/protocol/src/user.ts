@@ -34,9 +34,9 @@ export const botProfileSchema = z.object({
   /** The bot's commands, the same list the composer's "/" menu draws. */
   commands: z.array(botCommandSchema),
   /**
-   * TDLib `botInfo.menu_button` when it names a link instead of the command list
-   * (`botMenuButton`). A Web App menu travels the same way every Web App button
-   * does — it opens in the browser, not in an app window (§8.3).
+   * TDLib `botInfo.menu_button` when it names a Web App instead of the command
+   * list (`botMenuButton`). It opens in the app's Mini App window (§9.4.1), the
+   * same way an inline or reply-keyboard Web App button does.
    */
   menu: z.object({ text: z.string(), url: z.string() }).optional(),
 })

@@ -80,7 +80,12 @@ export default defineConfig({
     ],
     build: {
       rollupOptions: {
-        input: { index: resolve(__dirname, 'src/preload/index.ts') },
+        input: {
+          index: resolve(__dirname, 'src/preload/index.ts'),
+          // The guest web view a Mini App loads runs with its own preload: the
+          // host's `window.tg` API must never be visible to a remote page.
+          miniapp: resolve(__dirname, 'src/preload/miniapp.ts'),
+        },
       },
     },
   },

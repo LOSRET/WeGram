@@ -4,6 +4,8 @@ import type { Message, ReplyKeyboard } from '@wegram/protocol'
 export interface ActiveReplyKeyboard {
   /** The carrying message's id: what a one-time hide is keyed by. */
   messageId: number
+  /** The sender's user id: the bot a Web App key belongs to (§9.4). */
+  senderId: number
   keyboard: ReplyKeyboard
 }
 
@@ -26,7 +28,7 @@ export function activeReplyKeyboard(messages: readonly Message[]): ActiveReplyKe
     if (message.replyKeyboardHidden) return null
     const keyboard = message.replyKeyboard
     if (!keyboard || keyboard.rows.length === 0) continue
-    return { messageId: message.id, keyboard }
+    return { messageId: message.id, senderId: message.senderId, keyboard }
   }
   return null
 }

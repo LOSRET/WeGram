@@ -81,12 +81,7 @@ export function ChatPane() {
   const [deleting, setDeleting] = useState<PendingDelete | null>(null)
   /** 聊天信息 (design doc §9.9): `lib/useSlidingPanel` keeps it mounted while it slides. */
   const info = useSlidingPanel<undefined>(INFO_PANEL_ANIM_MS)
-  const {
-    open: openInfoPanel,
-    close: closeInfo,
-    isOpen: infoOpen,
-    reset: resetInfo,
-  } = info
+  const { open: openInfoPanel, close: closeInfo, isOpen: infoOpen, reset: resetInfo } = info
   /** 清空聊天记录 asks first: the history of a chat cannot be undeleted. */
   const [clearConfirm, setClearConfirm] = useState(false)
   /**
@@ -116,11 +111,7 @@ export function ChatPane() {
 
   /** The full-pane discussion view (design doc §9.8); it keeps its message while it slides. */
   const comments = useSlidingPanel<Message>(COMMENT_PANEL_ANIM_MS)
-  const {
-    open: openCommentsPanel,
-    close: closeComments,
-    reset: resetComments,
-  } = comments
+  const { open: openCommentsPanel, close: closeComments, reset: resetComments } = comments
 
   const openInfo = useCallback((): void => {
     openInfoPanel(undefined)
@@ -662,6 +653,22 @@ export function ChatPane() {
               setUsedKeyboard({ chatId: activeChatId, messageId: replyKeyboard.messageId })
             }
           }}
+          onOpenWebApp={async (url, buttonText) => {
+            // The key belongs to the bot that sent it: a keyboard can sit in a
+            // group, where the chat's own user id is not the bot's (§9.4).
+            const botUserId = replyKeyboard?.senderId ?? 0
+            if (botUserId <= 0) {
+              useAppStore.getState().setToast('这个按钮不属于机器人')
+              return
+            }
+            await invoke('miniapp:open', {
+              source: 'keyboard',
+              chatId: activeChatId,
+              botUserId,
+              url,
+              buttonText,
+            })
+          }}
           {...(isChannel ? { onCollapse: () => setChannelInputChatId(null) } : {})}
         />
       ) : (
@@ -719,8 +726,7 @@ export function ChatPane() {
              patches `interaction.comments` through an `interaction` op, and the
              panel's header follows it. */
           message={
-            messages.find((item) => item.id === comments.panel?.value.id) ??
-            comments.panel.value
+            messages.find((item) => item.id === comments.panel?.value.id) ?? comments.panel.value
           }
           open={comments.isOpen}
           onClose={closeComments}
@@ -729,7 +735,11 @@ export function ChatPane() {
       ) : null}
 
       {profileUserId !== null ? (
-        <ProfileCard userId={profileUserId} onClose={() => setProfileUserId(null)} />
+        <ProfileCard
+          userId={profileUserId}
+          {...(activeChatId === null ? {} : { chatId: activeChatId })}
+          onClose={() => setProfileUserId(null)}
+        />
       ) : null}
 
       {stickerSetId !== null ? (

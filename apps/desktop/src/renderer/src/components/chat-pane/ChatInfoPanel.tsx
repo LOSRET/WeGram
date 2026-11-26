@@ -431,7 +431,11 @@ export function ChatInfoPanel({
       */}
       {profileOpen && chat.userId !== undefined
         ? createPortal(
-            <ProfileCard userId={chat.userId} onClose={() => setProfileOpen(false)} />,
+            <ProfileCard
+              userId={chat.userId}
+              chatId={chat.id}
+              onClose={() => setProfileOpen(false)}
+            />,
             document.body,
           )
         : null}

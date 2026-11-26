@@ -38,6 +38,8 @@
 @import './link-preview.css';
 /* 即时预览: the link reader, sliding over the chat column. */
 @import './instant-view.css';
+/* 小程序: the Mini App window's strip (design doc §9.4). */
+@import './miniapp.css';
 @import './poll.css';
 /* 资料卡: the person sheet the header title and 更多资料 open. */
 @import './profile.css';

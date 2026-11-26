@@ -68,8 +68,9 @@ export function mapUserProfile(
  *
  * Everything lives in `userFullInfo.bot_info`; a human has no `userTypeBot` and
  * therefore no bot section at all. The menu button only travels when it names a
- * link — `botMenuButtonCommands` / `default` mean "the command list", which the
- * card already draws as 命令.
+ * Web App (`botMenuButton`) — `botMenuButtonCommands` / `default` mean "the
+ * command list", which the card already draws as 命令. The card opens the menu
+ * through `miniapp:open` (design doc §9.4.1).
  */
 function botProfile(user: TdObject, full: TdObject | undefined): BotProfile | undefined {
   if (user.type?._ !== 'userTypeBot') return undefined
@@ -97,7 +98,7 @@ function botProfile(user: TdObject, full: TdObject | undefined): BotProfile | un
   }
 }
 
-/** A bot's `botMenuButton` as a link; the command-flavoured kinds carry none. */
+/** A bot's `botMenuButton` as a Web App URL; the command kinds carry none. */
 function menuButtonOf(menu: TdObject | undefined): { text: string; url: string } | undefined {
   if (menu?._ !== 'botMenuButton') return undefined
   const text = typeof menu.text === 'string' ? menu.text.trim() : ''

@@ -19,6 +19,10 @@ screens/SettingsWindow.tsx  the 设置 window (`#settings`, design doc §9.11): 
 screens/InstantViewWindow.tsx  即时预览's own window (`#instantview`, design doc §8.9):
                          toolbar (title, page zoom, 在浏览器打开) + `components/instant-view/
                          InstantViewPage.tsx` (the `web:instantView` fetch + RichMessage)
+screens/MiniAppWindow.tsx  小程序's own window strip (`#miniapp`, design doc §9.4.1): the
+                         48 px drag region (bot name, ⋯ → native menu, ×); the page itself
+                         is a main-process `WebContentsView` below it, so this route never
+                         renders or receives the signed URL
 screens/QrWindow.tsx     the 群二维码 window (`#qr`, design doc §9.9): a frameless 360×560
                          sheet with the member collage, 群聊：…, the code, its validity
                          line and 转发给朋友 / 复制图片 / 保存图片. It owns no shell state
@@ -57,7 +61,8 @@ lib/inlineQuery.ts     (pure, unit-tested) `@bot query`: the handle and the quer
 lib/useInlineQuery.ts  inline results: 250 ms debounce, `next_offset` paging, and a stale
                       answer can never paint over a newer one
 components/ReplyKeyboard.tsx  a bot's custom reply keyboard under the composer: text keys
-                        send their label, request/WebApp keys are drawn but refuse (§8.3)
+                        send their label, request keys refuse, a `webAppUrl` key opens a
+                        Mini App (§8.3, §9.4.1)
 components/InlineResults.tsx  a bot's inline results above the composer (`@bot query`):
                         thumbnail / title / description per row, arrows + Enter, and
                         加载更多 while `next_offset` says there is more
@@ -522,8 +527,11 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   **The custom reply keyboard belongs to a message, not to the chat.** `lib/replyKeyboard.ts`
   takes the newest row that carries one (an ordinary reply does not clear it), a one-time
   keyboard is hidden by remembering that row's id in `ChatPane` — never by a per-chat flag —
-  and its text keys take the same send path. A request/WebApp key is drawn dimmed and must
-  never post its label as a message. The keyboard ends in three ways only: a newer keyboard,
+  and its text keys take the same send path. A request key is drawn dimmed and must
+  never post its label as a message; a Web App key (`webAppUrl`) is *not* dimmed — it
+  opens the Mini App window (§9.4.1) through `miniapp:open` with the keyboard's sender.
+  Inline keyboard Web App buttons and the profile card's 菜单 take the same channel;
+  a `t.me/<bot>/<app>` link is parsed by `lib/telegramLink.ts` into `webApp`. The keyboard ends in three ways only: a newer keyboard,
   the one-time hide above, and `replyKeyboardHidden` (TDLib `replyMarkupRemoveKeyboard`) — the
   removal row carries no keyboard at all, so it must be its own marker or the older grid stays
   forever. **强制回复** (`Message.forceReply`) is `lib/forceReply.ts`'s decision: walking backwards,

@@ -40,6 +40,7 @@ import { setProxy as applyProxyConfig, testProxy as testProxyConfig } from './pr
 import type { ProxyDeps } from './proxy'
 import * as stickers from './stickers'
 import { createBotApi } from './bot-api'
+import { createMiniAppApi } from './webapp-api'
 import { createChatApi } from './chat-api'
 import { createSendApi } from './send-api'
 import { createTopicApi } from './topic-api'
@@ -448,6 +449,12 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   readonly pressCallback = this.botApi.pressCallback
   readonly inlineQuery = this.botApi.inlineQuery
   readonly sendInlineResult = this.botApi.sendInlineResult
+
+  /** Mini Apps (Web Apps): signed URLs and `WebApp.sendData`; `webapp-api.ts`. */
+  private readonly miniAppApi = createMiniAppApi(() => this.actionDeps)
+  readonly openMiniApp = this.miniAppApi.openMiniApp
+  readonly closeMiniApp = this.miniAppApi.closeMiniApp
+  readonly sendMiniAppData = this.miniAppApi.sendMiniAppData
 
   private readonly webApi = createWebApi(() => this.actionDeps)
   readonly instantView = this.webApi.instantView

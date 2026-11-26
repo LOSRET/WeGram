@@ -14,6 +14,13 @@ import { resolveProxySecrets, toStoredProxy } from '../proxy'
 import type { ProxyController } from '../proxy-controller'
 import { closeQrWindow, getQrWindow, openQrWindow, qrTarget } from '../qr-window'
 import { instantViewWindowState, openInstantViewWindow } from '../instant-view-window'
+import {
+  miniAppWindowState,
+  openMiniAppWindow,
+  reloadMiniApp,
+  requestMiniAppClose,
+  showMiniAppMenu,
+} from '../mini-app-window'
 import type { SettingsStore } from '../store/settings'
 import type { UiDatabase } from '../store/ui-db'
 import type { TelegramAdapter } from '../telegram/adapter'
@@ -87,6 +94,11 @@ export interface HandlerDeps {
    * `evt:mediaCleared` and reloads the viewer, whose strip is its own window.
    */
   onMediaCleared?: () => void
+  /**
+   * 举报 from a Mini App's ⋮ menu: the web view has no report UI, so main closes
+   * it and asks the shell to open its own 举报 sheet for the bot (§9.4).
+   */
+  onReportBot?: (userId: number) => void
 }
 
 /**
@@ -109,6 +121,7 @@ export function createHandlers({
   onLocate,
   setActiveChat,
   onMediaCleared,
+  onReportBot,
 }: HandlerDeps): IpcHandlerMap {
   /**
    * The viewer's own downloads (open / save / copy / reveal) outrank the
@@ -250,6 +263,33 @@ export function createHandlers({
     'bots:callback': (payload) => adapter.pressCallback(payload),
     'bots:inlineQuery': (payload) => adapter.inlineQuery(payload),
     'bots:inlineSend': (payload) => adapter.sendInlineResult(payload),
+    /**
+     * Mini Apps (§9.4): resolve the signed URL, then hand it to the window in
+     * main. The renderer only names the surface that was pressed, and never
+     * sees the signed URL.
+     */
+    'miniapp:open': async (payload) => {
+      const launch = await adapter.openMiniApp(payload)
+      openMiniAppWindow(
+        {
+          title: launch.title,
+          url: launch.url,
+          botUserId: launch.botUserId,
+          ...(launch.launchId === undefined ? {} : { launchId: launch.launchId }),
+          buttonText: 'buttonText' in payload ? payload.buttonText : '',
+        },
+        {
+          theme: storedTheme(uiDb),
+          releaseLaunch: (launchId) => adapter.closeMiniApp(launchId),
+          sendData: (input) => adapter.sendMiniAppData(input),
+          onReport: (userId) => onReportBot?.(userId),
+        },
+      )
+    },
+    'miniapp:init': () => miniAppWindowState(),
+    'miniapp:menu': (payload) => showMiniAppMenu(payload),
+    'miniapp:reload': () => reloadMiniApp(),
+    'miniapp:close': () => requestMiniAppClose(),
     /** 即时预览: the reader window's target, and the page it draws (design doc §8.9). */
     'web:open': (payload) => {
       openInstantViewWindow(payload, BrowserWindow.getFocusedWindow())

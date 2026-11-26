@@ -62,6 +62,12 @@ export const eventChannels = [
    */
   'evt:locate',
   /**
+   * 举报 from a Mini App's ⋮ menu. The web view has no report UI of its own, so
+   * main closes it and asks the shell to open its 举报 sheet for that bot
+   * (design doc §9.4) — the same `users:report` flow the 资料卡 uses.
+   */
+  'evt:report',
+  /**
    * 数据与存储 deleted cached files (清理缓存, or 缓存上限 trimming). Every
    * `wx-media://` URL the shell cached may point into a file that no longer
    * exists, so it drops them and lets the visible bubbles download again.
@@ -121,6 +127,7 @@ export const eventSchemas = {
       topicId: z.number().int().positive().optional(),
     }),
   ),
+  'evt:report': envelope(z.object({ userId: z.number().int().positive() })),
   'evt:error': envelope(appErrorSchema),
   'evt:proxy': envelope(proxyStateSchema),
 } satisfies Record<EventChannel, z.ZodType>

@@ -94,9 +94,28 @@ describe('telegramLinkTarget', () => {
       expect(telegramLinkTarget('https://t.me/proxy?server=example.com')).toBeNull()
     })
 
+    it('reads a Mini App link and its startapp payload', () => {
+      // A non-numeric third segment is a bot's app short name, not a post.
+      expect(telegramLinkTarget('https://t.me/soso_search/app')).toEqual({
+        kind: 'username',
+        username: 'soso_search',
+        webApp: { shortName: 'app' },
+      })
+      expect(telegramLinkTarget('https://t.me/soso_search/app?startapp=invite_7')).toEqual({
+        kind: 'username',
+        username: 'soso_search',
+        webApp: { shortName: 'app', startParameter: 'invite_7' },
+      })
+      expect(telegramLinkTarget('https://t.me/soso_search/app?startapp=bad%20value')).toEqual({
+        kind: 'username',
+        username: 'soso_search',
+        webApp: { shortName: 'app' },
+      })
+    })
+
     it('refuses malformed paths instead of guessing a chat', () => {
       expect(telegramLinkTarget('https://t.me/')).toBeNull()
-      expect(telegramLinkTarget('https://t.me/ada_lovelace/notanumber')).toBeNull()
+      expect(telegramLinkTarget('https://t.me/ada_lovelace/7/extra')).toBeNull()
       expect(telegramLinkTarget('https://t.me/c/notanumber/7')).toBeNull()
       expect(telegramLinkTarget('https://t.me/ada-lovelace')).toBeNull()
       expect(telegramLinkTarget('https://t.me/%61da_lovelace')).toBeNull()

@@ -10,6 +10,7 @@ import { installPreviewBridge } from '@renderer/lib/preview-bridge'
 import { queryClient } from '@renderer/lib/query'
 import { LoginWindow } from '@renderer/screens/LoginWindow'
 import { InstantViewWindow } from '@renderer/screens/InstantViewWindow'
+import { MiniAppWindow } from '@renderer/screens/MiniAppWindow'
 import { QrWindow } from '@renderer/screens/QrWindow'
 import { SettingsWindow } from '@renderer/screens/SettingsWindow'
 
@@ -38,6 +39,8 @@ createRoot(container).render(
         <InstantViewWindow />
       ) : route.startsWith('#settings') ? (
         <SettingsWindow />
+      ) : route.startsWith('#miniapp') ? (
+        <MiniAppWindow />
       ) : (
         <App />
       )}

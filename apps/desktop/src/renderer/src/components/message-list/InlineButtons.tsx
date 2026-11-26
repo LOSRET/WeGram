@@ -13,6 +13,12 @@ interface InlineButtonsProps {
   /** The chat and message the keyboard hangs off: where a press posts to. */
   chatId: number
   messageId: number
+  /**
+   * The bot the keyboard belongs to (the message's sender), needed by a Mini App
+   * button: TDLib's `openWebApp` scopes the signed URL to it (§9.4). Absent in
+   * an 即时预览 page, which has no message behind its rows.
+   */
+  botUserId?: number
 }
 
 /**
@@ -21,14 +27,43 @@ interface InlineButtonsProps {
  * URL buttons are plain links, so the shell's existing `setWindowOpenHandler`
  * (windows.ts) sends them to the OS and the renderer never navigates. A callback
  * button posts its payload back to the bot (`bots:callback`) and the bot's answer
- * is drawn — a toast, an alert dialog, or a URL to open. Anything else stays
- * inert and says so instead of pretending to work.
+ * is drawn — a toast, an alert dialog, or a URL to open. A Web App button opens
+ * the Mini App window through `miniapp:open` (design doc §9.4.1); anything else
+ * stays inert and says so instead of pretending to work.
  */
-export function InlineButtons({ rows, chatId, messageId }: InlineButtonsProps) {
+export function InlineButtons({ rows, chatId, messageId, botUserId }: InlineButtonsProps) {
   /** `row:index` of the button whose callback is in flight: one press at a time. */
   const [pressing, setPressing] = useState<string | null>(null)
 
+  const openWebApp = (button: InlineButton, key: string): void => {
+    if (!botUserId) {
+      useAppStore.getState().setToast('这个按钮需要机器人消息才能打开')
+      return
+    }
+    if (pressing) return
+    setPressing(key)
+    void (async () => {
+      try {
+        await invoke('miniapp:open', {
+          source: 'inline',
+          chatId,
+          botUserId,
+          url: button.webAppUrl ?? '',
+          buttonText: button.text,
+        })
+      } catch (error) {
+        useAppStore.getState().setError(errorMessage(error))
+      } finally {
+        setPressing(null)
+      }
+    })()
+  }
+
   const press = (button: InlineButton, key: string): void => {
+    if (button.webAppUrl) {
+      openWebApp(button, key)
+      return
+    }
     const callback = button.callback
     if (!callback) {
       useAppStore.getState().setToast('这类按钮暂未支持')
@@ -76,7 +111,9 @@ export function InlineButtons({ rows, chatId, messageId }: InlineButtonsProps) {
               <button
                 type="button"
                 className={
-                  'wx-inline-button' + tint + (button.callback ? '' : ' wx-inline-button--inert')
+                  'wx-inline-button' +
+                  tint +
+                  (button.callback || button.webAppUrl ? '' : ' wx-inline-button--inert')
                 }
                 key={index}
                 disabled={pressing === key}

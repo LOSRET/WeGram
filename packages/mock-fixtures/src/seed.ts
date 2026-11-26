@@ -61,6 +61,8 @@ export interface FixtureSeed {
     shortDescription?: string
     /** TDLib `botInfo.description`: the welcome text an empty bot chat shows. */
     description?: string
+    /** TDLib `botInfo.menu_button`: a `botMenuButton` that opens a Mini App (§9.4). */
+    menu?: { text: string; url: string }
     commands: Array<{ command: string; description: string }>
   }
   /**

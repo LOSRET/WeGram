@@ -43,6 +43,8 @@ You sign in with your own account and see your real chats, groups and channels. 
 
 **Stickers** Static WebP, TGS (Lottie, gunzipped via `DecompressionStream('gzip')`) and WebM video stickers all render. The picker is backed by `getInstalledStickerSets`.
 
+**Mini Apps** A bot's Telegram Web App opens in its own 560×780 window: bot name, ⋯ and × on the strip, a sandboxed page below it. Reply-keyboard keys, inline-keyboard keys, the bot profile's menu and `t.me/<bot>/<app>` links all lead there. The signed URL stays in main; the page talks back through `TelegramWebviewProxy` (`sendData` / `close` / `openLink`).
+
 **Look** WeChat 4.x skin, light and dark; native title-bar overlay (32 px); floating overlay scrollbars on long panes (Chromium's native bars take a layout gutter, so rows re-flow whenever the bar appears); the chrome icons are vectors extracted from the client's own `Weixin.dll`.
 
 ## Architecture
@@ -180,7 +182,7 @@ Logs land in `.cache\app.log`.
 - **Voice/video calls**: Telegram does not expose them through TDLib's public API; it would mean rewriting the stack.
 - **Secret chats (E2E)**: TDLib has the types but the pitfalls are expensive. Not in v1; revisit for v2.
 - **Multiple accounts**: v1 is single-account.
-- **Mobile, Moments, mini-programs**: no matching entities on the Telegram side.
+- **Mobile, Moments**: no matching entities on the Telegram side. (Mini Apps are supported as Telegram Mini Apps.)
 
 ## Disclaimer
 

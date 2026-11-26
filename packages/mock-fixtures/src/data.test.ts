@@ -48,8 +48,10 @@ describe('the fake account', () => {
         { text: '设置提醒', sendsText: true },
       ],
       [{ text: '分享手机号', sendsText: false }],
+      [{ text: '首页', sendsText: false, webAppUrl: 'https://w.test/app' }],
     ])
     expect(grid?.placeholder).toBe('点下面的按钮，或输入 /help')
+    expect(bot?.bot?.menu).toEqual({ text: '打开小程序', url: 'https://w.test/app' })
     // The bot is not an address-book contact, so no contact fields travel.
     expect(bot?.contact).toBeUndefined()
   })

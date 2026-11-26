@@ -626,6 +626,18 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     }
     case 'web:state':
       return previewInstantViewState()
+    /**
+     * Mini Apps need the `WebContentsView` main owns and TDLib's signed URL; a
+     * plain browser page has neither. The preview says so instead of pretending.
+     */
+    case 'miniapp:open':
+      throw { code: 'not_implemented', message: '小程序窗口只在桌面版中可用' }
+    case 'miniapp:init':
+      throw { code: 'not_implemented', message: '小程序窗口只在桌面版中可用' }
+    case 'miniapp:menu':
+    case 'miniapp:reload':
+    case 'miniapp:close':
+      return undefined
     /** 即时预览: the same demo page the mock adapter serves (design doc §8.9). */
     case 'web:instantView':
       return buildInstantView(

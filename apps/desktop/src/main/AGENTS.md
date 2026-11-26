@@ -28,6 +28,15 @@ instant-view-window.ts  即时预览 (§8.9): the reader as its own top-level wi
                     (title only; the page tools are a 36 px second row, or the zoom and
                     the window buttons collide), so no default menu bar, and
                     `titleBarOverlay` follows the theme
+mini-app-bridge.ts   the guest's `web_app_*` table: parses the preload's JSON and dispatches
+                    to close / sendData / theme / viewport / popup / openExternal. No
+                    Electron imports, so `mini-app-bridge.test.ts` pins it.
+mini-app-window.ts  小程序 / Telegram Mini Apps (§9.4.1): the one frameless 560×780 window
+                    (route #miniapp) with a 48 px strip and a sandboxed WebContentsView
+                    below it; the signed URL stays here, `TelegramWebviewProxy` events
+                    (`src/preload/miniapp.ts`) become close / sendWebAppData / openLink,
+                    the ⋯ is a native menu, and 举报 publishes `evt:report`. One window,
+                    re-targeted; `closeWebApp` releases an `openWebApp` launch
 notifications.ts    desktop toasts from TDLib's notification stream; suppresses the chat
                     the focused shell shows (ui:setActiveChat), flashes the task bar, and
                     stops at once when 设置 → 消息通知's 桌面通知 switch is off (read per

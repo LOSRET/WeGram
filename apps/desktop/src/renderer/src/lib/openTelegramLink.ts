@@ -24,6 +24,20 @@ import type { TelegramLinkTarget } from './telegramLink'
 export function openTelegramLink(target: TelegramLinkTarget): void {
   void (async () => {
     try {
+      // `t.me/<bot>/<app>` names a Mini App, not a conversation (§9.4). Main
+      // resolves the bot and asks TDLib for the signed URL; the link parser only
+      // recognised the shape.
+      if (target.kind === 'username' && target.webApp) {
+        await invoke('miniapp:open', {
+          source: 'link',
+          username: target.username,
+          shortName: target.webApp.shortName,
+          ...(target.webApp.startParameter === undefined
+            ? {}
+            : { startParameter: target.webApp.startParameter }),
+        })
+        return
+      }
       const chat = await resolveChat(target)
       const store = useAppStore.getState()
       store.applyChatOps([{ op: 'upsert', chat }])

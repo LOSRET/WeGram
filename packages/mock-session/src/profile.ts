@@ -73,6 +73,8 @@ export function reportAnswer(input: {
 export interface FakeBotProfile {
   shortDescription?: string
   description?: string
+  /** TDLib `botInfo.menu_button`: the Mini App the profile's 菜单 opens (§9.4). */
+  menu?: { text: string; url: string }
   commands: Array<{ command: string; description: string }>
 }
 
@@ -147,6 +149,7 @@ export function composeProfile(
               ? { shortDescription: source.bot.shortDescription }
               : {}),
             ...(source.bot.description ? { description: source.bot.description } : {}),
+            ...(source.bot.menu ? { menu: source.bot.menu } : {}),
             commands: source.bot.commands,
           },
         }
@@ -164,7 +167,11 @@ export function pageCommonChats<T extends { id: number }>(
   input: { offset?: number; limit?: number } = {},
 ): T[] {
   const start =
-    input.offset === undefined ? 0 : Math.max(0, chats.findIndex((chat) => chat.id === input.offset))
+    input.offset === undefined
+      ? 0
+      : Math.max(
+          0,
+          chats.findIndex((chat) => chat.id === input.offset),
+        )
   return chats.slice(start, start + (input.limit ?? 50))
 }
-

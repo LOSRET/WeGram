@@ -11,6 +11,7 @@ import { presenceInvokeChannels, presenceInvokeSchemas } from './presence'
 import { userInvokeChannels, userInvokeSchemas } from './user'
 import { reportInvokeChannels, reportInvokeSchemas } from './report'
 import { botInvokeChannels, botInvokeSchemas } from './bot'
+import { miniAppInvokeChannels, miniAppInvokeSchemas } from './miniapp'
 import { webInvokeChannels, webInvokeSchemas } from './web'
 import { chatInvokeChannels, chatInvokeSchemas } from './chats'
 import { qrInvokeChannels, qrInvokeSchemas } from './qr'
@@ -137,6 +138,8 @@ export const invokeChannels = [
   ...reportInvokeChannels,
   /** Bots: the commands a bot publishes and pressing an inline button; ./bot.ts. */
   ...botInvokeChannels,
+  /** Mini Apps (Telegram Web Apps): the in-app web view; ./miniapp.ts. */
+  ...miniAppInvokeChannels,
   'search:global',
   'search:inChat',
   /**
@@ -377,6 +380,7 @@ export const invokeSchemas = {
   ...userInvokeSchemas,
   ...reportInvokeSchemas,
   ...botInvokeSchemas,
+  ...miniAppInvokeSchemas,
   ...webInvokeSchemas,
   'search:global': {
     request: z.object({ q: z.string().min(1), limit: z.number().int().positive().max(50) }),

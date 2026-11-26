@@ -28,6 +28,9 @@ report) and `user.ts` (the 资料卡 DTO — including `BotProfile`, the bot-onl
 `report.ts` (the phased 举报 contract for a person and for one message),
 `bot.ts` (机器人: the command list plus the empty-chat introduction, a callback button's
 answer, and the inline query (`@bot query`) result rows — four channels),
+`miniapp.ts` (小程序 / Telegram Mini Apps: the four entry surfaces in `miniapp:open`, the
+stub's `miniapp:init` title+theme, `miniapp:menu` / `reload` / `close`, and `MiniAppLaunch` —
+the signed URL stays main-only; design doc §9.4.1),
 `reaction.ts` (the 表情回应 chip DTO, display-only for now), `properties.ts` (the
 per-message capability answer the context menu reads) and `web.ts` (即时预览: the
 `web:instantView` channel and the rich-block page the reader draws). The channel tables of `chats.ts`, `qr.ts`, `send.ts`, `presence.ts`,

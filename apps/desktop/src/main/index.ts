@@ -34,6 +34,7 @@ import {
   showViewerWithShell,
 } from './viewer'
 import { closeInstantViewWindow, setInstantViewTheme } from './instant-view-window'
+import { closeMiniAppWindow, setMiniAppTheme } from './mini-app-window'
 import {
   applyTitleBarTheme,
   createMainWindow,
@@ -334,6 +335,15 @@ async function bootstrap(): Promise<void> {
         bus?.publish('evt:mediaCleared', {})
         reloadViewer()
       },
+      /**
+       * 举报 from a Mini App's ⋮ menu: the guest web view has no report UI, so
+       * the shell's own phased 举报 sheet takes over, the way the 资料卡 does.
+       */
+      onReportBot: (userId) => {
+        const win = mainWindow
+        if (win && !win.isDestroyed()) raiseShellAboveViewer(win)
+        bus?.publish('evt:report', { userId })
+      },
     }),
   )
 
@@ -394,6 +404,7 @@ function applyTheme(theme: 'light' | 'dark'): void {
   setViewerTheme(theme)
   setInstantViewTheme(theme)
   setSettingsTheme(theme)
+  setMiniAppTheme(theme)
   bus?.publish('evt:theme', { theme })
 }
 
@@ -442,6 +453,7 @@ function showMainWindow(theme: 'light' | 'dark', closeLogin: 'immediate' | 'afte
       event.preventDefault()
       closeSettingsWindow()
       closeInstantViewWindow()
+      closeMiniAppWindow()
       hideViewerWithShell()
       win.hide()
     }
@@ -453,6 +465,7 @@ function showMainWindow(theme: 'light' | 'dark', closeLogin: 'immediate' | 'afte
     closeViewer()
     closeSettingsWindow()
     closeInstantViewWindow()
+    closeMiniAppWindow()
   })
   if (closeLogin === 'immediate') {
     // First sign-in: the login window must not linger on the profile step. The
@@ -482,6 +495,7 @@ function syncWindowsToAuth(state: AuthState): void {
     return
   }
   if (!mainWindow) return
+  closeMiniAppWindow()
   openLoginWindow()
   mainWindow.close()
 }
@@ -514,6 +528,7 @@ app.on('before-quit', () => {
   // The adapter stop below emits `auth: closed`; that is a teardown, not a logout.
   quitting = true
   closeSettingsWindow()
+  closeMiniAppWindow()
   bus?.dispose()
   bus = null
   unregisterIpc()

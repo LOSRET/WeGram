@@ -258,11 +258,14 @@ export type InlineButtonStyle = z.infer<typeof inlineButtonStyleSchema>
 /**
  * One button under a message or inside a rich page (Telegram's inline keyboard).
  * `url` is set for the kinds that open something; `callback` is what a button
- * posts to its bot (§8.3).
+ * posts to its bot (§8.3); `webAppUrl` is a Mini App, which opens in the app's
+ * own web view instead of the browser (§9.4).
  */
 export const inlineButtonSchema = z.object({
   text: z.string(),
   url: z.string().optional(),
+  /** TDLib `inlineKeyboardButtonTypeWebApp.url`: signed by `openWebApp` first. */
+  webAppUrl: z.string().optional(),
   callback: inlineButtonCallbackSchema.optional(),
   /** Absent for the ordinary grey button; see inlineButtonStyleSchema. */
   style: inlineButtonStyleSchema.optional(),
@@ -272,15 +275,20 @@ export type InlineButton = z.infer<typeof inlineButtonSchema>
 /**
  * One key of a bot's custom reply keyboard (TDLib `keyboardButton`).
  *
- * `sendsText` is the one distinction the client needs: a `keyboardButtonTypeText`
- * posts its own label as a message, while the request kinds (phone number,
- * location, poll, users, chat) and a Web App key ask the *client* for something
- * this one cannot produce — the grid still draws them, but pressing one refuses
- * instead of sending "分享手机号" as text (§8.3).
+ * `sendsText` is the one distinction the send path needs: a
+ * `keyboardButtonTypeText` posts its own label as a message, while the request
+ * kinds (phone number, location, poll, users, chat) ask the *client* for
+ * something this one cannot produce — the grid still draws them, but pressing
+ * one refuses instead of sending "分享手机号" as text (§8.3).
+ *
+ * A `keyboardButtonTypeWebApp` key is the exception: it is neither text nor a
+ * request. `webAppUrl` is what the Mini App window needs to open it (§9.4).
  */
 export const replyKeyboardButtonSchema = z.object({
   text: z.string().min(1),
   sendsText: z.boolean(),
+  /** TDLib `keyboardButtonTypeWebApp.url`; absent for every other key kind. */
+  webAppUrl: z.string().optional(),
 })
 export type ReplyKeyboardButton = z.infer<typeof replyKeyboardButtonSchema>
 

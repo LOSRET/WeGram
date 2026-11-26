@@ -467,7 +467,14 @@ export const MessageRow = memo(
           {/* Telegram's inline keyboard is attached to the message, not to its
               bubble: under it, on the transcript's own background, so the buttons
               read as their own control strip instead of part of the body. */}
-          {buttons ? <InlineButtons rows={buttons} chatId={chat.id} messageId={first.id} /> : null}
+          {buttons ? (
+            <InlineButtons
+              rows={buttons}
+              chatId={chat.id}
+              messageId={first.id}
+              {...(first.senderId > 0 ? { botUserId: first.senderId } : {})}
+            />
+          ) : null}
           {/* 取消上传: visible while a media row is still uploading, for the same
               reason 未发送 is: a transfer the reader can no longer stop is worse than
               a momentary button under a bubble. */}

@@ -13,7 +13,18 @@
  * on the target for the first-open screen rather than discarded with the query.
  */
 export type TelegramLinkTarget =
-  | { kind: 'username'; username: string; messageId?: number; startParameter?: string }
+  | {
+      kind: 'username'
+      username: string
+      messageId?: number
+      startParameter?: string
+      /**
+       * `t.me/<bot>/<app>`: a Mini App link (design doc §9.4). The short name is
+       * passed to TDLib (`getWebAppLinkUrl`), which signs the URL; this parser
+       * only recognises the shape.
+       */
+      webApp?: { shortName: string; startParameter?: string }
+    }
   | { kind: 'user'; userId: number }
   | { kind: 'chat'; chatId: number; messageId?: number }
 
@@ -93,6 +104,22 @@ function fromPath(url: URL): TelegramLinkTarget | null {
   }
   if (name === undefined || name.startsWith('+') || NOT_A_CHAT.has(name)) return null
   if (!USERNAME.test(name)) return null
+  // A public link has at most one segment after the name (a post or an app).
+  if (rest.length > 1) return null
+  /**
+   * `t.me/<bot>/<app>`: a third path that is not a post number names a Mini App.
+   * A numeric segment is always Telegram's server post number, and a bot's app
+   * short name is a username-shaped word (Bot API's own rule).
+   */
+  if (rest[0] !== undefined && !/^[0-9]+$/.test(rest[0])) {
+    if (rest.length > 1 || !USERNAME.test(rest[0])) return null
+    const start = webAppStartParameterOf(url)
+    return {
+      kind: 'username',
+      username: name,
+      webApp: { shortName: rest[0], ...(start === undefined ? {} : { startParameter: start }) },
+    }
+  }
   const messageId = linkedMessageId(rest[0])
   if (rest[0] !== undefined && messageId === undefined) return null
   const startParameter = startParameterOf(url)
@@ -129,9 +156,7 @@ function fromTg(url: URL): TelegramLinkTarget | null {
     // A private chat's id is the user id; TDLib opens it with createPrivateChat.
     if (chatId > 0) return { kind: 'user', userId: chatId }
     const messageId = linkedMessageId(url.searchParams.get('message_id') ?? undefined)
-    return messageId === undefined
-      ? { kind: 'chat', chatId }
-      : { kind: 'chat', chatId, messageId }
+    return messageId === undefined ? { kind: 'chat', chatId } : { kind: 'chat', chatId, messageId }
   }
   return null
 }
@@ -140,6 +165,12 @@ function fromTg(url: URL): TelegramLinkTarget | null {
 function startParameterOf(url: URL): string | undefined {
   const value = url.searchParams.get('start')
   return value && /^[A-Za-z0-9_-]{1,64}$/.test(value) ? value : undefined
+}
+
+/** A Mini App's `startapp` payload; longer than a bot `start` payload. */
+function webAppStartParameterOf(url: URL): string | undefined {
+  const value = url.searchParams.get('startapp')
+  return value && /^[A-Za-z0-9_-]{1,512}$/.test(value) ? value : undefined
 }
 
 function internalChatId(value: string | undefined): number | null {

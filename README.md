@@ -43,6 +43,8 @@ WeGram 是一个自用的 Telegram 桌面客户端：协议层用 Telegram 官�
 
 **贴纸** 静态 WebP、TGS（Lottie，`DecompressionStream('gzip')` 解压）、WebM 视频三种格式都渲染；贴纸面板来自 `getInstalledStickerSets`。
 
+**小程序** 机器人发布的 Telegram Mini App 在自己的 560×780 窗口里打开：顶部是机器人名 + ⋯ + ×，下面是沙箱化的页面；回复键盘、内联键盘、机器人资料卡的「菜单」和 `t.me/<bot>/<app>` 链接都能进入。签名 URL 只在主进程，页面通过 `TelegramWebviewProxy` 调 `sendData` / `close` / `openLink`。
+
 **界面** 微信 4.x 皮肤，浅色 + 暗色；原生标题栏 overlay（32 px）；长列表用浮动滚动条（Chromium 原生滚动条会占布局，行会抖）；图标是从客户端 `Weixin.dll` 里抽出来的矢量。
 
 ## 架构
@@ -180,7 +182,7 @@ scripts\start-test.cmd          # 连测试 DC（WEGRAM_TDLIB_TEST_DC=1，复用
 - **语音 / 视频通话**：Telegram 不走 TDLib 的公开 API，等于重写一套。
 - **秘密聊天（E2E）**：TDLib 有类型但坑多，v1 不做，v2 再评估。
 - **多账号**：v1 单账号。
-- **移动端、朋友圈、小程序**：没有对应实体，硬塞只会两边都不像。
+- **移动端、朋友圈**：没有对应实体，硬塞只会两边都不像。（小程序已按 Telegram Mini App 支持。）
 
 ## 免责声明
 

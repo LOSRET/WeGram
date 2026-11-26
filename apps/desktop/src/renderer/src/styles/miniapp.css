@@ -1,0 +1,85 @@
+/* ==========================================================================
+   Mini App window (design doc §9.4).
+
+   Only the 48 px strip is ours: main positions the guest `WebContentsView`
+   immediately below it, which is why this file must not add a second row and why
+   the strip's height is mirrored by `MINI_APP_BAR_H` in main/mini-app-window.ts.
+   No native frame: the strip is the drag region, and × belongs to the client.
+   ========================================================================== */
+
+.wx-miniapp {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--wx-pane);
+  color: var(--wx-text);
+  font-family: var(--wx-font);
+}
+
+.wx-miniapp__bar {
+  flex: none;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 16px;
+  background: var(--wx-iv-win-bar);
+  border-bottom: 1px solid var(--wx-divider);
+  /* The whole strip moves the window; the buttons opt out below. */
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.wx-miniapp__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--wx-text);
+}
+
+.wx-miniapp__actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  -webkit-app-region: no-drag;
+}
+
+.wx-miniapp__button {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wx-text);
+  font-family: var(--wx-font);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.wx-miniapp__button:hover:not(:disabled) {
+  background: var(--wx-row-hover);
+}
+
+.wx-miniapp__button:disabled {
+  color: var(--wx-text-disabled);
+  cursor: default;
+}
+
+.wx-miniapp__button--close {
+  font-size: 22px;
+}
+
+.wx-miniapp__error {
+  margin: 48px 24px 0;
+  text-align: center;
+  font-size: var(--wx-fs-caption);
+  color: var(--wx-text-secondary);
+}

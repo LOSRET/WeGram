@@ -27,12 +27,15 @@ import { asArray } from '../json'
 export function buttonTarget(
   type: TdObject | undefined,
   gameShortName?: string,
-): Pick<InlineButton, 'url' | 'callback'> {
+): Pick<InlineButton, 'url' | 'webAppUrl' | 'callback'> {
   switch (type?._) {
     case 'inlineKeyboardButtonTypeUrl':
     case 'inlineKeyboardButtonTypeLoginUrl':
-    case 'inlineKeyboardButtonTypeWebApp':
       return typeof type.url === 'string' && type.url ? { url: type.url } : {}
+    case 'inlineKeyboardButtonTypeWebApp':
+      // A Mini App is not a link: the URL must go through `openWebApp` first,
+      // which is why it travels under its own field (§9.4).
+      return typeof type.url === 'string' && type.url ? { webAppUrl: type.url } : {}
     case 'inlineKeyboardButtonTypeCallback':
     case 'inlineKeyboardButtonTypeCallbackWithPassword': {
       // Pressing these posts the button's payload back to its bot
@@ -156,11 +159,21 @@ export function mapForceReply(markup: TdObject | undefined): ForceReply | undefi
 
 /**
  * One `keyboardButton`. Its `type` decides whether the label is a message to send:
- * only `keyboardButtonTypeText` means that, so everything else (a phone number, a
- * location, a poll, a chat, a Web App) travels as "drawn but refuses".
+ * only `keyboardButtonTypeText` means that. A `keyboardButtonTypeWebApp` carries
+ * the URL a Mini App needs (§9.4); every other kind (a phone number, a location,
+ * a poll, a chat) is drawn but refuses, because this client cannot ask for it.
  */
 function replyKeyboardButtonOf(button: TdObject | undefined): ReplyKeyboardButton | null {
   const text = typeof button?.text === 'string' ? button.text.trim() : ''
   if (!text) return null
-  return { text, sendsText: button?.type?._ === 'keyboardButtonTypeText' }
+  const type = button?.type
+  const webAppUrl =
+    type?._ === 'keyboardButtonTypeWebApp' && typeof type.url === 'string' && type.url
+      ? type.url
+      : undefined
+  return {
+    text,
+    sendsText: type?._ === 'keyboardButtonTypeText',
+    ...(webAppUrl ? { webAppUrl } : {}),
+  }
 }

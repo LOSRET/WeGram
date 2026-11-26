@@ -22,8 +22,11 @@ credentials (development only), plus the real PNG/WebP/TGS/WebM media it generat
 - `edits.ts` — 编辑 / 编辑说明 / delete / 重试 as one `createMockEdits` factory: each
   rewrites one fixture row and announces the op that describes it (a text edit is an
   `edit`, a caption is a `replace`).
-- `bots.ts` — the fixture bot's two endpoints: the commands it publishes (the composer's
-  "/" list) and its canned callback answer (a toast, and an alert for the `alert` payload).
+- `bots.ts` — the fixture bot's endpoints: the commands it publishes (the composer's
+  "/" list), its canned callback answer (a toast, and an alert for the `alert` payload)
+  and the offline `data:` page a 小程序 opens (design doc §9.4.1). The page talks through
+  `TelegramWebviewProxy`, so the guest preload, `sendData` and the window strip are
+  exercised with no network and no Telegram account.
 - `users.ts` — 资料卡 for the fixture people: reads the seed into the shared card
   composition, keeps this session's 备注 / 添加删除联系人 / 拉黑 overrides in a map
   (nothing persists) and answers 共同群聊 and the phased 举报 from the shared rules.

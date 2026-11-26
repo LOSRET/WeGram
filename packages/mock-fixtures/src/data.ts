@@ -624,6 +624,8 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
       // The profile card's 简介 and the text an empty chat would show (§8.3).
       shortDescription: 'WeGram 助手：演示机器人命令、按钮和自定义键盘。',
       description: '你好，我是 WeGram 助手。点下面的按钮试试。',
+      // The profile's 菜单 row: a Mini App, not a browser link (§9.4).
+      menu: { text: '打开小程序', url: 'https://w.test/app' },
       commands: [
         { command: 'start', description: '重新开始' },
         { command: 'help', description: '看看我能做什么' },
@@ -671,6 +673,8 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
           ],
           // A callback the mock answers with `show_alert`: the one-button dialog.
           [{ text: '弹窗提醒', callback: { type: 'data', data: 'alert' } }, { text: '复制示例' }],
+          // A Mini App key: it opens the in-app web view, not the browser (§9.4).
+          [{ text: '打开小程序', webAppUrl: 'https://w.test/app' }],
         ],
       },
       // The custom reply keyboard (§8.3): text keys that send their own label, and
@@ -692,6 +696,7 @@ export function buildFixtureSeeds(options: FixtureOptions): Map<number, FixtureS
               { text: '设置提醒', sendsText: true },
             ],
             [{ text: '分享手机号', sendsText: false }],
+            [{ text: '首页', sendsText: false, webAppUrl: 'https://w.test/app' }],
           ],
           placeholder: '点下面的按钮，或输入 /help',
         },

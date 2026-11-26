@@ -23,8 +23,13 @@ export interface AppWindowSpec {
   minHeight?: number
   backgroundColor: string
   title?: string
-  /** No native frame (the login window paints its own strip) and no resizing. */
+  /** No native frame (the login / Mini App windows paint their own strip). */
   frameless?: boolean
+  /**
+   * A frameless window that can still be resized. The login sheet is fixed; a
+   * Mini App is a browser-like sheet the reader may drag larger (design doc §9.4).
+   */
+  resizable?: boolean
   /** The window's own window-controls overlay, when it has a title strip. */
   overlay?: Electron.TitleBarOverlay
   /** Renderer route to boot on: `login`, `viewer`; omitted for the shell. */
@@ -41,7 +46,7 @@ export function createAppWindow(spec: AppWindowSpec): BrowserWindow {
     ...(spec.frameless
       ? {
           frame: false,
-          resizable: false,
+          resizable: spec.resizable === true,
           maximizable: false,
           minimizable: false,
           fullscreenable: false,

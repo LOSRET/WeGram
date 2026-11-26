@@ -9,11 +9,16 @@ import { useAppStore } from '../store/useAppStore'
 import { Avatar } from './Avatar'
 import { Modal } from './Modal'
 import { ReportDialog } from './ReportDialog'
-import { RichText, safeHref } from './RichText'
-import { TelegramLink } from './TelegramLink'
+import { RichText } from './RichText'
 
 interface ProfileCardProps {
   userId: number
+  /**
+   * The conversation the card was opened from, when there was one. A bot's
+   * Web App menu uses it as `openWebApp.chat_id`, so the page's init data names
+   * the chat the reader was in (design doc §9.4.1).
+   */
+  chatId?: number
   /**
    * 发消息: offered only when the card was opened outside a chat (通讯录), because
    * inside one the reader is already talking to this person.
@@ -35,7 +40,7 @@ interface ProfileCardProps {
  * page of chat summaries per call, and a card that is merely glanced at should
  * not pay for a list nobody asked to see.
  */
-export function ProfileCard({ userId, onOpenChat, onClose }: ProfileCardProps) {
+export function ProfileCard({ userId, chatId, onOpenChat, onClose }: ProfileCardProps) {
   const userAvatars = useAppStore((state) => state.userAvatars)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [busy, setBusy] = useState(false)
@@ -136,6 +141,29 @@ export function ProfileCard({ userId, onOpenChat, onClose }: ProfileCardProps) {
   const botAbout = profile?.bot
     ? (profile.bot.shortDescription ?? profile.bot.description ?? '')
     : ''
+
+  /**
+   * 菜单: a bot's `botMenuButton` is a Mini App, not a browser link (design doc
+   * §9.4). `miniapp:open` resolves the signed URL in main; the sheet closes so
+   * the Mini App window is not opened behind it.
+   */
+  const openBotMenu = async (): Promise<void> => {
+    const menu = profile?.bot?.menu
+    if (!menu || busy) return
+    setBusy(true)
+    try {
+      await invoke('miniapp:open', {
+        source: 'menu',
+        botUserId: userId,
+        url: menu.url,
+        buttonText: menu.text,
+        ...(chatId === undefined ? {} : { chatId }),
+      })
+      onClose()
+    } catch (error) {
+      fail(error)
+    }
+  }
 
   return (
     <>
@@ -252,15 +280,17 @@ export function ProfileCard({ userId, onOpenChat, onClose }: ProfileCardProps) {
                 </div>
               ) : null}
 
-              {profile.bot?.menu && safeHref(profile.bot.menu.url) ? (
+              {profile.bot?.menu ? (
                 <div className="wx-profile__row">
                   <span className="wx-profile__label">菜单</span>
-                  <TelegramLink
+                  <button
+                    type="button"
                     className="wx-profile__link"
-                    href={safeHref(profile.bot.menu.url) ?? ''}
+                    disabled={busy}
+                    onClick={() => void openBotMenu()}
                   >
                     {profile.bot.menu.text}
-                  </TelegramLink>
+                  </button>
                 </div>
               ) : null}
 
