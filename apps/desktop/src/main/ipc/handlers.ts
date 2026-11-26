@@ -14,10 +14,17 @@ import { createMiniAppBiometry } from '../mini-app-biometry'
 import { resolveProxySecrets, toStoredProxy } from '../proxy'
 import type { ProxyController } from '../proxy-controller'
 import { closeQrWindow, getQrWindow, openQrWindow, qrTarget } from '../qr-window'
+import {
+  closeReportWindow,
+  openReportWindow,
+  reportWindowState,
+} from '../report-window'
 import { instantViewWindowState, openInstantViewWindow } from '../instant-view-window'
 import {
+  miniAppMenuState,
   miniAppWindowState,
   openMiniAppWindow,
+  pickMiniAppMenu,
   pressMiniAppControl,
   reloadMiniApp,
   requestMiniAppClose,
@@ -96,11 +103,6 @@ export interface HandlerDeps {
    * `evt:mediaCleared` and reloads the viewer, whose strip is its own window.
    */
   onMediaCleared?: () => void
-  /**
-   * 举报 from a Mini App's ⋮ menu: the web view has no report UI, so main closes
-   * it and asks the shell to open its own 举报 sheet for the bot (§9.4).
-   */
-  onReportBot?: (userId: number) => void
 }
 
 /**
@@ -123,7 +125,6 @@ export function createHandlers({
   onLocate,
   setActiveChat,
   onMediaCleared,
-  onReportBot,
 }: HandlerDeps): IpcHandlerMap {
   const biometry = createMiniAppBiometry(uiDb)
   /**
@@ -291,12 +292,13 @@ export function createHandlers({
           sendData: (input) => adapter.sendMiniAppData(input),
           invokeCustomMethod: (input) => adapter.invokeWebAppCustomRequest(input),
           biometry,
-          onReport: (userId) => onReportBot?.(userId),
         },
       )
     },
     'miniapp:init': () => miniAppWindowState(),
     'miniapp:menu': (payload) => showMiniAppMenu(payload),
+    'miniapp:menuState': () => miniAppMenuState(),
+    'miniapp:menuPick': (payload) => pickMiniAppMenu(payload.id),
     'miniapp:reload': () => reloadMiniApp(),
     'miniapp:close': () => requestMiniAppClose(),
     'miniapp:press': (payload) => pressMiniAppControl(payload.target),
@@ -770,6 +772,18 @@ export function createHandlers({
     },
     'qr:close': () => {
       closeQrWindow()
+    },
+    /**
+     * 举报 is a window of its own (design doc §9.4.1): a Mini App reports its bot
+     * without being closed, and the 资料卡 / message menu share the same surface.
+     * The phased `reportChat` calls stay `users:report` / `messages:report`.
+     */
+    'report:open': (payload) => {
+      openReportWindow(payload, storedTheme(uiDb), BrowserWindow.getFocusedWindow())
+    },
+    'report:state': () => reportWindowState(),
+    'report:close': () => {
+      closeReportWindow()
     },
   }
 }

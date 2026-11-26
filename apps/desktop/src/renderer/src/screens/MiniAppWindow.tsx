@@ -6,7 +6,7 @@ import type {
 } from '@wegram/protocol'
 import { useEffect, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react'
 
-import { ChevronLeftIcon } from '@renderer/components/Icon'
+import { ChevronLeftWideIcon } from '@renderer/components/Icon'
 import { errorMessage, invoke } from '@renderer/lib/ipc'
 
 /**
@@ -56,12 +56,18 @@ export function MiniAppWindow() {
   // Main sends this only to the Mini App host, with the window's own sequence.
   useEffect(() => window.tg.on('evt:miniappControls', (event) => setControls(event.payload)), [])
 
-  /** The native menu is anchored under the ⋮, in this window's client coordinates. */
+  /**
+   * The ⋯ card (⋮ → 重载页面 / 使用条款 / 隐私政策 / 举报) is main's own
+   * transparent view: it hangs right-aligned under this button, so the only
+   * thing it needs from here is the button's rectangle.
+   */
   const openMenu = (event: MouseEvent<HTMLButtonElement>): void => {
     const rect = event.currentTarget.getBoundingClientRect()
     void invoke('miniapp:menu', {
-      x: Math.max(0, Math.round(rect.right - 168)),
-      y: Math.round(rect.bottom + 4),
+      left: Math.round(rect.left),
+      top: Math.round(rect.top),
+      right: Math.round(rect.right),
+      bottom: Math.round(rect.bottom),
     }).catch((failure: unknown) => setError(errorMessage(failure)))
   }
 
@@ -112,7 +118,7 @@ export function MiniAppWindow() {
             aria-label="返回"
             onClick={() => press('back')}
           >
-            <ChevronLeftIcon size={18} />
+            <ChevronLeftWideIcon size={18} />
           </button>
         ) : null}
         <h1 className="wx-miniapp__title" title={state?.title ?? ''}>

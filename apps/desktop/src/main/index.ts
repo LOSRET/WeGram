@@ -35,6 +35,7 @@ import {
 } from './viewer'
 import { closeInstantViewWindow, setInstantViewTheme } from './instant-view-window'
 import { closeMiniAppWindow, setMiniAppTheme } from './mini-app-window'
+import { closeReportWindow } from './report-window'
 import {
   applyTitleBarTheme,
   createMainWindow,
@@ -335,15 +336,6 @@ async function bootstrap(): Promise<void> {
         bus?.publish('evt:mediaCleared', {})
         reloadViewer()
       },
-      /**
-       * 举报 from a Mini App's ⋮ menu: the guest web view has no report UI, so
-       * the shell's own phased 举报 sheet takes over, the way the 资料卡 does.
-       */
-      onReportBot: (userId) => {
-        const win = mainWindow
-        if (win && !win.isDestroyed()) raiseShellAboveViewer(win)
-        bus?.publish('evt:report', { userId })
-      },
     }),
   )
 
@@ -454,6 +446,7 @@ function showMainWindow(theme: 'light' | 'dark', closeLogin: 'immediate' | 'afte
       closeSettingsWindow()
       closeInstantViewWindow()
       closeMiniAppWindow()
+      closeReportWindow()
       hideViewerWithShell()
       win.hide()
     }
@@ -466,6 +459,7 @@ function showMainWindow(theme: 'light' | 'dark', closeLogin: 'immediate' | 'afte
     closeSettingsWindow()
     closeInstantViewWindow()
     closeMiniAppWindow()
+    closeReportWindow()
   })
   if (closeLogin === 'immediate') {
     // First sign-in: the login window must not linger on the profile step. The
@@ -529,6 +523,7 @@ app.on('before-quit', () => {
   quitting = true
   closeSettingsWindow()
   closeMiniAppWindow()
+  closeReportWindow()
   bus?.dispose()
   bus = null
   unregisterIpc()

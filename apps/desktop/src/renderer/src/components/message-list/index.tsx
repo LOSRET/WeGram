@@ -3,7 +3,7 @@ import type { ChatSummary, LinkPreview, Message, MessageProperties } from '@wegr
 import { useCallback, useMemo, useRef, useState } from 'react'
 
 import { isSameDay } from '../../lib/format'
-import { invoke } from '../../lib/ipc'
+import { errorMessage, invoke } from '../../lib/ipc'
 import { selfIdentity } from '../../lib/self'
 import { useAnchoredScroll } from '../../lib/useAnchoredScroll'
 import { useAppStore } from '../../store/useAppStore'
@@ -11,7 +11,6 @@ import type { UnreadMarker } from '../../store/useAppStore'
 import { ContextMenu } from '../ContextMenu'
 import { JumpToLatestIcon } from '../Icon'
 import { OverlayScrollbar } from '../OverlayScrollbar'
-import { ReportDialog } from '../ReportDialog'
 import { DaySeparator, UnreadDivider } from './Divider'
 import { MessageRow } from './MessageRow'
 import { buildMessageMenuItems } from './menu'
@@ -167,7 +166,6 @@ export function MessageList({
   const contentRef = useRef<HTMLDivElement | null>(null)
   const [menu, setMenu] = useState<MenuState | null>(null)
   /** 举报: the row whose phased report sheet is open (one message at a time). */
-  const [report, setReport] = useState<Message | null>(null)
   /** Guards a properties answer that lands after closing or re-opening the menu. */
   const menuRequest = useRef(0)
 
@@ -420,7 +418,15 @@ export function MessageList({
               onCancelSend,
               onTranscribe,
               onTogglePin,
-              onReport: (message) => setReport(message),
+              onReport: (message) => {
+                void invoke('report:open', {
+                  kind: 'message',
+                  chatId: chat.id,
+                  messageId: message.id,
+                }).catch((failure: unknown) =>
+                  useAppStore.getState().setError(errorMessage(failure)),
+                )
+              },
             },
             { canReply, properties: menu.properties, pinnedMessageId },
           )}
@@ -428,12 +434,6 @@ export function MessageList({
         />
       ) : null}
 
-      {report ? (
-        <ReportDialog
-          target={{ kind: 'message', chatId: chat.id, messageId: report.id }}
-          onClose={() => setReport(null)}
-        />
-      ) : null}
     </div>
   )
 }

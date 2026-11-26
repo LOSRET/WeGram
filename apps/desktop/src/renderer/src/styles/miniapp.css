@@ -1,6 +1,9 @@
 /* ==========================================================================
    Mini App window (design doc §9.4).
 
+   The ⋯ card (`#miniappmenu`) is a transparent view over the guest page, so its
+   page must not paint a backdrop of its own — only the card does.
+
    The 48 px strip and optional native bottom-button bar are ours. Main positions
    the guest `WebContentsView` between them; the strip height is mirrored by
    `MINI_APP_BAR_H`, and the footer height comes from `miniapp:init` /
@@ -52,6 +55,12 @@
 }
 
 .wx-miniapp__button {
+  /* Icon-only buttons: the chevron is a block-level <svg>, so in a plain block
+     button it hugged the left edge and sat ~12 px off centre; flex centres both
+     the icon and the ⋮ / × glyphs. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 34px;
   height: 34px;
   padding: 0;
@@ -165,6 +174,12 @@
   100% {
     transform: translateX(120%);
   }
+}
+
+/* The ⋯ card's route: see-through, or the guest page would disappear behind it. */
+html[data-backdrop='clear'],
+html[data-backdrop='clear'] body {
+  background: transparent;
 }
 
 .wx-miniapp__error {

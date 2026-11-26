@@ -20,14 +20,27 @@ screens/InstantViewWindow.tsx  即时预览's own window (`#instantview`, design
                          toolbar (title, page zoom, 在浏览器打开) + `components/instant-view/
                          InstantViewPage.tsx` (the `web:instantView` fetch + RichMessage)
 screens/MiniAppWindow.tsx  小程序's own window chrome (`#miniapp`, design doc §9.4.1): the
-                         48 px drag region (Back, bot name, ⋯ → native menu, ×) plus the
+                         48 px drag region (Back, bot name, ⋯ → the ⋯ card, ×) plus the
                          optional native Main/Secondary button bar. The page between them
                          is a main-process `WebContentsView`, so this route never renders or
                          receives the signed URL
+screens/MiniAppMenu.tsx 小程序's ⋯ card (`#miniappmenu`): the app's own `.wx-context-menu`
+                         card (重载页面 / 设置 / 使用条款 / 隐私政策 / 举报), drawn in a
+                         SECOND, transparent `WebContentsView` that main layers over the
+                         guest — the guest paints above the strip's DOM, so the card cannot
+                         live there. Main owns the rows (`miniapp:menuState`) and the side
+                         effects (`miniapp:menuPick`); the route only paints them, and its
+                         page is see-through (`data-backdrop="clear"`)
 screens/QrWindow.tsx     the 群二维码 window (`#qr`, design doc §9.9): a frameless 360×560
                          sheet with the member collage, 群聊：…, the code, its validity
                          line and 转发给朋友 / 复制图片 / 保存图片. It owns no shell state
                          and rasterises its own PNG (lib/qrImage.ts).
+screens/ReportWindow.tsx 举报's window (`#report`, design doc §9.13): frameless 380×560,
+                         parented by main to whoever opened it (a Mini App's ⋯ card, the
+                         资料卡, the message menu). It reads `report:state` for its target
+                         and theme, then draws `components/ReportSheet.tsx`; the phased
+                         reportChat calls are the plain `users:report` /
+                         `messages:report` channels, so the window needs no shell state
 screens/login/           useLoginFlow (the whole sign-in flow) + BootStatus / bootCopy (the
                          startup-phase and failed/crashed panel) + QrStep / ProfileStep /
                          PhoneForm / LoginFooter / LoginHelp + loginCopy (pure copy table)
@@ -156,11 +169,13 @@ components/ProfileCard.tsx  资料卡: the person sheet a private chat's title a
                         `canBeReported` is TDLib's `chat.can_be_reported`, all through
                         `users:*`; a bot additionally draws 简介 / 命令 / 菜单 from
                         `UserProfile.bot`, and hides 备注 + 添加为联系人)
-components/ReportDialog.tsx  举报: the phased reportChat state machine (reasons →
-                        possibly more reasons [a bot's report does this] → maybe a
-                        comment → filed), shared by the 资料卡's 举报 and the
-                        message menu's (`ReportTarget` picks the channel); the reason
-                        list is whatever TDLib sent, never a local shortlist, and
+components/ReportSheet.tsx  举报's content (§9.13): the phased reportChat state machine
+                        (reasons → possibly more reasons [a bot's report does this] →
+                        maybe a comment → filed), drawn as the body of the 举报 window
+                        that the 资料卡, the message menu and a Mini App's ⋯ card all
+                        open (`report:open` picks the target, not the channel). It owns
+                        its error line — a window has no shell banner — the reason list
+                        is whatever TDLib sent, never a local shortlist, and
                         `textOptional` (`is_optional`) lets the comment be skipped
 components/chat-pane/PinnedBar.tsx  置顶消息: one line above the scroller (text +
                         定位 + ×); `usePinnedMessage` owns the fetch and the calls

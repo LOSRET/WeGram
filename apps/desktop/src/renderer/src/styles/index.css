@@ -43,6 +43,8 @@
 @import './poll.css';
 /* 资料卡: the person sheet the header title and 更多资料 open. */
 @import './profile.css';
+/* 举报: its own window, carrying the .wx-report__* rows profile.css measured. */
+@import './report.css';
 /* 设置: the standalone window (design doc §9.11). */
 @import './settings.css';
 @import './viewer.css';

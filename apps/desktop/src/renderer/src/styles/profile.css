@@ -281,16 +281,10 @@
 
 /* 举报: Telegram's report sheet — a left-aligned title, the server's reasons as
    plain rows with a trailing chevron (not bordered buttons), and one 关闭 link at
-   the bottom. The comment step replaces the list with its box and a 举报 button. */
-.wx-report {
-  width: 380px;
-  /* Taller than .wx-modal's 80vh on purpose: Telegram's sheet shows the whole
-     reason list, and only a very long one scrolls. */
-  max-height: 92vh;
-  padding: 0;
-  gap: 0;
-  overflow: hidden;
-}
+   the bottom. The comment step replaces the list with its box and a 举报 button.
+
+   Since 2026-11-27 the sheet is its own window (styles/report.css owns that
+   chrome); these rules are the rows and the footer it still draws. */
 
 .wx-report__title {
   margin: 0;
@@ -304,14 +298,9 @@
   display: flex;
   flex-direction: column;
   padding: 0 8px 8px;
-  /* Telegram's own report list is eleven rows; the sheet should hold that without
-     scrolling. Only a longer server list gets an inner scroll — and when the card
-     itself is clamped by .wx-modal's max-height, min-height: 0 lets this list be
-     the part that shrinks instead of clipping the footer. */
-  max-height: 480px;
-  min-height: 0;
-  overflow-y: auto;
-  scrollbar-width: thin;
+  /* Telegram's own report list is eleven rows. No inner scroll: the window's own
+     body is the thing that scrolls (styles/report.css), so the list never draws a
+     second scrollbar inside it. */
 }
 
 .wx-report__option {

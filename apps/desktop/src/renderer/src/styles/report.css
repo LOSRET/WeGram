@@ -1,0 +1,91 @@
+/* ==========================================================================
+   举报 window (design doc §9.4.1).
+
+   The phased report sheet used to be a modal inside whichever window opened it.
+   It is its own frameless 380 x 560 window now: a Mini App can report its bot
+   without being closed, and the 资料卡 / message menu share the same surface.
+
+   The reason list, the comment box and the footer keep the .wx-report__* rules
+   from profile.css (they were measured against the client); this file only adds
+   the window's chrome — the drag strip, its title, the close button, and the
+   error line a standalone window needs.
+   ========================================================================== */
+
+.wx-report-window {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--wx-pane);
+  color: var(--wx-text);
+  user-select: none;
+}
+
+.wx-report-window__bar {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 44px 0 20px;
+  /* The strip is the window's drag handle; the × opts out below. */
+  -webkit-app-region: drag;
+}
+
+.wx-report-window__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--wx-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wx-report-window__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--wx-icon);
+  font-size: 18px;
+  line-height: 1;
+  -webkit-app-region: no-drag;
+}
+
+.wx-report-window__close:hover {
+  background: var(--wx-row-hover);
+  color: var(--wx-text);
+}
+
+/* The reason list is the part that scrolls: Telegram's own list is eleven rows,
+   and a window cannot grow with it. */
+.wx-report-window__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+/* A failed call has nowhere else to go in a window of its own. */
+.wx-report__error {
+  margin: 0 20px 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  /* A tint of the one danger token, not a second hard-coded red. */
+  background: color-mix(in srgb, var(--wx-danger) 10%, transparent);
+  color: var(--wx-danger);
+  font-size: 12px;
+  line-height: 1.5;
+}

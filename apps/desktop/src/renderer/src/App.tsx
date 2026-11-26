@@ -1,10 +1,9 @@
 import { errorMessage, invoke } from '@renderer/lib/ipc'
 import { MainShell } from '@renderer/components/MainShell'
 import { PerfPanel } from '@renderer/components/PerfPanel'
-import { ReportDialog } from '@renderer/components/ReportDialog'
 import { useAppStore } from '@renderer/store/useAppStore'
 import type { MessageOp } from '@wegram/protocol'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 
 import { classifySeq, needsResync } from './lib/eventSeq'
 import { activateChat } from './lib/openChat'
@@ -20,12 +19,6 @@ export function App() {
   const theme = useAppStore((state) => state.theme)
   const messageTextSize = useAppStore((state) => state.messageTextSize)
   const ready = auth.kind === 'ready'
-  /**
-   * 举报 from a Mini App's ⋮ menu: the guest web view has no report sheet, so
-   * main closes it and names the bot here (§9.4). The sheet is the same phased
-   * `ReportDialog` the 资料卡 uses.
-   */
-  const [reportUser, setReportUser] = useState<number | null>(null)
 
   useEffect(() => {
     document.documentElement.dataset['theme'] = theme
@@ -247,10 +240,6 @@ export function App() {
           })
           .catch((cause) => useAppStore.getState().setError(errorMessage(cause)))
       }),
-      window.tg.on('evt:report', (event) => {
-        track(event.seq)
-        setReportUser(event.payload.userId)
-      }),
       window.tg.on('evt:error', (event) => {
         track(event.seq)
         store.setError(event.payload.message)
@@ -321,12 +310,6 @@ export function App() {
   return (
     <>
       <MainShell />
-      {reportUser !== null ? (
-        <ReportDialog
-          target={{ kind: 'user', userId: reportUser }}
-          onClose={() => setReportUser(null)}
-        />
-      ) : null}
       {showPerfPanel ? <PerfPanel /> : null}
     </>
   )

@@ -8,7 +8,6 @@ import { openMention } from '../lib/openMention'
 import { useAppStore } from '../store/useAppStore'
 import { Avatar } from './Avatar'
 import { Modal } from './Modal'
-import { ReportDialog } from './ReportDialog'
 import { RichText } from './RichText'
 
 interface ProfileCardProps {
@@ -46,8 +45,6 @@ export function ProfileCard({ userId, chatId, onOpenChat, onClose }: ProfileCard
   const [busy, setBusy] = useState(false)
   const [editingNote, setEditingNote] = useState(false)
   const [noteDraft, setNoteDraft] = useState('')
-  /** 举报 is its own phased sheet (see ReportDialog). */
-  const [reportOpen, setReportOpen] = useState(false)
   /** 共同群聊: opened rows are fetched once and kept for this card's lifetime. */
   const [commonOpen, setCommonOpen] = useState(false)
   const [commonChats, setCommonChats] = useState<ChatSummary[] | null>(null)
@@ -413,7 +410,11 @@ export function ProfileCard({ userId, chatId, onOpenChat, onClose }: ProfileCard
                 <button
                   type="button"
                   className="wx-profile__action wx-profile__action--danger"
-                  onClick={() => setReportOpen(true)}
+                  onClick={() => {
+                    void invoke('report:open', { kind: 'user', userId }).catch(
+                      (failure: unknown) => useAppStore.getState().setError(errorMessage(failure)),
+                    )
+                  }}
                 >
                   举报
                 </button>
@@ -425,10 +426,6 @@ export function ProfileCard({ userId, chatId, onOpenChat, onClose }: ProfileCard
         )}
       </Modal>
 
-      {/* The 举报 sheet is its own modal: closing it must not close the card. */}
-      {reportOpen ? (
-        <ReportDialog target={{ kind: 'user', userId }} onClose={() => setReportOpen(false)} />
-      ) : null}
     </>
   )
 }

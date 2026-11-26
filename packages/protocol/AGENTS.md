@@ -25,12 +25,15 @@ moved out of `channels.ts` at its budget), `message-ops.ts` (the `MessageOp` pat
 duration + reply, and its send channel), `presence.ts` (peer status, the active-chat
 report) and `user.ts` (the 资料卡 DTO — including `BotProfile`, the bot-only half of the card — + its
 备注 / 共同群聊 / 添加联系人 channels),
-`report.ts` (the phased 举报 contract for a person and for one message),
+`report.ts` (the phased 举报 contract for a person and for one message, plus the
+report window's `ReportTarget` / `report:open` · `state` · `close` — the sheet is its
+own window since 2026-11-27, design doc §9.13),
 `bot.ts` (机器人: the command list plus the empty-chat introduction and the optional
 Web App menu the composer's 小程序 button opens, a callback button's answer, and the
 inline query (`@bot query`) result rows — four channels),
 `miniapp.ts` (小程序 / Telegram Mini Apps: the four entry surfaces in `miniapp:open`,
-`miniapp:init` title+theme+native controls, `miniapp:menu` / `reload` / `close` / `press`,
+`miniapp:init` title+theme+native controls, `miniapp:menu` + its card's
+`menuState` / `menuPick` row table, `reload` / `close` / `press`,
 the directed `evt:miniappControls` contract, and `MiniAppLaunch` — the signed URL stays
 main-only; design doc §9.4.1),
 `reaction.ts` (the 表情回应 chip DTO, display-only for now), `properties.ts` (the

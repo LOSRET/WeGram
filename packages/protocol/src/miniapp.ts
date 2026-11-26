@@ -110,6 +110,36 @@ export const miniAppStateSchema = z.object({
 })
 export type MiniAppState = z.infer<typeof miniAppStateSchema>
 
+/**
+ * One row of the strip's ⋯ card. Main owns the list (and the side effect each
+ * row runs); the card's own window only draws the labels it is handed.
+ */
+export const miniAppMenuItemSchema = z.object({
+  id: z.enum(['reload', 'settings', 'terms', 'privacy', 'report']),
+  label: z.string().min(1),
+  /** A hairline above this row: 重载/设置 · 使用条款/隐私政策 · 举报. */
+  dividerBefore: z.boolean(),
+})
+export type MiniAppMenuItem = z.infer<typeof miniAppMenuItemSchema>
+export type MiniAppMenuAction = MiniAppMenuItem['id']
+
+export const miniAppMenuAnchorSchema = z.object({
+  left: z.number(),
+  top: z.number(),
+  right: z.number(),
+  bottom: z.number(),
+})
+export type MiniAppMenuAnchor = z.infer<typeof miniAppMenuAnchorSchema>
+
+/** What the ⋯ card draws: its theme, the button it hangs from, its rows. */
+export const miniAppMenuSchema = z.object({
+  theme: z.enum(['light', 'dark']),
+  /** The ⋯'s rectangle in the strip's client coordinates. */
+  anchor: miniAppMenuAnchorSchema,
+  items: z.array(miniAppMenuItemSchema),
+})
+export type MiniAppMenu = z.infer<typeof miniAppMenuSchema>
+
 export const miniAppInvokeChannels = [
   /**
    * Opens (or re-targets) the Mini App window. The adapter resolves the signed
@@ -119,11 +149,16 @@ export const miniAppInvokeChannels = [
   /** Called by the Mini App window itself: its title + theme for the strip. */
   'miniapp:init',
   /**
-   * The strip's ⋮: main pops the native menu (reload / terms / privacy /
-   * report). A native menu is used because the guest web view paints above the
-   * window's own DOM, so a renderer popover would be covered by the page.
+   * The strip's ⋮: main opens the ⋯ card (reload / settings / terms / privacy /
+   * report). It is the app's own WeChat-style card, drawn by a transparent
+   * `WebContentsView` above the guest, because the page's view paints over the
+   * window's DOM (design doc §9.4.1).
    */
   'miniapp:menu',
+  /** The ⋯ card asks what to draw: its rows, theme and anchor. */
+  'miniapp:menuState',
+  /** The card was used: an action row's id, or null for "dismissed". */
+  'miniapp:menuPick',
   'miniapp:reload',
   'miniapp:close',
   /** The host renderer's native Back/Main/Secondary/Settings control was pressed. */
@@ -140,11 +175,16 @@ export const miniAppInvokeSchemas = {
     response: miniAppStateSchema,
   },
   'miniapp:menu': {
-    /** Anchor of the ⋮ in the window's client coordinates. */
-    request: z.object({
-      x: z.number().int().min(0).max(10000),
-      y: z.number().int().min(0).max(10000),
-    }),
+    /** The ⋯'s rectangle in the strip's client coordinates; the card hangs under it. */
+    request: miniAppMenuAnchorSchema,
+    response: z.void(),
+  },
+  'miniapp:menuState': {
+    request: z.void(),
+    response: miniAppMenuSchema,
+  },
+  'miniapp:menuPick': {
+    request: z.object({ id: miniAppMenuItemSchema.shape.id.nullable() }),
     response: z.void(),
   },
   'miniapp:reload': {

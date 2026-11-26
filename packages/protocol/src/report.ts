@@ -41,6 +41,24 @@ export const chatReportSchema = z.object({
 })
 export type ChatReport = z.infer<typeof chatReportSchema>
 
+/**
+ * What a 举报 is about. It crosses IPC because 举报 is its own window since
+ * 2026-11-27 — a Mini App's ⋯ card can report its bot without closing the app,
+ * and the sheet has one home instead of living inside whichever window opened it.
+ */
+export const reportTargetSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('user'), userId: z.number().int() }),
+  z.object({ kind: z.literal('message'), chatId: z.number().int(), messageId: z.number().int() }),
+])
+export type ReportTarget = z.infer<typeof reportTargetSchema>
+
+/** What the 举报 window draws: whose report it is, and the app's theme. */
+export const reportWindowStateSchema = z.object({
+  target: reportTargetSchema,
+  theme: z.enum(['light', 'dark']),
+})
+export type ReportWindowState = z.infer<typeof reportWindowStateSchema>
+
 export const reportInvokeChannels = [
   /**
    * 举报 a person: the adapter resolves their private chat and reports that, so
@@ -53,6 +71,15 @@ export const reportInvokeChannels = [
    * `messageProperties.can_report_chat` allows it.
    */
   'messages:report',
+  /**
+   * Opens (or re-targets) the 举报 window on a target (design doc §9.9). The sheet
+   * then asks the two channels above for the reasons: they are the TDLib calls.
+   */
+  'report:open',
+  /** The window asks whose report it is, and the theme to paint. */
+  'report:state',
+  /** The window's own × / 关闭: it is frameless, so nothing native closes it. */
+  'report:close',
 ] as const
 
 export const reportInvokeSchemas = {
@@ -74,5 +101,17 @@ export const reportInvokeSchemas = {
       text: z.string().max(4000).optional(),
     }),
     response: chatReportSchema,
+  },
+  'report:open': {
+    request: reportTargetSchema,
+    response: z.void(),
+  },
+  'report:state': {
+    request: z.void(),
+    response: reportWindowStateSchema,
+  },
+  'report:close': {
+    request: z.void(),
+    response: z.void(),
   },
 }

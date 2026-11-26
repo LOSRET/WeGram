@@ -1,8 +1,16 @@
 import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
-import type { MiniAppPressRequest, MiniAppState } from '@wegram/protocol'
+import type {
+  MiniAppMenu,
+  MiniAppMenuAction,
+  MiniAppMenuAnchor,
+  MiniAppMenuItem,
+  MiniAppPressRequest,
+  MiniAppState,
+} from '@wegram/protocol'
 import { AppError } from '@wegram/protocol'
-import { BrowserWindow, dialog, ipcMain, Menu, shell, WebContentsView } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, shell, WebContentsView } from 'electron'
 
 import {
   centerOnDisplay,
@@ -26,6 +34,7 @@ import {
 } from './mini-app-controls'
 import type { MiniAppBiometryService } from './mini-app-biometry'
 import { miniAppThemeParams } from './mini-app-theme'
+import { openReportWindow } from './report-window'
 import { createLogger } from './util'
 
 const logger = createLogger('miniapp')
@@ -68,8 +77,6 @@ export interface MiniAppWindowDeps {
   }) => Promise<unknown>
   /** Windows Hello consent, verification and DPAPI-sealed token storage. */
   biometry: MiniAppBiometryService
-  /** 举报 from the ⋮ menu: the shell opens its own report sheet. */
-  onReport: (userId: number) => void
 }
 
 interface OpenTarget {
@@ -80,6 +87,11 @@ interface OpenTarget {
 let miniAppWindow: BrowserWindow | null = null
 /** The guest web view; a re-target replaces it (a browser tab, not a new window). */
 let guest: WebContentsView | null = null
+/** The ⋯ card's own transparent view, layered above the guest while it is open. */
+let menu: WebContentsView | null = null
+let menuState: MiniAppMenu | null = null
+/** Directed evt:miniappMenu sequence; the card page is its only listener. */
+let menuSeq = 0
 let opened: OpenTarget | null = null
 let deps: MiniAppWindowDeps | null = null
 /** `WebApp.setClosingConfirmation`: the ×/Alt+F4 asks before it discards state. */
@@ -108,6 +120,8 @@ let forceClosing = false
  * replaces the guest and releases the previous `launch_id`.
  */
 export function openMiniAppWindow(target: MiniAppWindowTarget, next: MiniAppWindowDeps): void {
+  // A new app invalidates a card that was open for the previous one.
+  closeMiniAppMenu()
   deps = next
   // A new page has its own closing behaviour; the previous app's must not leak.
   confirmsClosing = false
@@ -171,6 +185,8 @@ export function openMiniAppWindow(target: MiniAppWindowTarget, next: MiniAppWind
   win.on('resize', () => {
     layoutGuest(win)
     sendViewport(win)
+    // The card hangs from the ⋯'s old position; a resized window means it is stale.
+    closeMiniAppMenu()
   })
   win.on('close', (event) => {
     if (forceClosing || !confirmsClosing) return
@@ -207,6 +223,7 @@ export function openMiniAppWindow(target: MiniAppWindowTarget, next: MiniAppWind
     miniAppSession += 1
     forceClosing = false
     confirmsClosing = false
+    destroyMenuLayer()
     destroyGuest()
     if (launchId && release) {
       void release(launchId).catch((error: unknown) => {
@@ -272,6 +289,8 @@ export function closeMiniAppWindow(): void {
 /** 设置 → 外观 reaches the strip, its native background and the page's theme params. */
 export function setMiniAppTheme(theme: 'light' | 'dark'): void {
   if (opened) opened.theme = theme
+  // The card is painted from the theme it was opened with; ask again.
+  closeMiniAppMenu()
   repaintWindowChrome(getMiniAppWindow(), {
     background: theme === 'dark' ? '#1e1e1f' : '#fafafa',
   })
@@ -281,6 +300,7 @@ export function setMiniAppTheme(theme: 'light' | 'dark'): void {
 export function reloadMiniApp(): void {
   const win = getMiniAppWindow()
   if (!win || !opened) return
+  closeMiniAppMenu()
   controls = defaultMiniAppControls()
   controlsSeq += 1
   miniAppSession += 1
@@ -288,32 +308,166 @@ export function reloadMiniApp(): void {
   void guest?.webContents.loadURL(opened.target.url)
 }
 
-/** The strip's ⋮: a native menu, because the guest paints above the window's DOM. */
-export function showMiniAppMenu(anchor: { x: number; y: number }): void {
+/**
+ * The strip's ⋮: the client's own WeChat-style card (design doc §9.4.1).
+ *
+ * It cannot be a native `Menu` — an OS menu brings the OS font, the OS hover
+ * colour and the OS hairline, which is why it read as somebody else's — and it
+ * cannot live in the strip's page either: the guest `WebContentsView` paints
+ * above the window's DOM. It is therefore a second, transparent
+ * `WebContentsView` layered over the guest (the `#miniappmenu` route), which
+ * draws only the card. Main owns the rows and what each one does; the card is
+ * handed `anchor` — the ⋯'s rectangle — so it can hang right-aligned under it.
+ */
+export function showMiniAppMenu(anchor: MiniAppMenuAnchor): void {
   const win = getMiniAppWindow()
-  if (!win) return
-  const menu = Menu.buildFromTemplate([
-    { label: '重载页面', click: reloadMiniApp },
-    ...(controls.settingsVisible
-      ? [{ label: '设置', click: () => pressMiniAppControl('settings') }]
-      : []),
-    { type: 'separator' },
-    { label: '使用条款', click: () => openExternal(TELEGRAM_TERMS) },
-    { label: '隐私政策', click: () => openExternal(TELEGRAM_PRIVACY) },
-    { type: 'separator' },
-    {
-      label: '举报',
-      click: () => {
-        // Capture first: `closeMiniAppWindow` may emit `closed` synchronously,
-        // and that clears `deps`.
-        const userId = opened?.target.botUserId
-        const report = deps?.onReport
-        closeMiniAppWindow()
-        if (userId !== undefined) report?.(userId)
-      },
+  if (!win || !opened) return
+  menuState = { theme: opened.theme, anchor, items: menuRows() }
+  if (!menu || menu.webContents.isDestroyed()) {
+    createMenuLayer(win)
+    return
+  }
+  layoutMenu(win)
+  // One layer for the whole window: spinning a renderer up per press cost ~250 ms
+  // and reloading it cost another ~110 ms (both measured), so the loaded page is
+  // simply told the new rows — revealing the page's own layer is one frame.
+  revealMenu(menu)
+}
+
+/** Shows the card and hands its page the rows it must draw. */
+function revealMenu(view: WebContentsView): void {
+  if (!menuState || view.webContents.isDestroyed()) return
+  menuSeq += 1
+  view.webContents.send('evt:miniappMenu', { seq: menuSeq, payload: menuState })
+  view.setVisible(true)
+  // The card is a layer of its own, so it has to be given the keyboard: Esc is
+  // the way out a reader expects, and the strip's page cannot see the keys.
+  view.webContents.focus()
+}
+
+/**
+ * The card's layer, created once per window and kept hidden between presses.
+ *
+ * A fresh `WebContentsView` starts on `about:blank`, which is WHITE, and this view
+ * covers the whole window: joining the window before its own page is up flashed a
+ * white sheet on every ⋯ press (reported 2026-11-27). It therefore joins hidden
+ * and is revealed only after `did-finish-load`, when the transparent `#miniappmenu`
+ * page is what will paint.
+ */
+function createMenuLayer(win: BrowserWindow): void {
+  const view = new WebContentsView({
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      spellcheck: false,
     },
-  ])
-  menu.popup({ window: win, x: anchor.x, y: anchor.y })
+  })
+  // AARRGGBB: the card is the only thing this view may paint.
+  view.setBackgroundColor('#00000000')
+  view.setVisible(false)
+  menu = view
+  win.contentView.addChildView(view)
+  layoutMenu(win)
+
+  const devUrl = process.env['ELECTRON_RENDERER_URL']
+  const url =
+    !app.isPackaged && devUrl
+      ? `${devUrl}#miniappmenu`
+      : `${pathToFileURL(join(__dirname, '../renderer/index.html')).href}#miniappmenu`
+  void view.webContents.loadURL(url)
+
+  view.webContents.on('did-finish-load', () => {
+    // A press that already ended (Esc, a row, the window moving) must not reveal it.
+    if (menu !== view) return
+    revealMenu(view)
+  })
+  // A hidden layer that never loads would leave the menu "open" and invisible.
+  view.webContents.on('did-fail-load', (_event, code, _description, _url, isMainFrame) => {
+    if (!isMainFrame || code === -3 || menu !== view) return
+    closeMiniAppMenu()
+  })
+}
+
+/** What `miniapp:menuState` answers: the rows, the theme and the anchor. */
+export function miniAppMenuState(): MiniAppMenu {
+  if (!menuState) throw new AppError('internal', '小程序的 ⋯ 菜单没有打开')
+  return menuState
+}
+
+/** A row was picked; `null` is the card being dismissed. */
+export function pickMiniAppMenu(id: MiniAppMenuAction | null): void {
+  closeMiniAppMenu()
+  if (id) runMiniAppMenuAction(id)
+}
+
+/** Hides the card; safe when none is open. The layer itself is kept for the next press. */
+export function closeMiniAppMenu(): void {
+  menuState = null
+  if (menu && !menu.webContents.isDestroyed()) menu.setVisible(false)
+  // The card had the keyboard; the page it was opened over takes it back, so a
+  // Mini App's own shortcuts keep working after Esc.
+  if (guest && !guest.webContents.isDestroyed()) guest.webContents.focus()
+}
+
+/** The window is going away: the layer goes with it. */
+function destroyMenuLayer(): void {
+  const view = menu
+  menu = null
+  menuState = null
+  if (!view) return
+  try {
+    miniAppWindow?.contentView.removeChildView(view)
+  } catch {
+    // The window may already be gone during teardown; the web contents still is.
+  }
+  try {
+    view.webContents.close()
+  } catch (error) {
+    logger.warn('closing the ⋯ card failed:', error instanceof Error ? error.message : error)
+  }
+}
+
+function layoutMenu(win: BrowserWindow): void {
+  if (!menu) return
+  const size = win.getContentSize()
+  menu.setBounds({ x: 0, y: 0, width: size[0] ?? 0, height: size[1] ?? 0 })
+}
+
+/** The rows, grouped the way the official client groups them. */
+function menuRows(): MiniAppMenuItem[] {
+  return [
+    { id: 'reload', label: '重载页面', dividerBefore: false },
+    ...(controls.settingsVisible
+      ? [{ id: 'settings' as const, label: '设置', dividerBefore: false }]
+      : []),
+    { id: 'terms', label: '使用条款', dividerBefore: true },
+    { id: 'privacy', label: '隐私政策', dividerBefore: false },
+    { id: 'report', label: '举报', dividerBefore: true },
+  ]
+}
+
+/** The side effect behind a row. */
+function runMiniAppMenuAction(id: MiniAppMenuAction): void {
+  if (id === 'reload') {
+    reloadMiniApp()
+    return
+  }
+  if (id === 'settings') {
+    pressMiniAppControl('settings')
+    return
+  }
+  if (id === 'terms' || id === 'privacy') {
+    openExternal(id === 'terms' ? TELEGRAM_TERMS : TELEGRAM_PRIVACY)
+    return
+  }
+  // 举报 is its own window (design doc §9.4.1), parented to this one: the app stays
+  // open (its page state survives a cancelled report) and the sheet appears above
+  // it rather than behind it.
+  const win = getMiniAppWindow()
+  const userId = opened?.target.botUserId
+  if (userId !== undefined) openReportWindow({ kind: 'user', userId }, opened?.theme ?? 'light', win)
 }
 
 /**
@@ -436,6 +590,8 @@ function commitControls(): void {
   controlsSeq += 1
   const win = getMiniAppWindow()
   if (!win) return
+  // 设置 is one of the card's rows, so a control change rebuilds it.
+  closeMiniAppMenu()
   win.webContents.send('evt:miniappControls', { seq: controlsSeq, payload: controls })
   layoutGuest(win)
   sendViewport(win)

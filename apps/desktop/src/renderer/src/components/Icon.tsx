@@ -181,6 +181,35 @@ export function ChevronLeftIcon({ size = 12, ...rest }: IconProps) {
 }
 
 /**
+ * 小程序标题条的返回箭头: the 8×14 chevron above is drawn for 12–16 px rows, and at
+ * the strip's 18 px its ~64° arms read as a narrow wedge (the owner's report:
+ * "这个箭头是不是有点太扁了"). This is the same height with wider, ~59° arms and a
+ * 1.7 px weight — the shape the client's own chrome uses. It stays local to the
+ * strip on purpose: the row chevrons elsewhere are the measured payload glyphs.
+ */
+export function ChevronLeftWideIcon({ size = 18, ...rest }: IconProps) {
+  return (
+    <svg
+      width={(size * 12) / 18}
+      height={size}
+      viewBox="0 0 12 18"
+      fill="none"
+      aria-hidden="true"
+      focusable="false"
+      {...rest}
+    >
+      <path
+        d="M10.25 2.05 1.75 9l8.5 5.95"
+        stroke="currentColor"
+        strokeWidth={1.7}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+/**
  * 已归档会话's tile glyph: Telegram's archive box (a lid, a body, a handle).
  * WeChat has no archive row, so the tile is drawn at the same 1.4 px weight as
  * the hand-drawn chrome around it rather than borrowed from the payload set.

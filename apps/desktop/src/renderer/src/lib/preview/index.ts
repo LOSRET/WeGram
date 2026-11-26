@@ -633,8 +633,19 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'miniapp:open':
       throw { code: 'not_implemented', message: '小程序窗口只在桌面版中可用' }
     case 'miniapp:init':
+    case 'miniapp:menuState':
       throw { code: 'not_implemented', message: '小程序窗口只在桌面版中可用' }
+    /**
+     * 举报 lives in its own window, which the browser preview cannot open: it
+     * answers the state read with the same "desktop only" refusal the Mini App
+     * window gives, so a sheet never claims to have filed anything.
+     */
+    case 'report:open':
+    case 'report:state':
+    case 'report:close':
+      throw { code: 'not_implemented', message: '举报窗口只在桌面版中可用' }
     case 'miniapp:menu':
+    case 'miniapp:menuPick':
     case 'miniapp:reload':
     case 'miniapp:close':
     case 'miniapp:press':

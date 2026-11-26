@@ -10,8 +10,10 @@ import { installPreviewBridge } from '@renderer/lib/preview-bridge'
 import { queryClient } from '@renderer/lib/query'
 import { LoginWindow } from '@renderer/screens/LoginWindow'
 import { InstantViewWindow } from '@renderer/screens/InstantViewWindow'
+import { MiniAppMenu } from '@renderer/screens/MiniAppMenu'
 import { MiniAppWindow } from '@renderer/screens/MiniAppWindow'
 import { QrWindow } from '@renderer/screens/QrWindow'
+import { ReportWindow } from '@renderer/screens/ReportWindow'
 import { SettingsWindow } from '@renderer/screens/SettingsWindow'
 
 // Browser preview (pnpm web): no preload script exists, so install a mock bridge.
@@ -26,6 +28,10 @@ if (!container) throw new Error('#root is missing from index.html')
 // and the shell itself must not render a login form inside the main window.
 const route = window.location.hash
 
+// The Mini App's ⋯ card is one transparent `WebContentsView` over the guest page
+// (design doc §9.4.1): only the card may paint, so the page has no backdrop.
+if (route.startsWith('#miniappmenu')) document.documentElement.dataset['backdrop'] = 'clear'
+
 createRoot(container).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
@@ -35,10 +41,14 @@ createRoot(container).render(
         <LoginWindow />
       ) : route.startsWith('#qr') ? (
         <QrWindow />
+      ) : route.startsWith('#report') ? (
+        <ReportWindow />
       ) : route.startsWith('#instantview') ? (
         <InstantViewWindow />
       ) : route.startsWith('#settings') ? (
         <SettingsWindow />
+      ) : route.startsWith('#miniappmenu') ? (
+        <MiniAppMenu />
       ) : route.startsWith('#miniapp') ? (
         <MiniAppWindow />
       ) : (

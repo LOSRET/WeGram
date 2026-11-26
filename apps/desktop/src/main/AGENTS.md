@@ -21,6 +21,12 @@ settings-window.ts  the 设置 window: frameless 640×558, NOT parented (design 
                     the shell's close, 退出登录 and before-quit close it explicitly
 qr-window.ts        the 群二维码 window: frameless 360×560, parented to the shell (closes
                     with it), owns the chat it draws for qr:info and the window's ×
+report-window.ts    举报 (§9.13): frameless 380×560, parented to WHOEVER opened it — the
+                    Mini App window for its ⋯ card, the shell for the 资料卡 / message
+                    menu — so the app no longer has to be closed to report its bot.
+                    One window re-targeted (reload); report:state hands the renderer
+                    its target, the phased reportChat calls stay users:report /
+                    messages:report
 instant-view-window.ts  即时预览 (§8.9): the reader as its own top-level window (route
                     #instantview), one target held in memory for `web:state`, reloaded
                     to re-target; the shell closes it on quit like the viewer. It borrows
@@ -45,8 +51,13 @@ mini-app-window.ts  小程序 / Telegram Mini Apps (§9.4.1): the one frameless 
                     and a sandboxed WebContentsView between them; the signed URL stays here,
                     `TelegramWebviewProxy` events
                     (`src/preload/miniapp.ts`) become close / sendWebAppData / openLink,
-                    the ⋯ is a native menu, and 举报 publishes `evt:report`. One window,
-                    re-targeted; `closeWebApp` releases an `openWebApp` launch
+                    and 举报 opens the report window parented to this one (the app is
+                    not closed). The ⋯ card is NOT a native menu: it is
+                    the client's own `.wx-context-menu` card, drawn by a second, transparent
+                    `WebContentsView` (route `#miniappmenu`) layered over the guest, because
+                    the guest's view paints above the window's DOM (`miniapp:menuState` /
+                    `miniapp:menuPick`; main owns the rows). One window, re-targeted;
+                    `closeWebApp` releases an `openWebApp` launch
 notifications.ts    desktop toasts from TDLib's notification stream; suppresses the chat
                     the focused shell shows (ui:setActiveChat), flashes the task bar, and
                     stops at once when 设置 → 消息通知's 桌面通知 switch is off (read per
