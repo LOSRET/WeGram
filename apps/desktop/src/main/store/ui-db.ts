@@ -14,6 +14,31 @@ const logger = createLogger('ui-db')
 /** `app_settings` key of the 图片和视频 window's level (design doc §9.5). */
 const VIEWER_VOLUME_KEY = 'viewer_volume'
 
+/** SQLite's primary result code; extended codes (`8 + n * 256`) keep the low byte. */
+const SQLITE_READONLY = 8
+
+/**
+ * Did a write fail because this connection is read-only?
+ *
+ * SQLite opens an unwritable database file without erroring, then answers every
+ * write with this. The user-visible text is `attempt to write a readonly
+ * database`; `errcode` (when node:sqlite provides it) also names extended causes
+ * such as `SQLITE_READONLY_DBMOVED` (1032) and `SQLITE_READONLY_DIRECTORY` (1544).
+ */
+function isReadonlyError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false
+  if (
+    'errcode' in error &&
+    typeof error.errcode === 'number' &&
+    (error.errcode & 0xff) === SQLITE_READONLY
+  ) {
+    return true
+  }
+  return 'message' in error && typeof error.message === 'string'
+    ? error.message.includes('readonly database')
+    : false
+}
+
 /**
  * UI database (`ui.db`, design doc §5.1/§5.2).
  *
@@ -25,7 +50,13 @@ const VIEWER_VOLUME_KEY = 'viewer_volume'
  * Message data is NOT stored here: TDLib owns it (§5.1).
  */
 const SCHEMA = `
-PRAGMA journal_mode = WAL;
+-- DELETE, not WAL, on purpose. WAL keeps a persistent -wal/-shm pair next to
+-- ui.db; a higher-integrity process (an elevated dev shell, a backup tool, a
+-- packaged app) can create those at Medium while Electron runs at Low, and then
+-- SQLite opens this database read-only for good. The rollback journal exists only
+-- for the write and is created by the writer itself, so there is no sidecar to go
+-- stale across launches. One connection writes this store, and its writes are tiny.
+PRAGMA journal_mode = DELETE;
 
 CREATE TABLE IF NOT EXISTS accounts (
   id            INTEGER PRIMARY KEY,
@@ -100,16 +131,72 @@ export class UiDatabase {
 
   open(): void {
     if (this.db) return
-    mkdirSync(dirname(this.file), { recursive: true })
-    const db = new DatabaseSync(this.file)
-    db.exec(SCHEMA)
-    this.db = db
+    this.db = this.connect()
     logger.info(`opened ${this.file}`)
   }
 
   close(): void {
     this.db?.close()
     this.db = null
+  }
+
+  private connect(): DatabaseSync {
+    mkdirSync(dirname(this.file), { recursive: true })
+    // The default busy timeout is 0: a lock held by another handle failed
+    // immediately instead of waiting the few milliseconds it needed. Five seconds
+    // is the usual SQLite default for a single-owner file.
+    const db = new DatabaseSync(this.file, { timeout: 5_000 })
+    try {
+      db.exec(SCHEMA)
+    } catch (error) {
+      // A store already stuck in WAL with sidecars this process cannot write can
+      // still be read; its writes already fail with the clear SQLITE_READONLY
+      // error. Do not turn that degraded state into a startup crash.
+      if (!isReadonlyError(error)) throw error
+      logger.warn('ui.db answered readonly during setup; continuing read-only')
+    }
+    return db
+  }
+
+  /**
+   * Runs one write, reopening once if SQLite answers `SQLITE_READONLY`.
+   *
+   * When the OS refuses a write-open (another process's share mode, or a file
+   * created at a higher integrity level than this process), SQLite opens the
+   * database read-only without an error: reads keep working and only writes
+   * answer `attempt to write a readonly database` — exactly what the settings
+   * window showed on 2026-11-26. A fresh connection after the holder is gone is
+   * writable; if it is not, the retry's error is the one the caller sees.
+   *
+   * The journal mode is DELETE for the same reason (see SCHEMA): WAL's persistent
+   * `-wal`/`-shm` sidecars are a second place for that integrity mismatch to live,
+   * and a Low-integrity Electron cannot remove sidecars a higher-integrity process
+   * left behind.
+   */
+  private write(run: (db: DatabaseSync) => void): void {
+    try {
+      run(this.require())
+    } catch (error) {
+      if (!isReadonlyError(error)) throw error
+      logger.warn('ui.db is read-only; reopening and retrying the write')
+      this.reconnect()
+      run(this.require())
+    }
+  }
+
+  private reconnect(): void {
+    const previous = this.db
+    // Open the replacement before dropping the old handle: if the file is still
+    // locked, the current reader stays usable instead of leaving the app with no
+    // open database at all.
+    const next = this.connect()
+    this.db = next
+    if (!previous) return
+    try {
+      previous.close()
+    } catch (error) {
+      logger.warn(`old ui.db handle did not close: ${String(error)}`)
+    }
   }
 
   getDraft(chatId: number): DraftRecord | null {
@@ -125,24 +212,25 @@ export class UiDatabase {
   }
 
   saveDraft(chatId: number, draft: DraftRecord | null): void {
-    const db = this.require()
-    if (!draft || draft.text.trim().length === 0) {
+    this.write((db) => {
+      if (!draft || draft.text.trim().length === 0) {
+        db.prepare(
+          `INSERT INTO chat_ui_state (chat_id, draft_text, draft_reply_to, last_painted_at)
+           VALUES (?, NULL, NULL, ?)
+           ON CONFLICT(chat_id) DO UPDATE SET draft_text = NULL, draft_reply_to = NULL, last_painted_at = excluded.last_painted_at`,
+        ).run(chatId, Date.now())
+        return
+      }
+
       db.prepare(
         `INSERT INTO chat_ui_state (chat_id, draft_text, draft_reply_to, last_painted_at)
-         VALUES (?, NULL, NULL, ?)
-         ON CONFLICT(chat_id) DO UPDATE SET draft_text = NULL, draft_reply_to = NULL, last_painted_at = excluded.last_painted_at`,
-      ).run(chatId, Date.now())
-      return
-    }
-
-    db.prepare(
-      `INSERT INTO chat_ui_state (chat_id, draft_text, draft_reply_to, last_painted_at)
-       VALUES (?, ?, ?, ?)
-       ON CONFLICT(chat_id) DO UPDATE SET
-         draft_text = excluded.draft_text,
-         draft_reply_to = excluded.draft_reply_to,
-         last_painted_at = excluded.last_painted_at`,
-    ).run(chatId, draft.text, draft.replyTo ?? null, Date.now())
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(chat_id) DO UPDATE SET
+           draft_text = excluded.draft_text,
+           draft_reply_to = excluded.draft_reply_to,
+           last_painted_at = excluded.last_painted_at`,
+      ).run(chatId, draft.text, draft.replyTo ?? null, Date.now())
+    })
   }
 
   /** 话题内草稿: the same record as a chat's, keyed by (chat, topic). */
@@ -162,39 +250,40 @@ export class UiDatabase {
   }
 
   saveTopicDraft(chatId: number, topicId: number, draft: DraftRecord | null): void {
-    const db = this.require()
-    if (!draft || draft.text.trim().length === 0) {
+    this.write((db) => {
+      if (!draft || draft.text.trim().length === 0) {
+        db.prepare(
+          `INSERT INTO topic_ui_state (chat_id, topic_id, draft_text, draft_reply_to, last_painted_at)
+           VALUES (?, ?, NULL, NULL, ?)
+           ON CONFLICT(chat_id, topic_id) DO UPDATE SET
+             draft_text = NULL, draft_reply_to = NULL, last_painted_at = excluded.last_painted_at`,
+        ).run(chatId, topicId, Date.now())
+        return
+      }
+
       db.prepare(
         `INSERT INTO topic_ui_state (chat_id, topic_id, draft_text, draft_reply_to, last_painted_at)
-         VALUES (?, ?, NULL, NULL, ?)
+         VALUES (?, ?, ?, ?, ?)
          ON CONFLICT(chat_id, topic_id) DO UPDATE SET
-           draft_text = NULL, draft_reply_to = NULL, last_painted_at = excluded.last_painted_at`,
-      ).run(chatId, topicId, Date.now())
-      return
-    }
-
-    db.prepare(
-      `INSERT INTO topic_ui_state (chat_id, topic_id, draft_text, draft_reply_to, last_painted_at)
-       VALUES (?, ?, ?, ?, ?)
-       ON CONFLICT(chat_id, topic_id) DO UPDATE SET
-         draft_text = excluded.draft_text,
-         draft_reply_to = excluded.draft_reply_to,
-         last_painted_at = excluded.last_painted_at`,
-    ).run(chatId, topicId, draft.text, draft.replyTo ?? null, Date.now())
+           draft_text = excluded.draft_text,
+           draft_reply_to = excluded.draft_reply_to,
+           last_painted_at = excluded.last_painted_at`,
+      ).run(chatId, topicId, draft.text, draft.replyTo ?? null, Date.now())
+    })
   }
 
   /** 话题内阅读位置; `messageId: null` means "the reader was at the bottom". */
   saveTopicAnchor(chatId: number, topicId: number, messageId: number | null, offset = 0): void {
-    this.require()
-      .prepare(
+    this.write((db) => {
+      db.prepare(
         `INSERT INTO topic_ui_state (chat_id, topic_id, scroll_anchor_id, scroll_offset, last_painted_at)
          VALUES (?, ?, ?, ?, ?)
          ON CONFLICT(chat_id, topic_id) DO UPDATE SET
            scroll_anchor_id = excluded.scroll_anchor_id,
            scroll_offset = excluded.scroll_offset,
            last_painted_at = excluded.last_painted_at`,
-      )
-      .run(chatId, topicId, messageId, offset, Date.now())
+      ).run(chatId, topicId, messageId, offset, Date.now())
+    })
   }
 
   getTopicAnchor(chatId: number, topicId: number): { messageId: number; offset: number } | null {
@@ -214,13 +303,20 @@ export class UiDatabase {
     return row?.v ?? null
   }
 
+  /** The journal mode in force; the schema asks for DELETE (see SCHEMA). */
+  getJournalMode(): string {
+    const row = this.require().prepare('PRAGMA journal_mode').get() as
+      { journal_mode: string } | undefined
+    return row?.journal_mode ?? ''
+  }
+
   setSetting(key: string, value: string): void {
-    this.require()
-      .prepare(
+    this.write((db) => {
+      db.prepare(
         `INSERT INTO app_settings (k, v) VALUES (?, ?)
          ON CONFLICT(k) DO UPDATE SET v = excluded.v`,
-      )
-      .run(key, value)
+      ).run(key, value)
+    })
   }
 
   /**
@@ -249,16 +345,16 @@ export class UiDatabase {
    * is what makes reopening the chat land on the newest message.
    */
   saveScrollAnchor(chatId: number, messageId: number | null, offset = 0): void {
-    this.require()
-      .prepare(
+    this.write((db) => {
+      db.prepare(
         `INSERT INTO chat_ui_state (chat_id, scroll_anchor_id, scroll_offset, last_painted_at)
          VALUES (?, ?, ?, ?)
          ON CONFLICT(chat_id) DO UPDATE SET
            scroll_anchor_id = excluded.scroll_anchor_id,
            scroll_offset = excluded.scroll_offset,
            last_painted_at = excluded.last_painted_at`,
-      )
-      .run(chatId, messageId, offset, Date.now())
+      ).run(chatId, messageId, offset, Date.now())
+    })
   }
 
   /**
@@ -269,16 +365,16 @@ export class UiDatabase {
    * No row at all is the default: the discussion view opens at its top.
    */
   saveCommentAnchor(chatId: number, messageId: number, anchorId: number, offset = 0): void {
-    this.require()
-      .prepare(
+    this.write((db) => {
+      db.prepare(
         `INSERT INTO comment_ui_state (chat_id, message_id, anchor_id, anchor_offset, last_painted_at)
          VALUES (?, ?, ?, ?, ?)
          ON CONFLICT(chat_id, message_id) DO UPDATE SET
            anchor_id = excluded.anchor_id,
            anchor_offset = excluded.anchor_offset,
            last_painted_at = excluded.last_painted_at`,
-      )
-      .run(chatId, messageId, anchorId, offset, Date.now())
+      ).run(chatId, messageId, anchorId, offset, Date.now())
+    })
   }
 
   getCommentAnchor(

@@ -72,8 +72,9 @@
    TDLib 要在里面建 SQLite 并写 WAL。开发期也不要用相对路径,否则从不同 cwd 启动会分裂出多个 session。
 3. **不需要 electron-rebuild。** `tdl.node` 是 N-API 产物,跨 Node/Electron 版本 ABI 稳定;
    但必须保证 Electron 是 x64(预编译只有 win32-x64)。
-4. **TDLib 已经在用 WAL 模式**(`-wal`/`-shm` 已出现),不要再对 `ui.db` 之外的库做额外 PRAGMA;
-   `ui.db` 自己开 WAL 即可,两者互不干扰。
+4. **TDLib 已经在用 WAL 模式**(`-wal`/`-shm` 已出现),不要再对 TDLib 的库做额外 PRAGMA;
+   `ui.db` 则用 **DELETE** 回滚日志(2026-11-26 改):WAL 的常驻 sidecar 会在不同完整性级别的
+   进程之间变成只读,详见 `docs/技术方案.md` §5.2;两者互不干扰。
 
 ## 复现方式
 

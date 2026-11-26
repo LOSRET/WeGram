@@ -27,6 +27,7 @@ try {
   const db = new UiDatabase(file)
   db.open()
 
+  check('journal mode', db.getJournalMode(), 'delete')
   check('empty draft', db.getDraft(42), null)
   db.saveDraft(42, { text: '草稿内容', replyTo: 7 })
   check('draft roundtrip', db.getDraft(42), { text: '草稿内容', replyTo: 7 })

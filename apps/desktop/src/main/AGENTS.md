@@ -119,6 +119,19 @@ change belongs in the adapter.
 - **All `node:sqlite` calls live in `store/ui-db.ts`** (also lint-enforced).
   `settings.json` keeps only what must be known before any window exists: the
   proxy config (sealed secret) and the TDLib network options (`prefer_ipv6`).
+- **`ui.db` uses DELETE journaling, not WAL, on purpose.** When the OS refuses a
+  write-open SQLite opens the database read-only *without an error*: reads work and
+  only writes answer `attempt to write a readonly database` (the 2026-11-26 settings
+  window). On this machine the dev `electron.exe` carries a **Low mandatory-integrity
+  label** (inherited from the project folder), while WAL's `-wal`/`-shm` sidecars left
+  by a higher-integrity process are Medium — Low can read them but not write them, and
+  no restart helps while they exist. DELETE mode has no persistent sidecar: the
+  rollback journal is created by the writer and removed on commit. The data folder
+  should keep its Low label **inheritable** (`/setintegritylevel (OI)(CI)Low`) so files
+  created there by a shell or backup tool are still writable by the app. Every write
+  still goes through `UiDatabase.write`, which reopens once on `SQLITE_READONLY` and
+  retries, and the connection has a 5 s busy timeout; do not call `db.prepare(...).run`
+  directly from a new store method, or it bypasses that recovery.
 - **A `wx-media://` token is a local path *or* a file id.** A file id means "TDLib is still
   downloading this": `protocol.ts` tails the file and must measure readable bytes with
   `getFileDownloadedPrefixSize`, never with `stat().size` (the file is sparse). Stopping a

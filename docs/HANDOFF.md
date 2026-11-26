@@ -2172,3 +2172,22 @@ claim is. Nothing here replaces §1 (state) or §9 (gaps).
 - 浏览器预览已点过(640×558):通用四行、数据与存储五行的开合、选中、Esc 与底部翻转;
   未在 Electron 窗口再点。
 
+**2026-11-26 — 设置写库 readonly:完整性级别,不是重启竞争**
+- 现网报错 `attempt to write a readonly database` 不是数据损坏,重启也不消失。根因是
+  **Windows 强制完整性控制(MIC)**:开发用的 `node_modules` 里 `electron.exe` 带
+  `Low Mandatory Level` 标签,App 进程因此是 Low;而 `ui.db` 目录虽然是 Low,标签不是
+  `(OI)(CI)` 可继承,任何更高完整性进程(高权限 Node 探针、备份/同步工具、另一个构建)
+  创建的 `ui.db-wal`/`-shm` 会是 Medium。Low 进程能读 Medium、不能写;SQLite 于是静默
+  以只读方式打开 WAL 库,只有写失败。`icacls` 实测:`ui.db` Low、`ui.db-wal`/`-shm`
+  Medium;Electron 对后两者 `r+` 得到 EPERM,普通(高权限)Node 可以;移走 sidecar 后
+  Electron 立刻能写。**只要这两个文件还在,重开多少次都还是只读**。
+- 彻底处理:(1) `ui.db` 改为 **DELETE 回滚日志**(schema 第一行),不再有跨进程持久的
+  `-wal`/`-shm` 可踩;只有写事务期间由写者自己创建 `-journal`。(2) 数据目录的低完整性
+  标签加上 `(OI)(CI)` 继承,之后任何工具在 `%APPDATA%\WeGram` 新建的文件都是 Low,Low
+  App 可写。(3) 一次性移走已存在的 Medium sidecar(本次 WAL 为 0 字节,无数据可丢)。
+- 代码层仍保留 `UiDatabase.write`:所有写(草稿、话题、锚点、`app_settings`)捕获
+  `SQLITE_READONLY`(含 1032/1544 扩展码)后重开连接重试一次,连接带 5 s busy timeout;
+  写绕过 `write()` 就没有这层恢复。回归测试 `src/main/store/ui-db.test.ts` 新增
+  「journal_mode 是 delete 且关闭后只剩 ui.db」,并保留只读文件恢复测试
+  (`pnpm test` 141 files / 1082 tests)。
+
