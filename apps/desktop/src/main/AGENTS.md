@@ -54,9 +54,12 @@ telegram/tdlib/actions/  TDLib requests as functions over ActionDeps, grouped in
                     chats / pins / history / files / send / comments / poll / users /
                     notification-settings (消息通知's per-scope defaults) and web
                     (即时预览's getWebPageInstantView)
-                    (index.ts re-exports); `poll.ts` also owns the visible-poll keepalive
-                    (`messages:refreshPoll` → `getMessage`), which must touch TDLib's LRU
-                    or a comment poll loses its live registration after cache eviction.
+                    (index.ts re-exports); `poll.ts` also owns the visible-poll read
+                    (`messages:refreshPoll`): `getMessage` for an ordinary row, plus
+                    `getMessageThreadHistory` (one row, server) when the row names its
+                    comment thread — a discussion group is not the open chat, so TDLib
+                    unloads its rows and `getMessage` would answer from the local store.
+                    The server answer is painted as a `poll` patch.
                     message-input.ts holds the one send
                     envelope. pins.ts owns 群公告 + 置顶消息 (one pinned message per
                     chat, and an unpin has to resolve the current id)

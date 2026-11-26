@@ -102,7 +102,7 @@ async function resolveThread(
   input: CommentTarget,
   /** Sending needs the thread root (it is the reply target); reading does not. */
   options: { requireRoot?: boolean } = {},
-): Promise<{ chatId: number; rootId: number }> {
+): Promise<{ chatId: number; rootId: number; comments?: number }> {
   const thread = await deps.invoke({
     _: 'getMessageThread',
     chat_id: input.chatId,
@@ -114,7 +114,12 @@ async function resolveThread(
   if (options.requireRoot && !rootId) {
     throw new AppError('not_implemented', '这个帖子还没有讨论群组，不能评论')
   }
-  return { chatId, rootId }
+  // `getMessageThread` is a server answer, and its reply_info is the live count;
+  // the post row in the transcript may have been read much earlier. A forum can
+  // answer without reply_info, so the field stays absent rather than guessed.
+  const replyCount = Number(thread?.reply_info?.reply_count)
+  const comments = Number.isFinite(replyCount) && replyCount >= 0 ? replyCount : undefined
+  return { chatId, rootId, ...(comments === undefined ? {} : { comments }) }
 }
 
 function memberKindOf(status: TdObject | undefined): ChatMemberKind {
@@ -143,21 +148,26 @@ function memberKindOf(status: TdObject | undefined): ChatMemberKind {
  * "can I comment".
  */
 export async function commentInfo(deps: ActionDeps, input: CommentTarget): Promise<CommentAccess> {
-  const { chatId } = await resolveThread(deps, input)
+  const { chatId, comments } = await resolveThread(deps, input)
   const chat = await deps.invoke({ _: 'getChat', chat_id: chatId })
   const supergroupId = chat?.type?._ === 'chatTypeSupergroup' ? Number(chat.type.supergroup_id) : 0
   if (!supergroupId) {
-    return resolveCommentAccess({
-      memberKind: 'unknown',
-      restrictedIsMember: false,
-      defaultCanSend: false,
-      restrictedCanSend: false,
-      hasPublicUsername: false,
-      joinToSend: true,
-      joinByRequest: false,
-      isBroadcast: false,
-      slowModeSeconds: 0,
-    })
+    return withThreadCount(
+      deps,
+      input,
+      comments,
+      resolveCommentAccess({
+        memberKind: 'unknown',
+        restrictedIsMember: false,
+        defaultCanSend: false,
+        restrictedCanSend: false,
+        hasPublicUsername: false,
+        joinToSend: true,
+        joinByRequest: false,
+        isBroadcast: false,
+        slowModeSeconds: 0,
+      }),
+    )
   }
   const supergroup = await deps.invoke({ _: 'getSupergroup', supergroup_id: supergroupId })
   const status: TdObject | undefined = supergroup?.status
@@ -169,17 +179,52 @@ export async function commentInfo(deps: ActionDeps, input: CommentTarget): Promi
   const slowModeSeconds = supergroup?.is_slow_mode_enabled
     ? await slowModeLeft(deps, supergroupId)
     : 0
-  return resolveCommentAccess({
-    memberKind: memberKindOf(status),
-    restrictedIsMember: Boolean(status?.is_member),
-    defaultCanSend: Boolean(chat?.permissions?.can_send_basic_messages),
-    restrictedCanSend: Boolean(status?.permissions?.can_send_basic_messages),
-    hasPublicUsername,
-    joinToSend: Boolean(supergroup?.join_to_send_messages),
-    joinByRequest: Boolean(supergroup?.join_by_request),
-    isBroadcast: Boolean(supergroup?.is_broadcast_group),
-    slowModeSeconds,
+  return withThreadCount(
+    deps,
+    input,
+    comments,
+    resolveCommentAccess({
+      memberKind: memberKindOf(status),
+      restrictedIsMember: Boolean(status?.is_member),
+      defaultCanSend: Boolean(chat?.permissions?.can_send_basic_messages),
+      restrictedCanSend: Boolean(status?.permissions?.can_send_basic_messages),
+      hasPublicUsername,
+      joinToSend: Boolean(supergroup?.join_to_send_messages),
+      joinByRequest: Boolean(supergroup?.join_by_request),
+      isBroadcast: Boolean(supergroup?.is_broadcast_group),
+      slowModeSeconds,
+    }),
+  )
+}
+
+/**
+ * Adds the thread's live count to the access answer.
+ *
+ * The panel's header and the post's 评论 bar both read `interaction.comments`, and
+ * the transcript's copy is only as fresh as the last interaction update. The
+ * thread read above is a server answer, so it patches the post through the normal
+ * op stream as well — the official client shows the same count on both.
+ */
+function withThreadCount(
+  deps: Pick<ActionDeps, 'emit'>,
+  input: CommentTarget,
+  comments: number | undefined,
+  access: CommentAccess,
+): CommentAccess {
+  if (comments === undefined) return access
+  deps.emit({
+    type: 'messages',
+    chatId: input.chatId,
+    ops: [
+      {
+        op: 'interaction',
+        chatId: input.chatId,
+        messageId: input.messageId,
+        interaction: { comments, canOpen: true },
+      },
+    ],
   })
+  return { ...access, comments }
 }
 
 async function slowModeLeft(

@@ -46,6 +46,11 @@ export const commentAccessSchema = z.object({
   joinByRequest: z.boolean(),
   /** Seconds left on slow mode before another comment may be sent. */
   slowModeSeconds: z.number().int().nonnegative(),
+  /**
+   * The thread's total comments, from the same server answer that resolved the
+   * thread. Absent when TDLib has no reply_info for it (a forum topic thread).
+   */
+  comments: z.number().int().nonnegative().optional(),
 })
 export type CommentAccess = z.infer<typeof commentAccessSchema>
 

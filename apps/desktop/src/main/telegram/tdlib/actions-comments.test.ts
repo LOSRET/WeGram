@@ -229,6 +229,49 @@ describe('commentInfo', () => {
 
     expect((await commentInfo(deps, { chatId: -100999, messageId: 12 })).slowModeSeconds).toBe(30)
   })
+
+  it('returns the thread count from the same server answer', async () => {
+    const { deps, events } = makeDeps((method) => {
+      if (method._ === 'getMessageThread') {
+        return { chat_id: -100123, message_thread_id: 77, reply_info: { reply_count: 14 } }
+      }
+      if (method._ === 'getChat') {
+        return {
+          type: { _: 'chatTypeSupergroup', supergroup_id: 55, is_channel: false },
+          permissions: { _: 'chatPermissions', can_send_basic_messages: true },
+        }
+      }
+      if (method._ === 'getSupergroup') {
+        return {
+          _: 'supergroup',
+          status: { _: 'chatMemberStatusMember' },
+          usernames: { _: 'usernames', active_usernames: [], editable_username: '' },
+          join_to_send_messages: true,
+          join_by_request: false,
+          is_broadcast_group: false,
+          is_slow_mode_enabled: false,
+        }
+      }
+      throw new Error(`unexpected ${String(method._)}`)
+    })
+
+    const access = await commentInfo(deps, { chatId: -100999, messageId: 12 })
+
+    expect(access.comments).toBe(14)
+    // The transcript's post row is patched too, so both surfaces agree on the count.
+    expect(events).toContainEqual({
+      type: 'messages',
+      chatId: -100999,
+      ops: [
+        {
+          op: 'interaction',
+          chatId: -100999,
+          messageId: 12,
+          interaction: { comments: 14, canOpen: true },
+        },
+      ],
+    })
+  })
 })
 
 describe('joinCommentGroup', () => {

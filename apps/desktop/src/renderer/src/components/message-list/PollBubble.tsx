@@ -1,6 +1,7 @@
 import type { Poll } from '@wegram/protocol'
 import { useState, type FormEvent } from 'react'
 
+import { useCommentThread } from '../../lib/commentThread'
 import { errorMessage, invoke, isAppErrorShape } from '../../lib/ipc'
 import {
   pollCanAddOption,
@@ -17,6 +18,7 @@ import {
   pollToggleSelection,
   pollVotable,
 } from '../../lib/poll'
+import { useInView } from '../../lib/useInView'
 import { usePollRefresh } from '../../lib/usePollRefresh'
 import { useAppStore } from '../../store/useAppStore'
 
@@ -58,7 +60,11 @@ export function PollBubble({
   const [optionText, setOptionText] = useState('')
 
   const selection = pollDraftSelection(draft, poll)
-  const refreshFailed = usePollRefresh(chatId, messageId, poll)
+  const thread = useCommentThread()
+  // A comment panel keeps every loaded row mounted, so only a poll that is about to
+  // be read asks for a server read; the transcripts' rows are virtualised anyway.
+  const [cardRef, inView] = useInView<HTMLDivElement>()
+  const refreshFailed = usePollRefresh(chatId, messageId, poll, thread, inView.visible)
   const results = pollResultsVisible(poll)
   const lockKey = poll.id || String(messageId)
   const locked = lockedPollId !== null && lockedPollId === lockKey
@@ -124,7 +130,7 @@ export function PollBubble({
   const staged = poll.allowsMultipleAnswers && pollSelectionChanged(poll, selection)
 
   return (
-    <div className="wx-poll">
+    <div className="wx-poll" ref={cardRef}>
       <div className="wx-poll__head">
         <div className="wx-poll__question">{poll.question}</div>
         {poll.description ? <div className="wx-poll__description">{poll.description}</div> : null}

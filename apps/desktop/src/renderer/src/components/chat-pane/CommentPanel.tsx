@@ -6,9 +6,11 @@ import {
   commentKey,
   formatCount,
   mergeComments,
+  mergeNewestPage,
   withoutCommentBar,
 } from '../../lib/comments'
 import { resolveCommentLanding } from '../../lib/commentAnchor'
+import { CommentThreadSource } from '../../lib/commentThread'
 import { messagePreview } from '../../lib/format'
 import { selfIdentity } from '../../lib/self'
 import { useEscapeKey } from '../../lib/useEscapeKey'
@@ -33,8 +35,11 @@ interface ThreadPage {
 }
 
 /**
- * Fetched threads survive closing the panel, so reopening is instant. A page is
- * still refreshed when the panel opens for a message nothing has fetched yet.
+ * Fetched threads survive closing the panel, so reopening paints instantly. The
+ * cache is only the first paint: each open re-reads the newest page in the
+ * background and merges it (`mergeNewestPage`), like the official client loading
+ * the thread again — otherwise a comment posted since the last visit would never
+ * appear, and neither would the counters it carries.
  */
 const threadCache = new Map<string, ThreadPage>()
 
@@ -110,6 +115,8 @@ export function CommentPanel({
   const [page, setPage] = useState<ThreadPage | null>(
     () => threadCache.get(key) ?? (threadIsEmpty ? { messages: [], hasMore: false } : null),
   )
+  /** True when this mount's first paint came from the cache (or the empty page). */
+  const startedWithPage = useRef(page !== null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const entered = useEnterOnOpen(open)
@@ -167,11 +174,21 @@ export function CommentPanel({
     [discussionChatId],
   )
 
+  /**
+   * The post whose thread these rows belong to. A comment's own chat is the
+   * discussion group; TDLib's thread read (and a poll's refresh) is anchored on
+   * this post instead.
+   */
+  const thread = useMemo(
+    () => ({ chatId: message.chatId, messageId: message.id }),
+    [message.chatId, message.id],
+  )
+
   /** Rows in the panel never open a return trip: no message menu, no nested thread. */
   const noopMenu = useCallback((): void => undefined, [])
   const noopComments = useCallback((): void => undefined, [])
 
-  const total = message.interaction?.comments ?? page?.messages.length ?? 0
+  const total = access?.comments ?? message.interaction?.comments ?? page?.messages.length ?? 0
 
   const loadAccess = useCallback(async (): Promise<void> => {
     try {
@@ -285,6 +302,45 @@ export function CommentPanel({
   useEffect(() => {
     if (page === null && !loadingRef.current && error === null) void load()
   }, [error, load, page])
+
+  /**
+   * A page this mount starts with is a snapshot, not the thread: the session cache
+   * (or the empty page the post advertised) can be hours old, and this panel only
+   * pages *older*. The official client re-reads the thread when it opens, so the
+   * newest page is fetched again and merged (lib/comments.ts `mergeNewestPage`):
+   * comments posted since the last visit appear, and so do their polls' counters.
+   * No spinner — the cached rows are already readable, and a failed background read
+   * keeps them instead of raising the error line.
+   */
+  useEffect(() => {
+    if (!startedWithPage.current) return
+    let cancelled = false
+    void invoke('messages:comments', {
+      chatId: message.chatId,
+      messageId: message.id,
+      limit: COMMENT_PAGE,
+    })
+      .then((answer) => {
+        if (cancelled) return
+        setPage((current) => {
+          if (!current) return current
+          const next = mergeNewestPage(
+            current,
+            answer.messages.map(withoutCommentBar),
+            answer.hasMore,
+          )
+          if (!next) return current
+          threadCache.set(key, next)
+          return next
+        })
+      })
+      .catch(() => {
+        // The cached page stays; a background re-read never raises the error bar.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [key, message.chatId, message.id])
 
   // The panel's rows never enter `messagesByChat`, so a vote in a comment's poll
   // reaches this card only here; without it the next tap was refused as a revote.
@@ -448,39 +504,45 @@ export function CommentPanel({
                * The rows are the panel's own list, not a chat's history: the media
                * viewer's strip has to be built from it (lib/viewerSource.ts), or a
                * photo or a video in the comments opens nothing at all.
+               *
+               * The thread anchor travels with the rows too: a poll in here is
+               * re-read through this post (lib/commentThread.tsx, §9.10), which is
+               * the only server request that still carries its results.
                */
-              <ViewerSource value={shown}>
-                {error !== null ? (
-                  /**
-                   * A failed older page keeps the comments already on screen: the
-                   * retry line sits above them, because that page is exactly what
-                   * is out of view up there.
-                   */
-                  <ErrorHint error={error} onRetry={() => void load(shown[0]?.id)} />
-                ) : page !== null && page.hasMore && loading ? (
-                  <div className="wx-comments-panel__hint">正在加载更早的评论…</div>
-                ) : null}
-                {shown.map((comment) => (
-                  /**
-                   * The wrapper is the anchor slot: `useCommentAnchor` measures the
-                   * first visible `data-message-id` row, so it must exist for every
-                   * comment (a service row carries none and is simply skipped).
-                   */
-                  <div key={comment.id} data-message-id={comment.id}>
-                    <MessageRow
-                      chat={discussionChat}
-                      messages={[comment]}
-                      repliedTo={null}
-                      self={self}
-                      avatarUrl={senderAvatarUrl(comment, discussionChat, self, userAvatars)}
-                      readOutboxMaxId={Number.MAX_SAFE_INTEGER}
-                      onOpenMenu={noopMenu}
-                      onOpenComments={noopComments}
-                      onOpenStickerSet={onOpenStickerSet}
-                    />
-                  </div>
-                ))}
-              </ViewerSource>
+              <CommentThreadSource value={thread}>
+                <ViewerSource value={shown}>
+                  {error !== null ? (
+                    /**
+                     * A failed older page keeps the comments already on screen: the
+                     * retry line sits above them, because that page is exactly what
+                     * is out of view up there.
+                     */
+                    <ErrorHint error={error} onRetry={() => void load(shown[0]?.id)} />
+                  ) : page !== null && page.hasMore && loading ? (
+                    <div className="wx-comments-panel__hint">正在加载更早的评论…</div>
+                  ) : null}
+                  {shown.map((comment) => (
+                    /**
+                     * The wrapper is the anchor slot: `useCommentAnchor` measures the
+                     * first visible `data-message-id` row, so it must exist for every
+                     * comment (a service row carries none and is simply skipped).
+                     */
+                    <div key={comment.id} data-message-id={comment.id}>
+                      <MessageRow
+                        chat={discussionChat}
+                        messages={[comment]}
+                        repliedTo={null}
+                        self={self}
+                        avatarUrl={senderAvatarUrl(comment, discussionChat, self, userAvatars)}
+                        readOutboxMaxId={Number.MAX_SAFE_INTEGER}
+                        onOpenMenu={noopMenu}
+                        onOpenComments={noopComments}
+                        onOpenStickerSet={onOpenStickerSet}
+                      />
+                    </div>
+                  ))}
+                </ViewerSource>
+              </CommentThreadSource>
             )}
           </div>
         </div>

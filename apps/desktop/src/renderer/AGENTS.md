@@ -84,8 +84,11 @@ components/chat-pane/     render tree + useChatHistory (history/ modules) + mess
                          chat-style rows + CommentComposer, the shared composer card posting
                          text / sticker / photo-file through messages:sendComment; non-members
                          get the official client's 加入/申请加入 gate instead; opens at the
-                         top of the thread) + useCommentAnchor (that thread's
-                         reading position in ui.db; the default landing is the top) +
+                         top of the thread; a cached thread paints first and the newest page
+                         is re-read in the background and merged — `mergeNewestPage` — like
+                         the official client loading the thread again; the header count comes
+                         from `messages:commentInfo.comments`) + useCommentAnchor (that
+                         thread's reading position in ui.db; the default landing is the top) +
                          ChatInfoPanel (聊天信息, §9.9: a 314 px OVERLAY sheet — transform
                          only, the transcript keeps its width — with 搜索群成员 and the
                          member grid for groups, a private chat's face opening 资料卡,
@@ -190,10 +193,16 @@ lib/format.ts         time / preview / avatar helpers (pure, unit-tested)
 lib/poll.ts           (pure, unit-tested) results visibility, votability, selection
                       staging, footer/mode copy, vote-restriction copy, quiz correctness,
                       whether an answer may still be changed (allows_revoting)
-lib/pollRefresh.ts    (pure, unit-tested) the 5 s visible-poll keepalive timing
-lib/usePollRefresh.ts  re-reads a mounted open poll on mount/focus/visibility and every
-                       5 s, keeping its TDLib cache registration alive; reports failure
-                       as the card's 更新失败 note, never the global error banner
+lib/pollRefresh.ts    (pure, unit-tested) the 10 s visible-poll read timing
+lib/usePollRefresh.ts  re-reads a poll that is in view on mount/focus/visibility and
+                       every 10 s (a comment panel keeps every row mounted, so an
+                       off-screen card pauses); a comment row names its thread so main
+                       can read the row from the server (`getMessageThreadHistory`) and
+                       paint the current counters; reports failure as the card's
+                       更新失败 note, never the error banner
+lib/commentThread.tsx  the thread anchor a comment panel's rows carry (the commented post's
+                       chat/id), read by `PollBubble` — a comment row's own chat is the
+                       discussion group, which is not the thread TDLib re-reads
 lib/search.ts         normalizeQuery / containsText / matchSegments — the ONE reading of a
                       search box, and the hit emphasis a result row draws
 lib/useGlobalSearch.ts  the search panel's conversation hits: 260 ms debounce over

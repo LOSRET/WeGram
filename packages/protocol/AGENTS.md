@@ -15,7 +15,8 @@ switch, and their `notifications:*` channel table), `storage.ts` (数据与存�
 the cache usage, 缓存上限, 清理缓存 and their `storage:*` channel table), `viewer.ts` (the 图片和视频 window's payloads),
 `chat.ts` (the chat DTOs: kind/summary/member/pinned message/invite link/chat ops),
 `chats.ts` (the chat domain's channel keys and schemas), `qr.ts` (the 群二维码
-window's channels), `poll.ts` (the poll DTO + the vote/add-option/refresh channels),
+window's channels), `poll.ts` (the poll DTO + the vote/add-option/refresh channels; the
+refresh request may name the comment thread it must re-read),
 `comment.ts` (the comment-thread contract, including what a
 comment carries: text, a sticker or a local file), `search.ts` (the cross-chat
 message search schemas), `events.ts` (the `evt:*` tables + `EventChannel`/`EventEnvelope`,

@@ -98,6 +98,43 @@ export function mergeComments(current: Message[], older: Message[]): Message[] {
 }
 
 /**
+ * Merge a re-read newest page into a cached thread window.
+ *
+ * The panel holds its pages for the whole session, so a thread reopened after new
+ * comments would otherwise keep the snapshot it was first read with. The official
+ * client re-reads the thread on open; this is the rule that puts that answer over
+ * the cached rows. When the page overlaps or extends the window its rows replace
+ * the cached tail, and when it no longer touches the window (a whole page of
+ * comments arrived) joining the two would draw a hole the panel cannot fill, so the
+ * server page replaces the window and older comments are paged back from there.
+ *
+ * `hasMore` describes the older direction, so an extended window keeps the cached
+ * flag. `null` means there is nothing to merge (an empty answer).
+ */
+export function mergeNewestPage(
+  current: { messages: Message[]; hasMore: boolean },
+  incoming: Message[],
+  incomingHasMore: boolean,
+): { messages: Message[]; hasMore: boolean } | null {
+  if (incoming.length === 0) return null
+  if (current.messages.length === 0) {
+    return { messages: incoming, hasMore: incomingHasMore }
+  }
+  const cachedNewest = current.messages[current.messages.length - 1]
+  const incomingOldest = incoming[0]
+  if (!cachedNewest || !incomingOldest) return null
+  if (incomingOldest.id > cachedNewest.id) {
+    return { messages: incoming, hasMore: incomingHasMore }
+  }
+  const byId = new Map(current.messages.map((message) => [message.id, message]))
+  for (const message of incoming) byId.set(message.id, message)
+  return {
+    messages: [...byId.values()].sort((a, b) => a.id - b.id),
+    hasMore: current.hasMore,
+  }
+}
+
+/**
  * 1.2万 / 3.4亿 style counts, as WeChat prints view numbers. One decimal, and
  * a trailing `.0` is dropped; below 10 000 the exact number is shown.
  */

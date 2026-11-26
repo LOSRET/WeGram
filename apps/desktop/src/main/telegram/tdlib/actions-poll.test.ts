@@ -63,6 +63,75 @@ describe('refreshPoll', () => {
     expect(actionDeps.emit).not.toHaveBeenCalled()
   })
 
+  it('re-reads a comment thread from the server and paints its counters', async () => {
+    const invoke = vi.fn(async (method: TdObject) => {
+      if (method._ === 'getMessage') {
+        expect(method).toEqual({ _: 'getMessage', chat_id: 500, message_id: 42 })
+        return pollMessage(2)
+      }
+      // The discussion group's row is read through the post it comments on: a
+      // server request, which is also what re-registers the poll. The cursor is
+      // exclusive, so +1 makes this row the newest of the answer.
+      expect(method).toEqual({
+        _: 'getMessageThreadHistory',
+        chat_id: -100111,
+        message_id: 77,
+        from_message_id: 43,
+        offset: 0,
+        limit: 1,
+      })
+      return { messages: [pollMessage(4)] }
+    })
+    const actionDeps = deps(invoke)
+
+    await expect(
+      refreshPoll(actionDeps, {
+        chatId: 500,
+        messageId: 42,
+        thread: { chatId: -100111, messageId: 77 },
+      }),
+    ).resolves.toBe(true)
+    expect(actionDeps.emit).toHaveBeenCalledWith({
+      type: 'messages',
+      chatId: 500,
+      ops: [
+        {
+          op: 'poll',
+          chatId: 500,
+          messageId: 42,
+          poll: expect.objectContaining({ totalVoterCount: 4 }),
+        },
+      ],
+    })
+
+    // The next heartbeat returns the same counters: nothing to repaint.
+    await refreshPoll(actionDeps, {
+      chatId: 500,
+      messageId: 42,
+      thread: { chatId: -100111, messageId: 77 },
+    })
+    expect(actionDeps.emit).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the local copy when the thread cannot be read', async () => {
+    const invoke = vi.fn(async (method: TdObject) => {
+      if (method._ === 'getMessage') return pollMessage(2)
+      throw new Error('Can not get message thread history in the chat')
+    })
+    const actionDeps = deps(invoke)
+
+    await expect(
+      refreshPoll(actionDeps, {
+        chatId: 500,
+        messageId: 42,
+        thread: { chatId: -100111, messageId: 77 },
+      }),
+    ).resolves.toBe(true)
+    // A failed server read is not a licence to paint the local snapshot.
+    expect(actionDeps.emit).not.toHaveBeenCalled()
+    expect(actionDeps.logger.warn).toHaveBeenCalledOnce()
+  })
+
   it('still announces the server copy after this account votes', async () => {
     const invoke = vi.fn(async (method: TdObject) => {
       if (method._ === 'setPollAnswer') return { _: 'ok' }

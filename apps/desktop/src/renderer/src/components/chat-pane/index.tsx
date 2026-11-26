@@ -23,7 +23,7 @@ import { ChatHeader } from './ChatHeader'
 import { ChatInfoPanel } from './ChatInfoPanel'
 import { usePinnedMessage } from './usePinnedMessage'
 import { PinnedBar } from './PinnedBar'
-import { COMMENT_PANEL_ANIM_MS } from '../../lib/comments'
+import { COMMENT_PANEL_ANIM_MS, commentKey } from '../../lib/comments'
 import { useSlidingPanel } from '../../lib/useSlidingPanel'
 import { CommentPanel } from './CommentPanel'
 import {
@@ -708,6 +708,13 @@ export function ChatPane() {
 
       {comments.panel ? (
         <CommentPanel
+          /**
+           * The panel's page and scroll state belong to one thread. Opening another
+           * post while this one is mounted swaps the value in place; without the key
+           * React reuses the panel and its rows (measured: 37 + 30 rows of two
+           * different threads in one list).
+           */
+          key={commentKey(comments.panel.value.chatId, comments.panel.value.id)}
           /* The live store row, not the snapshot taken on open: posting a comment
              patches `interaction.comments` through an `interaction` op, and the
              panel's header follows it. */

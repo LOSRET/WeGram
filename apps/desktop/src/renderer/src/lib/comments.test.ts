@@ -8,6 +8,7 @@ import {
   hasCommentBar,
   isCommentablePost,
   mergeComments,
+  mergeNewestPage,
 } from './comments'
 
 function comment(id: number, text = `c${id}`): Message {
@@ -67,6 +68,44 @@ describe('comment bar rules', () => {
     const current = [comment(21)]
     expect(mergeComments(current, [comment(22)])).toBe(current)
     expect(mergeComments(current, [])).toBe(current)
+  })
+})
+
+describe('mergeNewestPage', () => {
+  it('extends a cached window with comments posted since the last visit', () => {
+    const cached = { messages: [comment(10), comment(11)], hasMore: true }
+    const next = mergeNewestPage(cached, [comment(11), comment(12), comment(13)], false)
+
+    expect(next?.messages.map((message) => message.id)).toEqual([10, 11, 12, 13])
+    // The older direction did not change: the cached flag still answers it.
+    expect(next?.hasMore).toBe(true)
+  })
+
+  it('takes a fresh copy of a row the server has changed', () => {
+    const cached = { messages: [comment(10, 'old')], hasMore: false }
+    const next = mergeNewestPage(cached, [comment(10, 'edited')], true)
+
+    expect(next?.messages[0]?.text).toBe('edited')
+  })
+
+  it('replaces a window the newest page no longer touches', () => {
+    // A whole page of comments arrived between two opens: joining the two windows
+    // would hide the gap, so the server page wins and older comments page back.
+    const cached = { messages: [comment(10)], hasMore: false }
+    const next = mergeNewestPage(cached, [comment(41), comment(42)], true)
+
+    expect(next?.messages.map((message) => message.id)).toEqual([41, 42])
+    expect(next?.hasMore).toBe(true)
+  })
+
+  it('starts from the answer when the panel began with no rows', () => {
+    const next = mergeNewestPage({ messages: [], hasMore: false }, [comment(1)], false)
+    expect(next?.messages.map((message) => message.id)).toEqual([1])
+    expect(next?.hasMore).toBe(false)
+  })
+
+  it('has nothing to do for an empty answer', () => {
+    expect(mergeNewestPage({ messages: [comment(1)], hasMore: false }, [], false)).toBeNull()
   })
 })
 

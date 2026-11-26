@@ -4,7 +4,7 @@ import { POLL_REFRESH_MS, pollRefreshInterval } from './pollRefresh'
 
 describe('poll refresh timing', () => {
   it("re-reads an open poll sooner than TDLib's own results poll", () => {
-    expect(POLL_REFRESH_MS).toBe(5_000)
+    expect(POLL_REFRESH_MS).toBe(10_000)
     expect(pollRefreshInterval({ closed: false })).toBe(POLL_REFRESH_MS)
   })
 

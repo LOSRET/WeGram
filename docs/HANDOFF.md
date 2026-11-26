@@ -79,7 +79,7 @@ pnpm workspace, W1 + W2 + the W3 main body implemented, plus the private-chat P0
 | Transcript | virtualised list, anchored prepend, load-around anchors, day/unread separators, real sender photos, read receipts, typing + presence, reply/edit/delete/forward, polls, comments bar, channel post composition + author signatures, pinned bar, reaction chips, link preview cards |
 | Media | photo/document send+receive with progress, `wx-media://` Range streaming (including a file TDLib is still downloading), viewer window for photos **and** videos, 表情 panel, 贴纸包盒子, album send, caption edit |
 | Stickers / emoji | WebP `<img>`, TGS → lottie-web (transcript) or one ThorVG canvas (grids), WebM `<video>`, animated-emoji messages (no bubble, one pass, click sound), premium sticker effects, custom emoji entities, Apple emoji as a CBDT colour font |
-| Polls | `PollBubble` + `lib/poll.ts`, `messages:vote` / `messages:addPollOption`, option order vs position, immediate `poll` patches from `updateMessageContent.new_content` and a 5 s visible-poll keepalive |
+| Polls | `PollBubble` + `lib/poll.ts`, `messages:vote` / `messages:addPollOption`, option order vs position, immediate `poll` patches from `updateMessageContent.new_content`, and a 10 s visible-poll read that re-reads a comment row through its thread (server) so the counters move like the official client's |
 | Login | own frameless 280×373 window: TDLib QR (local `qrcode`), 用手机号登录 fallback via `auth:reset`, profile step only for a restored session |
 | 通讯录 | TDLib address book (`getContacts` + `getUser`), pinyin initials via ICU, contact card with 备注/DC/phone, 发消息 creates the private chat |
 | 链接预览 | a text message's link preview (Message.linkPreview from TDLib messageText.link_preview): cover photo + site/title/description, tinted from a stable hue of the URL, and the ⚡ 即时预览 bar that opens the reader as its own window (`web:open` → `main/instant-view-window.ts`, route `#instantview`; `web:instantView` → TDLib `getWebPageInstantView`, mapped into the rich-block union and drawn by `RichMessage`; zoom in the toolbar; design doc §8.9) |
@@ -344,7 +344,8 @@ apps/desktop/src/renderer/src/
   store/                     types, initialState (DATA_DEFAULTS), reducers, slices/{auth,
                              chats,messages,media,ui}, useAppStore (assembler)
   lib/                       pure rules + hooks: format, entities, media, mediaVariant,
-                             mediaPriority, tgs, poll, pollRefresh/usePollRefresh, comments, presence, typingPing,
+                             mediaPriority, tgs, poll, pollRefresh/usePollRefresh,
+                             commentThread, comments, presence, typingPing,
                              albumSend, editTarget, voice/ (recorder + oggOpus), qr, zoom,
                              player, viewer, chatInfo, listMetrics, scrollGeometry,
                              telegramLink, stickerMedia, stickerSetLink, customEmoji,
@@ -944,12 +945,26 @@ are grouped by the layer that owns the rule; the code comments carry the same fa
   arrives later as `updateMessageContent`. Its `new_content` is applied immediately as a
   `poll` patch, not discarded behind a second `getMessage` read. Quiz correct answers stay
   empty until the account answers or the poll closes.
-- **A visible poll needs a foreground keepalive.** TDLib unregisters a poll when its
-  containing message leaves the message cache and refreshes registered online polls only
-  every 42–60 seconds. Renderer-owned comment rows can outlive that cache entry (measured:
-  official client 18 voters, WeGram still 2), so `usePollRefresh` re-reads mounted open polls
-  every 5 seconds and on focus/visibility. The read touches TDLib's LRU; an evicted row is
-  loaded again, re-registering the poll and triggering TDLib's immediate results fetch.
+- **A visible poll needs a real read, not just a keepalive.** TDLib refreshes registered
+  polls roughly every 42–60 seconds and unregisters a poll when its message leaves the
+  message cache. A comment row lives in the discussion group, which is not the open chat:
+  TDLib drops its rows (and the registration) while the thread stays on screen, and
+  `getMessage` then answers from the local store. The measured result was the same frozen
+  card (official client 18 voters, WeGram still 2). `usePollRefresh` therefore runs every
+  10 seconds on a card that is in view, plus on focus and on visibility; a comment row
+  names its post through `lib/commentThread.tsx`, and main re-reads that one row with
+  `getMessageThreadHistory`
+  (server) — `getMessage` would only hit the local copy. The returned counters are painted
+  as a `poll` patch; `rememberPoll` keeps an unchanged read silent. An ordinary transcript
+  poll keeps the cheap local touch and moves on TDLib's own update.
+- **The comment count is re-read with the thread.** `messages:commentInfo` already calls
+  `getMessageThread` (a server request), and its `reply_info.reply_count` is the live total;
+  the answer carries it as `comments` and patches the post with an `interaction` op, so a
+  cached thread page cannot leave the panel header at yesterday's number (measured: 10 vs
+  the official client's 14). The panel's rows are re-read too: a mount that starts from
+  `threadCache` fetches the newest page in the background and merges it
+  (`lib/comments.ts` `mergeNewestPage`), so comments posted since the last visit appear;
+  a page that no longer touches the cached window replaces it instead of drawing a hole.
 - **The poll schema is newer than the version number suggests**: 1.8.70 (c8828d50) already
   has `pollOption.id`, `option_order`, `can_see_results`, `can_add_option`,
   `vote_restriction_reason`. `setPollAnswer` takes `chat_id`/`message_id`/`option_ids`, and

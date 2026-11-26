@@ -508,7 +508,7 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'messages:addPollOption':
       return handlePreviewPoll(channel, store, previewMessagesStore)
     case 'messages:refreshPoll':
-      // The preview has no TDLib cache to keep alive.
+      // The preview has no server copy to re-read a poll from.
       return true
     case 'messages:typing':
       // The preview has no peer to show an indicator.

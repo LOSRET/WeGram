@@ -98,7 +98,15 @@ export const pollInvokeSchemas = {
     response: z.void(),
   },
   /**
-   * Keeps a visible poll's TDLib message cache entry alive and re-reads its counters.
+   * Re-reads a visible poll's counters.
+   *
+   * A poll drawn inside a comment thread carries that thread's anchor: TDLib drops
+   * the discussion group's messages (and the poll's result registration) while the
+   * thread is still on screen, and `getMessage` then answers from the local store.
+   * The anchor lets main re-read the row through `getMessageThreadHistory` — a
+   * server request that both re-registers the poll and returns the current results.
+   * Without an anchor the read is the local `getMessage` touch.
+   *
    * False means the message/poll is no longer available; a background refresh must
    * not raise the renderer's error banner.
    */
@@ -106,6 +114,10 @@ export const pollInvokeSchemas = {
     request: z.object({
       chatId: z.number().int(),
       messageId: z.number().int(),
+      /** The commented post (channel chat + id) when the row is in a comment pane. */
+      thread: z
+        .object({ chatId: z.number().int(), messageId: z.number().int() })
+        .optional(),
     }),
     response: z.boolean(),
   },
