@@ -1,10 +1,11 @@
 /* ==========================================================================
    Mini App window (design doc §9.4).
 
-   Only the 48 px strip is ours: main positions the guest `WebContentsView`
-   immediately below it, which is why this file must not add a second row and why
-   the strip's height is mirrored by `MINI_APP_BAR_H` in main/mini-app-window.ts.
-   No native frame: the strip is the drag region, and × belongs to the client.
+   The 48 px strip and optional native bottom-button bar are ours. Main positions
+   the guest `WebContentsView` between them; the strip height is mirrored by
+   `MINI_APP_BAR_H`, and the footer height comes from `miniapp:init` /
+   `evt:miniappControls`. No native frame: the strip is the drag region, and ×
+   belongs to the client.
    ========================================================================== */
 
 .wx-miniapp {
@@ -62,6 +63,7 @@
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
+  -webkit-app-region: no-drag;
 }
 
 .wx-miniapp__button:hover:not(:disabled) {
@@ -75,6 +77,94 @@
 
 .wx-miniapp__button--close {
   font-size: 22px;
+}
+
+.wx-miniapp__native-bar {
+  flex: none;
+  margin-top: auto;
+  display: flex;
+  gap: 8px;
+  padding: 4px 12px;
+  box-sizing: border-box;
+  background: var(--wx-iv-win-bar);
+  border-top: 1px solid var(--wx-divider);
+  -webkit-app-region: no-drag;
+}
+
+.wx-miniapp__native-bar--top,
+.wx-miniapp__native-bar--bottom {
+  flex-direction: column;
+}
+
+.wx-miniapp__native {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 48px;
+  padding: 0 16px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 8px;
+  background: var(--wx-login-green);
+  color: var(--wx-text-on-brand);
+  font-family: var(--wx-font);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wx-miniapp__native--secondary {
+  background: var(--wx-pane);
+  color: var(--wx-brand-text);
+}
+
+.wx-miniapp__native:hover:not(:disabled) {
+  filter: brightness(0.96);
+}
+
+.wx-miniapp__native:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.wx-miniapp__native-text {
+  position: relative;
+  z-index: 1;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wx-miniapp__native .wx-spinner {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  z-index: 2;
+}
+
+.wx-miniapp__native--shine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    110deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.32) 48%,
+    transparent 76%
+  );
+  transform: translateX(-120%);
+  animation: wx-miniapp-shine 2.4s ease-in-out infinite;
+}
+
+@keyframes wx-miniapp-shine {
+  0%,
+  55% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
 }
 
 .wx-miniapp__error {

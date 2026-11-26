@@ -31,12 +31,23 @@ export const botCommandsAnswerSchema = z.object({
    * so this client keeps the list to one-to-one chats.
    */
   isBot: z.boolean(),
+  /**
+   * The bot's own user id, so the composer's 小程序 button can name the bot in
+   * `miniapp:open` (`source: 'menu'`). Absent whenever `isBot` is false.
+   */
+  botUserId: z.number().int().positive().optional(),
   commands: z.array(botCommandSchema),
   /**
    * TDLib `botInfo.description`: the text Telegram shows in an empty bot chat.
    * Empty is valid; the client still offers its 开始 button.
    */
   description: z.string().optional(),
+  /**
+   * TDLib `botInfo.menu_button` when it names a Web App (`botMenuButton`): the
+   * bot's Mini App, which the composer draws as 小程序 beside 语音转文字. The
+   * command/default kinds carry none — the "/" list already is that menu.
+   */
+  menu: z.object({ text: z.string(), url: z.string() }).optional(),
 })
 export type BotCommandsAnswer = z.infer<typeof botCommandsAnswerSchema>
 

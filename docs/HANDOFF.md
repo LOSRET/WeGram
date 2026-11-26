@@ -88,8 +88,8 @@ pnpm workspace, W1 + W2 + the W3 main body implemented, plus the private-chat P0
 | Channels | 服务号 bottom card, 加入/申请加入 for an unjoined channel, keyboard switch for admins |
 | Settings | batch A (账号与安全 / 通用 / 网络与代理 / 关于) + batch B's first group 消息通知 (桌面通知 + 私聊/群聊/频道的 免打扰 / 提示音 / 预览); the rest of B and C pending (§9) |
 | Private chat P0/P1 | send failure + 重试, outgoing typing, online/last-seen, delete chat / mark unread, notifications + tray, voice notes (recorded in-renderer, OGG/Opus muxed in-repo), albums (**mixed photos + videos**), **video messages (MP4/MOV metadata read locally)**, **取消上传 for a pending send**, **转发来源 on received forwards**, **聊天文件 tabs in 查找聊天内容**, pinned bar, speech-to-text, reactions (display only), block/report, profile card with 备注 + 共同群聊, caption edit, add/remove contact |
-| 机器人 | inline-keyboard callbacks end to end (`bots:callback` → `getCallbackQueryAnswer`; answer as toast / alert dialog / URL), the composer's `/` command list (`bots:commands`, lazily asked), clickable `botCommand` entities that send the command, the custom reply keyboard with its removal, 强制回复 (the row is offered as the reply target), the bot's profile card (简介 / commands / menu button), inline bots (`@bot query` → `bots:inlineQuery` / `bots:inlineSend`, a result panel above the input), 添加成员 (`chats:addMember` → `addChatMembers`), which is how a bot joins a group, and the first-open screen (empty bot chat → `botInfo.description` + 开始 → ordinary `/start` send, including a validated one-shot deep-link payload); the fixture bot (`@wegram_helper`) serves all of it in the mock/preview |
-| Mini Apps | Telegram Web Apps open in their own frameless 560×780 window (`#miniapp`): a 48 px bot-name strip (⋯ native menu: 重载页面 / 使用条款 / 隐私政策 / 举报; ×), a sandboxed `WebContentsView` below it, and a preload that exposes only `TelegramWebviewProxy`. Entry points: reply-keyboard Web App keys, inline-keyboard Web App buttons, the bot profile's 菜单, and `t.me/<bot>/<app>` links. The signed URL (TDLib `getWebAppUrl` / `openWebApp` / `getWebAppLinkUrl`) never leaves main; `closeWebApp` releases a launch, `sendWebAppData` carries `WebApp.sendData`, and 举报 re-enters the shell's report sheet (`evt:report`). The mock uses an offline `data:` page; the browser preview cannot open the window and says so. Design doc §9.4.1 |
+| 机器人 | inline-keyboard callbacks end to end (`bots:callback` → `getCallbackQueryAnswer`; answer as toast / alert dialog / URL), the composer's `/` command list (`bots:commands`, lazily asked) and its 小程序 button when the bot's menu is a Web App, clickable `botCommand` entities that send the command, the custom reply keyboard with its removal, 强制回复 (the row is offered as the reply target), the bot's profile card (简介 / commands / menu button), inline bots (`@bot query` → `bots:inlineQuery` / `bots:inlineSend`, a result panel above the input), 添加成员 (`chats:addMember` → `addChatMembers`), which is how a bot joins a group, and the first-open screen (empty bot chat → `botInfo.description` + 开始 → ordinary `/start` send, including a validated one-shot deep-link payload); the fixture bot (`@wegram_helper`) serves all of it in the mock/preview |
+| Mini Apps | Telegram Web Apps open in their own frameless 560×780 window (`#miniapp`): a 48 px bot-name strip (⋯ native menu: 重载页面 / 使用条款 / 隐私政策 / 举报; ×), a sandboxed `WebContentsView` below it, and a preload that exposes only `TelegramWebviewProxy`. Entry points: the composer's 小程序 button beside 语音转文字, reply-keyboard Web App keys, inline-keyboard Web App buttons, the bot profile's 菜单, and `t.me/<bot>/<app>` links. The signed URL (TDLib `getWebAppUrl` / `openWebApp` / `getWebAppLinkUrl`) never leaves main; `closeWebApp` releases a launch, `sendWebAppData` carries `WebApp.sendData`, and 举报 re-enters the shell's report sheet (`evt:report`). A real ExViewer signed URL now renders and routes inside the guest (2026-11-26). Native Main/Secondary/Back/Settings controls, CloudStorage through TDLib custom requests, and Windows Hello with DPAPI-sealed per-user/bot tokens are implemented; the button/storage bridge is mock/CDP-verified and Windows Hello authorization + authentication passed on this machine. The mock uses an offline `data:` page; the browser preview cannot open the window and says so. Design doc §9.4.1 |
 | Proxy | 跟随系统代理 by default, `proxy:refresh` / `evt:proxy`, probe + 30 s retry, DPAPI-sealed secrets |
 | Packaging | `.github/workflows/release.yml`: version bump on `main` → NSIS installer → GitHub Release (proven by v0.1.0–v0.1.2); the installer has never been installed or signed |
 
@@ -97,7 +97,7 @@ pnpm workspace, W1 + W2 + the W3 main body implemented, plus the private-chat P0
 
 | Claim | Evidence |
 |---|---|
-| The build is sound | `pnpm verify` = lint → typecheck → test → build, zero warnings. Last recorded green run: 2026-11-26, 143 files / 1108 tests (the count grows; read the run) |
+| The build is sound | `pnpm verify` = lint → typecheck → test → build, zero warnings. Last recorded green run: 2026-11-26, 146 files / 1127 tests (the count grows; read the run) |
 | The UI behaves | mock Electron passes (`launch-detached.ps1 -NoSandbox -Mock`) and the browser preview; the numbers in §5 were measured off those windows |
 | Paging / scroll / FPS | CDP against the real account: 5000 messages at 60 fps, **0.0 px** drift when prepending, 60 pages with no duplicates |
 | The read path against real TDLib | `pnpm tdlib:smoke` (read-only) + real-account Electron sessions |
@@ -105,11 +105,11 @@ pnpm workspace, W1 + W2 + the W3 main body implemented, plus the private-chat P0
 | **Writes** to Telegram | the §9.1 matrix now runs on the test DCs: `pnpm tdlib:test-dc` (text / edit / photo / voice / delete), `pnpm tdlib:test-dc:writes` (album, caption edit, pin, 标为未读, 备注, 联系人, 拉黑, 举报, 转文字, 删除聊天) — last run 9 pass / 3 partial / 1 skip / 0 fail — and `pnpm tdlib:test-dc:media` (video / mixed album / 取消上传) — 5 pass / 0 fail, 2026-11-25. The partials and the skip are named in §9.1 |
 | The QR login with a real phone | **not yet** — mapping, encoding and fallback are mock-verified only |
 | 机器人 commands + callbacks against real TDLib | `pnpm tdlib:test-dc:bot` (test DCs): BotFather's 27 commands map through `bot_info.commands`, and pressing the `/mybots` inline button answers a callback query (empty answer, no 502) — run 2026-11-24 |
-| Mini App window and bridge | mock Electron + CDP (2026-11-26): the reply-keyboard 首页 key, the inline 打开小程序 button and the profile 菜单 each open/retarget the one window; a `miniapp:open` link source was invoked through `window.tg` (its `t.me` parser is unit-tested separately). The offline `data:` page renders below the strip, `TelegramWebviewProxy` is present, `WebApp.sendData` posts without an error, a closing-confirmation request makes ×/Alt+F4 ask, ⋮ opens the native menu and 举报 closes the window + opens the shell's report sheet. **Not yet:** a real bot's signed URL through a test-DC session (`getWebAppUrl` / `openWebApp` / `getWebAppLinkUrl` are type-checked against the installed TDLib types and unit-tested with fake requests) |
+| Mini App window and bridge | mock Electron + CDP (2026-11-26): the reply-keyboard 首页 key, the inline 打开小程序 button and the profile 菜单 each open/retarget the one window; a `miniapp:open` link source was invoked through `window.tg` (its `t.me` parser is unit-tested separately). The offline `data:` page renders below the strip, `TelegramWebviewProxy` is present, `WebApp.sendData` posts without an error, a closing-confirmation request makes ×/Alt+F4 ask, ⋮ opens the native menu and 举报 closes the window + opens the shell's report sheet. The TDLib calls are type-checked and unit-tested with fake requests; the real-bot result is in the next row |
 | Windows toasts, tray icon | **not yet** on this machine (no Start-Menu shortcut; `Shell_NotifyIcon` refused in the agent session) |
 | The installer, code signing, auto-update, sandboxed launch on a clean machine | **not yet** (v0.1.0 artifact predates the inlined credentials, so it still boots the mock) |
 | Settings batch A against a real account | **not yet** — mock only |
-| Mini Apps against a real bot | **not yet** — the window, bridge and every entry point are mock/CDP-verified; the TDLib calls are pinned by unit tests, but no real Web App has been opened with a signed URL yet (see §9.1) |
+| Mini Apps against a real bot | **open + render proven 2026-11-26**: ExViewer's real `openWebApp` signed URL loaded in the guest, mounted its React tree and navigated to `#/settings`; CDP read the rendered profile/settings/content and both Telegram globals were present. The first attempt had a blank window because TDLib omitted `tgWebAppThemeParams`; `application_name: 'tdesktop'` plus the current `themeParameters` fixed it. Native controls and CloudStorage are mock/CDP-verified; Windows Hello authorization, authentication, encrypted token return and token removal passed on this machine. Still unproven against a real bot: `sendWebAppData`, a real CloudStorage round-trip and the other entry surfaces (the local proxy was unavailable during the bridge pass) |
 
 ---
 
@@ -277,11 +277,11 @@ HTTPS URL in real). The guest's `TelegramWebviewProxy` is callable from that tar
    `+8613800000000` / `12345` / `wegram`), then the shell: rail icons, list header, row
    spacing, selected row, bubbles both sides, day/unread separators, composer card, hover
    timestamp, context menus, delete confirm, forward sheet, sticker panel, app menu, chat-info
-   panel, settings window, dark mode, empty-pane watermark. Mini Apps: the bot chat's 首页
-   keyboard key, 打开小程序 inline button and profile 菜单 each open one window; the strip
-   title is the bot's name, ⋯ offers 重载页面 / 使用条款 / 隐私政策 / 举报, the guest renders
-   below it, a closing-confirmation prompt appears after the page asks for one, and 举报 closes
-   the window while the shell's report sheet opens.
+   panel, settings window, dark mode, empty-pane watermark. Mini Apps: the bot chat's composer
+   小程序 button, 首页 keyboard key, 打开小程序 inline button and profile 菜单 each open one
+   window; the strip title is the bot's name, ⋯ offers 重载页面 / 使用条款 / 隐私政策 / 举报,
+   the guest renders below it, a closing-confirmation prompt appears after the page asks for
+   one, and 举报 closes the window while the shell's report sheet opens.
 3. For a visual judgement, crop the same region from app and reference, scale to the same
    width, paste side by side, read once. Reference crops live in `.cache/wxref` (gitignored).
 4. `pnpm web` is fine for CSS iteration, but **do not judge the pane there**: Chrome's
@@ -313,9 +313,14 @@ apps/desktop/src/main/
   viewer.ts, viewer-size.ts  the 图片和视频 BrowserWindow and its measured size maths
   qr-window.ts               the 群/频道二维码 sheet (frameless 360×560, child of the shell)
   settings-window.ts         the 设置 window (640×558, no parent, single instance)
-  mini-app-window.ts         小程序: #miniapp strip + WebContentsView, native ⋯ menu,
-                             closeWebApp / sendWebAppData / evt:report
+  mini-app-window.ts         小程序: #miniapp strip + native action bar + WebContentsView,
+                             native ⋯ menu, controls/storage/biometry, evt:report
   mini-app-bridge.ts         (pure) the guest's web_app_* events → host effects
+  mini-app-controls.ts       (pure) button patches + exact action-bar geometry
+  mini-app-cloud-storage.ts  (pure) reserved custom-method validation/result shapes
+  mini-app-biometry.ts       Windows Hello service + DPAPI token handling;
+                             biometry-worker.ts runs win-hello off the main thread
+  mini-app-theme.ts          (pure) SDK colour keys + TDLib themeParameters
   system-proxy.ts            Chromium resolveProxy + registry fallback
   system-proxy-rules.ts      (pure) PAC/static/registry parsers
   ipc/router.ts              per-channel zod validation, Result envelope
@@ -858,7 +863,7 @@ the opacity and fills `currentColor`.
 
 | Delta | Why |
 |---|---|
-| Composer toolbar keeps WeChat's five buttons (表情 / 收藏 cube / 文件夹 / 剪刀+chevron / 麦克风); 收藏, 剪刀 and the tool-row 麦克风 toast "还没有接入" | favourites and screenshot have no protocol source; the tool-row mic is the client's **dictation**, not voice notes (§7). The client's right-hand 语音输入 circle is left out — 发送 follows the toolbar. Voice notes live on the circled mic beside 发送 |
+| Composer toolbar keeps WeChat's five buttons (表情 / 收藏 cube / 文件夹 / 剪刀+chevron / 麦克风), plus a 小程序 mark to the right of the mic in a bot chat whose menu is a Web App; 收藏, 剪刀 and the tool-row 麦克风 toast "还没有接入" | favourites and screenshot have no protocol source; the tool-row mic is the client's **dictation**, not voice notes (§7). The client's right-hand 语音输入 circle is left out — 发送 follows the toolbar. Voice notes live on the circled mic beside 发送; 小程序 is the bot's Mini App (§9.4.1), so it exists only where Telegram gives it a target |
 | Avatars are real where the protocol carries them, initials elsewhere | `Self.avatarUrl`, `ChatSummary.avatarUrl`, `Message.senderAvatarUrl` + `evt:avatars`; a cold row shows its initial for a moment — intended, not a missing image |
 | 通讯录 is Telegram's address book, not the chat list | `getContacts` + `getUser`: a person you never wrote to still has a card; 发消息 creates the chat. Service rows are kept for the silhouette (公众号、服务号 shows the channel count; the rest toast) |
 | Chinese initials come from ICU, not a pinyin table | `contactInitial` compares the first Han character against 23 boundary characters with `Intl.Collator('zh-Hans-CN')`; polyphones (重/长) can land a letter off |
@@ -902,6 +907,9 @@ the opacity and fills `currentColor`.
   `telegram-web-app.js` looks for. Main answers `theme_changed` / `viewport_changed`
   through `Telegram.WebView.receiveEvent`. `WebApp.sendData` → `sendWebAppData`, and the
   closing-confirmation flag is honoured by a native question before `×`/Alt+F4 discards it.
+- A bot whose menu button is a Web App also gets a **小程序** button in the chat's composer,
+  to the right of 语音转文字: `bots:commands` carries `botUserId` + `menu`, so the same
+  `miniapp:open` menu entry runs without opening the profile card.
 - The mock serves an offline `data:` page so the whole window can be driven over CDP; see
   §3.5 for the launcher and §9.4.1 of the design doc for the TDLib calls.
 
@@ -1222,6 +1230,21 @@ are grouped by the layer that owns the rule; the code comments carry the same fa
   close, 退出登录, tray-hide and `before-quit` — like the viewer and 即时预览, otherwise
   `window-all-closed` would never fire. Re-targeting keeps one window and replaces the guest;
   `closeWebApp` releases only a launch `openWebApp` handed back.
+- **A Mini App launch needs both an official platform and theme parameters.** TDLib writes
+  `webAppOpenParameters.application_name` into `tgWebAppPlatform`; use `tdesktop`, not a
+  free-form `wegram`. It also omits `tgWebAppThemeParams` when `theme` is null, and strict SDKs
+  such as ExViewer's reject the whole URL before React mounts. The symptom is a blank guest
+  under a correct title strip, while the same bot opens in Telegram. Pass the current theme on
+  every `getWebAppUrl` / `openWebApp` / `getWebAppLinkUrl` call.
+- **Mini App native controls and privileged bridges are host-owned.** BottomButton setup is a
+  partial update; the host renderer draws the native action bar and main shrinks the guest by
+  exactly 56 px per row. Back lives in the 48 px strip, Settings in the native ⋮ menu, and clicks
+  are sent back as `*_button_pressed` without performing navigation. CloudStorage only forwards
+  the four reserved methods through `sendWebAppCustomRequest`. Windows Hello runs in a worker
+  thread because `win-hello` is synchronous; consent/token rows are user+bot scoped and tokens are
+  DPAPI-sealed, never plaintext. Async responses are dropped after retarget/reload.
+  `win-hello` 1.1.1 is verified on this x64 machine; ARM64 and installer packaging are not yet
+  exercised.
 - **A pending QR login cannot be cancelled in TDLib.** `requestQrCodeAuthentication` works from
   `waitPhoneNumber`, then TDLib keeps re-sending `authorizationStateWaitOtherDeviceConfirmation`
   with a fresh link. `setAuthenticationPhoneNumber` is refused in that state and there is no
@@ -1697,11 +1720,12 @@ sign to merge them.
    unit-tested only) and the 群二维码 window in its real Electron form.
 7. **A real microphone** for voice notes (only the fake device was measured), and Electron 45's
    `AudioEncoder` opus support (measured on Edge 157 only).
-8. **Mini Apps against a real bot** — the window, bridge, theme events, close, 举报 and every
-   entry point are mock/CDP-verified (2026-11-26), and the three TDLib requests are pinned by
-   `actions/webapp.test.ts`; what is missing is one real signed URL (a bot with a Web App,
-   test DC or a disposable account) proving `getWebAppUrl` / `openWebApp` /
-   `getWebAppLinkUrl` and `sendWebAppData` against the installed TDLib build.
+8. **Mini Apps' remaining real-bot surfaces** — ExViewer's real `openWebApp` signed URL now
+   opens, mounts and routes in the guest (2026-11-26); `actions/webapp.test.ts` pins the TDLib
+   open and CloudStorage custom-request shapes. Native controls and CloudStorage are
+   mock/CDP-verified, and Windows Hello passed on this machine. Still missing against a real bot:
+   `sendWebAppData`, a real CloudStorage round-trip and the reply-keyboard / profile-menu /
+   `t.me` link entry points.
 
 ### 9.2 Functional gaps, in a sensible order
 

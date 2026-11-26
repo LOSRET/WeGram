@@ -4,6 +4,7 @@ import { bootStateSchema } from './boot'
 import { chatOpSchema } from './chat'
 import { authStateSchema, connectionStateSchema, userAvatarSchema } from './dto'
 import { messageOpSchema } from './message-ops'
+import { miniAppControlsSchema } from './miniapp'
 import { peerStatusSchema } from './presence'
 import { messageTextSizeSchema, proxyStateSchema, sendKeySchema } from './settings'
 import { appErrorSchema } from './errors'
@@ -67,6 +68,8 @@ export const eventChannels = [
    * (design doc §9.4) — the same `users:report` flow the 资料卡 uses.
    */
   'evt:report',
+  /** Native Mini App chrome changed; only the `#miniapp` host renderer draws it. */
+  'evt:miniappControls',
   /**
    * 数据与存储 deleted cached files (清理缓存, or 缓存上限 trimming). Every
    * `wx-media://` URL the shell cached may point into a file that no longer
@@ -128,6 +131,7 @@ export const eventSchemas = {
     }),
   ),
   'evt:report': envelope(z.object({ userId: z.number().int().positive() })),
+  'evt:miniappControls': envelope(miniAppControlsSchema),
   'evt:error': envelope(appErrorSchema),
   'evt:proxy': envelope(proxyStateSchema),
 } satisfies Record<EventChannel, z.ZodType>

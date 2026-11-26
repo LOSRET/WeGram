@@ -13,8 +13,15 @@ import type { ActionDeps } from './actions'
  */
 export function createMiniAppApi(getDeps: () => ActionDeps) {
   return {
-    openMiniApp: async (input: MiniAppOpenRequest): Promise<MiniAppLaunch> =>
-      actions.openMiniApp(getDeps(), input),
+    openMiniApp: async (
+      input: MiniAppOpenRequest,
+      theme: 'light' | 'dark',
+    ): Promise<MiniAppLaunch> => actions.openMiniApp(getDeps(), input, theme),
+    invokeWebAppCustomRequest: async (input: {
+      botUserId: number
+      method: string
+      parameters: string
+    }): Promise<unknown> => actions.invokeMiniAppCustomRequest(getDeps(), input),
     closeMiniApp: async (launchId?: string): Promise<void> =>
       actions.closeMiniApp(getDeps(), launchId),
     sendMiniAppData: async (input: {

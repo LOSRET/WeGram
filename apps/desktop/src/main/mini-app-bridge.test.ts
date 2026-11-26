@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   handleMiniAppEvent,
-  miniAppThemeParams,
   parseMiniAppEvent,
   parseMiniAppPopup,
   type MiniAppBridgeHost,
@@ -17,6 +16,31 @@ function host() {
   const requestViewport = vi.fn()
   const setClosingConfirmation = vi.fn()
   const showPopup = vi.fn()
+  const setupMainButton = vi.fn()
+  const setupSecondaryButton = vi.fn()
+  const setupBackButton = vi.fn()
+  const setupSettingsButton = vi.fn()
+  const setBottomBarColor = vi.fn()
+  const invokeCustomMethod = vi.fn(async () => true)
+  const biometryInfo = vi.fn(async () => ({
+    available: false,
+    type: 'unknown' as const,
+    accessRequested: false,
+    accessGranted: false,
+    tokenSaved: false,
+    deviceId: 'device-1',
+  }))
+  const biometryRequestAccess = vi.fn(async () => ({
+    available: false,
+    type: 'unknown' as const,
+    accessRequested: true,
+    accessGranted: false,
+    tokenSaved: false,
+    deviceId: 'device-1',
+  }))
+  const biometryAuthenticate = vi.fn(async () => ({ status: 'failed' as const }))
+  const biometryUpdateToken = vi.fn(async () => ({ status: 'failed' as const }))
+  const biometryOpenSettings = vi.fn()
   const unhandled = vi.fn()
   const bridge: MiniAppBridgeHost = {
     receive,
@@ -27,6 +51,17 @@ function host() {
     requestViewport,
     setClosingConfirmation,
     showPopup,
+    setupMainButton,
+    setupSecondaryButton,
+    setupBackButton,
+    setupSettingsButton,
+    setBottomBarColor,
+    invokeCustomMethod,
+    biometryInfo,
+    biometryRequestAccess,
+    biometryAuthenticate,
+    biometryUpdateToken,
+    biometryOpenSettings,
     unhandled,
   }
   return {
@@ -38,6 +73,17 @@ function host() {
     requestViewport,
     setClosingConfirmation,
     showPopup,
+    setupMainButton,
+    setupSecondaryButton,
+    setupBackButton,
+    setupSettingsButton,
+    setBottomBarColor,
+    invokeCustomMethod,
+    biometryInfo,
+    biometryRequestAccess,
+    biometryAuthenticate,
+    biometryUpdateToken,
+    biometryOpenSettings,
     unhandled,
   }
 }
@@ -99,20 +145,95 @@ describe('parseMiniAppPopup', () => {
   })
 })
 
-describe('miniAppThemeParams', () => {
-  it('turns the app theme into the SDK colour keys', () => {
-    expect(miniAppThemeParams('dark')).toMatchObject({
-      bg_color: '#1e1e1f',
-      button_color: '#2ea6ff',
-    })
-    expect(miniAppThemeParams('light')).toMatchObject({
-      bg_color: '#ffffff',
-      button_color: '#07c160',
+describe('handleMiniAppEvent', () => {
+  it('forwards native-button setup patches without treating them as clicks', () => {
+    const h = host()
+    handleMiniAppEvent('web_app_setup_main_button', { text: 'Save', is_visible: true }, h.bridge)
+    handleMiniAppEvent(
+      'web_app_setup_secondary_button',
+      { text: 'Cancel', position: 'top' },
+      h.bridge,
+    )
+    handleMiniAppEvent('web_app_setup_back_button', { is_visible: true }, h.bridge)
+    handleMiniAppEvent('web_app_setup_settings_button', { is_visible: true }, h.bridge)
+    handleMiniAppEvent('web_app_set_bottom_bar_color', { color: '#112233' }, h.bridge)
+
+    expect(h.setupMainButton).toHaveBeenCalledWith({ text: 'Save', is_visible: true })
+    expect(h.setupSecondaryButton).toHaveBeenCalledWith({ text: 'Cancel', position: 'top' })
+    expect(h.setupBackButton).toHaveBeenCalledWith({ is_visible: true })
+    expect(h.setupSettingsButton).toHaveBeenCalledWith({ is_visible: true })
+    expect(h.setBottomBarColor).toHaveBeenCalledWith({ color: '#112233' })
+    expect(h.receive).not.toHaveBeenCalled()
+  })
+
+  it('round-trips a CloudStorage custom method with its request id', async () => {
+    const h = host()
+    await handleMiniAppEvent(
+      'web_app_invoke_custom_method',
+      {
+        req_id: 'storage-1',
+        method: 'saveStorageValue',
+        params: { key: 'theme', value: 'dark' },
+      },
+      h.bridge,
+    )
+
+    expect(h.invokeCustomMethod).toHaveBeenCalledWith(
+      'saveStorageValue',
+      '{"key":"theme","value":"dark"}',
+    )
+    expect(h.receive).toHaveBeenCalledWith('custom_method_invoked', {
+      req_id: 'storage-1',
+      result: true,
     })
   })
-})
 
-describe('handleMiniAppEvent', () => {
+  it('refuses unknown custom methods without forwarding them', async () => {
+    const h = host()
+    await handleMiniAppEvent(
+      'web_app_invoke_custom_method',
+      { req_id: 'storage-2', method: 'deleteEverything', params: {} },
+      h.bridge,
+    )
+    expect(h.invokeCustomMethod).not.toHaveBeenCalled()
+    expect(h.receive).toHaveBeenCalledWith('custom_method_invoked', {
+      req_id: 'storage-2',
+      error: 'Invalid CloudStorage request',
+    })
+  })
+
+  it('maps biometry info, auth and token results to the official events', async () => {
+    const h = host()
+    await handleMiniAppEvent('web_app_biometry_get_info', {}, h.bridge)
+    expect(h.receive).toHaveBeenLastCalledWith('biometry_info_received', {
+      available: false,
+      type: 'unknown',
+      access_requested: false,
+      access_granted: false,
+      token_saved: false,
+      device_id: 'device-1',
+    })
+
+    await handleMiniAppEvent(
+      'web_app_biometry_request_auth',
+      { reason: '  Unlock the gallery  ' },
+      h.bridge,
+    )
+    expect(h.biometryAuthenticate).toHaveBeenCalledWith('Unlock the gallery')
+    expect(h.receive).toHaveBeenLastCalledWith('biometry_auth_requested', { status: 'failed' })
+
+    await handleMiniAppEvent('web_app_biometry_update_token', { token: 'secret' }, h.bridge)
+    expect(h.biometryUpdateToken).toHaveBeenCalledWith('secret')
+    expect(h.receive).toHaveBeenLastCalledWith('biometry_token_updated', { status: 'failed' })
+  })
+
+  it('opens platform biometric settings without inventing a success response', () => {
+    const h = host()
+    handleMiniAppEvent('web_app_biometry_open_settings', {}, h.bridge)
+    expect(h.biometryOpenSettings).toHaveBeenCalledOnce()
+    expect(h.receive).not.toHaveBeenCalled()
+  })
+
   it('answers a theme request with the current theme', () => {
     const h = host()
     handleMiniAppEvent('web_app_request_theme', {}, h.bridge)
@@ -143,7 +264,10 @@ describe('handleMiniAppEvent', () => {
     expect(h.openExternal).toHaveBeenNthCalledWith(1, 'https://example.com/x')
     expect(h.openExternal).toHaveBeenNthCalledWith(2, 'https://t.me/ada_lovelace/7')
     expect(h.showPopup).toHaveBeenCalledWith(
-      expect.objectContaining({ message: '继续吗？', buttons: [expect.objectContaining({ id: 'yes' })] }),
+      expect.objectContaining({
+        message: '继续吗？',
+        buttons: [expect.objectContaining({ id: 'yes' })],
+      }),
     )
   })
 

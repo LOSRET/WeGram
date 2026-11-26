@@ -66,16 +66,28 @@ const DEMO_PAGE = `<!doctype html>
     function post(type, data) {
       try { window.TelegramWebviewProxy && window.TelegramWebviewProxy.postEvent(type, JSON.stringify(data || {})); } catch (e) {}
     }
-    window.Telegram = { WebApp: {
-      ready: function () { post('web_app_ready'); },
-      expand: function () { post('web_app_expand'); },
-      close: function () { post('web_app_close'); },
-      sendData: function (data) { post('web_app_data_send', { data: String(data) }); },
-      initData: (location.hash || '').replace(/^#/, ''),
-      themeParams: {},
-      version: '6.0',
-      platform: 'wegram'
-    } };
+    window.Telegram = {
+      WebApp: {
+        ready: function () { post('web_app_ready'); },
+        expand: function () { post('web_app_expand'); },
+        close: function () { post('web_app_close'); },
+        sendData: function (data) { post('web_app_data_send', { data: String(data) }); },
+        initData: (location.hash || '').replace(/^#/, ''),
+        themeParams: {},
+        version: '9.6',
+        platform: 'tdesktop'
+      },
+      WebView: {
+        receiveEvent: function (type) {
+          if (type === 'main_button_pressed') say('已点击主按钮');
+          if (type === 'secondary_button_pressed') say('已点击次要按钮');
+          if (type === 'back_button_pressed') say('已点击返回按钮');
+          if (type === 'settings_button_pressed') say('已点击设置项');
+          if (type === 'custom_method_invoked') say('CloudStorage 请求已完成');
+          if (type === 'biometry_info_received') say('Biometry 桥接已响应');
+        }
+      }
+    };
     var toast = document.getElementById('toast');
     function say(text) { toast.textContent = text; toast.classList.add('on'); setTimeout(function () { toast.classList.remove('on'); }, 1600); }
     document.getElementById('go').addEventListener('click', function () { say('这是演示页面，搜索不会发出请求'); });
@@ -83,6 +95,13 @@ const DEMO_PAGE = `<!doctype html>
     document.getElementById('send').addEventListener('click', function () { window.Telegram.WebApp.sendData(JSON.stringify({ demo: true, at: Date.now() })); say('已通过 WebApp.sendData 发送'); });
     window.Telegram.WebApp.ready();
     window.Telegram.WebApp.expand();
+    post('web_app_setup_main_button', { text: '发送数据给机器人', is_visible: true, color: '#07c160', text_color: '#ffffff' });
+    post('web_app_setup_secondary_button', { text: '取消', is_visible: true, position: 'top', color: '#f5f5f5', text_color: '#2481cc' });
+    post('web_app_setup_back_button', { is_visible: true });
+    post('web_app_setup_settings_button', { is_visible: true });
+    post('web_app_set_bottom_bar_color', { color: '#eef2f7' });
+    post('web_app_invoke_custom_method', { req_id: 'mock-storage-1', method: 'saveStorageValue', params: { key: 'demo', value: 'ready' } });
+    post('web_app_biometry_get_info', {});
   </script>
 </body></html>`
 

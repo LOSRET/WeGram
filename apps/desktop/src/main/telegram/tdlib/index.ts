@@ -453,6 +453,7 @@ export class TdlibAdapter extends AdapterEmitter implements TelegramAdapter {
   /** Mini Apps (Web Apps): signed URLs and `WebApp.sendData`; `webapp-api.ts`. */
   private readonly miniAppApi = createMiniAppApi(() => this.actionDeps)
   readonly openMiniApp = this.miniAppApi.openMiniApp
+  readonly invokeWebAppCustomRequest = this.miniAppApi.invokeWebAppCustomRequest
   readonly closeMiniApp = this.miniAppApi.closeMiniApp
   readonly sendMiniAppData = this.miniAppApi.sendMiniAppData
 

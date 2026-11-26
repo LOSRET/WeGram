@@ -10,26 +10,28 @@ import type {
 
 import type { TdObject } from '../client'
 import { asArray } from '../json'
-import { botText } from '../map/user'
+import { botMenuButtonOf, botText } from '../map/user'
 import { mapInlineResults } from '../map/inline'
 import { mapMessage } from '../map/message'
 import { replyTo, topicRef } from './message-input'
 import type { ActionDeps } from './deps'
 
 /**
- * The bot half of the protocol: the commands a bot publishes and pressing one of
- * its inline buttons.
+ * The bot half of the protocol: the commands a bot publishes (with the Web App
+ * menu that feeds the composer's 小程序 button) and pressing one of its inline
+ * buttons.
  *
- * Both are ordinary TDLib requests over local data — the command list lives in
- * `userFullInfo.bot_info`, and a callback button's payload is already in the
- * message — so neither needs a network round trip before it is sent.
+ * Both are ordinary TDLib requests over local data — the command list and menu
+ * live in `userFullInfo.bot_info`, and a callback button's payload is already in
+ * the message — so neither needs a network round trip before it is sent.
  */
 
 /** A chat that is not a private chat with a bot: the composer draws no list. */
 const NO_BOT: BotCommandsAnswer = { isBot: false, commands: [] }
 
 /**
- * The commands the chat's bot publishes (`botInfo.commands`).
+ * The commands the chat's bot publishes (`botInfo.commands`), plus the Web App
+ * menu (`botInfo.menu_button`) the composer draws as 小程序.
  *
  * TDLib splits this over three objects: the chat says whether it is private, the
  * user's `type` says whether that person is a bot, and the full info carries the
@@ -57,10 +59,13 @@ export async function botCommands(
   const commands = asArray<TdObject>(full?.bot_info?.commands)
     .map(commandOf)
     .filter((command): command is BotCommand => command !== null)
+  const menu = botMenuButtonOf(full?.bot_info?.menu_button)
   return {
     isBot: true,
+    botUserId: userId,
     commands,
     description: botText(full?.bot_info?.description) ?? '',
+    ...(menu ? { menu } : {}),
   }
 }
 

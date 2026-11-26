@@ -10,6 +10,8 @@ asarUnpack:
   # tdjson.dll cannot be LoadLibrary'd from inside app.asar (RESULTS.md, conclusion 1)
   - '**/node_modules/@prebuilt-tdlib/**'
   - '**/node_modules/prebuilt-tdlib/**'
+  # Windows Hello's native addon cannot be loaded from inside app.asar.
+  - '**/node_modules/win-hello/**'
 win:
   target:
     - nsis

@@ -333,9 +333,10 @@ export interface TelegramAdapter {
    */
   reportMessage(input: InvokeRequest<'messages:report'>): Promise<ChatReport>
   /**
-   * The commands the chat's bot publishes (TDLib `botInfo.commands`), for the
-   * composer's "/" list. Only a private chat with a bot has any: anything else
-   * answers `{ isBot: false, commands: [] }`, and the composer then draws no list.
+   * The commands the chat's bot publishes (TDLib `botInfo.commands`) and its
+   * optional Web App menu, for the composer's "/" list and 小程序 button. Only a
+   * private chat with a bot has any: anything else answers
+   * `{ isBot: false, commands: [] }`, and the composer then draws neither.
    */
   botCommands(chatId: number): Promise<BotCommandsAnswer>
   /**
@@ -364,9 +365,21 @@ export interface TelegramAdapter {
    * button / menu button asks `openWebApp`, a `t.me` link asks
    * `getWebAppLinkUrl`); the adapter hides that difference and answers the URL
    * plus the bot's name for the window's strip. The URL is signed for this
-   * account and must never cross IPC.
+   * account and must never cross IPC. The current app theme is main-process
+   * context: TDLib signs it into the launch parameters as `tgWebAppThemeParams`.
    */
-  openMiniApp(input: MiniAppOpenRequest): Promise<MiniAppLaunch>
+  openMiniApp(input: MiniAppOpenRequest, theme: 'light' | 'dark'): Promise<MiniAppLaunch>
+  /**
+   * CloudStorage's reserved custom methods (`saveStorageValue`, `getStorageValues`,
+   * `deleteStorageValues`, `getStorageKeys`) travel through TDLib's generic
+   * `sendWebAppCustomRequest`. The bridge validates the method and parameters;
+   * the adapter returns the decoded JSON result.
+   */
+  invokeWebAppCustomRequest(input: {
+    botUserId: number
+    method: string
+    parameters: string
+  }): Promise<unknown>
   /**
    * Tells TDLib that a Mini App opened through `openWebApp` was closed, so the
    * bot's launch can be released (`closeWebApp`). A keyboard-button launch has

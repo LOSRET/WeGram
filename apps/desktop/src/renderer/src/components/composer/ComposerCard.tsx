@@ -19,6 +19,7 @@ import {
   EmojiIcon,
   FolderIcon,
   MicIcon,
+  MiniProgramIcon,
   ScissorsIcon,
   VoiceMessageIcon,
 } from '../Icon'
@@ -51,6 +52,14 @@ export interface ComposerCardProps {
   onRecordingChange?: (recording: boolean) => void
   /** A toolbar entry with no protocol behind it yet (收藏 / 截图 / 语音). */
   onNotice: (label: string) => void
+  /**
+   * 小程序 (§9.4.1): the bot's Mini App menu. When present, the card draws the
+   * WeChat mark to the right of 语音转文字; the caller owns the launch.
+   */
+  miniApp?: { text: string; url: string }
+  onOpenMiniApp?: () => void
+  /** A launch is in flight: disables only the 小程序 button. */
+  miniAppBusy?: boolean
   /** A channel's way back to the 服务号 bar; absent everywhere else. */
   onCollapse?: () => void
   /** The box lost focus: a chat cancels its 对方正在输入 ping here. */
@@ -83,6 +92,9 @@ export function ComposerCard({
   onSendVoice,
   onRecordingChange,
   onNotice,
+  miniApp,
+  onOpenMiniApp,
+  miniAppBusy = false,
   onCollapse,
   onBlur,
 }: ComposerCardProps) {
@@ -220,6 +232,21 @@ export function ComposerCard({
             >
               <MicIcon size={20} />
             </button>
+            {/*
+              小程序 (§9.4.1): only a bot that publishes a Web App menu has one,
+              so the mark appears to the right of 语音转文字 in that chat alone.
+            */}
+            {miniApp && onOpenMiniApp ? (
+              <button
+                className="wx-tool-button wx-tool-button--miniapp"
+                onClick={onOpenMiniApp}
+                disabled={toolsDisabled || miniAppBusy}
+                title="小程序"
+                aria-label="小程序"
+              >
+                <MiniProgramIcon size={21} />
+              </button>
+            ) : null}
           </div>
 
           {onCollapse ? (

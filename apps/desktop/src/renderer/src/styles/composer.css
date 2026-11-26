@@ -374,6 +374,14 @@
   color: var(--wx-text);
 }
 
+/* 小程序 (design doc §9.4.1): the one tool with a brand tint, because it opens
+   the bot's Mini App rather than acting on the message. Both selectors carry
+   the hover rule's specificity, so hovering does not turn the mark grey. */
+.wx-tool-button.wx-tool-button--miniapp,
+.wx-tool-button.wx-tool-button--miniapp:hover:not(:disabled) {
+  color: var(--wx-miniapp);
+}
+
 .wx-tool-button:disabled {
   opacity: 0.35;
   cursor: default;

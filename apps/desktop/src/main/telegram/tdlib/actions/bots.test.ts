@@ -4,7 +4,7 @@ import type { TdObject } from '../client'
 import { botCommands } from './bots'
 
 /** The bot-info lookup behind both the "/" menu and the first-open screen. */
-function botDeps(description: unknown) {
+function botDeps(description: unknown, menuButton?: TdObject) {
   return {
     invoke: async (method: TdObject): Promise<unknown> => {
       if (method._ === 'getChat') {
@@ -16,6 +16,7 @@ function botDeps(description: unknown) {
           bot_info: {
             description,
             commands: [{ command: 'start', description: '开始' }],
+            ...(menuButton ? { menu_button: menuButton } : {}),
           },
         }
       }
@@ -28,6 +29,7 @@ describe('botCommands', () => {
   it('carries the empty-chat introduction together with the command list', async () => {
     await expect(botCommands(botDeps('你好，我是机器人。'), 13)).resolves.toEqual({
       isBot: true,
+      botUserId: 26,
       commands: [{ command: 'start', description: '开始' }],
       description: '你好，我是机器人。',
     })
@@ -44,5 +46,24 @@ describe('botCommands', () => {
       isBot: true,
       description: '',
     })
+  })
+
+  it('carries the Web App menu that the composer opens as 小程序', async () => {
+    const menuButton = {
+      _: 'botMenuButton',
+      text: ' 打开小程序 ',
+      url: ' https://w.test/app ',
+    }
+    await expect(botCommands(botDeps('', menuButton), 13)).resolves.toMatchObject({
+      isBot: true,
+      botUserId: 26,
+      menu: { text: '打开小程序', url: 'https://w.test/app' },
+    })
+  })
+
+  it('leaves the command/default menu kinds out of the answer', async () => {
+    await expect(
+      botCommands(botDeps('', { _: 'botMenuButtonCommands' }), 13),
+    ).resolves.not.toHaveProperty('menu')
   })
 })

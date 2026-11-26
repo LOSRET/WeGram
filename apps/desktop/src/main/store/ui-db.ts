@@ -9,6 +9,12 @@ export interface DraftRecord {
   replyTo?: number
 }
 
+export interface MiniAppBiometryRecord {
+  accessRequested: boolean
+  accessGranted: boolean
+  tokenSealed: string | null
+}
+
 const logger = createLogger('ui-db')
 
 /** `app_settings` key of the 图片和视频 window's level (design doc §9.5). */
@@ -110,6 +116,17 @@ CREATE TABLE IF NOT EXISTS topic_ui_state (
 CREATE TABLE IF NOT EXISTS app_settings (
   k TEXT PRIMARY KEY,
   v TEXT NOT NULL
+);
+
+-- Mini App biometric consent and the DPAPI-sealed token, isolated by the
+-- signed-in user and bot. The raw token never reaches this database.
+CREATE TABLE IF NOT EXISTS miniapp_biometry (
+  user_id          INTEGER NOT NULL,
+  bot_user_id      INTEGER NOT NULL,
+  access_requested INTEGER NOT NULL DEFAULT 0,
+  access_granted   INTEGER NOT NULL DEFAULT 0,
+  token_sealed     TEXT,
+  PRIMARY KEY (user_id, bot_user_id)
 );
 
 CREATE TABLE IF NOT EXISTS media_cache (
@@ -316,6 +333,48 @@ export class UiDatabase {
         `INSERT INTO app_settings (k, v) VALUES (?, ?)
          ON CONFLICT(k) DO UPDATE SET v = excluded.v`,
       ).run(key, value)
+    })
+  }
+
+  getMiniAppBiometry(userId: number, botUserId: number): MiniAppBiometryRecord {
+    const row = this.require()
+      .prepare(
+        `SELECT access_requested, access_granted, token_sealed
+         FROM miniapp_biometry WHERE user_id = ? AND bot_user_id = ?`,
+      )
+      .get(userId, botUserId) as
+      { access_requested: number; access_granted: number; token_sealed: string | null } | undefined
+    return {
+      accessRequested: row?.access_requested === 1,
+      accessGranted: row?.access_granted === 1,
+      tokenSealed: row?.token_sealed ?? null,
+    }
+  }
+
+  setMiniAppBiometryAccess(
+    userId: number,
+    botUserId: number,
+    access: { requested: boolean; granted: boolean },
+  ): void {
+    this.write((db) => {
+      db.prepare(
+        `INSERT INTO miniapp_biometry (user_id, bot_user_id, access_requested, access_granted)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(user_id, bot_user_id) DO UPDATE SET
+           access_requested = excluded.access_requested,
+           access_granted = excluded.access_granted`,
+      ).run(userId, botUserId, access.requested ? 1 : 0, access.granted ? 1 : 0)
+    })
+  }
+
+  /** `tokenSealed: null` removes the token; callers seal before writing. */
+  setMiniAppBiometryToken(userId: number, botUserId: number, tokenSealed: string | null): void {
+    this.write((db) => {
+      db.prepare(
+        `INSERT INTO miniapp_biometry (user_id, bot_user_id, token_sealed)
+         VALUES (?, ?, ?)
+         ON CONFLICT(user_id, bot_user_id) DO UPDATE SET token_sealed = excluded.token_sealed`,
+      ).run(userId, botUserId, tokenSealed)
     })
   }
 

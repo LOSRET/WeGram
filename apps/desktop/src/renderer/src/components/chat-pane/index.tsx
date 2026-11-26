@@ -630,6 +630,7 @@ export function ChatPane() {
       ) : !topicsOpen && (!isChannel || (canPost && channelInputOpen)) ? (
         <Composer
           chatId={activeChatId}
+          isPrivateChat={chat.kind === 'private'}
           topicId={topicId}
           replyTo={replyTo}
           editing={editingForChat}

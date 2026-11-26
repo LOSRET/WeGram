@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 
-import type { MiniAppState } from '@wegram/protocol'
+import type { MiniAppPressRequest, MiniAppState } from '@wegram/protocol'
 import { AppError } from '@wegram/protocol'
 import { BrowserWindow, dialog, ipcMain, Menu, shell, WebContentsView } from 'electron'
 
@@ -13,11 +13,19 @@ import {
 } from './app-window'
 import {
   handleMiniAppEvent,
-  miniAppThemeParams,
   parseMiniAppEvent,
   type MiniAppBridgeHost,
   type MiniAppPopup,
 } from './mini-app-bridge'
+import {
+  applyBottomBarColor,
+  applyBottomButtonPatch,
+  applyVisibilityPatch,
+  defaultMiniAppControls,
+  withActionBarHeight,
+} from './mini-app-controls'
+import type { MiniAppBiometryService } from './mini-app-biometry'
+import { miniAppThemeParams } from './mini-app-theme'
 import { createLogger } from './util'
 
 const logger = createLogger('miniapp')
@@ -38,8 +46,10 @@ export interface MiniAppWindowTarget {
   url: string
   /** TDLib `openWebApp.launch_id`, released when the window goes away. */
   launchId?: string
-  /** Whose Mini App this is: `WebApp.sendData` and 举报 need it. */
+  /** Whose Mini App this is: `WebApp.sendData`, storage and 举报 need it. */
   botUserId: number
+  /** The signed-in account; storage and biometric tokens are user-scoped. */
+  userId: number
   /** The button that opened it: TDLib `sendWebAppData.button_text`. */
   buttonText: string
 }
@@ -50,6 +60,14 @@ export interface MiniAppWindowDeps {
   releaseLaunch: (launchId?: string) => Promise<void>
   /** Posts `WebApp.sendData` back to the bot (`sendWebAppData`). */
   sendData: (input: { botUserId: number; buttonText: string; data: string }) => Promise<void>
+  /** CloudStorage's reserved methods through TDLib's custom-request seam. */
+  invokeCustomMethod: (input: {
+    botUserId: number
+    method: string
+    parameters: string
+  }) => Promise<unknown>
+  /** Windows Hello consent, verification and DPAPI-sealed token storage. */
+  biometry: MiniAppBiometryService
   /** 举报 from the ⋮ menu: the shell opens its own report sheet. */
   onReport: (userId: number) => void
 }
@@ -67,6 +85,11 @@ let deps: MiniAppWindowDeps | null = null
 /** `WebApp.setClosingConfirmation`: the ×/Alt+F4 asks before it discards state. */
 let confirmsClosing = false
 let confirming = false
+/** Native chrome requested by the current guest; a new launch resets it. */
+let controls = defaultMiniAppControls()
+let controlsSeq = 0
+/** Invalidates async popup/storage/biometry responses across retarget and reload. */
+let miniAppSession = 0
 /** Set while `closeMiniAppWindow` tears the window down, so `close` skips the prompt. */
 let forceClosing = false
 
@@ -89,6 +112,9 @@ export function openMiniAppWindow(target: MiniAppWindowTarget, next: MiniAppWind
   // A new page has its own closing behaviour; the previous app's must not leak.
   confirmsClosing = false
   confirming = false
+  controls = defaultMiniAppControls()
+  controlsSeq = 0
+  miniAppSession += 1
   const previous = opened
   opened = { target, theme: next.theme }
 
@@ -178,6 +204,7 @@ export function openMiniAppWindow(target: MiniAppWindowTarget, next: MiniAppWind
     miniAppWindow = null
     opened = null
     deps = null
+    miniAppSession += 1
     forceClosing = false
     confirmsClosing = false
     destroyGuest()
@@ -200,7 +227,7 @@ export function getMiniAppWindow(): BrowserWindow | null {
 /** What `miniapp:init` answers. Only the strip calls it. */
 export function miniAppWindowState(): MiniAppState {
   if (!opened) throw new AppError('internal', '小程序窗口没有打开任何小程序')
-  return { title: opened.target.title, theme: opened.theme }
+  return { title: opened.target.title, theme: opened.theme, controls }
 }
 
 /**
@@ -210,6 +237,27 @@ export function miniAppWindowState(): MiniAppState {
  */
 export function requestMiniAppClose(): void {
   getMiniAppWindow()?.close()
+}
+
+/** A native control was pressed; the guest owns the resulting navigation/action. */
+export function pressMiniAppControl(target: MiniAppPressRequest['target']): void {
+  if (target === 'main') {
+    if (!controls.main.isVisible || !controls.main.isActive) return
+    receiveInPage('main_button_pressed')
+    return
+  }
+  if (target === 'secondary') {
+    if (!controls.secondary.isVisible || !controls.secondary.isActive) return
+    receiveInPage('secondary_button_pressed')
+    return
+  }
+  if (target === 'back') {
+    if (!controls.backVisible) return
+    receiveInPage('back_button_pressed')
+    return
+  }
+  if (!controls.settingsVisible) return
+  receiveInPage('settings_button_pressed')
 }
 
 /** The shell's close / 退出登录 / quit take the Mini App window with them. */
@@ -233,6 +281,10 @@ export function setMiniAppTheme(theme: 'light' | 'dark'): void {
 export function reloadMiniApp(): void {
   const win = getMiniAppWindow()
   if (!win || !opened) return
+  controls = defaultMiniAppControls()
+  controlsSeq += 1
+  miniAppSession += 1
+  commitControls()
   void guest?.webContents.loadURL(opened.target.url)
 }
 
@@ -242,6 +294,9 @@ export function showMiniAppMenu(anchor: { x: number; y: number }): void {
   if (!win) return
   const menu = Menu.buildFromTemplate([
     { label: '重载页面', click: reloadMiniApp },
+    ...(controls.settingsVisible
+      ? [{ label: '设置', click: () => pressMiniAppControl('settings') }]
+      : []),
     { type: 'separator' },
     { label: '使用条款', click: () => openExternal(TELEGRAM_TERMS) },
     { label: '隐私政策', click: () => openExternal(TELEGRAM_PRIVACY) },
@@ -270,13 +325,22 @@ ipcMain.on('miniapp:event', (event, raw: unknown) => {
   if (!guest || event.sender !== guest.webContents) return
   const payload = parseMiniAppEvent(raw)
   if (!payload) return
-  handleMiniAppEvent(payload.eventType, payload.eventData, bridgeHost())
+  void Promise.resolve(
+    handleMiniAppEvent(payload.eventType, payload.eventData, bridgeHost()),
+  ).catch((error: unknown) => {
+    logger.warn('guest event failed:', error instanceof Error ? error.message : error)
+  })
 })
 
 /** The effects the page's events reach; the window owns every one of them. */
 function bridgeHost(): MiniAppBridgeHost {
+  const requestGuest = guest
+  const requestSession = miniAppSession
   return {
-    receive: receiveInPage,
+    receive: (eventType, eventData) => {
+      if (guest !== requestGuest || miniAppSession !== requestSession) return
+      receiveInPage(eventType, eventData)
+    },
     close: () => getMiniAppWindow()?.close(),
     sendData: (data) => {
       if (!opened || !deps) return
@@ -290,6 +354,37 @@ function bridgeHost(): MiniAppBridgeHost {
           logger.warn('WebApp.sendData failed:', error instanceof Error ? error.message : error)
         })
     },
+    invokeCustomMethod: async (method, parameters) => {
+      if (!opened || !deps) throw new Error('Mini App is no longer open')
+      return deps.invokeCustomMethod({ botUserId: opened.target.botUserId, method, parameters })
+    },
+    biometryInfo: async () => {
+      if (!opened || !deps) throw new Error('Mini App is no longer open')
+      return deps.biometry.info(opened.target.userId, opened.target.botUserId)
+    },
+    biometryRequestAccess: async (reason) => {
+      if (!opened || !deps) throw new Error('Mini App is no longer open')
+      return deps.biometry.requestAccess(
+        opened.target.userId,
+        opened.target.botUserId,
+        reason,
+        getMiniAppWindow(),
+      )
+    },
+    biometryAuthenticate: async (reason) => {
+      if (!opened || !deps) throw new Error('Mini App is no longer open')
+      return deps.biometry.authenticate(
+        opened.target.userId,
+        opened.target.botUserId,
+        reason,
+        getMiniAppWindow(),
+      )
+    },
+    biometryUpdateToken: async (token) => {
+      if (!opened || !deps) throw new Error('Mini App is no longer open')
+      return deps.biometry.updateToken(opened.target.userId, opened.target.botUserId, token)
+    },
+    biometryOpenSettings: () => deps?.biometry.openSettings(),
     theme: () => opened?.theme ?? 'light',
     openExternal,
     requestViewport: () => {
@@ -300,14 +395,58 @@ function bridgeHost(): MiniAppBridgeHost {
       confirmsClosing = needed
     },
     showPopup,
+    setupMainButton: (patch) => {
+      controls = withActionBarHeight({
+        ...controls,
+        main: applyBottomButtonPatch(controls.main, patch),
+      })
+      commitControls()
+    },
+    setupSecondaryButton: (patch) => {
+      controls = withActionBarHeight({
+        ...controls,
+        secondary: applyBottomButtonPatch(controls.secondary, patch),
+      })
+      commitControls()
+    },
+    setupBackButton: (patch) => {
+      controls = { ...controls, backVisible: applyVisibilityPatch(controls.backVisible, patch) }
+      commitControls()
+    },
+    setupSettingsButton: (patch) => {
+      controls = {
+        ...controls,
+        settingsVisible: applyVisibilityPatch(controls.settingsVisible, patch),
+      }
+      commitControls()
+    },
+    setBottomBarColor: (patch) => {
+      controls = {
+        ...controls,
+        bottomBarColor: applyBottomBarColor(patch, controls.bottomBarColor),
+      }
+      commitControls()
+    },
     unhandled: (eventType) => logger.info(`guest event not handled: ${eventType}`),
   }
+}
+
+/** Native chrome changed: only the Mini App host renderer receives this sequence. */
+function commitControls(): void {
+  controlsSeq += 1
+  const win = getMiniAppWindow()
+  if (!win) return
+  win.webContents.send('evt:miniappControls', { seq: controlsSeq, payload: controls })
+  layoutGuest(win)
+  sendViewport(win)
 }
 
 /** `WebApp.showPopup`: Electron's native box, answered with `popup_closed`. */
 function showPopup(popup: MiniAppPopup): void {
   const win = getMiniAppWindow()
   if (!win) return
+  const requestGuest = guest
+  const requestSession = miniAppSession
   const cancelId = popup.buttons.findIndex(
     (button) => button.type === 'cancel' || button.type === 'close',
   )
@@ -322,11 +461,13 @@ function showPopup(popup: MiniAppPopup): void {
       ...(cancelId < 0 ? {} : { cancelId }),
     })
     .then(({ response }) => {
+      if (guest !== requestGuest || miniAppSession !== requestSession) return
       const button = popup.buttons[response]
       receiveInPage('popup_closed', button === undefined ? {} : { button_id: button.id })
     })
     .catch((error: unknown) => {
       logger.warn('popup failed:', error instanceof Error ? error.message : error)
+      if (guest !== requestGuest || miniAppSession !== requestSession) return
       receiveInPage('popup_closed', {})
     })
 }
@@ -411,7 +552,7 @@ function layoutGuest(win: BrowserWindow): void {
     x: 0,
     y: MINI_APP_BAR_H,
     width,
-    height: Math.max(0, height - MINI_APP_BAR_H),
+    height: Math.max(0, height - MINI_APP_BAR_H - controls.actionBarHeight),
   })
 }
 
@@ -420,19 +561,20 @@ function sendViewport(win: BrowserWindow): void {
   const size = win.getContentSize()
   const height = size[1] ?? 0
   receiveInPage('viewport_changed', {
-    height: Math.max(0, height - MINI_APP_BAR_H),
+    height: Math.max(0, height - MINI_APP_BAR_H - controls.actionBarHeight),
     is_state_stable: true,
     is_expanded: true,
   })
 }
 
 /** Main -> page, through the door `telegram-web-app.js` documents. */
-function receiveInPage(eventType: string, eventData: unknown): void {
+function receiveInPage(eventType: string, eventData?: unknown): void {
   const view = guest
   if (!view || view.webContents.isDestroyed()) return
+  const dataArgument = eventData === undefined ? '' : `, ${jsString(eventData)}`
   const script = `window.Telegram && window.Telegram.WebView && window.Telegram.WebView.receiveEvent(${jsString(
     eventType,
-  )}, ${jsString(eventData)});`
+  )}${dataArgument});`
   void view.webContents.executeJavaScript(script).catch((error: unknown) => {
     logger.warn(
       `could not deliver ${eventType} to the page:`,
@@ -464,7 +606,7 @@ function originOf(url: string): string {
 }
 
 function jsString(value: unknown): string {
-  return JSON.stringify(value).replace(/</g, '\\u003c')
+  return (JSON.stringify(value) ?? 'null').replace(/</g, '\\u003c')
 }
 
 /** A failed load is still a window: it says so, and ⋮ → 重载页面 retries. */

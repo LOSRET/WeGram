@@ -67,7 +67,11 @@ export default defineConfig({
     ],
     build: {
       rollupOptions: {
-        input: { index: resolve(__dirname, 'src/main/index.ts') },
+        input: {
+          index: resolve(__dirname, 'src/main/index.ts'),
+          // win-hello is synchronous; Mini App biometric prompts run off the main thread.
+          'biometry-worker': resolve(__dirname, 'src/main/biometry-worker.ts'),
+        },
       },
     },
   },

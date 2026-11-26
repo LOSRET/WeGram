@@ -31,6 +31,7 @@ function seeds(): Map<number, FixtureSeed> {
     bot: {
       username: 'wegram_helper',
       description: '你好，我是 WeGram 助手。',
+      menu: { text: '打开小程序', url: 'https://w.test/app' },
       commands: [{ command: 'start', description: '开始' }],
     },
   })
@@ -76,8 +77,10 @@ describe('seed lookups', () => {
     const index = seeds()
     expect(botCommandsAnswer(index.get(13) ?? null)).toEqual({
       isBot: true,
+      botUserId: 26,
       commands: [{ command: 'start', description: '开始' }],
       description: '你好，我是 WeGram 助手。',
+      menu: { text: '打开小程序', url: 'https://w.test/app' },
     })
     expect(botCommandsAnswer(index.get(2) ?? null)).toEqual({ isBot: false, commands: [] })
   })

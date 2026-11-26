@@ -10,6 +10,7 @@ import { closeLoginWindow } from '../login-window'
 import { drop, hold } from '../media/leases'
 import { registerStreamFile } from '../media/registry'
 import { writeVoiceNote } from '../media/voice-file'
+import { createMiniAppBiometry } from '../mini-app-biometry'
 import { resolveProxySecrets, toStoredProxy } from '../proxy'
 import type { ProxyController } from '../proxy-controller'
 import { closeQrWindow, getQrWindow, openQrWindow, qrTarget } from '../qr-window'
@@ -17,6 +18,7 @@ import { instantViewWindowState, openInstantViewWindow } from '../instant-view-w
 import {
   miniAppWindowState,
   openMiniAppWindow,
+  pressMiniAppControl,
   reloadMiniApp,
   requestMiniAppClose,
   showMiniAppMenu,
@@ -123,6 +125,7 @@ export function createHandlers({
   onMediaCleared,
   onReportBot,
 }: HandlerDeps): IpcHandlerMap {
+  const biometry = createMiniAppBiometry(uiDb)
   /**
    * The viewer's own downloads (open / save / copy / reveal) outrank the
    * transcript's background fetches, so the file the reader is acting on wins.
@@ -269,19 +272,25 @@ export function createHandlers({
      * sees the signed URL.
      */
     'miniapp:open': async (payload) => {
-      const launch = await adapter.openMiniApp(payload)
+      const theme = storedTheme(uiDb)
+      const auth = adapter.getAuthState()
+      if (auth.kind !== 'ready') throw new AppError('internal', '登录完成后才能打开小程序')
+      const launch = await adapter.openMiniApp(payload, theme)
       openMiniAppWindow(
         {
           title: launch.title,
           url: launch.url,
           botUserId: launch.botUserId,
+          userId: auth.me.id,
           ...(launch.launchId === undefined ? {} : { launchId: launch.launchId }),
           buttonText: 'buttonText' in payload ? payload.buttonText : '',
         },
         {
-          theme: storedTheme(uiDb),
+          theme,
           releaseLaunch: (launchId) => adapter.closeMiniApp(launchId),
           sendData: (input) => adapter.sendMiniAppData(input),
+          invokeCustomMethod: (input) => adapter.invokeWebAppCustomRequest(input),
+          biometry,
           onReport: (userId) => onReportBot?.(userId),
         },
       )
@@ -290,6 +299,7 @@ export function createHandlers({
     'miniapp:menu': (payload) => showMiniAppMenu(payload),
     'miniapp:reload': () => reloadMiniApp(),
     'miniapp:close': () => requestMiniAppClose(),
+    'miniapp:press': (payload) => pressMiniAppControl(payload.target),
     /** 即时预览: the reader window's target, and the page it draws (design doc §8.9). */
     'web:open': (payload) => {
       openInstantViewWindow(payload, BrowserWindow.getFocusedWindow())

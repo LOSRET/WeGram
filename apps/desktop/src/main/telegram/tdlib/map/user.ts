@@ -89,7 +89,7 @@ function botProfile(user: TdObject, full: TdObject | undefined): BotProfile | un
   })
   const shortDescription = botText(info?.short_description)
   const description = botText(info?.description)
-  const menu = menuButtonOf(info?.menu_button)
+  const menu = botMenuButtonOf(info?.menu_button)
   return {
     ...(shortDescription ? { shortDescription } : {}),
     ...(description ? { description } : {}),
@@ -98,8 +98,14 @@ function botProfile(user: TdObject, full: TdObject | undefined): BotProfile | un
   }
 }
 
-/** A bot's `botMenuButton` as a Web App URL; the command kinds carry none. */
-function menuButtonOf(menu: TdObject | undefined): { text: string; url: string } | undefined {
+/**
+ * A bot's `botMenuButton` as a Web App URL; the command kinds carry none.
+ * Shared by the profile card (`botProfile`) and `bots:commands`, which feeds
+ * the composer's 小程序 button.
+ */
+export function botMenuButtonOf(
+  menu: TdObject | undefined,
+): { text: string; url: string } | undefined {
   if (menu?._ !== 'botMenuButton') return undefined
   const text = typeof menu.text === 'string' ? menu.text.trim() : ''
   const url = typeof menu.url === 'string' ? menu.url.trim() : ''

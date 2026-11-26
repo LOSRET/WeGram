@@ -35,6 +35,12 @@ export interface ComposerEditing {
 
 interface ComposerProps {
   chatId: number
+  /**
+   * A private chat may hold a bot, and a bot may publish a Mini App menu. The
+   * composer asks `bots:commands` on open so the 小程序 button appears without
+   * the reader typing "/" first; a group or channel never pays for that answer.
+   */
+  isPrivateChat: boolean
   /** 话题 (design doc §9.12); `null` posts into the chat itself. */
   topicId: number | null
   replyTo: Message | null
@@ -84,6 +90,7 @@ interface ComposerProps {
  */
 export function Composer({
   chatId,
+  isPrivateChat,
   topicId,
   replyTo,
   editing,
@@ -100,13 +107,20 @@ export function Composer({
 }: ComposerProps) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
+  /** A Mini App launch in flight disables its own button, never the whole box. */
+  const [miniAppBusy, setMiniAppBusy] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   /**
    * 机器人命令: "/" at the start of the box opens the bot's command list
    * (design doc §8.3). The list is derived from the box, never stored, so it
    * closes by itself as soon as the reader types a space or deletes the slash.
    */
-  const { commands: botCommands, load: loadBotCommands } = useBotCommands(chatId)
+  const {
+    commands: botCommands,
+    load: loadBotCommands,
+    menu: botMenu,
+    botUserId,
+  } = useBotCommands(chatId)
   const query = commandQuery(text)
   const matches = useMemo(
     () => (query === null ? [] : filterCommands(botCommands, query)),
@@ -196,10 +210,19 @@ export function Composer({
     setCommandIndex(0)
   }, [query])
 
-  /** The commands are asked for only once the reader starts a command. */
+  /** A group asks for the list only once the reader starts a command. */
   useEffect(() => {
     if (query !== null) loadBotCommands()
   }, [query, loadBotCommands])
+
+  /**
+   * 小程序 (§9.4.1): a private chat may be a bot, and the bot's menu travels in
+   * the same `bot_info` answer as its commands. Asking on open (instead of only
+   * on "/") is what lets the 小程序 button appear beside 语音转文字.
+   */
+  useEffect(() => {
+    if (isPrivateChat) loadBotCommands()
+  }, [isPrivateChat, loadBotCommands])
 
   /** A picked command replaces the box and leaves the caret after its space. */
   useEffect(() => {
@@ -395,6 +418,29 @@ export function Composer({
       useAppStore.getState().setError(errorMessage(error))
     } finally {
       setBusy(false)
+    }
+  }
+
+  /**
+   * 小程序 (§9.4.1): the bot's own Web App, opened from the button beside
+   * 语音转文字. `bots:commands` carried both the menu and the bot id, so this is
+   * the same `miniapp:open` entry the profile card's 菜单 uses.
+   */
+  const openMiniApp = async (): Promise<void> => {
+    if (!botMenu || botUserId === undefined || miniAppBusy) return
+    setMiniAppBusy(true)
+    try {
+      await invoke('miniapp:open', {
+        source: 'menu',
+        botUserId,
+        url: botMenu.url,
+        buttonText: botMenu.text,
+        chatId,
+      })
+    } catch (error) {
+      useAppStore.getState().setError(errorMessage(error))
+    } finally {
+      setMiniAppBusy(false)
     }
   }
 
@@ -641,6 +687,9 @@ export function Composer({
         onSendVoice={(voice) => void sendVoice(voice)}
         onRecordingChange={recordingAction}
         onNotice={notWired}
+        miniApp={botMenu}
+        onOpenMiniApp={() => void openMiniApp()}
+        miniAppBusy={miniAppBusy}
         {...(onCollapse ? { onCollapse } : {})}
       />
 

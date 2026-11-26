@@ -65,14 +65,48 @@ export const miniAppOpenRequestSchema = z.discriminatedUnion('source', [
 ])
 export type MiniAppOpenRequest = z.infer<typeof miniAppOpenRequestSchema>
 
+const miniAppButtonColorSchema = z.string().regex(/^#[0-9a-f]{6}$/i)
+
+/** A MainButton / SecondaryButton after the guest's partial setup updates. */
+export const miniAppButtonSchema = z.object({
+  text: z.string(),
+  /** Null means "use the current theme's default" rather than a page override. */
+  color: miniAppButtonColorSchema.nullable(),
+  textColor: miniAppButtonColorSchema.nullable(),
+  isVisible: z.boolean(),
+  isActive: z.boolean(),
+  isProgressVisible: z.boolean(),
+  hasShineEffect: z.boolean(),
+  /** Only SecondaryButton reads this; MainButton keeps the default `left`. */
+  position: z.enum(['left', 'right', 'top', 'bottom']),
+})
+export type MiniAppButton = z.infer<typeof miniAppButtonSchema>
+
+/** Native chrome the guest asked for; `actionBarHeight` is owned by main. */
+export const miniAppControlsSchema = z.object({
+  main: miniAppButtonSchema,
+  secondary: miniAppButtonSchema,
+  backVisible: z.boolean(),
+  settingsVisible: z.boolean(),
+  bottomBarColor: miniAppButtonColorSchema.nullable(),
+  actionBarHeight: z.number().int().min(0).max(112),
+})
+export type MiniAppControls = z.infer<typeof miniAppControlsSchema>
+
+export const miniAppPressRequestSchema = z.object({
+  target: z.enum(['main', 'secondary', 'back', 'settings']),
+})
+export type MiniAppPressRequest = z.infer<typeof miniAppPressRequestSchema>
+
 /**
- * What `miniapp:init` answers: the strip's title and the theme it paints.
+ * What `miniapp:init` answers: the strip's title, theme and native controls.
  * Never the signed URL — the window in main owns that.
  */
 export const miniAppStateSchema = z.object({
   /** The bot's display name, which is what the official client titles the window. */
   title: z.string(),
   theme: z.enum(['light', 'dark']),
+  controls: miniAppControlsSchema,
 })
 export type MiniAppState = z.infer<typeof miniAppStateSchema>
 
@@ -92,6 +126,8 @@ export const miniAppInvokeChannels = [
   'miniapp:menu',
   'miniapp:reload',
   'miniapp:close',
+  /** The host renderer's native Back/Main/Secondary/Settings control was pressed. */
+  'miniapp:press',
 ] as const
 
 export const miniAppInvokeSchemas = {
@@ -117,6 +153,10 @@ export const miniAppInvokeSchemas = {
   },
   'miniapp:close': {
     request: z.void(),
+    response: z.void(),
+  },
+  'miniapp:press': {
+    request: miniAppPressRequestSchema,
     response: z.void(),
   },
 } satisfies Record<

@@ -17,6 +17,10 @@
   --wx-bot-start-bg: #07c160;
   --wx-bot-start-bg-hover: #06ad56;
   --wx-bot-start-ink: #002b15;
+  /* 小程序 mark beside 语音转文字 (design doc §9.4.1): the reference badge's
+     indigo, so the bot's Mini App reads as its own tool rather than another
+     grey composer glyph. */
+  --wx-miniapp: #6467f0;
 
   /* Chrome */
   --wx-rail: #e0e0e0;
@@ -248,6 +252,7 @@
   --wx-bot-start-bg: #0b7d45;
   --wx-bot-start-bg-hover: #096b3b;
   --wx-bot-start-ink: #ffffff;
+  --wx-miniapp: #8b8ef7;
   --wx-rail-icon: #969697;
   --wx-icon: #a5a5a5;
   --wx-icon-strong: #b1b1b1;

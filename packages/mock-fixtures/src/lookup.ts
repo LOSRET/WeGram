@@ -73,12 +73,19 @@ export function firstBotSeed(seeds: SeedIndex): FixtureSeed | null {
 
 /**
  * `bots:commands` for one chat: the fixture bot publishes its list, anything else
- * answers "no commands", exactly like TDLib does for a human chat.
+ * answers "no commands", exactly like TDLib does for a human chat. The bot's user
+ * id and its Web App menu ride the same answer, so the composer's 小程序 button
+ * has a target in the fakes too.
  */
 export function botCommandsAnswer(seed: FixtureSeed | null): BotCommandsAnswer {
-  return seed?.bot
-    ? { isBot: true, commands: seed.bot.commands, description: seed.bot.description ?? '' }
-    : { isBot: false, commands: [] }
+  if (!seed?.bot) return { isBot: false, commands: [] }
+  return {
+    isBot: true,
+    ...(seed.chat.userId === undefined ? {} : { botUserId: seed.chat.userId }),
+    commands: seed.bot.commands,
+    description: seed.bot.description ?? '',
+    ...(seed.bot.menu ? { menu: seed.bot.menu } : {}),
+  }
 }
 
 /**

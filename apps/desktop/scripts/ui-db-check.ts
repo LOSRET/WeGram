@@ -48,6 +48,19 @@ try {
   check('another thread is untouched', db.getCommentAnchor(42, 901), null)
   check('the chat anchor is untouched', db.getScrollAnchor(42), { messageId: 12345, offset: 12 })
 
+  db.setMiniAppBiometryAccess(7, 26, { requested: true, granted: true })
+  db.setMiniAppBiometryToken(7, 26, 'dpapi:sealed-token')
+  check('mini app biometry roundtrip', db.getMiniAppBiometry(7, 26), {
+    accessRequested: true,
+    accessGranted: true,
+    tokenSealed: 'dpapi:sealed-token',
+  })
+  check('another bot is isolated', db.getMiniAppBiometry(7, 27), {
+    accessRequested: false,
+    accessGranted: false,
+    tokenSealed: null,
+  })
+
   db.close()
 
   // Reopen: everything must survive a restart.
@@ -58,6 +71,11 @@ try {
   check('comment anchor after reopen', reopened.getCommentAnchor(42, 900), {
     messageId: 4711,
     offset: -8,
+  })
+  check('mini app biometry after reopen', reopened.getMiniAppBiometry(7, 26), {
+    accessRequested: true,
+    accessGranted: true,
+    tokenSealed: 'dpapi:sealed-token',
   })
   reopened.close()
 } finally {

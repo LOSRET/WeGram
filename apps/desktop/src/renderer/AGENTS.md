@@ -19,10 +19,11 @@ screens/SettingsWindow.tsx  the 设置 window (`#settings`, design doc §9.11): 
 screens/InstantViewWindow.tsx  即时预览's own window (`#instantview`, design doc §8.9):
                          toolbar (title, page zoom, 在浏览器打开) + `components/instant-view/
                          InstantViewPage.tsx` (the `web:instantView` fetch + RichMessage)
-screens/MiniAppWindow.tsx  小程序's own window strip (`#miniapp`, design doc §9.4.1): the
-                         48 px drag region (bot name, ⋯ → native menu, ×); the page itself
-                         is a main-process `WebContentsView` below it, so this route never
-                         renders or receives the signed URL
+screens/MiniAppWindow.tsx  小程序's own window chrome (`#miniapp`, design doc §9.4.1): the
+                         48 px drag region (Back, bot name, ⋯ → native menu, ×) plus the
+                         optional native Main/Secondary button bar. The page between them
+                         is a main-process `WebContentsView`, so this route never renders or
+                         receives the signed URL
 screens/QrWindow.tsx     the 群二维码 window (`#qr`, design doc §9.9): a frameless 360×560
                          sheet with the member collage, 群聊：…, the code, its validity
                          line and 转发给朋友 / 复制图片 / 保存图片. It owns no shell state
@@ -74,6 +75,9 @@ components/composer/       ComposerCard: the ONE bordered input card (§8.4 + §
                          machine and the in-card bar: cancel ×, a dotted pill and the
                          send circle whose hover reveal expands it into green 发送; 发语音
                          is the circled mic beside 发送, the tool-row mic is 语音转文字.
+                         A bot chat whose menu is a Web App adds 小程序 to the right of that
+                         mic — Composer supplies `bots:commands`'s `menu` + `botUserId` and
+                         the button runs the same `miniapp:open` menu entry (§9.4.1).
 lib/voice/            语音消息's audio path: oggOpus.ts (pure, unit-tested — OGG pages,
                       lacing, OpusHead/OpusTags, the OGG CRC-32) and recorder.ts
                       (getUserMedia → AudioContext 48 kHz → ScriptProcessor → WebCodecs
@@ -531,7 +535,10 @@ The renderer is a sandboxed web page: **no `electron`, no `node:*`, no `tdl`**
   never post its label as a message; a Web App key (`webAppUrl`) is *not* dimmed — it
   opens the Mini App window (§9.4.1) through `miniapp:open` with the keyboard's sender.
   Inline keyboard Web App buttons and the profile card's 菜单 take the same channel;
-  a `t.me/<bot>/<app>` link is parsed by `lib/telegramLink.ts` into `webApp`. The keyboard ends in three ways only: a newer keyboard,
+  a `t.me/<bot>/<app>` link is parsed by `lib/telegramLink.ts` into `webApp`. **The composer's
+  小程序 button is that same menu**: `bots:commands` carries `botUserId` + `menu`, a private
+  chat asks on open (so the mark appears without typing "/"), and the button posts the `menu`
+  source; a group or channel never asks. The keyboard ends in three ways only: a newer keyboard,
   the one-time hide above, and `replyKeyboardHidden` (TDLib `replyMarkupRemoveKeyboard`) — the
   removal row carries no keyboard at all, so it must be its own marker or the older grid stays
   forever. **强制回复** (`Message.forceReply`) is `lib/forceReply.ts`'s decision: walking backwards,

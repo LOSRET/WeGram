@@ -7,7 +7,8 @@ credentials (development only), plus the real PNG/WebP/TGS/WebM media it generat
 ## What belongs here
 
 - `index.ts` — the `MockAdapter`: auth flow (phone/code/password, simulated QR),
-  chat/history/search/sticker/media endpoints, and the ambient traffic timer.
+  chat/history/search/sticker/media endpoints, in-memory Mini App CloudStorage, and the
+  ambient traffic timer.
 - `fixtures.ts` — a thin adapter over `@wegram/mock-fixtures` (the account data, shared
   with the browser preview), injecting this side's `mediaOf` and clock.
 - `assets.ts` (`MockAssets`) / `avatars.ts` (`MockAvatars`) — generated media and the

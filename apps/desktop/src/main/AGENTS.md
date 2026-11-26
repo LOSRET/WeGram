@@ -29,11 +29,21 @@ instant-view-window.ts  即时预览 (§8.9): the reader as its own top-level wi
                     the window buttons collide), so no default menu bar, and
                     `titleBarOverlay` follows the theme
 mini-app-bridge.ts   the guest's `web_app_*` table: parses the preload's JSON and dispatches
-                    to close / sendData / theme / viewport / popup / openExternal. No
-                    Electron imports, so `mini-app-bridge.test.ts` pins it.
+                    close / sendData / theme / viewport / popup / native buttons /
+                    CloudStorage / Biometry. No Electron imports; tests pin the wire shape.
+mini-app-controls.ts (pure) partial BottomButton/BackButton/SettingsButton patches and the
+                    exact native action-bar height; `mini-app-controls.test.ts` pins it.
+mini-app-cloud-storage.ts (pure) validates the four CloudStorage custom methods and their
+                    TDLib results; unknown custom methods never leave main.
+mini-app-biometry.ts Windows Hello service: user+bot consent, DPAPI-sealed tokens in ui.db,
+                    and async bridge results. `biometry-worker.ts` runs synchronous
+                    `win-hello` in a worker thread; retarget/reload invalidates results.
+mini-app-theme.ts    the Mini App palette shared by SDK theme events and TDLib's signed
+                     `themeParameters`; `mini-app-theme.test.ts` pins both mappings.
 mini-app-window.ts  小程序 / Telegram Mini Apps (§9.4.1): the one frameless 560×780 window
-                    (route #miniapp) with a 48 px strip and a sandboxed WebContentsView
-                    below it; the signed URL stays here, `TelegramWebviewProxy` events
+                    (route #miniapp) with a 48 px strip, optional native bottom-button bar,
+                    and a sandboxed WebContentsView between them; the signed URL stays here,
+                    `TelegramWebviewProxy` events
                     (`src/preload/miniapp.ts`) become close / sendWebAppData / openLink,
                     the ⋯ is a native menu, and 举报 publishes `evt:report`. One window,
                     re-targeted; `closeWebApp` releases an `openWebApp` launch
@@ -84,8 +94,9 @@ telegram/tdlib/send-api.ts  createSendApi: the message seam methods (send/edit/d
                     index.ts at the same budget when 语音消息's send landed
 telegram/tdlib/bot-api.ts  createBotApi: the bot seam methods (bots:commands / bots:callback /
                     bots:inlineQuery / bots:inlineSend), split out the way user-api.ts was;
-                    actions/bots.ts holds the TDLib requests (bot_info.commands + description,
-                    getCallbackQueryAnswer, searchPublicChat + getInlineQueryResults,
+                    actions/bots.ts holds the TDLib requests (bot_info.commands + description + the
+                    Web App menu that feeds the composer's 小程序 button, getCallbackQueryAnswer,
+                    searchPublicChat + getInlineQueryResults,
                     sendInlineQueryResultMessage), and map/inline.ts folds the twelve
                     inlineQueryResult* shapes into one row. A bot's profile page is not a bot
                     channel — map/user.ts reads userFullInfo.bot_info into UserProfile.bot

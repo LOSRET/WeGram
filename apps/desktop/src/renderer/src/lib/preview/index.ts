@@ -637,6 +637,7 @@ async function handle(channel: InvokeChannel, payload: unknown): Promise<unknown
     case 'miniapp:menu':
     case 'miniapp:reload':
     case 'miniapp:close':
+    case 'miniapp:press':
       return undefined
     /** 即时预览: the same demo page the mock adapter serves (design doc §8.9). */
     case 'web:instantView':

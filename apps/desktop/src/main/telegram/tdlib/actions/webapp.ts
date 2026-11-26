@@ -1,6 +1,7 @@
 import { AppError } from '@wegram/protocol'
 import type { MiniAppLaunch, MiniAppOpenRequest } from '@wegram/protocol'
 
+import { miniAppTdlibTheme } from '../../../mini-app-theme'
 import type { TdObject } from '../client'
 import { displayName } from '../map/user'
 import type { ActionDeps } from './deps'
@@ -18,11 +19,11 @@ import type { ActionDeps } from './deps'
  *   also carries the `launch_id` the client must release with `closeWebApp`
  * - a `t.me/<bot>/<app>` link: `getWebAppLinkUrl(...)`
  *
- * The application name tells the page which client it is in; Telegram's SDK
- * reads it back as `tgWebAppPlatform`/`WebApp.platform`. Keep it stable —
- * changing it changes what a mini app believes about its host.
+ * TDLib writes `application_name` into `tgWebAppPlatform`. It is a Telegram
+ * platform identifier, not a free-form host name: Mini Apps use it to select
+ * official-client behavior, so this desktop host uses `tdesktop`.
  */
-const APPLICATION_NAME = 'wegram'
+const APPLICATION_NAME = 'tdesktop'
 
 /** A signed Web App URL; anything that is not HTTPS is a bug, not a page. */
 function signedUrl(value: unknown): string {
@@ -44,14 +45,23 @@ async function botTitle(deps: Pick<ActionDeps, 'invoke'>, botUserId: number): Pr
   return displayName(user) || `机器人 ${botUserId}`
 }
 
-/** The TDLib parameters every Web App open shares (application name + default theme). */
-function openParameters(): TdObject {
-  return { _: 'webAppOpenParameters', application_name: APPLICATION_NAME }
+/**
+ * The TDLib parameters every Web App open shares. `theme` is required by strict
+ * launch-parameter parsers; without it TDLib omits `tgWebAppThemeParams` and the
+ * page can reject the signed URL before its React tree mounts.
+ */
+function openParameters(theme: 'light' | 'dark'): TdObject {
+  return {
+    _: 'webAppOpenParameters',
+    application_name: APPLICATION_NAME,
+    theme: { _: 'themeParameters', ...miniAppTdlibTheme(theme) },
+  }
 }
 
 export async function openMiniApp(
   deps: Pick<ActionDeps, 'invoke'>,
   input: MiniAppOpenRequest,
+  theme: 'light' | 'dark',
 ): Promise<MiniAppLaunch> {
   if (input.source === 'link') {
     const { botUserId, chatId, title } = await resolveLinkBot(deps, input.username)
@@ -65,7 +75,7 @@ export async function openMiniApp(
       // which the official client asks about once. This client has no consent
       // sheet yet, so it does not grant it behind the reader's back.
       allow_write_access: false,
-      parameters: openParameters(),
+      parameters: openParameters(theme),
     })) as TdObject
     return { title, botUserId, url: signedUrl(answer?.url) }
   }
@@ -76,7 +86,7 @@ export async function openMiniApp(
       _: 'getWebAppUrl',
       bot_user_id: input.botUserId,
       url: input.url,
-      parameters: openParameters(),
+      parameters: openParameters(theme),
     })) as TdObject
     return { title, botUserId: input.botUserId, url: signedUrl(answer?.url) }
   }
@@ -95,7 +105,7 @@ export async function openMiniApp(
       start_parameter: startAppOf(input.url) ?? '',
       // Same rule as the link entry: no hidden write grant (no consent sheet yet).
       allow_write_access: false,
-      parameters: openParameters(),
+      parameters: openParameters(theme),
     })) as TdObject
     return { title, botUserId: input.botUserId, url: signedUrl(answer?.url) }
   }
@@ -109,7 +119,7 @@ export async function openMiniApp(
     chat_id: input.chatId ?? 0,
     bot_user_id: input.botUserId,
     url: input.url,
-    parameters: openParameters(),
+    parameters: openParameters(theme),
   })) as TdObject
   // TDLib's int64 may arrive as a string (its documented shape) or a number.
   const launchId =
@@ -208,4 +218,27 @@ export async function sendMiniAppData(
     button_text: input.buttonText,
     data: input.data,
   })
+}
+
+/** CloudStorage's four reserved methods use TDLib's generic custom-request seam. */
+export async function invokeMiniAppCustomRequest(
+  deps: Pick<ActionDeps, 'invoke'>,
+  input: { botUserId: number; method: string; parameters: string },
+): Promise<unknown> {
+  const answer = (await deps.invoke({
+    _: 'sendWebAppCustomRequest',
+    bot_user_id: input.botUserId,
+    method: input.method,
+    parameters: input.parameters,
+  })) as TdObject
+  const raw = answer?.result
+  if (typeof raw !== 'string') {
+    throw new AppError('tdlib_error', '小程序存储请求没有返回结果')
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return parsed
+  } catch {
+    throw new AppError('tdlib_error', '小程序存储请求返回了无效结果')
+  }
 }

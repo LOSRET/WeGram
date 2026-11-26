@@ -46,6 +46,33 @@ describe('UiDatabase', () => {
     expect(readdirSync(dir)).toEqual(['ui.db'])
   })
 
+  it('isolates Mini App biometric consent and sealed tokens by user and bot', () => {
+    dir = mkdtempSync(join(tmpdir(), 'wegram-ui-db-'))
+    const db = new UiDatabase(join(dir, 'ui.db'))
+    db.open()
+
+    db.setMiniAppBiometryAccess(1, 10, { requested: true, granted: true })
+    db.setMiniAppBiometryToken(1, 10, 'dpapi:first')
+    db.setMiniAppBiometryAccess(2, 10, { requested: true, granted: false })
+    db.setMiniAppBiometryToken(1, 11, 'dpapi:other-bot')
+
+    expect(db.getMiniAppBiometry(1, 10)).toEqual({
+      accessRequested: true,
+      accessGranted: true,
+      tokenSealed: 'dpapi:first',
+    })
+    expect(db.getMiniAppBiometry(2, 10)).toEqual({
+      accessRequested: true,
+      accessGranted: false,
+      tokenSealed: null,
+    })
+    expect(db.getMiniAppBiometry(1, 11).tokenSealed).toBe('dpapi:other-bot')
+
+    db.setMiniAppBiometryToken(1, 10, null)
+    expect(db.getMiniAppBiometry(1, 10).tokenSealed).toBeNull()
+    db.close()
+  })
+
   /**
    * A file the OS refuses to open for writing makes SQLite open the database
    * read-only without an error: reads work, and only the first write answers

@@ -112,6 +112,8 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
   private auth: AuthState = { kind: 'idle' }
   private connection: ConnectionState = 'offline'
   private readonly fixtures = new Map<number, Fixture>()
+  /** CloudStorage demo state, isolated by bot just like the real service. */
+  private readonly miniAppCloudStorage = new Map<number, Map<string, string>>()
   /**
    * The comment endpoints live in `./comments.ts`; fields keep this file small.
    * Threads post the same rows a chat does, so they borrow `sendDeps` — read
@@ -427,6 +429,50 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
       url: this.bots.demoSignedUrl(),
     }
   }
+  async invokeWebAppCustomRequest(input: {
+    botUserId: number
+    method: string
+    parameters: string
+  }): Promise<unknown> {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(input.parameters)
+    } catch {
+      throw new AppError('invalid_payload', '小程序存储参数无效')
+    }
+    if (!isRecord(parsed)) throw new AppError('invalid_payload', '小程序存储参数无效')
+
+    const store = this.miniAppCloudStorage.get(input.botUserId) ?? new Map<string, string>()
+    this.miniAppCloudStorage.set(input.botUserId, store)
+    if (input.method === 'saveStorageValue') {
+      const key = parsed['key']
+      const value = parsed['value']
+      if (typeof key !== 'string' || typeof value !== 'string') {
+        throw new AppError('invalid_payload', '小程序存储参数无效')
+      }
+      store.set(key, value)
+      return true
+    }
+    if (input.method === 'getStorageValues') {
+      const keys = parsed['keys']
+      if (!Array.isArray(keys) || !keys.every((key) => typeof key === 'string')) {
+        throw new AppError('invalid_payload', '小程序存储参数无效')
+      }
+      return Object.fromEntries(
+        keys.flatMap((key) => (store.has(key) ? [[key, store.get(key) ?? '']] : [])),
+      )
+    }
+    if (input.method === 'deleteStorageValues') {
+      const keys = parsed['keys']
+      if (!Array.isArray(keys) || !keys.every((key) => typeof key === 'string')) {
+        throw new AppError('invalid_payload', '小程序存储参数无效')
+      }
+      for (const key of keys) store.delete(key)
+      return true
+    }
+    if (input.method === 'getStorageKeys') return [...store.keys()]
+    throw new AppError('not_implemented', '小程序不支持这个自定义方法')
+  }
   async closeMiniApp(): Promise<void> {}
   async sendMiniAppData(): Promise<void> {}
 
@@ -719,4 +765,8 @@ export class MockAdapter extends AdapterEmitter implements TelegramAdapter {
       emit: (event) => this.emit(event),
     })
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
